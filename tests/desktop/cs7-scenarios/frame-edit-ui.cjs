@@ -3,7 +3,9 @@
 // drags, so a person performs each gesture. The person never reports a verdict and never attaches document
 // state: after every reply the HARNESS makes the read-only Nemo MCP reads itself (history depth, per-layer cell
 // runs; session.read, bound to the candidate) and this oracle computes the effect itself (revision, history
-// counts, total frames, cell kinds). Pixels come from the helper's own owned-window capture, not from the operator.
+// counts, total frames, cell kinds). Pixels come from the helper's own owned-window capture, and every rectangle from the
+// helper's own accessibility frames, not from the operator. The route of a gesture (F-key or menu item) is not observable
+// by the harness: those surfaces are declared operator-attested in the row, never observed.
 const path = require('node:path');
 const { isDeepStrictEqual: same } = require('node:util');
 const kit = require('./installed-kit.cjs');
@@ -15,6 +17,49 @@ const CLAUSES = ['scene-f5-f6-f7', 'scene-menu-and-shortcuts', 'scene-undo-redo'
 const KINDS = ['key', 'interpolated', 'held', 'unexposed'];
 const OP = { history: 'query.document.object.history', timing: 'query.document.object.layer.timing' };
 const CAPTURE = 'capture-1.png';
+// The helper's first `observe` is reserved for the Start screen, so when this row runs first its first helper command is a capture.
+const PRIME = 'capture-2.png';
+// Compact, measured from the accessibility frames of the layer row (window points): at most the baseline `.lrow` height (34),
+// each visibility/lock/shy control no taller than 28 and no wider than 90, and a name long enough to prove the ellipsis (60).
+const ROW_MAX = 34, CONTROL_H = 28, CONTROL_W = 90, NAME_MIN = 60;
+const EYE = /^(Hide|Show) /;
+
+// Judge the layer rows from ONE harness capture and the accessibility frames read around it. Returns
+// {status: 'pass' | 'fail' | 'unrun', reason, facts}. Nothing here is operator input.
+function judgeStyling(shot, uids) {
+  const no = (status, reason, facts = {}) => ({ status, reason, facts });
+  if (!shot) return no('unrun', 'the capture or the accessibility read was not available');
+  if (!shot.window) return no('unrun', 'the helper did not report the window size');
+  if (!shot.stable) return no('unrun', 'the accessibility frames moved while the capture was taken');
+  const buttons = shot.nodes.filter(n => n.role === 'AXButton' && kit.labelsOfNode(n).length);
+  if (!buttons.some(n => kit.frameOf(n))) return no('unrun', 'the helper reported no accessibility frames');
+  const rows = [];
+  for (const uid of uids) {
+    const tail = ' (' + uid + ')';
+    const eyes = buttons.filter(n => kit.labelsOfNode(n).some(l => EYE.test(l) && l.endsWith(tail)));
+    const picks = buttons.filter(n => kit.labelsOfNode(n).some(l => l.endsWith(tail) && !EYE.test(l)));
+    if (eyes.length !== 1 || picks.length !== 1) return no('fail', 'the layer row of ' + uid + ' lacks its named name and visibility controls', { uid, eyes: eyes.length, picks: picks.length });
+    const label = kit.labelsOfNode(eyes[0]).find(l => EYE.test(l) && l.endsWith(tail)), name = label.replace(EYE, '').slice(0, -tail.length);
+    const withName = verbs => buttons.filter(n => kit.labelsOfNode(n).some(l => verbs.some(v => l === v + ' ' + name)));
+    const locks = withName(['Lock', 'Unlock']), shys = withName(['Mark shy', 'Unmark shy']);
+    if (locks.length === 0 || shys.length === 0) return no('fail', 'the lock or shy control of ' + uid + ' lost its accessible name', { uid });
+    if (locks.length > 1 || shys.length > 1) return no('unrun', 'two layers share the name of ' + uid + ', so their lock and shy controls cannot be told apart');
+    const parts = { pick: picks[0], eye: eyes[0], lock: locks[0], shy: shys[0] }, frames = Object.fromEntries(Object.entries(parts).map(([k, n]) => [k, kit.frameOf(n)]));
+    if (Object.values(frames).some(f => !f)) return no('unrun', 'the row of ' + uid + ' has a control without an accessibility frame');
+    rows.push({ uid, name, frames, box: kit.unionOf(Object.values(frames)) });
+  }
+  const long = rows.filter(r => r.name.length >= NAME_MIN);
+  if (long.length !== 1) return no('unrun', 'exactly one layer row with a name of at least ' + NAME_MIN + ' characters is required', { names: rows.map(r => r.name.length) });
+  const image = shot.image, scale = image.width / shot.window.w;
+  const area = kit.toPixels(image, shot.window, kit.unionOf(rows.map(r => r.box))), nameBox = kit.toPixels(image, shot.window, long[0].frames.pick);
+  if (!area || !nameBox || !kit.rectOk(image, area, 120, 40) || !kit.rectOk(image, nameBox, 60, 8)) return no('unrun', 'the layer rows or the long name lie outside the capture or are too small to measure');
+  const stats = kit.rectStats(image, area), bands = kit.textBands(image, nameBox, Math.max(2, Math.round(2 * scale)));
+  const dark = stats.meanLuma < 110 && stats.lightFraction < 0.08;
+  const oneLine = bands.length === 1 && bands[0][1] - bands[0][0] + 1 <= 30 * scale;
+  const compact = rows.every(r => r.box.h <= ROW_MAX && ['eye', 'lock', 'shy'].every(k => r.frames[k].h <= CONTROL_H && r.frames[k].w <= CONTROL_W));
+  const facts = { dark, oneLine, compact, rowHeights: rows.map(r => Math.round(r.box.h)), meanLuma: Math.round(stats.meanLuma), bands: bands.length, sha256: shot.sha256 };
+  return dark && oneLine && compact ? no('pass', null, facts) : no('fail', 'layer rows ' + JSON.stringify({ dark, oneLine, compact }), facts);
+}
 
 // ---- raw read-back -> state ---------------------------------------------------------------------
 function pair(p, operation) {
@@ -131,15 +176,12 @@ const PLAN = [
   { id: 'scene-setup', type: 'setup', check: null,
     how: 'Make a clean test document through the ordinary UI: File > New with the defaults (Untitled, 1920x1080, 24 fps), close the tutorial. On ' +
       '"Layer 1" draw one stroke on frame 1 (the cell becomes a key with content). Add a second layer, draw one stroke on its frame 1, then ' +
-      'right-click its row in the layer list (the Layer menu) and choose "Convert to component". Rename the FIRST layer to a name of about 70 ' +
-      'characters, for example "A very long layer name that must stay on a single line with an ellipsis ok". Leave the layer list fully visible ' +
+      'right-click its row in the layer list (the Layer menu) and choose "Convert to component". Rename the FIRST layer to a name of 70 ' +
+      'characters (at least 65), for example "A very long layer name that must stay on a single line with an ellipsis ok". Leave the layer list fully visible ' +
       'and no row hovered. Reply with {observation, productFailure, layers: {drawing: <layerUid of Layer 1>, component: <layerUid of the component ' +
       'layer>}}. ' + SCENE_READS },
-  { id: 'layer-row-styling', type: 'styling', check: 'layer-row-styling',
-    how: 'The runner has just saved an owned-window capture of the current screen. Open the PNG named in details.capturePath and measure, in ' +
-      'pixels of that image, two rectangles: layerRows (the whole block of layer rows in the timeline list) and longName (the name area of the ' +
-      'row with the long name). Reply with {observation, productFailure, rects: {layerRows: {x,y,w,h}, longName: {x,y,w,h}}}. Do not judge the ' +
-      'styling yourself: report only the rectangles and anything visibly broken.' },
+  // No operator phase: the runner captures the owned window once and reads the rows from the helper's accessibility frames.
+  { id: 'layer-row-styling', type: 'styling', check: 'layer-row-styling', auto: true },
   gesture('scene-f5', 'scene-f5-f6-f7', 'scene', 'insertFrame',
     'Click the cell of Layer 1 at frame 1 so exactly that cell is selected, then press the REAL F5 key once. ' + SCENE_READS),
   gesture('scene-f6', 'scene-f5-f6-f7', 'scene', 'insertKey',
@@ -166,10 +208,10 @@ const PLAN = [
     how: 'Press Cmd+Z exactly once with the app focused (no menu). ' + SCENE_READS },
   { id: 'scene-redo', type: 'redo', check: 'scene-undo-redo', ctx: 'scene',
     how: 'Press Cmd+Shift+Z exactly once. ' + SCENE_READS },
-  { id: 'scene-save', type: 'save', check: 'scene-save-reopen', ctx: 'scene',
+  { id: 'scene-save', type: 'save', check: 'scene-save-reopen', ctx: 'scene', file: 'saved/frame-edit-scene.json',
     how: 'Save the document (File > Save As) into the private report directory as saved/frame-edit-scene.json. Reply additionally with savedFile: ' +
       '"saved/frame-edit-scene.json" (path relative to the report directory). ' + SCENE_READS },
-  { id: 'scene-reopen', type: 'reopen', check: 'scene-save-reopen', ctx: 'scene',
+  { id: 'scene-reopen', type: 'reopen', check: 'scene-save-reopen', ctx: 'scene', file: 'saved/frame-edit-scene.json',
     how: 'Open that same saved file through File > Open (it opens as the document; do not edit anything). Reply with the same savedFile. ' + SCENE_READS },
   { id: 'component-enter', type: 'enter', check: 'component-edits', ctx: 'component',
     how: 'Double-click the component layer row to enter the component (the tab bar shows the component beside Scene). Do not edit. Reply also with ' +
@@ -192,10 +234,10 @@ const PLAN = [
     how: 'Press Cmd+Z exactly once inside the component. ' + COMP_READS },
   { id: 'component-redo', type: 'redo', check: 'component-undo-redo', ctx: 'component',
     how: 'Press Cmd+Shift+Z exactly once. ' + COMP_READS },
-  { id: 'component-save', type: 'save', check: 'component-save-reopen', ctx: 'component',
+  { id: 'component-save', type: 'save', check: 'component-save-reopen', ctx: 'component', file: 'saved/frame-edit-component.json',
     how: 'Back in the Scene tab or not, save with File > Save As as saved/frame-edit-component.json (relative to the report directory); reply with ' +
       'savedFile. Stay inside the component for the reads. ' + COMP_READS },
-  { id: 'component-reopen', type: 'reopen', check: 'component-save-reopen', ctx: 'component',
+  { id: 'component-reopen', type: 'reopen', check: 'component-save-reopen', ctx: 'component', file: 'saved/frame-edit-component.json',
     how: 'Open the saved file again through File > Open, double-click the component layer to enter it again and do not edit. Then remove the ' +
       'Duplicate keyframe binding you set in Settings > Shortcuts and close Settings, so the component is in view again. Reply only after that. ' + COMP_READS },
 ];
@@ -209,9 +251,12 @@ function createWorkflow({ reportDirectory }) {
     if (row.issue !== 2248 || !same(row.checks.map(c => c.id), CLAUSES)) throw new Error('original frame-edit clauses changed');
     const outcome = Object.fromEntries(CLAUSES.map(id => [id, 'unrun']));
     const remaining = Object.fromEntries(CLAUSES.map(id => [id, PLAN.filter(s => s.check === id).length]));
+    // A clause that could not be fully read stays unrun with its reason; it is never passed on what was read of the rest.
+    const held = new Set(), reasons = {};
+    const hold = (check, reason) => { held.add(check); reasons[check] = (reasons[check] ? reasons[check] + '; ' : '') + reason; };
     const dir = path.join(reportDirectory, ROW);
     const finish = (stop, reason) => {
-      kit.privateEvidence(dir, 'outcome', { schema: 'nemo.frame-edit-ui-private/1', outcome, reason: reason || null });
+      kit.privateEvidence(dir, 'outcome', { schema: 'nemo.frame-edit-ui-private/1', outcome, reasons, reason: reason || null });
       return { checks: CLAUSES.map(id => ({ id, status: outcome[id] })), safeToContinue: !stop };
     };
     const owner = await session.runtimeContext();
@@ -225,14 +270,22 @@ function createWorkflow({ reportDirectory }) {
       const details = { sourceSha: owner.identity.sourceSha, pid: owner.identity.pid, windowId: owner.window.windowId,
         reportDirectory, evidenceRule: 'Raw observations only. Source tests and posted input do not establish PASS.' };
       if (step.type === 'styling') {
-        const captured = await session.input('capture', CAPTURE);
-        if (!plain(captured) || captured.capture !== CAPTURE) throw malformed(ROW, step.id);
-        details.capturePath = path.join(reportDirectory, CAPTURE);
+        // The harness captures the owned window once, reads the PNG once (its sha256 is kept) and takes every rectangle from
+        // the helper's accessibility frames. The operator is not asked anything and sees no capture.
+        const shot = await kit.shot(session, reportDirectory, CAPTURE), verdict = judgeStyling(shot, scene ? Object.keys(scene.rows) : []);
+        kit.privateEvidence(dir, step.id, { schema: 'nemo.frame-edit-ui-private/1', ...verdict, window: shot?.window || null });
+        if (verdict.status === 'fail') { outcome[step.check] = 'fail'; return finish(true, 'layer-row-styling ' + verdict.reason); }
+        if (verdict.status === 'unrun') hold(step.check, verdict.reason);
+        if (--remaining[step.check] === 0 && !held.has(step.check)) outcome[step.check] = 'pass';
+        continue;
       }
+      // Files are measured by the runner around the step, never taken from what the operator says about them.
+      const requestedAt = Date.now(), fileBefore = step.file ? kit.measure(reportDirectory, step.file) : null;
+      if (step.type === 'save' && fileBefore) throw malformed(ROW, step.id);
       const ev = await session.requestEvidence({ row: ROW, phase: step.id, instruction: step.how, details });
       if (!rawOnly(ev) || !text(ev.observation) || typeof ev.productFailure !== 'boolean') throw malformed(ROW, step.id);
       kit.privateEvidence(dir, step.id, ev);
-      if (step.type === 'placement') continue;
+      if (step.type === 'placement') { await session.input('capture', PRIME); continue; }
       if (ev.productFailure) {
         // The operator may only report a failure, never a success; a reported failure is taken as stated.
         if (step.check) outcome[step.check] = 'fail';
@@ -241,24 +294,6 @@ function createWorkflow({ reportDirectory }) {
       const inComponent = step.ctx === 'component', entering = step.type === 'enter';
       if (inComponent && !entering && !componentContext) throw malformed(ROW, step.id);
       if (entering && !(plain(ev.component) && text(ev.component.context) && ev.component.context !== 'scene-root' && text(ev.component.layerUid))) throw malformed(ROW, step.id);
-      if (step.type === 'styling') {
-        const image = kit.loadPng(kit.readInside(reportDirectory, CAPTURE)), observed = await session.input('observe');
-        if (!image || !plain(ev.rects) || !Array.isArray(observed?.nodes)) throw malformed(ROW, step.id);
-        // The capture is the owned window; its proportions confirm the requested 1620x1420 placement.
-        if (Math.abs(image.width / image.height / (1620 / 1420) - 1) > 0.03) throw malformed(ROW, step.id);
-        if (!kit.rectOk(image, ev.rects.layerRows, 120, 40) || !kit.rectOk(image, ev.rects.longName, 60, 8)) throw malformed(ROW, step.id);
-        const scale = image.width / 1620, stats = kit.rectStats(image, ev.rects.layerRows);
-        const bands = kit.textBands(image, ev.rects.longName, Math.max(2, Math.round(2 * scale)));
-        const labels = observed.nodes.filter(n => plain(n) && n.role === 'AXButton' && Array.isArray(n.labels)).flatMap(n => n.labels.map(String));
-        const named = [/^(Hide|Show) /, /^(Lock|Unlock) /, /^(Mark shy|Unmark shy) /].every(re => labels.some(l => re.test(l)));
-        const dark = stats.meanLuma < 110 && stats.lightFraction < 0.08;
-        const oneLine = bands.length === 1 && bands[0][1] - bands[0][0] + 1 <= 30 * scale;
-        if (!(dark && oneLine && named)) {
-          outcome[step.check] = 'fail';
-          return finish(true, 'layer-row-styling ' + JSON.stringify({ dark, oneLine, named }));
-        }
-        outcome[step.check] = 'pass'; continue;
-      }
       // The harness reads the document (never the operator). The first installed run may meet MCP replies shaped
       // differently from the contract this oracle reads. Such reads are never guessed at: the reason is kept
       // privately, then the batch stops.
@@ -312,27 +347,37 @@ function createWorkflow({ reportDirectory }) {
         else if (inComponent && !sameContent(scene, nextScene)) failure = 'scene-changed-by-component-undo-redo';
         if (!failure) { adopt(); if (undoing) lastEdit[step.ctx] = { before: edit.before, after: edit.after, undone: next }; }
       } else if (step.type === 'save' || step.type === 'reopen') {
-        const bytes = kit.readInside(reportDirectory, ev.savedFile);
-        let json = null;
-        try { json = bytes ? JSON.parse(bytes.toString('utf8')) : null; } catch { json = null; }
-        const doc = plain(json) ? (int(json.totalFrames) ? json : json.document) : null;
-        if (!bytes || !plain(doc) || !int(doc.totalFrames) || !Array.isArray(doc.layers)) throw malformed(ROW, step.id);
-        const hash = kit.sha256(bytes);
+        if (ev.savedFile !== step.file) throw malformed(ROW, step.id);
+        const file = kit.measure(reportDirectory, step.file), json = kit.parseJson(file?.bytes);
+        if (!file || !kit.documentOf(json)) throw malformed(ROW, step.id);
         if (step.type === 'save') {
           // Saving must not edit: the reads taken after Save are exactly the state just verified.
           if (!sameDocument(prev, next) || next.revision !== prev.revision || !sameContent(prev, next) || (inComponent && !sameContent(scene, nextScene))) throw malformed(ROW, step.id);
-          failure = doc.totalFrames === nextScene.total ? null : 'saved-total-frames-differs';
-          saved = { file: ev.savedFile, hash, timeline: next, scene: nextScene };
+          // The file must have been written by this step (after the runner asked) and must agree with the verified layers and keys.
+          if (file.mtimeMs < requestedAt - 2000) failure = 'saved-file-predates-the-save-step';
+          else {
+            const compared = kit.compareSaved(json, { total: nextScene.total, sceneRows: nextScene.rows, rows: { ...nextScene.rows, ...next.rows } });
+            if (compared.fail) failure = compared.fail; else if (compared.unrun) hold(step.check, compared.unrun);
+          }
+          kit.privateEvidence(dir, 'file-' + step.id, { schema: 'nemo.frame-edit-ui-private/1', sha256: file.sha256, size: file.size, mtimeMs: file.mtimeMs, requestedAt });
+          saved = { file: step.file, hash: file.sha256, mtimeMs: file.mtimeMs, timeline: next, scene: nextScene };
         } else {
-          if (!saved || saved.file !== ev.savedFile) throw malformed(ROW, step.id);
-          if (hash !== saved.hash) failure = 'saved-file-changed-by-opening';
+          if (!saved || saved.file !== step.file) throw malformed(ROW, step.id);
+          if (file.sha256 !== saved.hash || file.mtimeMs !== saved.mtimeMs) failure = 'saved-file-changed-by-opening';
+          else if (sameDocument(saved.timeline, next)) failure = 'reopen-did-not-create-a-new-document';
           else if (next.undo !== 0 || next.redo !== 0) failure = 'reopened-history-not-fresh';
           else if (!sameContent(saved.timeline, next) || !sameContent(saved.scene, nextScene)) failure = 'reopened-timeline-differs-from-saved';
-          if (!failure) adopt();
+          if (!failure) {
+            // The reopened document is the saved file: its name is shown by the application (title or tab), read by the harness.
+            const stem = path.basename(step.file, '.json'), seenNow = await session.input('observe');
+            const texts = Array.isArray(seenNow?.nodes) ? seenNow.nodes.flatMap(n => [...kit.labelsOfNode(n), ...(typeof n?.value === 'string' ? [n.value] : [])]) : [];
+            if (!texts.some(t => t.includes(stem))) hold(step.check, 'the saved file name was not shown in the accessibility read after reopening');
+            adopt();
+          }
         }
       }
       if (failure) { outcome[step.check] = 'fail'; return finish(true, step.id + ': ' + failure); }
-      if (--remaining[step.check] === 0) outcome[step.check] = 'pass';
+      if (--remaining[step.check] === 0 && !held.has(step.check)) outcome[step.check] = 'pass';
     }
     return finish(false);
     } catch (error) {
@@ -343,4 +388,4 @@ function createWorkflow({ reportDirectory }) {
   } };
 }
 function prepare({ config }) { return createWorkflow({ reportDirectory: config.reportDirectory }); }
-module.exports = { prepare, createWorkflow, summarize, JUDGES, CLAUSES, PLAN };
+module.exports = { prepare, createWorkflow, summarize, judgeStyling, JUDGES, CLAUSES, PLAN };

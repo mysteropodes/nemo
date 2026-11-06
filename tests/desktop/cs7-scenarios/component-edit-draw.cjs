@@ -3,9 +3,11 @@
 // The UI32 helper has no pointer drawing and no double-click, so a person draws. The person never reports a
 // verdict and never attach document state: after each reply the HARNESS makes the read-only Nemo MCP reads itself
 // (history depth, per-layer cell runs; session.read, bound to the candidate) and this oracle computes the effect itself (revision step, history step, which cell gained
-// content, whether the Scene stayed unchanged). Pixels come from the helper's own owned-window capture
-// (instances) and from a PNG the person exports into the private report directory (bitmap brush); the person
-// only reports rectangles, never whether something "looks right".
+// content, whether the Scene stayed unchanged). Pixels come from the helper's own owned-window captures (instances; the
+// region is the drawing canvas's own accessibility frame) and from PNGs the person exports into the private report directory
+// (bitmap brush; their path, hash and mtime are measured by the runner and compared with a baseline export). The tool, the
+// Fill Brush placement and the app mode are read from the helper's accessibility facts after each gesture. How a tool was
+// picked (button or key) and how a menu item was reached cannot be observed: those surfaces are declared operator-attested.
 // Expected behaviour is the baseline's (1065e9d8): drawing on a held frame in Animation 2D promotes that frame
 // to its own key (app.js saveActiveLayerFrameOrPromote), enterSymbol swaps in the component's layers so every
 // tool draws unchanged inside it, and every instance of the component shows the component's frames.
@@ -19,17 +21,35 @@ const ROW = 'component-edit-draw';
 const CLAUSES = ['component-draw-tools', 'component-draw-undo-redo', 'component-instances-pixels', 'component-bitmap-export',
   'component-break-apart', 'component-motion-draw', 'component-draw-save-reopen'];
 const BEFORE = 'capture-21.png', AFTER = 'capture-22.png';
-const EXPORT = 'exports/bitmap-brush.png', SAVED = 'saved/component-draw.json';
-const DIFF = 24, INK_MIN = 200, NOISE_MAX = 20, RANGE_MIN = 30, EXPORT_INK = 0.01;
+// The helper's first `observe` is reserved for the Start screen, so when this row runs first its first helper command is a capture.
+const PRIME = 'capture-20.png';
+const BASELINE = 'exports/bitmap-baseline.png', EXPORT = 'exports/bitmap-brush.png', SAVED = 'saved/component-draw.json';
+const DIFF = 24, INK_MIN = 200, TILE_PIXELS = 10, TILES_X = 8, TILES_Y = 6, TILES_MAX = 24, EXPORT_INK_MIN = 200;
+const CANVAS = 'drawing-canvas', PLAYHEAD = 'info-frame';
+// The page's own labels (all four languages of src/js/i18n.js, plus the static English of src/index.html) name each control.
+const TOOLS = { select: /^(Select|Sélection|選択|Selección)/i, fillbrush: /^(Fill brush|Pinceau de remplissage|塗りブラシ|Pincel de relleno)/i, draw: /^(Brush|Pinceau(?! de remplissage)|ブラシ|Pincel(?! de relleno))/i,
+  pen: /^(Pen|Plume|ペン|Pluma)/i, rect: /^(Rectangle|Rectángulo|長方形)/i, line: /^(Line|Ligne|直線|Línea)/i, ellipse: /^(Ellipse|Elipse|楕円)/i };
+const MODES = { motion: /^(Motion|モーション)/i, anim2d: /(Animation 2D|2D Animation|Animación 2D|2Dアニメーション)/i };
+const ABOVE = /^(Above|Au-dessus|上|Encima)/i;
 
-// ---- raw pixel measurements (rectangles come from the person, every number from the image) -------------
-const inside = (outer, r) => r.x >= outer.x && r.y >= outer.y && r.x + r.w <= outer.x + outer.w && r.y + r.h <= outer.y + outer.h;
-const disjoint = (a, b) => a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y;
+// ---- raw pixel measurements (every rectangle comes from the helper's accessibility frames, every number from the image) ----
 const far = (p, q) => Math.abs(p[0] - q[0]) > DIFF || Math.abs(p[1] - q[1]) > DIFF || Math.abs(p[2] - q[2]) > DIFF;
 function changedPixels(a, b, rect) {
   let n = 0;
   for (let j = rect.y; j < rect.y + rect.h; j++) for (let i = rect.x; i < rect.x + rect.w; i++) if (far(kit.pixel(a, i, j), kit.pixel(b, i, j))) n++;
   return n;
+}
+// Changed pixels of a rectangle, and how many of its TILES_X x TILES_Y tiles hold more than TILE_PIXELS of them: a drawing in a
+// few tiles is a drawing; a change spread over the artboard (a pan, a zoom, a fill, a stale view) is not.
+function changeMap(a, b, rect) {
+  let total = 0, tiles = 0, tileCount = 0;
+  for (let ty = 0; ty < TILES_Y; ty++) for (let tx = 0; tx < TILES_X; tx++) {
+    const x0 = rect.x + Math.floor(rect.w * tx / TILES_X), x1 = rect.x + Math.floor(rect.w * (tx + 1) / TILES_X);
+    const y0 = rect.y + Math.floor(rect.h * ty / TILES_Y), y1 = rect.y + Math.floor(rect.h * (ty + 1) / TILES_Y);
+    if (x1 <= x0 || y1 <= y0) continue;
+    const n = changedPixels(a, b, { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }); total += n; tileCount++; if (n > TILE_PIXELS) tiles++;
+  }
+  return { total, tiles, tileCount };
 }
 function lumaRange(image, rect) {
   let lo = 255, hi = 0;
@@ -38,15 +58,42 @@ function lumaRange(image, rect) {
   }
   return hi - lo;
 }
-function rectMean(image, rect) {
-  const sum = [0, 0, 0];
-  for (let j = rect.y; j < rect.y + rect.h; j++) for (let i = rect.x; i < rect.x + rect.w; i++) { const p = kit.pixel(image, i, j); sum[0] += p[0]; sum[1] += p[1]; sum[2] += p[2]; }
-  return sum.map(v => v / (rect.w * rect.h));
+const RANGE_MIN = 30;
+
+// ---- facts read from the helper's accessibility nodes ----------------------------------------------------------
+const nodeText = n => [...kit.labelsOfNode(n), ...(typeof n?.value === 'string' ? [n.value] : [])];
+const byIdAll = (nodes, id) => nodes.filter(n => kit.idOfNode(n) === id);
+// The UI frame number the playhead shows (1-based, as the page prints it), or null when it is not readable.
+function playheadOf(nodes) {
+  const m = byIdAll(nodes, PLAYHEAD);
+  if (m.length !== 1) return null;
+  const v = nodeText(m[0]).map(t => /^\s*(\d+)\s*$/.exec(t)).find(Boolean);
+  return v ? Number(v[1]) : null;
 }
-function farFraction(image, rect, colour) {
-  let n = 0;
-  for (let j = rect.y; j < rect.y + rect.h; j++) for (let i = rect.x; i < rect.x + rect.w; i++) if (far(kit.pixel(image, i, j), colour)) n++;
-  return n / (rect.w * rect.h);
+// The active tool: the one tool button carrying the page's `active` class. {tool} | {unread: reason}; `other` when it is a different tool.
+function activeTool(nodes) {
+  const lit = nodes.filter(n => kit.hasClass(n, 'tool-btn') && kit.hasClass(n, 'active'));
+  if (!nodes.some(n => kit.hasClass(n, 'tool-btn'))) return { unread: 'no tool button with DOM classes in the helper read' };
+  if (lit.length !== 1) return { unread: lit.length ? 'more than one tool button is active' : 'no tool button is active' };
+  const label = nodeText(lit[0]).find(t => Object.values(TOOLS).some(re => re.test(t)));
+  const tool = label && Object.keys(TOOLS).find(k => TOOLS[k].test(label));
+  return tool ? { tool } : { unread: 'the active tool button has no known label' };
+}
+function activeMode(nodes) {
+  const lit = nodes.filter(n => kit.hasClass(n, 'app-mode-btn') && kit.hasClass(n, 'active'));
+  if (!nodes.some(n => kit.hasClass(n, 'app-mode-btn'))) return { unread: 'no mode button with DOM classes in the helper read' };
+  if (lit.length !== 1) return { unread: 'not exactly one mode button is active' };
+  const label = nodeText(lit[0]).join(' | '), mode = Object.keys(MODES).find(k => MODES[k].test(label));
+  return mode ? { mode } : { unread: 'the active mode button has no known label' };
+}
+function aboveSelected(nodes) {
+  const buttons = nodes.filter(n => kit.hasClass(n, 'icon-btn') && nodeText(n).some(t => ABOVE.test(t)));
+  if (buttons.length !== 1) return { unread: 'the Above placement button is not in the helper read' };
+  return { on: kit.hasClass(buttons[0], 'active') };
+}
+async function look(session) {
+  const r = await session.input('observe');
+  return Array.isArray(r?.nodes) && r.nodes.every(plain) ? r.nodes : null;
 }
 
 // ---- what each gesture must do, judged on the layer rows -------------------------------------------------
@@ -111,10 +158,10 @@ const SCENE_READS = READS + ' The runner reads context "scene-root".';
 const COMP_READS = READS + ' The runner reads the entered component\'s context (the context id you report) and "scene-root".';
 const KINDS = ' The runner also reads the layer kinds of "scene-root" itself.';
 const ui = frame => 'frame ' + (frame + 1);
-const compGesture = (id, frame, how) => ({ id, check: 'component-draw-tools', ctx: 'component', type: 'gesture', judge: 'draw', frame,
+const compGesture = (id, frame, tool, how, extra = {}) => ({ id, check: 'component-draw-tools', ctx: 'component', type: 'gesture', judge: 'draw', frame, tool, ...extra,
   how: 'Inside the component click the cell of its layer at ' + ui(frame) + ' so the playhead is on ' + ui(frame) + ' (that cell has no drawing yet). ' +
     how + ' Draw ONE gesture only, in the middle half of the artboard, then stop and do not click anything else. ' + COMP_READS });
-const motionGesture = (id, frame, first, how) => ({ id, check: 'component-motion-draw', ctx: 'scene', type: 'gesture', judge: 'drawAtPlayhead', frame, first,
+const motionGesture = (id, frame, first, tool, how) => ({ id, check: 'component-motion-draw', ctx: 'scene', type: 'gesture', judge: 'drawAtPlayhead', frame, first, tool, mode: 'motion',
   how: 'Select the layer named "Plain" and put the playhead on ' + ui(frame) + '. ' + how + ' Draw ONE gesture only, then stop. ' + SCENE_READS });
 const PLAN = [
   { id: 'window-placement', type: 'placement', check: null,
@@ -127,29 +174,29 @@ const PLAN = [
       '(blank keyframe) and convert it to a component the same way. Stay in Animation 2D and in the Scene tab. Reply with {observation, productFailure, ' +
       'layers: {anchor: <layerUid of Layer 1>, component: <layerUid of the first component layer>, plain: <layerUid of Plain>, bake: <layerUid of Bake>}}. ' +
       SCENE_READS + KINDS },
-  { id: 'motion-enter', type: 'mode', check: null, failCheck: 'component-motion-draw', ctx: 'scene',
+  { id: 'motion-enter', type: 'mode', mode: 'motion', check: null, failCheck: 'component-motion-draw', ctx: 'scene',
     how: 'Switch to Motion mode with the mode switch at the top. Do not edit anything. ' + SCENE_READS },
-  motionGesture('motion-draw', 10, true, 'Pick the Draw tool (B) and draw a stroke.'),
-  motionGesture('motion-pen', 11, false, 'Pick the Pen tool (P), click three points and finish the path (Enter).'),
-  motionGesture('motion-shape', 9, false, 'Pick the Rectangle tool (R) and drag one rectangle.'),
-  { id: 'motion-exit', type: 'mode', check: null, failCheck: 'component-motion-draw', ctx: 'scene',
+  motionGesture('motion-draw', 10, true, 'draw', 'Pick the Draw tool (B) and draw a stroke.'),
+  motionGesture('motion-pen', 11, false, 'pen', 'Pick the Pen tool (P), click three points and finish the path (Enter).'),
+  motionGesture('motion-shape', 9, false, 'rect', 'Pick the Rectangle tool (R) and drag one rectangle.'),
+  { id: 'motion-exit', type: 'mode', mode: 'anim2d', check: null, failCheck: 'component-motion-draw', ctx: 'scene',
     how: 'Switch back to 2D Animation. Stay in the Scene tab, put the playhead on frame 9, pick the Select tool and click on the empty pasteboard ' +
       'outside the artboard so nothing is selected, and move the mouse pointer off the artboard. Do not edit. ' + SCENE_READS },
-  { id: 'instance-before', type: 'shot', check: null,
-    how: 'The runner has just saved an owned-window capture of the Scene at frame 9. Open the PNG named in details.capturePath and measure, in pixels ' +
-      'of that image, three rectangles: canvas (the whole artboard), drawZone (the middle half of the artboard) and outside (a strip of the artboard, ' +
-      'at least 40x20 pixels, that you will never draw on, away from every stroke). Reply with {observation, productFailure, rects: {canvas, ' +
-      'drawZone, outside}} (each {x,y,w,h}). Do not judge anything else.' },
+  // No operator phase: the runner captures the owned window once and takes the region from the canvas's accessibility frame.
+  { id: 'instance-before', type: 'shot', check: null, auto: true },
+  { id: 'bitmap-baseline', type: 'export-baseline', check: 'component-bitmap-export', ctx: 'scene',
+    how: 'In the Scene tab put the playhead on frame 3 (the frame number box shows 3), then export the current frame as a PNG (File > Export) into the private ' +
+      'report directory as ' + BASELINE + '. Do not draw, select or move anything. Reply with {observation, productFailure, exportedFile: "' + BASELINE + '"}.' },
   { id: 'component-enter', type: 'enter', check: null, failCheck: 'component-draw-tools', ctx: 'component',
     how: 'Double-click the component layer row to enter the component (the tab bar shows the component beside Scene). Do not edit. Reply also with ' +
       'component: {context: <the entered component\'s context id>, layerUid: <the component\'s layer>}. ' + COMP_READS },
-  compGesture('comp-draw', 8, 'Pick the Draw tool (B).'),
-  compGesture('comp-pen', 7, 'Pick the Pen tool (P), click three points and finish the path (Enter).'),
-  compGesture('comp-line', 6, 'Pick the Line tool (L) and drag one line.'),
-  compGesture('comp-rect', 5, 'Pick the Rectangle tool (R) and drag one rectangle.'),
-  compGesture('comp-ellipse', 4, 'Pick the Ellipse tool (E) and drag one ellipse.'),
-  compGesture('comp-fillbrush', 3, 'Pick the Fill Brush tool, set Above in its options and paint one stroke.'),
-  compGesture('comp-bitmap', 2, 'Pick the Draw tool (B), turn Bitmap Brush on in the Brush panel (choose any tip) and paint one stroke.'),
+  compGesture('comp-draw', 8, 'draw', 'Pick the Draw tool (B).'),
+  compGesture('comp-pen', 7, 'pen', 'Pick the Pen tool (P), click three points and finish the path (Enter).'),
+  compGesture('comp-line', 6, 'line', 'Pick the Line tool (U) and drag one line.'),
+  compGesture('comp-rect', 5, 'rect', 'Pick the Rectangle tool (R) and drag one rectangle.'),
+  compGesture('comp-ellipse', 4, 'ellipse', 'Pick the Ellipse tool (L) and drag one ellipse.'),
+  compGesture('comp-fillbrush', 3, 'fillbrush', 'Pick the Fill Brush tool, set Above in its options and paint one stroke.', { above: true }),
+  compGesture('comp-bitmap', 2, 'draw', 'Pick the Draw tool (B), turn Bitmap Brush on in the Brush panel (choose any tip) and paint one stroke.', { bitmap: true }),
   { id: 'comp-undo', type: 'undo', check: 'component-draw-undo-redo', ctx: 'component',
     how: 'Press Cmd+Z exactly once inside the component with the app focused (no menu). ' + COMP_READS },
   { id: 'comp-redo', type: 'redo', check: 'component-draw-undo-redo', ctx: 'component',
@@ -158,10 +205,8 @@ const PLAN = [
     how: 'Click the Scene tab. Put the playhead on frame 9 again, pick the Select tool and click on the empty pasteboard outside the artboard so nothing ' +
       'is selected, and move the mouse pointer off the artboard. Do not draw or move anything else. ' + SCENE_READS },
   { id: 'bitmap-export', type: 'export', check: 'component-bitmap-export', ctx: 'scene',
-    how: 'In the Scene tab put the playhead on frame 3, then export the current frame as a PNG (File > Export) into the private report directory as ' +
-      EXPORT + '. Open the exported PNG and measure, in pixels of that image, stroke (a rectangle around the bitmap brush stroke you painted at frame 3, ' +
-      'containing nothing else) and background (an empty part of the picture, at least 20x10 pixels). Reply with {observation, productFailure, ' +
-      'exportedFile: "' + EXPORT + '", rects: {stroke, background}}. Report rectangles only.' },
+    how: 'In the Scene tab put the playhead on frame 3 again (the frame number box shows 3), then export the current frame as a PNG (File > Export) into the ' +
+      'private report directory as ' + EXPORT + '. Reply with {observation, productFailure, exportedFile: "' + EXPORT + '"}.' },
   { id: 'bake-break', type: 'bake', check: 'component-break-apart', ctx: 'scene',
     how: 'In the Scene tab right-click the row of the layer named "Bake" (a component instance) and choose "Break apart the component" in the Layer menu. ' +
       SCENE_READS + KINDS },
@@ -171,10 +216,10 @@ const PLAN = [
     how: 'Press Cmd+Shift+Z exactly once. ' + SCENE_READS + KINDS },
   { id: 'component-reenter', type: 'enter', check: null, failCheck: 'component-draw-save-reopen', ctx: 'component',
     how: 'Double-click the component layer row again to enter the component. Do not edit. Reply with the same component object. ' + COMP_READS },
-  { id: 'draw-save', type: 'save', check: 'component-draw-save-reopen', ctx: 'component',
+  { id: 'draw-save', type: 'save', check: 'component-draw-save-reopen', ctx: 'component', file: SAVED,
     how: 'Save the document (File > Save As) into the private report directory as ' + SAVED + '. Reply additionally with savedFile: "' + SAVED +
       '" (path relative to the report directory). Stay inside the component for the reads. ' + COMP_READS },
-  { id: 'draw-reopen', type: 'reopen', check: 'component-draw-save-reopen', ctx: 'component',
+  { id: 'draw-reopen', type: 'reopen', check: 'component-draw-save-reopen', ctx: 'component', file: SAVED,
     how: 'Open that same saved file through File > Open (do not edit anything), then double-click the component layer to enter it again. Reply with ' +
       'the same savedFile. ' + COMP_READS },
 ];
@@ -188,49 +233,67 @@ function createWorkflow({ reportDirectory }) {
     if (row.issue !== 2256 || !same(row.checks.map(c => c.id), CLAUSES)) throw new Error('original component-draw clauses changed');
     const outcome = Object.fromEntries(CLAUSES.map(id => [id, 'unrun']));
     const remaining = Object.fromEntries(CLAUSES.map(id => [id, PLAN.filter(s => s.check === id).length]));
-    const reasons = {};
+    // A clause that could not be fully read stays unrun with its reason; it is never passed on what was read of the rest.
+    const held = new Set(), reasons = {};
+    const hold = (check, reason) => { held.add(check); reasons[check] = (reasons[check] ? reasons[check] + '; ' : '') + reason; };
     const dir = path.join(reportDirectory, ROW);
     const finish = (stop, reason) => {
       kit.privateEvidence(dir, 'outcome', { schema: 'nemo.component-edit-draw-private/1', outcome, reasons, reason: reason || null });
       return { checks: CLAUSES.map(id => ({ id, status: outcome[id] })), safeToContinue: !stop };
     };
     const owner = await session.runtimeContext();
-    let scene = null, comp = null, plainUid = null, bakeUid = null, kinds = null, compLayer = null, componentContext = null, saved = null, rects = null;
+    let scene = null, comp = null, plainUid = null, bakeUid = null, kinds = null, compLayer = null, componentContext = null, saved = null, before = null, baseline = null;
     const lastEdit = {};
     try {
     for (const step of PLAN) {
       if (!same(await session.identity(), owner.identity)) throw malformed(ROW, step.id);
       const details = { sourceSha: owner.identity.sourceSha, pid: owner.identity.pid, windowId: owner.window.windowId,
         reportDirectory, evidenceRule: 'Raw observations only. Source tests and posted input do not establish PASS.' };
-      if (step.type === 'shot') {
-        const captured = await session.input('capture', BEFORE);
-        if (!plain(captured) || captured.capture !== BEFORE) throw malformed(ROW, step.id);
-        details.capturePath = path.join(reportDirectory, BEFORE);
+      if (step.auto) {
+        // No operator phase: one capture, taken and read by the harness, the canvas region from its own accessibility frame.
+        const shot = await kit.shot(session, reportDirectory, BEFORE), canvas = shot && shot.stable && shot.window ? byIdAll(shot.nodes, CANVAS) : [];
+        const frame = canvas.length === 1 ? kit.frameOf(canvas[0]) : null, rect = frame && kit.toPixels(shot.image, shot.window, frame);
+        kit.privateEvidence(dir, step.id, { schema: 'nemo.component-edit-draw-private/1', sha256: shot?.sha256 || null, stable: !!shot?.stable, window: shot?.window || null, canvas: frame, playhead: shot ? playheadOf(shot.nodes) : null });
+        if (!rect || !kit.rectOk(shot.image, rect, 100, 60)) hold('component-instances-pixels', 'the drawing canvas has no usable accessibility frame in a stable capture');
+        else if (lumaRange(shot.image, rect) < RANGE_MIN) hold('component-instances-pixels', 'the capture does not show the artboard (uniform canvas); pixels cannot be judged');
+        else before = { shot, frame, rect, playhead: playheadOf(shot.nodes) };
+        continue;
       }
+      // Files are measured by the runner around the step, never taken from what the operator says about them.
+      const requestedAt = Date.now(), file = step.file || (step.type === 'export' ? EXPORT : step.type === 'export-baseline' ? BASELINE : null);
+      if (file && kit.measure(reportDirectory, file) && step.type !== 'reopen') throw malformed(ROW, step.id);
       const ev = await session.requestEvidence({ row: ROW, phase: step.id, instruction: step.how, details });
       if (!rawOnly(ev) || !text(ev.observation) || typeof ev.productFailure !== 'boolean') throw malformed(ROW, step.id);
       kit.privateEvidence(dir, step.id, ev);
-      if (step.type === 'placement') continue;
+      if (step.type === 'placement') { await session.input('capture', PRIME); continue; }
       if (ev.productFailure) {
         // The person may only report a failure, never a success; a reported failure is taken as stated.
         if (step.check) outcome[step.check] = 'fail';
         return finish(true, step.id + (step.check ? ' failure reported' : ' precondition failed'));
       }
-      if (step.type === 'shot') {
-        const image = kit.loadPng(kit.readInside(reportDirectory, BEFORE)), r = ev.rects;
-        if (!image || !plain(r) || !kit.rectOk(image, r.canvas, 100, 60) || !kit.rectOk(image, r.drawZone, 40, 30) || !kit.rectOk(image, r.outside, 40, 20) ||
-          !inside(r.canvas, r.drawZone) || !inside(r.canvas, r.outside) || !disjoint(r.drawZone, r.outside)) throw malformed(ROW, step.id);
-        rects = { canvas: r.canvas, drawZone: r.drawZone, outside: r.outside };
+      if (step.type === 'export-baseline' || step.type === 'export') {
+        // The PNG is measured by the runner (hash, size, mtime), pinned to the playhead frame the page shows, and judged against
+        // the baseline export taken before the bitmap gesture.
+        const nodes = await look(session), playhead = nodes && playheadOf(nodes);
+        if (ev.exportedFile !== file) throw malformed(ROW, step.id);
+        const m = kit.measure(reportDirectory, file), image = m && kit.loadPng(m.bytes);
+        if (!m || !image || m.mtimeMs < requestedAt - 2000) throw malformed(ROW, step.id);
+        kit.privateEvidence(dir, 'file-' + step.id, { schema: 'nemo.component-edit-draw-private/1', sha256: m.sha256, size: m.size, mtimeMs: m.mtimeMs, requestedAt, playhead });
+        if (playhead === null) hold(step.check, 'the playhead frame was not readable when ' + file + ' was exported');
+        else if (playhead !== 3) throw malformed(ROW, step.id);
+        if (step.type === 'export-baseline') { baseline = { image, m }; remaining[step.check]--; continue; }
+        if (!baseline || baseline.image.width !== image.width || baseline.image.height !== image.height || m.mtimeMs < baseline.m.mtimeMs) throw malformed(ROW, step.id);
+        // The bitmap-brush record of the component at that frame, read by the harness: the stroke is a bitmap brush stroke with ink.
+        const bitmap = await kit.readBitmapScene(session, { contextId: componentContext, frame: 2, record: { dir, name: 'export-bitmap' } });
+        const mine = bitmap.entries.filter(e => plain(e) && e.layerUid === compLayer);
+        if (bitmap.refused) hold(step.check, 'the bitmap brush read was refused (' + bitmap.refused + ')');
+        else if (!mine.some(e => plain(e.ink))) { outcome[step.check] = 'fail'; return finish(true, 'no bitmap brush ink is recorded for the component layer at frame 3'); }
+        const changed = changeMap(baseline.image, image, { x: 0, y: 0, w: image.width, h: image.height });
+        kit.privateEvidence(dir, 'export-pixels', { schema: 'nemo.component-edit-draw-private/1', ...changed, inkMin: EXPORT_INK_MIN });
+        if (changed.total < EXPORT_INK_MIN) { outcome[step.check] = 'fail'; return finish(true, 'the exported frame differs from the baseline export by only ' + changed.total + ' pixels, so it shows no bitmap brush ink'); }
+        if (changed.tiles > TILES_MAX) { outcome[step.check] = 'fail'; return finish(true, 'the exported frame changed over ' + changed.tiles + ' tiles, which is not one brush stroke'); }
+        if (--remaining[step.check] === 0 && !held.has(step.check)) outcome[step.check] = 'pass';
         continue;
-      }
-      if (step.type === 'export') {
-        const image = ev.exportedFile === EXPORT ? kit.loadPng(kit.readInside(reportDirectory, EXPORT)) : null, r = ev.rects;
-        if (!image || !plain(r) || !kit.rectOk(image, r.stroke, 20, 10) || !kit.rectOk(image, r.background, 20, 10) || !disjoint(r.stroke, r.background)) throw malformed(ROW, step.id);
-        const colour = rectMean(image, r.background);
-        if (farFraction(image, r.background, colour) > 0.01) throw malformed(ROW, step.id);
-        const ink = farFraction(image, r.stroke, colour);
-        if (ink < EXPORT_INK) { outcome[step.check] = 'fail'; return finish(true, 'the exported frame shows no bitmap brush ink (' + ink.toFixed(4) + ')'); }
-        outcome[step.check] = 'pass'; continue;
       }
       const inComponent = step.ctx === 'component';
       if (inComponent && step.type !== 'enter' && !componentContext) throw malformed(ROW, step.id);
@@ -261,8 +324,11 @@ function createWorkflow({ reportDirectory }) {
         plainUid = l.plain; bakeUid = l.bake; kinds = k; scene = next; continue;
       }
       if (step.type === 'mode') {
-        // A view change: no edit, no history entry, the scene untouched.
+        // A view change: no edit, no history entry, the scene untouched; and the page shows the mode that was asked for.
         if (!unedited(scene, next)) { outcome[step.failCheck] = 'fail'; return finish(true, step.id + ': switching mode changed the document'); }
+        const nodes = await look(session), mode = nodes ? activeMode(nodes) : { unread: 'no accessibility read' };
+        if (mode.unread) hold(step.failCheck, step.id + ': ' + mode.unread);
+        else if (mode.mode !== step.mode) throw malformed(ROW, step.id);
         continue;
       }
       if (step.type === 'enter') {
@@ -287,19 +353,25 @@ function createWorkflow({ reportDirectory }) {
         if (!sameDocument(comp, next) || next.revision !== comp.revision || next.undo !== comp.undo || next.redo !== comp.redo || !sameContent(scene, next)) {
           throw malformed(ROW, step.id);
         }
-        const captured = await session.input('capture', AFTER);
-        if (!plain(captured) || captured.capture !== AFTER) throw malformed(ROW, step.id);
-        const before = kit.loadPng(kit.readInside(reportDirectory, BEFORE)), after = kit.loadPng(kit.readInside(reportDirectory, AFTER));
-        if (!before || !after || !rects || before.width !== after.width || before.height !== after.height) throw malformed(ROW, step.id);
-        if (lumaRange(before, rects.canvas) < RANGE_MIN) {
-          reasons[step.check] = 'the capture does not show the artboard (uniform canvas); pixels cannot be judged';
-          continue;
+        const after = await kit.shot(session, reportDirectory, AFTER);
+        if (!after) throw malformed(ROW, step.id);
+        const afterCanvas = after.stable && after.window ? byIdAll(after.nodes, CANVAS) : [], afterFrame = afterCanvas.length === 1 ? kit.frameOf(afterCanvas[0]) : null;
+        const afterPlayhead = playheadOf(after.nodes);
+        kit.privateEvidence(dir, 'shot-' + AFTER, { schema: 'nemo.component-edit-draw-private/1', sha256: after.sha256, stable: after.stable, canvas: afterFrame, playhead: afterPlayhead });
+        const frameMoved = f => !f || !before || ['x', 'y', 'w', 'h'].some(k => Math.abs(f[k] - before.frame[k]) > 1);
+        if (!before) { /* held at the baseline capture */ }
+        else if (!afterFrame || frameMoved(afterFrame) || Math.abs(after.window.w - before.shot.window.w) >= 1 || Math.abs(after.window.h - before.shot.window.h) >= 1 ||
+          after.image.width !== before.shot.image.width || after.image.height !== before.shot.image.height) hold(step.check, 'the canvas or the window moved between the two captures, or the second capture was not stable');
+        else if (before.playhead === null || afterPlayhead === null) hold(step.check, 'the playhead frame was not readable in both captures');
+        else if (before.playhead !== 9 || afterPlayhead !== 9) throw malformed(ROW, step.id);
+        else {
+          const map = changeMap(before.shot.image, after.image, before.rect);
+          kit.privateEvidence(dir, 'pixels', { schema: 'nemo.component-edit-draw-private/1', ...map, inkMin: INK_MIN, tilesMax: TILES_MAX });
+          if (map.total < INK_MIN) { outcome[step.check] = 'fail'; return finish(true, 'the scene instance does not show the component drawing (' + map.total + ' pixels changed)'); }
+          if (map.tiles > TILES_MAX) { outcome[step.check] = 'fail'; return finish(true, 'the scene changed over ' + map.tiles + ' of ' + map.tileCount + ' canvas tiles, which is not one drawing'); }
+          if (!held.has(step.check)) outcome[step.check] = 'pass';
         }
-        const ink = changedPixels(before, after, rects.drawZone), noise = changedPixels(before, after, rects.outside);
-        kit.privateEvidence(dir, 'pixels', { schema: 'nemo.component-edit-draw-private/1', ink, noise, inkMin: INK_MIN, noiseMax: NOISE_MAX });
-        if (ink < INK_MIN) { outcome[step.check] = 'fail'; return finish(true, 'the scene instance does not show the component drawing (' + ink + ' pixels changed)'); }
-        if (noise > NOISE_MAX) { outcome[step.check] = 'fail'; return finish(true, 'the scene changed outside the drawing zone (' + noise + ' pixels)'); }
-        outcome[step.check] = 'pass'; continue;
+        continue;
       }
       if (step.type === 'bake' || step.type === 'bake-undo' || step.type === 'bake-redo') {
         // Break apart bakes the instance's frames onto the layer: one edit, the layer is a drawing layer, its keys are the component's keys.
@@ -327,7 +399,7 @@ function createWorkflow({ reportDirectory }) {
         }
         if (bad) { outcome[step.check] = 'fail'; return finish(true, step.id + ': ' + bad); }
         scene = next; kinds = k;
-        if (--remaining[step.check] === 0) outcome[step.check] = 'pass';
+        if (--remaining[step.check] === 0 && !held.has(step.check)) outcome[step.check] = 'pass';
         continue;
       }
       const prev = inComponent ? comp : scene;
@@ -336,10 +408,35 @@ function createWorkflow({ reportDirectory }) {
       if (step.type === 'gesture') {
         const uid = inComponent ? compLayer : plainUid, sel = ev.selection;
         if (!plain(sel) || sel.layerUid !== uid || sel.frame !== step.frame || !int(sel.frame) || sel.frame >= prev.total || !Object.hasOwn(next.rows, uid)) throw malformed(ROW, step.id);
+        // What the page shows after the gesture: the tool that drew, the Fill Brush placement, the mode and the playhead frame.
+        const nodes = await look(session), tool = nodes ? activeTool(nodes) : { unread: 'no accessibility read' };
+        if (tool.unread) hold(step.check, step.id + ': ' + tool.unread);
+        else if (tool.tool !== step.tool) throw malformed(ROW, step.id);
+        if (step.above) {
+          const above = nodes ? aboveSelected(nodes) : { unread: 'no accessibility read' };
+          if (above.unread) hold(step.check, step.id + ': ' + above.unread);
+          else if (!above.on) throw malformed(ROW, step.id);
+        }
+        if (step.mode) {
+          const mode = nodes ? activeMode(nodes) : { unread: 'no accessibility read' };
+          if (mode.unread) hold(step.check, step.id + ': ' + mode.unread);
+          else if (mode.mode !== step.mode) throw malformed(ROW, step.id);
+        }
+        const playhead = nodes ? playheadOf(nodes) : null;
+        if (playhead === null) hold(step.check, step.id + ': the playhead frame was not readable');
+        else if (playhead !== step.frame + 1) throw malformed(ROW, step.id);
         const verdict = JUDGES[step.judge](prev.rows[uid], next.rows[uid], step.frame, step.first);
         if (verdict?.pre) throw malformed(ROW, step.id);
         failure = verdict?.fail || oneEdit(prev, next) || (othersSame(prev, next, uid) ? null : 'other-layers-changed');
         if (!failure && inComponent && !sameContent(scene, nextScene)) failure = 'scene-changed-by-component-drawing';
+        // A stroke added to a cell that already showed content (a held cell of an earlier key) changes no cell read. An edit
+        // that leaves the layer's rows exactly as they were cannot be shown to be this gesture's stroke: held, never passed.
+        if (!failure && step.first === false && same(prev.rows[uid], next.rows[uid])) hold(step.check, step.id + ': the layer rows did not change, so the stroke cannot be told from any other edit');
+        if (!failure && step.bitmap) {
+          const bitmap = await kit.readBitmapScene(session, { contextId: readContext, frame: step.frame, record: { dir, name: step.id + '-bitmap' } });
+          if (bitmap.refused) hold(step.check, step.id + ': the bitmap brush read was refused (' + bitmap.refused + ')');
+          else if (!bitmap.entries.some(e => plain(e) && e.layerUid === uid)) failure = 'no-bitmap-brush-record-for-the-stroke';
+        }
         if (!failure) { lastEdit[step.ctx] = { before: prev, after: next }; adopt(); }
       } else if (step.type === 'undo' || step.type === 'redo') {
         const edit = lastEdit[step.ctx];
@@ -350,35 +447,39 @@ function createWorkflow({ reportDirectory }) {
         else if (inComponent && !sameContent(scene, nextScene)) failure = 'scene-changed-by-component-undo-redo';
         if (!failure) { adopt(); if (undoing) lastEdit[step.ctx] = { before: edit.before, after: edit.after, undone: next }; }
       } else if (step.type === 'save' || step.type === 'reopen') {
-        const bytes = ev.savedFile === SAVED ? kit.readInside(reportDirectory, SAVED) : null;
-        let json = null;
-        try { json = bytes ? JSON.parse(bytes.toString('utf8')) : null; } catch { json = null; }
-        const doc = plain(json) ? (int(json.totalFrames) ? json : json.document) : null;
-        if (!bytes || !plain(doc) || !int(doc.totalFrames) || !Array.isArray(doc.layers)) throw malformed(ROW, step.id);
-        const hash = kit.sha256(bytes);
+        if (ev.savedFile !== step.file) throw malformed(ROW, step.id);
+        const f = kit.measure(reportDirectory, step.file), json = kit.parseJson(f?.bytes);
+        if (!f || !kit.documentOf(json)) throw malformed(ROW, step.id);
         if (step.type === 'save') {
           // Saving must not edit: the reads taken after Save are exactly the state just verified.
           if (!unedited(prev, next) || !sameContent(scene, nextScene)) throw malformed(ROW, step.id);
-          failure = doc.totalFrames === nextScene.total ? null : 'saved-total-frames-differs';
-          saved = { hash, timeline: next, scene: nextScene };
+          if (f.mtimeMs < requestedAt - 2000) failure = 'saved-file-predates-the-save-step';
+          else {
+            // The file must agree with the verified layers and keys, the component's own layers included.
+            const compared = kit.compareSaved(json, { total: nextScene.total, sceneRows: nextScene.rows, rows: { ...nextScene.rows, ...next.rows } });
+            if (compared.fail) failure = compared.fail; else if (compared.unrun) hold(step.check, compared.unrun);
+          }
+          kit.privateEvidence(dir, 'file-' + step.id, { schema: 'nemo.component-edit-draw-private/1', sha256: f.sha256, size: f.size, mtimeMs: f.mtimeMs, requestedAt });
+          saved = { hash: f.sha256, mtimeMs: f.mtimeMs, timeline: next, scene: nextScene };
         } else {
           if (!saved) throw malformed(ROW, step.id);
-          if (hash !== saved.hash) failure = 'saved-file-changed-by-opening';
+          if (f.sha256 !== saved.hash || f.mtimeMs !== saved.mtimeMs) failure = 'saved-file-changed-by-opening';
+          else if (sameDocument(saved.timeline, next)) failure = 'reopen-did-not-create-a-new-document';
           else if (next.undo !== 0 || next.redo !== 0) failure = 'reopened-history-not-fresh';
           else if (!sameContent(saved.timeline, next) || !sameContent(saved.scene, nextScene)) failure = 'reopened-drawings-differ-from-saved';
           if (!failure) adopt();
         }
       }
       if (failure) { outcome[step.check] = 'fail'; return finish(true, step.id + ': ' + failure); }
-      if (--remaining[step.check] === 0) outcome[step.check] = 'pass';
+      if (--remaining[step.check] === 0 && !held.has(step.check)) outcome[step.check] = 'pass';
     }
     return finish(false);
     } catch (error) {
       // Keep what was established before an unusable reply or an input refusal; the batch still stops.
-      try { kit.privateEvidence(dir, 'partial', { schema: 'nemo.component-edit-draw-private/1', outcome, stoppedBy: error?.code || 'error' }); } catch { /* receipt directory unavailable */ }
+      try { kit.privateEvidence(dir, 'partial', { schema: 'nemo.component-edit-draw-private/1', outcome, reasons, stoppedBy: error?.code || 'error' }); } catch { /* receipt directory unavailable */ }
       throw error;
     }
   } };
 }
 function prepare({ config }) { return createWorkflow({ reportDirectory: config.reportDirectory }); }
-module.exports = { prepare, createWorkflow, JUDGES, CLAUSES, PLAN, BEFORE, AFTER, EXPORT, SAVED };
+module.exports = { prepare, createWorkflow, JUDGES, CLAUSES, PLAN, BEFORE, AFTER, BASELINE, EXPORT, SAVED, activeTool, activeMode, aboveSelected, playheadOf, changeMap };

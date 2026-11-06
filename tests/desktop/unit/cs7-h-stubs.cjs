@@ -147,7 +147,14 @@ class World {
   evidence(ctx, extra = {}) {
     return { observation: 'did it', productFailure: false, ...extra };
   }
-  document() { return { format: 'nemo', formatVersion: 1, totalFrames: this.state.scene['layer-1'].k.length, layers: Object.keys(this.state.scene).map(uid => ({ uid })) }; }
+  // The native object document a Save writes: layers by uid with their stored key frames; the component's own layers beside it.
+  document() {
+    const layer = (uid, rows) => ({ layerUid: uid, name: uid, timing: { keys: rows.k.flatMap((kind, i) => (kind === 'key' ? [{ frame: i }] : [])) } });
+    const scene = this.state.scene, wrong = this.faults.savedLayersWrong;
+    return { format: 'nemo.native-object-document', formatVersion: 1, totalFrames: this.state.scene['layer-1'].k.length,
+      layers: Object.entries(scene).map(([uid, rows]) => layer(wrong ? uid + '-x' : uid, rows)),
+      components: [{ id: COMPONENT, layers: Object.entries(this.state.component).map(([uid, rows]) => layer(uid, rows)) }], objects: [] };
+  }
   async operator(request, drawingPng) {
     const phase = request.phase, faults = this.faults;
     this.phase = phase;
@@ -156,7 +163,6 @@ class World {
     if (faults.verdictAt === phase) return { ...this.evidence('scene'), pass: true };
     if (phase === 'window-placement') return { observation: 'placed', productFailure: false };
     if (phase === 'scene-setup') return this.evidence('scene', { layers: { drawing: 'layer-1', component: 'layer-2' } });
-    if (phase === 'layer-row-styling') return { observation: 'rows measured', productFailure: false, rects: drawingPng.rects };
     if (GESTURES[phase]) {
       const [ctx, kind, frame, span] = GESTURES[phase];
       this.edit(ctx, kind, frame, span);
@@ -169,13 +175,17 @@ class World {
     if (phase.endsWith('-save')) {
       const file = ctx === 'scene' ? 'saved/frame-edit-scene.json' : 'saved/frame-edit-component.json';
       fs.mkdirSync(path.join(this.dir, 'saved'), { recursive: true });
-      this.fileBytes = JSON.stringify(this.document()); fs.writeFileSync(path.join(this.dir, file), this.fileBytes);
+      this.fileBytes = JSON.stringify(this.document());
+      if (!faults.noWrite) fs.writeFileSync(path.join(this.dir, file), this.fileBytes);
+      this.openedFile = null;
       return this.evidence(ctx, { savedFile: file });
     }
     if (phase.endsWith('-reopen')) {
       const file = ctx === 'scene' ? 'saved/frame-edit-scene.json' : 'saved/frame-edit-component.json';
       this.documentId = ctx === 'scene' ? 'doc-2' : 'doc-3'; this.undoStack = []; this.redoStack = []; this.rev = 1;
       if (faults.touchFileOnOpen) fs.appendFileSync(path.join(this.dir, file), ' ');
+      this.openedFile = faults.noTitle ? null : file;
+      if (faults.sameDocumentOnReopen) this.documentId = ctx === 'scene' ? 'doc-1' : 'doc-2';
       if (faults.lostEditOnReopen) this.growScene();
       return this.evidence(ctx, { savedFile: file });
     }
@@ -184,15 +194,30 @@ class World {
   }
 }
 
-// An owned-window capture the styling check can judge: dark rows, one text line (or two), optional light buttons.
-function stylingPng({ light = false, wrapped = false } = {}) {
+// An owned-window capture the styling check can judge: dark rows, one text line (or two), optional light buttons. The window is
+// 810x710 points and the capture 810x710 pixels, so a frame is also its pixel rectangle.
+const LONG_NAME = 'A very long layer name that must stay on a single line with an ellipsis ok'; // 70 characters
+function stylingPng({ light = false, wrapped = false, tall = false, noFrames = false, unstable = false, lost = false } = {}) {
   const image = canvas(810, 710, [30, 30, 34, 255]);
   if (light) fillRect(image, 20, 100, 300, 200, [236, 236, 236, 255]);
   fillRect(image, 40, 112, 120, 8, [205, 205, 205, 255]);
   if (wrapped) fillRect(image, 40, 126, 90, 8, [205, 205, 205, 255]);
-  return { png: encodeRGBA(image.width, image.height, image.rgba), rects: { layerRows: { x: 20, y: 100, w: 300, h: 200 }, longName: { x: 30, y: 106, w: 200, h: 34 } } };
+  return { png: encodeRGBA(image.width, image.height, image.rgba), tall, noFrames, unstable, lost };
 }
-function frameSession({ directory, world, styling = stylingPng(), buttons = true, reader = stubReader({ directory, target: () => world, tamper: world.tamper && ((p, pair) => world.tamper(p, pair)) }) }) {
+function layerRowNodes(styling, shift = 0) {
+  const rows = [['layer-1', LONG_NAME, 106], ['layer-2', 'Layer 2', 150]], nodes = [];
+  const at = (x, y, w, h) => (styling.noFrames ? {} : { frame: { x: x + shift, y, w, h } });
+  for (const [uid, name, y] of rows) {
+    const pickH = styling.tall ? 44 : 30;
+    nodes.push({ role: 'AXButton', labels: [name + ' (' + uid + ')', name + ' — Visible'], identifiers: { resolved: '' }, ...at(30, y, 200, pickH) },
+      { role: 'AXButton', labels: ['Hide ' + name + ' (' + uid + ')'], identifiers: { resolved: '' }, ...at(236, y + 2, 30, 24) });
+    if (!styling.lost) nodes.push({ role: 'AXButton', labels: ['Lock ' + name], identifiers: { resolved: '' }, ...at(270, y + 2, 30, 24) },
+      { role: 'AXButton', labels: ['Mark shy ' + name], identifiers: { resolved: '' }, ...at(304, y + 2, 60, 24) });
+  }
+  return nodes;
+}
+function frameSession({ directory, world, styling = stylingPng(), reader = stubReader({ directory, target: () => world, tamper: world.tamper && ((p, pair) => world.tamper(p, pair)) }) }) {
+  let observes = 0;
   return {
     read: fn => reader.read(fn),
     start: async () => identity, identity: async () => ({ ...identity }), cleanup: async () => {},
@@ -201,8 +226,10 @@ function frameSession({ directory, world, styling = stylingPng(), buttons = true
     input: async (command, option) => {
       if (command === 'capture') { fs.writeFileSync(path.join(directory, option), styling.png); return { status: 'ok', capture: option }; }
       if (command === 'observe') {
-        const labels = buttons ? ['Hide Layer 1 (layer-1)', 'Lock Layer 1', 'Mark shy Layer 1'] : [];
-        return { status: 'ok', nodes: labels.map(l => ({ role: 'AXButton', labels: [l], identifiers: { resolved: '' } })) };
+        observes++;
+        const nodes = layerRowNodes(styling, styling.unstable && observes % 2 === 0 ? 7 : 0);
+        if (world.openedFile) nodes.push({ role: 'AXStaticText', labels: [path.basename(world.openedFile, '.json')], identifiers: { resolved: '' } });
+        return { status: 'ok', nodes, windowSize: { w: 810, h: 710 } };
       }
       throw new Error('unexpected helper command ' + command);
     },
@@ -211,12 +238,15 @@ function frameSession({ directory, world, styling = stylingPng(), buttons = true
 
 // ---- settings dialog model ----------------------------------------------------------------------
 const TABS = ['General', 'Updates', 'Collaboration', 'Feedback', 'Figma', 'Shortcuts', 'Labs', 'About'];
+const ANCHOR = { General: 'profile-name', Updates: 'app-check-update', Collaboration: 'sync-folder-path', Feedback: 'fb-pull', Figma: 'figma-token',
+  Shortcuts: 'shortcuts-reset', Labs: 'labs-tools-list', About: 'app-version-txt-about' };
+const defaultKeys = () => ({ insertFrame: 'F5', play: 'Enter' });
 const HINTS = { Animator: 'Edits their own layers.', Supervisor: 'Edits any layer directly.', Producer: 'Read-only plus comments.' };
 class SettingsApp {
   constructor(reportDirectory, faults = {}) {
     this.dir = reportDirectory; this.faults = faults;
     this.s = { project: false, menu: false, open: false, tab: 'General', name: 'Animateur 3I41', email: '', role: 'Animator', tool: 'hand', toast: '',
-      sync: '', loading: 0, keys: { insertFrame: 'F5', play: 'Enter' }, colour: [0x4a, 0x9e, 0xff], alpha: 1, originals: {}, panel: false, closed: 0,
+      sync: '', loading: 0, keys: faults.leakedBinding ? { ...defaultKeys(), duplicateKey: 'F9' } : defaultKeys(), colour: [0x4a, 0x9e, 0xff], alpha: 1, originals: {}, panel: false, closed: 0,
       checked: false, updates: [], merged: false };
     this.profileId = 'u_stub_1'; this.log = []; this.world = null;
   }
@@ -263,13 +293,13 @@ class SettingsApp {
         }
       });
     }
-    if (!this.faults.mergeNoop) this.world.rev++;
+    if (!this.faults.mergeNoop && !this.faults.mergeNoRevision) this.world.rev++;
     this.s.merged = true;
-    this.say(this.faults.mergeWrongToast ? 'Fusion de ' + entry.name + ' : +undefined ajout(s)' : 'Fusion de ' + entry.name + ' : +' + (this.faults.mergeNoop ? 1 : added) + ' ajout(s)');
+    if (!this.faults.mergeNoToast) this.say(this.faults.mergeWrongToast ? 'Fusion de ' + entry.name + ' : +undefined ajout(s)' : 'Fusion de ' + entry.name + ' : +' + (this.faults.mergeNoop ? 1 : added) + ' ajout(s)');
   }
   node(id, role, extra = {}) { return { role, identifier: '', identifiers: { resolved: id }, labels: [], ...extra }; }
   nodes() {
-    const s = this.s, out = [this.node('app-menu-btn', 'AXButton', { labels: ['Menu'] })];
+    const s = this.s, faults = this.faults, out = [this.node('app-menu-btn', 'AXButton', { labels: ['Menu'] })];
     if (s.project) out.push(this.node('project-tabs-settings', 'AXButton'));
     const expose = !this.faults.noToolState;
     out.push(this.node('', 'AXButton', { labels: ['Hand — pan the canvas (H or Space)'], ...(expose ? { selected: s.tool === 'hand' } : {}) }));
@@ -283,7 +313,7 @@ class SettingsApp {
     if (s.tab === 'General') {
       out.push(this.node('profile-name', 'AXTextField', { value: s.name }), this.node('profile-email', 'AXTextField', { value: s.email }),
         this.node('profile-role', 'AXPopUpButton', { value: s.role }), this.node('profile-role-hint', 'AXStaticText', { labels: [HINTS[s.role]] }),
-        this.node('profile-color-well', 'AXGroup'));
+        this.node('profile-color-well', 'AXGroup', faults.noWellFrame ? {} : { frame: { x: 50, y: 40, w: 24, h: 24 } }));
     } else if (s.tab === 'Collaboration') {
       out.push(this.node('sync-folder-path', 'AXTextField', { value: s.sync }));
       if (s.loading > 0) out.push({ role: 'AXStaticText', identifier: '', identifiers: { resolved: '' }, labels: ['Recherche…'] });
@@ -293,8 +323,10 @@ class SettingsApp {
           this.node('', 'AXButton', { labels: [s.merged ? STR.merged[0] : STR.merge[0]] }));
       }
     } else if (s.tab === 'Shortcuts') {
+      out.push(this.node('shortcuts-reset', 'AXButton'));
       for (const [action, key] of Object.entries(s.keys)) out.push(this.node('', 'AXButton', { labels: [action, key] }));
-    }
+    } else if (!faults.noAnchors) out.push(this.node(ANCHOR[s.tab], 'AXGroup'));
+    if (faults.wrongPane === s.tab) out.push(this.node('profile-name', 'AXTextField', { value: s.name }));
     return out;
   }
   png(name) {
@@ -309,7 +341,7 @@ class SettingsApp {
     if (s.sync !== '' && (command === 'sync.open-cancel' || command === 'sync.check-empty')) throw new OperatorInputError('input-refused', { command, ordinal: this.log.length });
     const ok = { status: 'ok', command };
     switch (command) {
-      case 'observe': return { ...ok, nodes: this.nodes() };
+      case 'observe': return { ...ok, nodes: this.nodes(), windowSize: { w: 300, h: 200 } };
       case 'capture': this.png(option); return { ...ok, capture: option };
       case 'settings.menu.open': s.menu = true; return ok;
       case 'settings.menu.entry': if (!s.menu) throw new Error('menu not open'); s.menu = false; s.open = true; return ok;
@@ -333,7 +365,7 @@ class SettingsApp {
         return ok;
       case 'tool.hand': s.tool = 'hand'; return ok;
       case 'sync.open-cancel': case 'sync.panel-observe': case 'sync.cancel-only': case 'sync.complete': return ok;
-      case 'sync.check-empty': s.loading = this.faults.stuckSearch ? 99 : 1; return ok;
+      case 'sync.check-empty': s.loading = this.faults.stuckSearch ? 99 : 1; if (!this.faults.checkInert) { s.checked = true; s.updates = []; } return ok;
       default: throw new Error('unexpected helper command ' + command);
     }
   }
@@ -343,11 +375,12 @@ class SettingsApp {
     const s = this.s, phase = request.phase, faults = this.faults;
     if (faults.failureAt === phase) return { observation: 'broken', productFailure: true };
     if (faults.malformedAt === phase) return { observation: 'ok', productFailure: false, rects: {} };
+    if (faults.verdictAt === phase) return { observation: 'ok', productFailure: false, pass: true };
     if (phase === 'window-placement') return { observation: 'placed', productFailure: false };
     if (phase === 'new-project') { s.project = true; return { observation: 'created', productFailure: false }; }
     if (phase === 'shortcut-rebind') { s.keys.insertFrame = 'F8'; return { observation: 'rebound', productFailure: false }; }
-    if (phase === 'shortcut-reset') { if (!faults.resetBroken) s.keys.insertFrame = 'F5'; return { observation: 'reset', productFailure: false }; }
-    if (phase === 'profile-color-measure') return { observation: 'measured', productFailure: false, rects: { well: { x: 50, y: 40, w: 24, h: 24 }, backdrop: { x: 20, y: 20 } } };
+    if (phase === 'shortcut-reset-first') { if (!faults.resetBroken) s.keys = defaultKeys(); return { observation: 'reset', productFailure: false }; }
+    if (phase === 'shortcut-reset') { if (!faults.resetBroken) s.keys = defaultKeys(); return { observation: 'reset', productFailure: false }; }
     if (phase === 'profile-color-opaque') { s.colour = [0x33, 0x66, 0x99]; s.alpha = 1; return { observation: 'set', productFailure: false }; }
     if (phase === 'profile-color-alpha') { if (!faults.alphaIgnored) s.alpha = 0.5; return { observation: 'set', productFailure: false }; }
     if (phase === 'profile-color-restore') { if (!faults.noRestore) { s.colour = [0x4a, 0x9e, 0xff]; s.alpha = 1; } return { observation: 'restored', productFailure: false }; }
@@ -383,4 +416,4 @@ function settingsSession({ app, reader = stubReader({ directory: app.dir, target
   };
   return wrapped;
 }
-module.exports = { identity, INSTANCE, FOREIGN, stubReader, World, frameSession, stylingPng, SettingsApp, settingsSession, clone };
+module.exports = { identity, INSTANCE, FOREIGN, stubReader, World, frameSession, stylingPng, layerRowNodes, LONG_NAME, SettingsApp, settingsSession, clone };

@@ -156,17 +156,28 @@ Run them in that order or separately; both capture with distinct names (`capture
   entered component (PR #2786). After every reply the harness itself makes the **read-only** Nemo MCP
   reads (`query.document.object.history`, one `query.document.object.layer.timing` view `cells` per
   layer, plus the Scene layers while inside a component); the operator attaches nothing. The oracle computes the revision step,
-  history depth, total frames and cell runs itself, reads the saved files from disk (hash, total
-  frames) and judges the layer-row styling from the helper's own owned-window capture. A reply with a
+  history depth, total frames and cell runs itself. The saved files are measured by the runner (hash, size, mtime, around the
+  Save As step) and compared with the verified layers and key frames; reopening must give a new document, leave the file
+  byte-identical and show its name. The layer-row styling takes no operator phase: the runner captures the owned window once,
+  reads the PNG once (its sha256 is kept) and takes every rectangle from the helper's accessibility frames (compact means a
+  row at most 34 points high and visibility/lock/shy controls at most 28 high and 90 wide). A reply with a
   verdict field or any attached read, or harness reads that are missing, unpinned or non-tiling, stops the batch.
 - `settings-profile` (#2172). `session.input` drives the Settings entries, the eight tabs, close and
   backdrop, profile name/email/role with restore, the tool buttons and the empty sync-folder
   open-cancel/check; `observe` supplies the raw accessibility facts. The helper **cannot** drive, so a
   person performs (and the oracle judges the effect of):
   - File > New (the `entry.*` commands need an entry mode this batch does not set);
-  - the colour swatch and its alpha (judged from the helper capture of the swatch the person located);
-  - rebinding a shortcut and "Reset all" (`shortcuts.reset` is denied; judged by comparing the Shortcuts
-    tab labels before, after rebind and after reset);
+  - the colour swatch and its alpha (judged from three helper captures; the swatch rectangle is the accessibility
+    frame of `#profile-color-well`, the ground is four samples just outside it, and a swatch that moved between
+    captures leaves the clause unrun);
+  - "Reset all" first, then rebinding a shortcut and "Reset all" again (`shortcuts.reset` is denied; the baseline is
+    the tab after the first Reset all, so a binding left by `frame-edit-ui` is not blamed on the product; judged
+    by comparing the Shortcuts tab labels before, after rebind and after reset);
+  - the eight tabs are judged by the one element only that pane renders (`profile-name`, `app-check-update`,
+    `sync-folder-path`, `fb-pull`, `figma-token`, `shortcuts-reset`, `labs-tools-list`, `app-version-txt-about`);
+    a tab showing another pane's element fails, one whose element is not in the accessibility read leaves the clause unrun;
+  - the empty-folder check passes only when the baseline's completion text ("Aucune mise à jour d'un autre profil.")
+    appears after the press and was not on screen before it; otherwise it is `unrun`;
   - the whole `sync-owner-paths` clause: drawing one stroke and a blank keyframe, then Publish with no
     folder, Choose… in the native picker (the exact folder is named in the phase), Publish, Check, a
     Merge row and a Publish into a folder the runner has made read-only. The helper has no Publish,
@@ -174,7 +185,8 @@ Run them in that order or separately; both capture with distinct names (`capture
   The sync oracle reads the disposable shared folder itself (what the app wrote, and the second profile
   it seeded from the app's own published snapshot), the accessibility read (folder path, update rows,
   Merge/Merged buttons, last toast text, which stays in `#toast` after it fades, so freshness is also
-  checked) and MCP cell reads of the document, made by the harness itself, before and after Merge. The clause is `unrun` with
+  checked) and MCP cell reads of the document, made by the harness itself, right before and after Merge: the merge needs a fresh
+  `Fusion de ... : +1 ajout(s)` toast, a later revision, an undisturbed history, content on frame 4 and the Merged row. The clause is `unrun` with
   its reason when a toast, the update list or the published snapshot shape is not readable, and `fail`
   when the baseline contract is contradicted (for example the merge toast says `+1 ajout(s)` but frame 4
   still has no content). #2355 (D06) migrates publish/pull/merge to native snapshots, so a first-run
@@ -200,14 +212,25 @@ add `exprGlobals` or `trackRoles`) into `<report>/legacy-source/` and asks the o
   document (a drawn layer, a component with a blank key on frame 2, an empty "Plain" layer, a "Bake" component),
   draws one gesture per tool inside the entered component (Draw, Pen, Line, Rectangle, Ellipse, Fill Brush, Bitmap
   Brush, each on its own empty cell), draws with Draw, Pen and a rectangle in Motion mode on "Plain", uses
-  Cmd+Z / Cmd+Shift+Z, leaves the component, exports a PNG, breaks the "Bake" component apart, saves and reopens.
-  After each reply the harness makes the read-only MCP reads itself (history, per-layer cells, and for Break apart
-  the scene layers page of `component.read`); the operator attaches none. The oracle computes the revision step, the history step, which cell
-  gained content or its own key, that the Scene stayed unchanged and that Break apart made a drawing layer holding
-  the component's keys. The instance pixels are measured from the helper capture taken before entering and after
-  leaving (rectangles are the only thing the person reports); the exported PNG is measured the same way. An
-  uniform capture leaves that one clause `unrun` with the reason. Not exercised (see the row's `taskEvidence`):
-  Text, the Fill tool, Pen continue, Perspective snap, bitmap re-bake on Select, component camera keys and markers.
+  Cmd+Z / Cmd+Shift+Z, leaves the component, exports two PNGs, breaks the "Bake" component apart, saves and reopens.
+  After each reply the harness makes the read-only MCP reads itself (history, per-layer cells, for Break apart
+  the scene layers page of `component.read`, and for the Bitmap Brush `query.document.object.brush.bitmap`); the operator
+  attaches none. The oracle computes the revision step, the history step, which cell gained content or its own key, that the
+  Scene stayed unchanged and that Break apart made a drawing layer holding the component's keys. After every gesture the
+  harness also reads the helper's accessibility facts: the one tool button with the page's `active` class must be the tool the
+  step names (a different tool is the operator's mistake and stops the batch), the Fill Brush "Above" button must be active,
+  Motion steps need the Motion mode button active, and the playhead box (`info-frame`) must show the step's frame; whatever
+  cannot be read leaves the clause `unrun` with the reason. The Bitmap Brush stroke must have a bitmap-brush record with ink
+  in the native read. A Motion stroke after the first is passed only when the layer rows change; when they do not (the stroke
+  went onto the origin key) the clause is `unrun`, since the edit cannot be told from any other. The instance pixels take no
+  operator rectangles: the runner captures the owned window before entering and after leaving the component at playhead frame 9,
+  reads each PNG once and compares them inside the accessibility frame of `drawing-canvas` (at least 200 pixels changed in at
+  most 24 of 48 tiles; the window, canvas and playhead must not have moved). The bitmap export is a baseline PNG
+  (`exports/bitmap-baseline.png`, exported before entering the component) and `exports/bitmap-brush.png`, both with the
+  playhead on frame 3, neither existing before its step; the runner measures their hash and mtime and compares them. The
+  saved file is measured by the runner and compared with the verified scene and component layers and key frames, and
+  reopening must give a new document. A uniform capture leaves the pixel clause `unrun` with the reason. Not exercised
+  (see the row's `taskEvidence`): Text, the Fill tool, Pen continue, Perspective snap, bitmap re-bake on Select, component camera keys and markers.
 - `legacy-import` (#2355; PRs 2772, 2774, 2777). A person opens the copied baseline files through the native picker,
   presses Cmd+S, Save As onto the original, F5, Cmd+Z, Cmd+Shift+Z and opens the saved file. The scenario measures the
   sha256, size and modified time of every old file after every phase, compares the opened document (scene frames,
@@ -220,8 +243,8 @@ add `exprGlobals` or `trackRoles`) into `<report>/legacy-source/` and asks the o
 A refusal before or around launch prints one line to stderr:
 `CS7 batch refused or incomplete (<reason>); inspect its private receipt. No acceptance claimed.`
 `<reason>` is the harness check's fixed message (for example `selected installed row b depends
-on a row outside the selection: a`). Any other error (file system, JSON syntax, scenario
-code) is reduced to its class and code, such as `SyntaxError` or `Error ENOENT`, so paths and
+on a row outside the selection: a`). Only an error raised by the harness `requireCheck` is quoted. Any other error (file system, JSON syntax, scenario
+code, even a plain `Error` with a short message) is reduced to its class and code, such as `SyntaxError` or `Error ENOENT`, so paths and
 evidence content never reach the terminal. Failures after launch are classified in the private
 receipt as before.
 

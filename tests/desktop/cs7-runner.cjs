@@ -81,6 +81,11 @@ function readyRows(declarations, { taskIds, surfaceIds, taskSurfaces, scenarios,
         check(Array.isArray(row[key]) && (key === 'surfaces' || row.status === 'Blocked' || row[key].length > 0 || Object.keys(row.partialTasks || {}).length > 0) &&
           new Set(row[key]).size === row[key].length && row[key].every(id => known.has(id)), 'installed row references unknown or duplicate ' + key);
       }
+      // `surfaces`: controls whose use or state the harness itself observed. `operatorAttestedSurfaces`: routes only the operator can
+      // vouch for (a shortcut key, a context-menu item, a native picker); they never count toward a task's coverage.
+      const attested = row.operatorAttestedSurfaces === undefined ? [] : row.operatorAttestedSurfaces;
+      check(Array.isArray(attested) && new Set(attested).size === attested.length && attested.every(id => surfaceIds.has(id)) &&
+        attested.every(id => !row.surfaces.includes(id)), 'installed operatorAttestedSurfaces unknown, duplicate or also in surfaces');
       checkTaskCoverage(row, taskSurfaces);
       check(Array.isArray(row.dependsOn) && new Set(row.dependsOn).size === row.dependsOn.length, 'installed dependencies required');
       check(Array.isArray(row.checks) && row.checks.length > 0, 'installed assertions required');
@@ -137,6 +142,7 @@ function rowResult(row, observations, status) {
   check(byId.size === observations.length && observations.every(c => row.checks.some(d => d.id === c.id)), 'unexpected installed assertion');
   return {
     id: row.id, issue: row.issue, status, tasks: row.tasks, partialTasks: structuredClone(row.partialTasks || {}), surfaces: row.surfaces,
+    operatorAttestedSurfaces: [...(row.operatorAttestedSurfaces || [])],
     ...(row.acceptanceReference ? { acceptanceReference: row.acceptanceReference } : {}),
     checks: row.checks.map(c => {
       const result = byId.get(c.id);
@@ -259,6 +265,8 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
     kindsCovered: KINDS.filter(k => covered.has(k)), kindsMissing: KINDS.filter(k => !covered.has(k)), verdict,
     ...(selected ? { selection: selected } : {}),
     ...publishedTasks(rows),
+    // Routes the harness could not observe, reported apart from the observed `surfaces` of each row so they never read as observed.
+    operatorAttestedSurfaces: [...new Set(rows.flatMap(r => r.operatorAttestedSurfaces || []))],
     installed: { identity: identity || null, operatorInputFailures, evidenceFailures, cleanup, terminalCode, failure, rows: results },
   };
   await save(result);
