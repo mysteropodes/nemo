@@ -846,7 +846,8 @@
         "scene_effect_scene_join_stack.rs",
         "object_raster_compositor.rs",
         "object_layered_content.rs",
-        "scene_effect_gpu_blend_fx.rs"
+        "scene_effect_gpu_blend_fx.rs",
+        "scene_effect_gpu_blend_items.rs"
       ],
       "publicApi": [
         "compositor.rs"
@@ -1743,6 +1744,7 @@
         "native_media_frame_export.rs",
         "native_media_frame_export_timing.rs",
         "native_media_retained_witness.rs",
+        "native_media_layered_pixels.rs",
         "native_import_transaction.rs",
         "native_import_transaction_atomic.rs",
         "native_import_transaction_chain.rs",
@@ -1933,6 +1935,7 @@
         "scene_effect_scene_join_families.rs",
         "scene_effect_scene_join_families_docs.rs",
         "scene_effect_scene_join_folder.rs",
+        "scene_effect_scene_join_items.rs",
         "scene_effect_layered_view.rs",
         "scene_effect_scene_join_stack.rs",
         "scene_effect_scene_join_support.rs",

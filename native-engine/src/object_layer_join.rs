@@ -12,9 +12,14 @@ impl ObjectCompositionWitness {
     /// Join THIS witness' packet to its layer-composition and effect-stack plan, so the viewport and the export select
     /// the same compositor path (`select_composition_path`). Every selected record is claimed by the compositor itself
     /// (the paint plan draws each of them, or refuses the frame), so a scene that needs none of the layered features
-    /// stays `Flat` and keeps the accepted fast path. An input the join cannot sample (an animated `blend` or `matteOn`
-    /// track, keyed effect parameters, an item-level effect) is a typed refusal here, never a neutral value.
-    pub(crate) fn with_joined_layers(self) -> Result<Self, ObjectSceneError> {
+    /// stays `Flat` and keeps the accepted fast path. Keyed effect parameters and a keyed `matteOn` are sampled at the
+    /// frame; an input the join cannot sample (an expressed `matteOn`, a `blend` track) is a typed refusal here,
+    /// never a neutral value.
+    ///
+    /// `effect_zoom` is the baseline `Viewport::effect_zoom` that scales every pixel-space effect radius: the session
+    /// navigation zoom of a viewport witness and 1 for an export, which renders document pixels 1:1. The stored
+    /// camera is NOT part of it: the baseline applies the camera to the items and leaves `effect_zoom` alone.
+    pub(crate) fn with_joined_layers(self, effect_zoom: f64) -> Result<Self, ObjectSceneError> {
         let packet = self.plan().packet();
         let refused = |reason| ObjectSceneError::UnsupportedGeometry {
             source_object_index: 0,
@@ -27,18 +32,16 @@ impl ObjectCompositionWitness {
         }
         let joined = join_scene(packet, &pin, vec![claims])
             .map_err(|_| refused("layer composition order unavailable"))?;
-        let zoom = self.camera_matrix().map_or(1., |m| m[0].hypot(m[1]));
-        let effects = plan_scene_effects(packet, &joined, &JoinOptions::new(zoom, &|_| false))
+        let effects = plan_scene_effects(packet, &joined, &JoinOptions::new(effect_zoom, &|_| false))
             .map_err(|error| match error {
                 SceneEffectJoinError::MaskInputs(inner) => inner,
                 SceneEffectJoinError::EffectParametersUnavailable { .. } => {
-                    refused("animated layer effect parameters are unavailable")
+                    refused("a keyed effect parameter could not be sampled")
                 }
                 SceneEffectJoinError::LayerCompositionPropertyUnavailable { property, .. } => {
                     refused(match property {
-                        "itemEffects" => "element effects are unavailable",
-                        "matteOn" => "an animated matte switch is unavailable",
-                        _ => "an animated blend mode is unavailable",
+                        "matteOn" => "an expressed matte switch is unavailable",
+                        _ => "a blend mode track is unavailable",
                     })
                 }
                 _ => refused("layer composition plan unavailable"),

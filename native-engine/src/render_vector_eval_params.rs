@@ -170,12 +170,15 @@ pub(crate) fn null_layer_motion_target(
         && layer.rig.value().is_none()
         && !layer.folder_id.value().is_some_and(Option::is_some)
         && !layer.follow_path.value().is_some_and(Option::is_some)
-        && !layer.blend_mode().is_some_and(|v| v != "normal")
-        && !layer.matte_mode().is_some_and(|v| v != "none")
-        && layer.matte_source_layer_uid.value().is_none()
-        && !layer.mattes_more.value().is_some_and(|v| !v.is_empty())
-        && !layer.effects.value().is_some_and(|v| !v.is_empty())
-        && layer.effects_from.value().is_none()
+        // #2257: a FOLDER carries its own effect stack (`sceneEffectsOf`, the borrowed one included), which the layered
+        // join applies to the flattened group; the baseline ignores a folder's blend and matte, so they are inert.
+        && (layer.is_folder_layer()
+            || (!layer.blend_mode().is_some_and(|v| v != "normal")
+                && !layer.matte_mode().is_some_and(|v| v != "none")
+                && layer.matte_source_layer_uid.value().is_none()
+                && !layer.mattes_more.value().is_some_and(|v| !v.is_empty())
+                && !layer.effects.value().is_some_and(|v| !v.is_empty())
+                && layer.effects_from.value().is_none()))
         && !layer
             .path_fx()
             .is_some_and(|fx| fx.iter().any(|f| f.enabled_flag() != Some(false)))

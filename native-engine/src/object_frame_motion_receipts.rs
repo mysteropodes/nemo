@@ -233,7 +233,11 @@ pub(crate) fn remaining_holder(
         && target.context_id() == "scene-root"
         && document.layers().iter().any(|l| l.layer_uid() == target.layer_uid());
     let base = layer || common || text_element(document, target);
-    if !(base || dormant_layer) {
+    // #2257: a layer's `matteOn` track is consumed by the layer-composition join (`matteOnAt`, `>= 50` is matted).
+    let matte_on = target.stroke_id().is_none()
+        && target.context_id() == "scene-root"
+        && document.layers().iter().any(|l| l.layer_uid() == target.layer_uid());
+    if !(base || dormant_layer || matte_on) {
         return None;
     }
     // A mixed visible contour and Text/raster layer
@@ -259,7 +263,9 @@ pub(crate) fn remaining_holder(
         let dormant_key = dormant_layer && ["positionZ", "rotationX", "rotationY"].contains(&key);
         let consumed = KEYS.contains(&key)
             || ((common || dormant_key) && ["positionZ", "rotationX", "rotationY"].contains(&key));
-        let owned = (base && consumed && (common || !mixed || key == "opacity")) || dormant_key;
+        let owned = (base && consumed && (common || !mixed || key == "opacity"))
+            || dormant_key
+            || (matte_on && key == "matteOn");
         !owned || (!evaluated && p.expression.value().is_some_and(|e| e.enabled))
     });
     if remaining.properties.len() == holder.properties().len() {

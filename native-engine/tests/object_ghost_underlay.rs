@@ -31,12 +31,20 @@ fn square(frame: u32, id: &str, x: i64, fill: [f64; 3]) -> Value {
 }
 /// Four frames; keys at 2 (red square, x 24..44) and 3 (blue square, x 36..56): they overlap at x 36..44.
 fn owner() -> NativeObjectHistory {
+    owner_with(json!({}))
+}
+/// The same project with `layer_extra` merged into layer L0 (a blend mode, for the layered compositor).
+pub(super) fn owner_with(layer_extra: Value) -> NativeObjectHistory {
     let scope = |frame: u32, id: &str| json!({"frameScope":{"kind":"authored","frame":frame},"elements":[{"layerUid":"L0","strokeId":id,"naturalPosition":0,"order":{}}]});
     let timing = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":2},{"frame":3}],"samples":[]});
+    let mut layer = json!({"layerUid":"L0","timing":timing});
+    for (key, value) in layer_extra.as_object().into_iter().flatten() {
+        layer[key] = value.clone();
+    }
     let bytes = serde_json::to_vec(&json!({"format":"nemo.native-project-document","formatVersion":1,
         "project":{"canvasW":64,"canvasH":64,"fps":24},"viewportReference":null,"assets":[],
         "drawing":{"format":"nemo.native-object-document","formatVersion":2,"totalFrames":4,
-            "layers":[{"layerUid":"L0","timing":timing}],
+            "layers":[layer],
             "objects":[square(2,"red",24,[1.,0.,0.]), square(3,"blue",36,[0.,0.,1.])],
             "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
                 "contexts":[{"contextId":"scene-root","layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],

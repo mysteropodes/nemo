@@ -8,14 +8,16 @@
 //! * a `Layered` plan becomes a `GpuLayerStack` (L08-G) whose per-wire-layer fills are the paint plan's commands
 //!   grouped by SOURCE layer and placed at that layer's paint-order wire index, validated as a whole, and checked to
 //!   cover the plan exactly once (`covers_plan`), so a layer can neither lose nor duplicate a command.
-//! Every layered feature G cannot render yet (element effect stacks, custom shaders) comes back as the typed
-//! `GpuBlendError::Unavailable` it already is; nothing is dropped. Layer, folder and effect-layer stacks are the
-//! join's planned `EffectStackPlan`s, admitted against each layer's box when the stack is composed.
+//! Every layered feature G cannot render (a custom shader, an item stack no supported entry owns) comes back as the typed
+//! `GpuBlendError::Unavailable` it already is; nothing is dropped. Layer, folder, effect-layer and item stacks are the
+//! join's planned `EffectStackPlan`s, admitted against each layer's or item's box when the stack is composed.
 //! No texture, device or scheduler state is touched: the compositor entries run the returned stack.
 use crate::compositor::scene_effect_gpu_blend::{
     layer_runs_from_plan, GpuBlendError, GpuFill, GpuLayerInput, GpuLayerPaint, GpuLayerStack,
-    GpuMask, GpuMaskMode,
+    GpuMask, GpuMaskMode, GpuUnavailable,
 };
+use crate::compositor::object_compositor::layered::item_object;
+use crate::object_render_scene::layered_entries;
 use crate::object_render_scene::mask_inputs::ObjectMaskMode;
 use crate::object_render_scene::scene_effect_kernels::scene_effect_order::{
     CompositionPlan, LayerStep, PaintSource, SkipReason,
@@ -127,6 +129,25 @@ pub(crate) fn select_composition_path<'a>(
     for (slot, layer) in join.layers().iter().enumerate() {
         inputs[slot].source_layer = Some(layer.source_layer_index);
         inputs[slot].effects = layer.stack.as_ref();
+        inputs[slot].item_effects = layer
+            .item_stacks
+            .iter()
+            .map(|(object, stack)| (*object, stack))
+            .collect();
+    }
+    // Every item stack is drawn by exactly the entry that owns its record; a stack no supported entry claims (a
+    // brush ink, a duplicator copy, a placed component, a video slot) is refused typed, never dropped.
+    if join.layers().iter().any(|layer| !layer.item_stacks.is_empty()) {
+        let claimed: std::collections::BTreeSet<usize> = layered_entries(plan)
+            .filter_map(|(_, entry)| item_object(plan, &entry))
+            .collect();
+        for (slot, layer) in join.layers().iter().enumerate() {
+            if layer.item_stacks.iter().any(|(object, _)| !claimed.contains(object)) {
+                return Err(PathSelectionError::Stack(GpuBlendError::Unavailable(
+                    GpuUnavailable::ElementEffects { layer: slot },
+                )));
+            }
+        }
     }
     for run in runs {
         let slot = join.wire_index_of_source(run.source_layer_index).ok_or(

@@ -102,13 +102,15 @@ fn the_stack_carries_the_folder_children_in_order_and_skips_them_at_the_top_leve
                         layer: 2,
                         blend: 0,
                         seeds: true,
-                        effects: false
+                        effects: false,
+                        elements: false
                     },
                     GpuFolderChild {
                         layer: 3,
                         blend: 1,
                         seeds: false,
-                        effects: false
+                        effects: false,
+                        elements: false
                     },
                 ])
             ),

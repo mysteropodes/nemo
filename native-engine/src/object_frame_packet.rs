@@ -4,7 +4,7 @@ use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_
 // Detached geometry planning is a frame-source port; rendering never owns publication.
 pub(crate) use crate::object_document::subselect::record as subselect_record;
 pub(crate) use crate::object_document::{
-    AuthoredOrder, BitmapBrushFields, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget,
+    AuthoredOrder, BitmapBrushFields, FrameScopeKind, LayerEffect, ObjectLayer, ObjectRecord, ObjectTarget,
     Presence, PropertyHolderTarget, SolidFill, VECTOR_FAMILY,
 };
 use crate::revision::ObjectSnapshot;

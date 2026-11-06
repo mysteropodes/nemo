@@ -3,9 +3,9 @@
 //! A `GpuLayerStack` is the L08-A `CompositionPlan` joined to per-layer paint:
 //! it holds no texture, device or scheduler state and is validated completely
 //! BEFORE any GPU allocation. A flat plan is refused (`FlatPlan`): the object
-//! compositor's fast path keeps painting it unchanged. Every baseline feature
-//! this leaf does not render (effect stacks, element effects, folders, mask
-//! feather) is a typed `Unavailable` refusal, never a silent drop.
+//! compositor's fast path keeps painting it unchanged. A planned feature whose
+//! input is missing (an effect stack, item stacks) is a typed `Unavailable`
+//! refusal, never a silent drop.
 
 use crate::object_render_scene::object_scene_style_emit::{prepare_item, PreparedItem};
 use crate::object_render_scene::scene_effect_kernels::scene_effect_order::{
@@ -92,6 +92,9 @@ pub(crate) struct GpuLayerInput<'a> {
     /// The planned effect stack of this layer (`None` when no entry is enabled): its own stack for an ordinary or
     /// folder layer, the "into" stack of an effect layer. Admission against the layer's box happens at compose time.
     pub(crate) effects: Option<&'a EffectStackPlan>,
+    /// Item-level stacks of this layer's own objects, by source object index: the baseline `item.effects`. An item
+    /// with a stack here is isolated and graded on its own box before it joins its run.
+    pub(crate) item_effects: BTreeMap<usize, &'a EffectStackPlan>,
 }
 
 /// Baseline features the layered path does not render.
@@ -165,6 +168,8 @@ pub(crate) struct GpuFolderChild {
     pub(crate) seeds: bool,
     /// The child's own effect stack runs on its isolated paint before it folds into the folder.
     pub(crate) effects: bool,
+    /// The child paints through its item-level stacks (`paint_layer_with_element_effects`).
+    pub(crate) elements: bool,
 }
 
 /// One planned paint step: the layer, its resolved mattes, its blend index. A folder step carries its children:
@@ -179,6 +184,8 @@ pub(crate) struct GpuStep {
     pub(crate) effects: bool,
     /// An adjustment layer: no paint of its own, its stack grades the accumulator below it.
     pub(crate) effect_layer: bool,
+    /// The layer paints through its item-level stacks (`paint_layer_with_element_effects`).
+    pub(crate) elements: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -245,6 +252,7 @@ impl<'a> GpuLayerStack<'a> {
                             folder: None,
                             effects: true,
                             effect_layer: true,
+                            elements: false,
                         });
                     }
                 }
@@ -254,6 +262,9 @@ impl<'a> GpuLayerStack<'a> {
                     let has_effects = |index: usize| {
                         inputs.get(index).is_some_and(|input| input.effects.is_some())
                     };
+                    let has_items = |index: usize| {
+                        inputs.get(index).is_some_and(|input| !input.item_effects.is_empty())
+                    };
                     let unavailable = match &paint.source {
                         PaintSource::Plain | PaintSource::Folder(_)
                             if paint.layer_effects && !has_effects(layer) =>
@@ -261,6 +272,7 @@ impl<'a> GpuLayerStack<'a> {
                             Some(GpuUnavailable::LayerEffects { layer })
                         }
                         PaintSource::Plain => None,
+                        PaintSource::ElementEffects if has_items(layer) => None,
                         PaintSource::ElementEffects => {
                             Some(GpuUnavailable::ElementEffects { layer })
                         }
@@ -273,7 +285,7 @@ impl<'a> GpuLayerStack<'a> {
                                         index: child.index,
                                     });
                                 }
-                                refused = refused.or(if child.item_effects {
+                                refused = refused.or(if child.item_effects && !has_items(child.index) {
                                     Some(GpuUnavailable::ElementEffects { layer: child.index })
                                 } else if child.layer_effects && !has_effects(child.index) {
                                     Some(GpuUnavailable::LayerEffects { layer: child.index })
@@ -285,6 +297,7 @@ impl<'a> GpuLayerStack<'a> {
                                     blend: child.blend,
                                     seeds: child.seeds_accumulator,
                                     effects: child.layer_effects,
+                                    elements: child.item_effects,
                                 });
                             }
                             folder = Some(flattened);
@@ -320,6 +333,7 @@ impl<'a> GpuLayerStack<'a> {
                         folder,
                         effects: paint.layer_effects,
                         effect_layer: false,
+                        elements: paint.source == PaintSource::ElementEffects,
                     });
                 }
             }
