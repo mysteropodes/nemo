@@ -80,6 +80,11 @@
       var ob=decor(doc,'div','lico comp-badge native-layer-opacity','Opacity: '+shown+(layer.opacityAnimated===true?' (animated — static value shown)':''));
       ob.innerHTML=BADGE+shown+'</span>';ob.style.width='auto';after.push(ob);
     }
+    // #2520: the baseline 3D Layer column cell (.motion-col-3d, before the Duplicator one) comes from the caller's hook; a click hands it a layer-policy edit of threeD.
+    if(typeof context.threeDCell==='function'&&typeof context.onPolicy==='function'){
+      var tc=context.threeDCell(layer,function(value){return context.onPolicy(layer,'threeD',value,node);});
+      if(tc){tc.style.order='1';after.push(tc);}
+    }
     // #2256: the baseline Duplicator column cell (.motion-col-duplicator) comes from the caller's hook too; its on/off state is the row's hasDuplicator fact.
     if(typeof context.duplicatorCell==='function'){var dc=context.duplicatorCell(layer,i,node);if(dc){dc.style.order='1';after.push(dc);}}
     // The baseline Parent cell (.lparent) comes from the caller's hook: it owns the Parent A edit, this file commits nothing.

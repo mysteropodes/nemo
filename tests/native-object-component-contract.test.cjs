@@ -18,12 +18,13 @@ const VALID = [
   ['duplicator.path', { command: 'object.duplicator.path', layerUid: 'layer-a', pathLayerUid: 'layer-b' }],
   // #2256 Q4: the inspector's closed partial edit; every member but the layer is optional.
   ['duplicator.config', { command: 'object.duplicator.config', layerUid: 'layer-a', mode: 'radial', rows: 3, cols: 4, spacingX: 150.5, spacingY: -20, count: 12, radius: 240, startAngle: 45,
-    radialOrient: true, pathAlignTangent: false, seed: 482913, staggerRandom: { position: true, hue: false }, timeOffset: { enabled: true, offsetFrames: 2.5, direction: 'centerOut' } }],
+    radialOrient: true, pathAlignTangent: false, seed: 482913, staggerRandom: { position: true, hue: false }, timeOffset: { enabled: true, offsetFrames: 2.5, direction: 'centerOut' },
+    effectorPos: { index: 1, x: 120.5, y: -40 } }],
   // #2256 Q5: the Component Instance panel's closed partial edit of the stored playback record.
   ['component.instance.set', { command: 'object.component.instance.set', layerUid: 'layer-a', mode: 'single', singleFrame: 9, placedAt: -4, speed: 2.5, atFrame: 12 }],
 ];
 const OPTIONAL = { 'component.expose': ['default'], 'duplicator.set': ['seed'],
-  'duplicator.config': ['mode', 'rows', 'cols', 'spacingX', 'spacingY', 'count', 'radius', 'startAngle', 'radialOrient', 'pathAlignTangent', 'seed', 'staggerRandom', 'timeOffset'],
+  'duplicator.config': ['mode', 'rows', 'cols', 'spacingX', 'spacingY', 'count', 'radius', 'startAngle', 'radialOrient', 'pathAlignTangent', 'seed', 'staggerRandom', 'timeOffset', 'effectorPos'],
   'component.instance.set': ['mode', 'singleFrame', 'placedAt', 'speed', 'atFrame'] };
 const envelope = (suffix, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'component-1', instanceId: 'instance-A', documentId: 'document-A',
   operation: P + suffix, expectedRevision: 7, payload }, extra);

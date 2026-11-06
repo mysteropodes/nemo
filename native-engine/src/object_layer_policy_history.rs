@@ -48,3 +48,8 @@ mod key_batch_tests;
 #[cfg(test)]
 #[path = "../tests/object_key_warp_color_edit.rs"]
 mod key_warp_color_tests;
+
+// #2520/#2525: the 3D layer switch through layer policy, its row fact, its property list and its gizmo bounds.
+#[cfg(test)]
+#[path = "../tests/object_layer_three_d.rs"]
+mod three_d_tests;

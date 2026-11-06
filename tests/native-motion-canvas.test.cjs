@@ -5,7 +5,8 @@
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 
 const ROOT = path.join(__dirname, '..', 'src', 'js', 'adapters');
-const SOURCES = ['native-object-widget-ui.js', 'native-motion-canvas-math.js', 'native-motion-canvas.js'];
+const SOURCES = ['native-object-widget-ui.js', 'native-motion-canvas-math.js', 'native-motion-effector.js', 'native-motion-canvas.js'];
+const CURVE = path.join(__dirname, '..', 'src', 'js', 'animation', 'curve.js');
 const LAYER = 'native-layer:1:0', PIN = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
 const BASE = { bounds: [100, 100, 300, 200], position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100] };
 
@@ -30,7 +31,10 @@ function harness(options) {
     async readProperty(selector) {
       reads.push(selector.view);
       const v = selector.view;
-      if (v.kind === 'layerBounds') return { kind: 'layerBounds', bounds: values.bounds, parentLayerUid: layer.parentLayerUid, frame: v.frame };
+      if (v.kind === 'layerBounds') {
+        if (o.boundsError) { const e = new Error('unavailable'); e.code = o.boundsError; throw e; }
+        return { kind: 'layerBounds', bounds: values.bounds, parentLayerUid: layer.parentLayerUid, parentAffine: values.parentAffine || [1, 0, 0, 1, 0, 0], frame: v.frame };
+      }
       if (v.kind === 'rawSample') return { kind: 'rawSample', value: values[v.property], frame: v.frame };
       return { kind: 'authoredKeys', items: keys, nextOffset: null, trackPresent: keys.length > 0 };
     },
@@ -53,6 +57,7 @@ function harness(options) {
     getElementById: (id) => (id === 'canvas-area' ? area : null), createElementNS: (ns, name) => make(name) };
   sandbox.requestAnimationFrame = (fn) => { frames.push(fn); return frames.length; };
   vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(CURVE, 'utf8'), sandbox, { filename: 'curve.js' });
   for (const file of SOURCES) vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), sandbox, { filename: file });
   const ctl = sandbox.NemoNativeMotionCanvas.desktop(vm.runInContext('globalThis', sandbox));
   const flush = () => { for (let n = 0; n < 3 && frames.length; n++) frames.splice(0).forEach((fn) => fn()); };
@@ -109,15 +114,32 @@ test('the Rotate ring writes rotation and the scale handles write scale, each fr
   await d.drag([200 + 36 * Math.cos(Math.PI / 6), 150 + 36 * Math.sin(Math.PI / 6)], [200 + 36 * Math.cos(Math.PI / 3), 150 + 36 * Math.sin(Math.PI / 3)]);
   assert.equal(Math.round(written(d)[0].action.values[0] * 1e4) / 1e4, 60, 'a turn adds the pointer angle to the stored rotation');
 });
-test('Alt+drag moves the anchor when no compensation is needed, and refuses with a notice otherwise', async () => {
+test('Alt+drag moves the anchor; with Rotation or Scale set the SAME edit carries keepPose so Position follows in one revision', async () => {
   const a = harness(); await a.ready();
   await a.drag([200, 150], [220, 160], { altKey: true });
-  assert.deepEqual(written(a), [{ property: 'anchor', action: { kind: 'setValue', frame: 0, values: [20, 10] } }]);
+  assert.deepEqual(written(a), [{ property: 'anchor', action: { kind: 'setValue', frame: 0, values: [20, 10] } }], 'no compensation needed at Rotation 0 and Scale 100');
   const b = harness({ values: { rotation: [30] } }); await b.ready();
-  const pivot = [200, 150];
-  await b.drag(pivot, [220, 160], { altKey: true });
-  assert.equal(b.edits.length, 0);
-  assert.match(b.toasts[0], /anchor_compensation/);
+  await b.drag([200, 150], [220, 160], { altKey: true });
+  const w = written(b);
+  assert.equal(w.length, 1, 'one edit, not an anchor edit plus a Position edit');
+  assert.equal(w[0].property, 'anchor');
+  assert.equal(w[0].action.keepPose, true);
+  // the pointer in the layer's own space: inverse of the 30 degree turn about the pivot, minus the bounds centre
+  const c30 = Math.cos(Math.PI / 6), s30 = Math.sin(Math.PI / 6);
+  assert.deepEqual(w[0].action.values.map((v) => Math.round(v * 1e4) / 1e4), [Math.round((20 * c30 + 10 * s30) * 1e4) / 1e4, Math.round((-20 * s30 + 10 * c30) * 1e4) / 1e4]);
+  assert.deepEqual(b.toasts, []);
+  const c = harness({ values: { scale: [200, 100] } }); await c.ready();
+  await c.drag([200, 150], [220, 160], { altKey: true });
+  assert.equal(written(c)[0].action.keepPose, true, 'a Scale other than 100 percent also needs the compensation');
+});
+test('the box stays put while a keepPose anchor is dragged (the preview applies the same Position follow)', async () => {
+  const h = harness({ values: { rotation: [30], scale: [150, 100] } }); await h.ready();
+  const before = h.overlay().children[0].attrs.points.split(' ').map((p) => p.split(',').map(Number));
+  await h.drag([200, 150], [260, 190], { altKey: true }, false);
+  h.flush();
+  const during = h.overlay().children.find((c) => c.name === 'polygon' && c.attrs.stroke === 'rgba(255,184,108,1)').attrs.points.split(' ').map((p) => p.split(',').map(Number));
+  assert.ok(during.every((q, i) => Math.abs(q[0] - before[i][0]) < 1e-6 && Math.abs(q[1] - before[i][1]) < 1e-6), 'corners unchanged: ' + JSON.stringify([before, during]));
+  assert.equal(h.edits.length, 0, 'nothing is written before the release');
 });
 test('a Position key diamond is grabbed on its own frame and written as setKey', async () => {
   const keys = [{ frame: 0, v: [0, 0] }, { frame: 10, v: [100, 50] }];
@@ -128,7 +150,7 @@ test('a Position key diamond is grabbed on its own frame and written as setKey',
   await away.drag([250, 175], [270, 185]);
   assert.deepEqual(written(away), [{ property: 'position', action: { kind: 'setValue', frame: 5, values: [70, 35] } }], 'off a key the drag keys the playhead, never an existing key');
   const svg = harness({ keys }); await svg.ready();
-  assert.ok(svg.overlay().children.some((c) => c.name === 'path'), 'the Position path is drawn between the keys');
+  assert.ok(svg.overlay().children.some((c) => c.name === 'polyline'), 'the Position path is drawn between the keys');
 });
 test('Escape, a frame change and a replaced owner commit nothing', async () => {
   const a = harness(); await a.ready();
@@ -142,8 +164,8 @@ test('Escape, a frame change and a replaced owner commit nothing', async () => {
   assert.equal(c.edits.length, 0, 'the document changed under the gesture');
   assert.equal(c.ctl.dragging(), false);
 });
-test('a locked layer, a parented layer, several selected layers, another mode and a component context take no gesture', async () => {
-  for (const [name, opts, prep] of [['locked', { layer: { locked: true } }], ['parented', { layer: { parentLayerUid: 'native-layer:0:0' } }], ['anim2d', { appMode: 'anim2d' }],
+test('a locked layer, several selected layers, another mode and a component context take no gesture', async () => {
+  for (const [name, opts, prep] of [['locked', { layer: { locked: true } }], ['anim2d', { appMode: 'anim2d' }],
     ['several', {}, (h) => { h.sandbox._layerSel = [0, 1]; }], ['component', {}, (h) => { h.sandbox.state.activeSymbolId = 'c1'; }]]) {
     const h = harness(opts); if (prep) prep(h);
     await h.ready();
@@ -165,4 +187,76 @@ test('a refused edit is a notice, never a throw, and the pan offset never reache
 test('no Paper or legacy layer model is read: the module needs only the native session', async () => {
   const h = harness(); await h.ready();
   for (const name of ['SMMotion', 'paper', 'userLayers', 'pushUndo']) assert.equal(h.sandbox[name], undefined, name);
+});
+
+const AFFINE_90 = [0, 1, -1, 0, 0, 0]; // (x, y) -> (-y, x)
+test('a parented layer is drawn and dragged through its ancestors: a translation, then a quarter turn (#2520)', async () => {
+  const t = harness({ values: { parentAffine: [1, 0, 0, 1, 40, 30] }, layer: { parentLayerUid: 'native-layer:0:0' } }); await t.ready();
+  assert.equal(t.overlay().children[0].attrs.points, '140,130 340,130 340,230 140,230', 'the box sits where the ancestor puts it');
+  await t.drag([240, 180], [300, 200]);
+  assert.deepEqual(written(t), [{ property: 'position', action: { kind: 'setValue', frame: 0, values: [60, 20] } }]);
+  const r = harness({ values: { parentAffine: AFFINE_90 }, layer: { parentLayerUid: 'native-layer:0:0' } }); await r.ready();
+  assert.equal(r.overlay().children[0].attrs.points, '-100,100 -100,300 -200,300 -200,100');
+  await r.drag([-150, 200], [-150, 260]);
+  assert.deepEqual(written(r), [{ property: 'position', action: { kind: 'setValue', frame: 0, values: [60, 0] } }], 'a world delta (0, 60) is the layer-space delta (60, 0)');
+  const g = harness({ values: { parentAffine: AFFINE_90 }, layer: { parentLayerUid: 'native-layer:0:0' } }); await g.ready();
+  await g.drag([-150, 200], [-120, 260], { shiftKey: true });
+  assert.deepEqual(written(g)[0].action.values, [60, 0], 'the axis lock is a world axis: (30, 60) locks to (0, 60), which is (60, 0) in the layer');
+});
+test('a parented layer keeps its anchor, rotation and key gestures in the ancestors\' frame (#2520)', async () => {
+  const keys = [{ frame: 0, v: [0, 0] }, { frame: 10, v: [100, 50] }];
+  const h = harness({ keys, values: { parentAffine: AFFINE_90 }, layer: { parentLayerUid: 'native-layer:0:0' } }); await h.ready();
+  await h.drag([-150, 200], [-170, 230]); // the key at frame 0 is at the pivot (200, 150) -> (-150, 200); world (-20, 30) -> local (30, 20)
+  assert.deepEqual(written(h), [{ property: 'position', action: { kind: 'setKey', frame: 0, values: [30, 20] } }]);
+  const a = harness({ values: { parentAffine: AFFINE_90 }, layer: { parentLayerUid: 'native-layer:0:0' } }); await a.ready();
+  await a.drag([-150, 200], [-160, 220], { altKey: true });
+  assert.deepEqual(written(a), [{ property: 'anchor', action: { kind: 'setValue', frame: 0, values: [20, 10] } }], 'world (-10, 20) is local (20, 10)');
+  const mirrored = harness({ values: { parentAffine: [-1, 0, 0, 1, 0, 0] }, layer: { parentLayerUid: 'native-layer:0:0' } }); await mirrored.ready();
+  const ring = [-200 + 36, 150];
+  await mirrored.drag(ring, [-200, 150 + 36]);
+  assert.equal(Math.round(written(mirrored)[0].action.values[0] * 1e4) / 1e4, -90, 'a mirroring ancestor reverses the sense of a turn');
+  const collapsed = harness({ values: { parentAffine: [0, 0, 0, 0, 0, 0] }, layer: { parentLayerUid: 'native-layer:0:0' } }); await collapsed.ready();
+  assert.equal((await collapsed.drag([200, 150], [260, 170])).d.stopped, false, 'a collapsed ancestor leaves no box to grab');
+});
+test('spatial key handles hIn / hOut are drawn, grabbed on any frame and written as setKeyHandle (#2520)', async () => {
+  const keys = [{ frame: 0, v: [0, 0], hOut: [50, 0] }, { frame: 10, v: [100, 50], hIn: [-40, 0] }];
+  const h = harness({ keys, frame: 5, values: { position: [50, 25] } }); await h.ready();
+  const circles = h.overlay().children.filter((c) => c.name === 'circle' && c.attrs.r === 4);
+  assert.equal(circles.length, 2, 'both handles are drawn');
+  await h.drag([250, 150], [270, 180]);
+  assert.deepEqual(written(h), [{ property: 'position', action: { kind: 'setKeyHandle', frame: 0, handle: 'hOut', values: [70, 30] } }], 'relative to its key, at the key\'s own frame');
+  const i = harness({ keys, frame: 5, values: { position: [50, 25] } }); await i.ready();
+  await i.drag([260, 200], [280, 190]); // the hIn handle of the key at frame 10 sits at pivot + (100, 50) + (-40, 0) = (260, 200)
+  assert.deepEqual(written(i), [{ property: 'position', action: { kind: 'setKeyHandle', frame: 10, handle: 'hIn', values: [-20, -10] } }]);
+  const zero = [{ frame: 0, v: [0, 0] }, { frame: 10, v: [100, 50] }];
+  const onKey = harness({ keys: zero }); await onKey.ready();
+  await onKey.drag([200, 150], [230, 170]);
+  assert.equal(written(onKey)[0].action.kind, 'setKey', 'a zero handle never hides the current frame\'s key');
+  const away = harness({ keys: zero, frame: 5, values: { position: [50, 25] } }); await away.ready();
+  await away.drag([200, 150], [230, 170]);
+  assert.deepEqual(written(away), [{ property: 'position', action: { kind: 'setKeyHandle', frame: 0, handle: 'hOut', values: [30, 20] } }], 'on another frame the zero handle is pulled out of its key');
+});
+test('the Position path is sampled once per frame through each key\'s easing (#2520)', async () => {
+  const keys = [{ frame: 0, v: [0, 0] }, { frame: 10, v: [100, 50] }];
+  const h = harness({ keys }); await h.ready();
+  const kids = h.overlay().children, line = kids.find((c) => c.name === 'polyline');
+  const pts = line.attrs.points.split(' ').map((p) => p.split(',').map(Number));
+  assert.equal(pts.length, 11, 'one sample per frame from frame 0 to frame 10');
+  assert.deepEqual(pts[0], [200, 150]); assert.deepEqual(pts[10], [300, 200]);
+  const gaps = pts.slice(1).map((p, i) => p[0] - pts[i][0]);
+  assert.ok(gaps[0] < gaps[5] && gaps[9] < gaps[5], 'dense at both ends of the default ease, wide in the middle: ' + gaps.join(','));
+  assert.equal(kids.filter((c) => c.name === 'circle' && c.attrs.r === 1.3).length, 11, 'a small dot at every frame');
+  const hold = harness({ keys: [{ frame: 0, v: [0, 0], hold: true }, { frame: 10, v: [100, 50] }] }); await hold.ready();
+  const held = hold.overlay().children.find((c) => c.name === 'polyline').attrs.points.split(' ');
+  assert.equal(new Set(held.slice(0, 10)).size, 1, 'a hold key stays on its point until the next key');
+});
+test('a layer the native read cannot box says so once instead of staying silent (#2520)', async () => {
+  const h = harness({ boundsError: 'unavailable' });
+  await h.ready(); await h.ctl.refresh(); await h.ctl.refresh();
+  assert.equal(h.toasts.length, 1);
+  assert.match(h.toasts[0], /Motion box is not available/);
+  assert.equal((await h.drag([200, 150], [260, 170])).d.stopped, false);
+  assert.equal(h.edits.length, 0);
+  const transient = harness({ boundsError: 'stale_revision' }); await transient.ready();
+  assert.deepEqual(transient.toasts, [], 'only a typed unavailable is a notice');
 });

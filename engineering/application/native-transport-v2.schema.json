@@ -4374,11 +4374,12 @@
           "enum": [
             "locked",
             "shy",
+            "threeD",
             "keyLock"
           ]
         },
         "value": {
-          "description": "Boolean for locked and shy; null or in/out/layer for keyLock (null clears the layer key-lock mode).",
+          "description": "Boolean for locked, shy and threeD; null or in/out/layer for keyLock (null clears the layer key-lock mode).",
           "oneOf": [
             {
               "type": "boolean"
@@ -4402,7 +4403,8 @@
             "flag": {
               "enum": [
                 "locked",
-                "shy"
+                "shy",
+                "threeD"
               ]
             },
             "value": {
@@ -4728,6 +4730,28 @@
                 "centerOut",
                 "random"
               ]
+            }
+          }
+        },
+        "effectorPos": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "index",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
             }
           }
         }
@@ -12345,7 +12369,8 @@
             "target",
             "frame",
             "bounds",
-            "parentLayerUid"
+            "parentLayerUid",
+            "parentAffine"
           ],
           "properties": {
             "instanceId": {
@@ -12392,6 +12417,16 @@
                   "minLength": 1
                 }
               ]
+            },
+            "parentAffine": {
+              "type": "array",
+              "minItems": 6,
+              "maxItems": 6,
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              }
             }
           }
         }
@@ -12456,6 +12491,41 @@
                   "type": "array",
                   "minItems": 1,
                   "maxItems": 4,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "keepPose": {
+                  "const": true
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frame",
+                "handle",
+                "values"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setKeyHandle"
+                },
+                "frame": {
+                  "type": "number"
+                },
+                "handle": {
+                  "enum": [
+                    "hIn",
+                    "hOut"
+                  ]
+                },
+                "values": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
                   "items": {
                     "type": "number"
                   }
@@ -20173,6 +20243,7 @@
             "seed",
             "sourceMode",
             "staggerRandom",
+            "effectors",
             "timeOffset"
           ],
           "properties": {
@@ -20268,6 +20339,46 @@
                 },
                 "hue": {
                   "type": "boolean"
+                }
+              }
+            },
+            "effectors": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "pos",
+                  "radius"
+                ],
+                "properties": {
+                  "pos": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "x",
+                          "y"
+                        ],
+                        "properties": {
+                          "x": {
+                            "type": "number"
+                          },
+                          "y": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "radius": {
+                    "type": "number"
+                  }
                 }
               }
             },

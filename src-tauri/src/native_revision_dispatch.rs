@@ -426,3 +426,7 @@ mod key_batch_tests;
 #[cfg(test)]
 #[path = "native_key_warp_color_dispatch_tests.rs"]
 mod key_warp_color_tests;
+
+#[cfg(test)]
+#[path = "native_three_d_dispatch_tests.rs"]
+mod three_d_tests;

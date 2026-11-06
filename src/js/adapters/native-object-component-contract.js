@@ -70,6 +70,12 @@
     frame: (value, at) => { if (!Number.isSafeInteger(value) || value < 0 || value > MAX_FRAME) fail(`${at} must be a native u32 frame`); },
     placedAt: (value, at) => { if (!Number.isSafeInteger(value) || value < -MAX_PLACED - 1 || value > MAX_PLACED) fail(`${at} must be a native i32 offset`); },
     speed: (value, at) => { if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) fail(`${at} must be a finite number above zero`); },
+    // The Motion canvas effector handle: the inline effector at a native u32 index takes a finite world anchor.
+    effectorPos: (value, at) => {
+      exact(value, ['index', 'x', 'y'], [], at);
+      if (!Number.isSafeInteger(value.index) || value.index < 0 || value.index > MAX_FRAME) fail(`${at}.index must be a native u32 index`);
+      KINDS.number(value.x, `${at}.x`); KINDS.number(value.y, `${at}.y`);
+    },
     dupTime: (value, at) => {
       exact(value, [], ['enabled', 'offsetFrames', 'direction'], at);
       if (has(value, 'enabled') && typeof value.enabled !== 'boolean') fail(`${at}.enabled must be a boolean`);
@@ -91,7 +97,7 @@
     // #2256 Q4: the inspector's closed partial edit of the stored descriptor (the path layer keeps duplicator.path).
     'duplicator.config': ['object.duplicator.config', 'command', [['layerUid', 'id'], ['mode', 'dupMode', true], ['rows', 'number', true], ['cols', 'number', true],
       ['spacingX', 'number', true], ['spacingY', 'number', true], ['count', 'number', true], ['radius', 'number', true], ['startAngle', 'number', true],
-      ['radialOrient', 'boolean', true], ['pathAlignTangent', 'boolean', true], ['seed', 'seed', true], ['staggerRandom', 'dupStagger', true], ['timeOffset', 'dupTime', true]]],
+      ['radialOrient', 'boolean', true], ['pathAlignTangent', 'boolean', true], ['seed', 'seed', true], ['staggerRandom', 'dupStagger', true], ['timeOffset', 'dupTime', true], ['effectorPos', 'effectorPos', true]]],
     // #2256 Q5: the Component Instance panel's closed partial edit of the stored playback record.
     'component.instance.set': ['object.component.instance.set', 'command', [['layerUid', 'id'], ['mode', 'instMode', true], ['singleFrame', 'frame', true],
       ['placedAt', 'placedAt', true], ['speed', 'speed', true], ['atFrame', 'frame', true]]],

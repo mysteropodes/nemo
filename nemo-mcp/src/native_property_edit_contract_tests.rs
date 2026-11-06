@@ -263,3 +263,33 @@ fn property_control_edits_admit_only_the_closed_declaration_shapes() {
         assert!(envelope(payload(action)).validate().is_err());
     }
 }
+
+// #2520/#2525: keepPose is the anchor-only Position-following setValue; setKeyHandle names one spatial handle of an existing key.
+#[test]
+fn keep_pose_and_key_handle_have_closed_shapes() {
+    let on = |property: &str, action: Value| {
+        let mut p = payload(action);
+        p["property"] = json!(property);
+        p
+    };
+    let keep = json!({"kind":"setValue","frame":3,"values":[4,5],"keepPose":true});
+    assert!(request(&on("anchor", keep.clone())));
+    assert!(envelope(on("anchor", keep.clone())).validate().is_ok());
+    for property in ["position", "rotation", "blob:property"] {
+        assert!(!request(&on(property, keep.clone())), "keepPose is anchor only: {property}");
+    }
+    for bad in [json!(false), json!(0), json!("true"), Value::Null] {
+        assert!(!request(&on("anchor", json!({"kind":"setValue","frame":3,"values":[4,5],"keepPose":bad}))));
+    }
+    assert!(!request(&on("anchor", json!({"kind":"setKey","frame":3,"values":[4,5],"keepPose":true}))));
+    let handle = |h: Value, v: Value| json!({"kind":"setKeyHandle","frame":-2.5,"handle":h,"values":v});
+    for which in ["hIn", "hOut"] {
+        assert!(request(&on("position", handle(json!(which), json!([-30, 5.5])))));
+    }
+    for (which, values) in [(json!("tangent"), json!([1, 2])), (json!("hIn"), json!([1])), (json!("hIn"), json!([1, 2, 3])), (json!("hOut"), json!([1, null])), (json!(0), json!([1, 2]))] {
+        assert!(!request(&on("position", handle(which, values))));
+    }
+    let mut no_frame = handle(json!("hIn"), json!([1, 2]));
+    no_frame.as_object_mut().unwrap().remove("frame");
+    assert!(!request(&on("position", no_frame)));
+}

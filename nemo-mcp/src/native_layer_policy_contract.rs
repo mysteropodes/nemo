@@ -9,7 +9,7 @@ pub(super) fn request(value: &Value) -> bool {
                 .and_then(Value::as_str)
                 .is_some_and(|uid| !uid.is_empty())
             && match (p.get("flag").and_then(Value::as_str), p.get("value")) {
-                (Some("locked" | "shy"), Some(value)) => value.is_boolean(),
+                (Some("locked" | "shy" | "threeD"), Some(value)) => value.is_boolean(),
                 // D37: one layer key-lock mode, null clears it.
                 (Some("keyLock"), Some(value)) => {
                     value.is_null() || matches!(value.as_str(), Some("in" | "out" | "layer"))
@@ -37,7 +37,7 @@ mod tests {
     }
     #[test]
     fn policy_shape_is_closed_and_requires_revision_without_inventing_id_grammar() {
-        for flag in ["locked", "shy"] {
+        for flag in ["locked", "shy", "threeD"] {
             for value in [false, true] {
                 let p = json!({"command":"object.layer.policy.edit","layerUid":"data:opaque authored layer","flag":flag,"value":value});
                 assert!(request(&p));
@@ -60,6 +60,9 @@ mod tests {
             ("locked", json!(null)),
             ("locked", json!("in")),
             ("shy", json!("layer")),
+            ("threeD", json!(null)),
+            ("threeD", json!("in")),
+            ("threeD", json!(1)),
         ] {
             let p = json!({"command":"object.layer.policy.edit","layerUid":"layer","flag":flag,"value":value});
             assert!(!request(&p), "{p}");

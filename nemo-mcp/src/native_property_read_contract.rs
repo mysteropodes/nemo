@@ -186,7 +186,7 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
     valid && serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= 3072)
 }
 
-/// #2520: the `layerBounds` result echoes the pinned selector, four finite bounds and the parent uid (or null).
+/// #2520: the `layerBounds` result echoes the pinned selector, four finite bounds, the parent uid (or null) and the six-number ancestor map.
 fn layer_bounds(document: &str, payload: &Value, value: &Value) -> bool {
     let view = &payload["view"];
     exact(
@@ -201,6 +201,7 @@ fn layer_bounds(document: &str, payload: &Value, value: &Value) -> bool {
             "frame",
             "bounds",
             "parentLayerUid",
+            "parentAffine",
         ],
         &[],
     )
@@ -211,6 +212,7 @@ fn layer_bounds(document: &str, payload: &Value, value: &Value) -> bool {
             .iter()
             .all(|k| value.get(*k) == payload.get(*k).or_else(|| view.get(*k)))
         && vector(&value["bounds"], 4)
+        && vector(&value["parentAffine"], 6)
         && (value["parentLayerUid"].is_null() || text(value.get("parentLayerUid")))
         && serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= 3072)
 }

@@ -17,12 +17,14 @@ const payload = (extra) => Object.assign({ command: 'object.duplicator.config', 
 test('every config member is optional and judged by its kind; unknown members and wrong types are refused', () => {
   for (const ok of [{}, { mode: 'grid' }, { mode: 'path', rows: 1, cols: 30.5, spacingX: -3, count: 500, radius: 0, startAngle: -90 }, { radialOrient: false, pathAlignTangent: true, seed: 0 },
     { staggerRandom: {} }, { staggerRandom: { position: true, rotation: false, scale: true, opacity: false, hue: true } }, { timeOffset: {} },
-    { timeOffset: { enabled: true, offsetFrames: -2, direction: 'random' } }]) {
+    { timeOffset: { enabled: true, offsetFrames: -2, direction: 'random' } }, { effectorPos: { index: 0, x: 1, y: -2.5 } }, { effectorPos: { index: 4294967295, x: 0, y: 0 } }]) {
     assert.doesNotThrow(() => contract.payload(CONFIG, payload(ok)), JSON.stringify(ok));
   }
   for (const bad of [{ mode: 'spiral' }, { mode: null }, { rows: '3' }, { rows: null }, { count: Infinity }, { seed: -1 }, { seed: 1.5 }, { seed: 4294967296 }, { radialOrient: 1 },
     { pathAlignTangent: 'true' }, { pathLayerUid: 'layer-b' }, { endAngle: 90 }, { staggerRandom: [] }, { staggerRandom: null }, { staggerRandom: { depth: true } },
-    { staggerRandom: { hue: 1 } }, { timeOffset: { direction: 'sideways' } }, { timeOffset: { enabled: 'yes' } }, { timeOffset: { offsetFrames: '1' } }, { timeOffset: { extra: 1 } }, { timeOffset: 7 }]) {
+    { staggerRandom: { hue: 1 } }, { timeOffset: { direction: 'sideways' } }, { timeOffset: { enabled: 'yes' } }, { timeOffset: { offsetFrames: '1' } }, { timeOffset: { extra: 1 } }, { timeOffset: 7 }, { effectorPos: null }, { effectorPos: {} }, { effectorPos: { index: 0, x: 1 } },
+    { effectorPos: { index: -1, x: 1, y: 1 } }, { effectorPos: { index: 1.5, x: 1, y: 1 } }, { effectorPos: { index: 4294967296, x: 1, y: 1 } }, { effectorPos: { index: 0, x: '1', y: 1 } },
+    { effectorPos: { index: 0, x: Infinity, y: 1 } }, { effectorPos: { index: 0, x: 1, y: 1, z: 2 } }, { effectorPos: [0, 1, 2] }]) {
     assert.throws(() => contract.payload(CONFIG, payload(bad)), TypeError, JSON.stringify(bad));
   }
   assert.throws(() => contract.payload(CONFIG, { command: 'object.duplicator.config' }), TypeError, 'the layer is required');
@@ -63,11 +65,13 @@ test('the duplicator read selector names one layer and the view is judged member
   }
   const view = Object.assign({}, pin, { kind: 'duplicator', layerUid: 'ly_dup', mode: 'grid', rows: 2, cols: 3, spacingX: 150, spacingY: 150, count: 8, radius: 200, startAngle: 0,
     radialOrient: false, pathAlignTangent: true, pathLayerUid: 'ly_path', seed: 17, sourceMode: 'shape',
-    staggerRandom: { position: false, rotation: false, scale: false, opacity: false, hue: false }, timeOffset: { enabled: false, offsetFrames: 1, direction: 'forward' } });
+    staggerRandom: { position: false, rotation: false, scale: false, opacity: false, hue: false }, timeOffset: { enabled: false, offsetFrames: 1, direction: 'forward' },
+    effectors: [{ pos: { x: 100, y: -20.5 }, radius: 150 }, { pos: null, radius: 0 }] });
   assert.doesNotThrow(() => reads.result(OPERATION_READ, view, request));
   const patch = (key, value) => Object.assign({}, view, { [key]: value });
   for (const bad of [patch('layerUid', 'other'), patch('mode', 'spiral'), patch('rows', '2'), patch('seed', -1), patch('radialOrient', 0), patch('pathLayerUid', ''), patch('sourceMode', 'pool'),
-    patch('staggerRandom', { position: true }), patch('timeOffset', { enabled: false, offsetFrames: 1, direction: 'sideways' }), patch('kind', 'context'), patch('atRevision', 8), patch('extra', 1)]) {
+    patch('staggerRandom', { position: true }), patch('timeOffset', { enabled: false, offsetFrames: 1, direction: 'sideways' }), patch('kind', 'context'), patch('atRevision', 8), patch('extra', 1), patch('effectors', null), patch('effectors', [{ pos: { x: 1 }, radius: 1 }]),
+    patch('effectors', [{ pos: null, radius: '1' }]), patch('effectors', [{ pos: { x: 1, y: 2 } }]), patch('effectors', new Array(17).fill({ pos: null, radius: 1 })), patch('effectors', [{ pos: { x: NaN, y: 2 }, radius: 1 }])]) {
     assert.throws(() => reads.result(OPERATION_READ, bad, request), TypeError, JSON.stringify(bad));
   }
 });

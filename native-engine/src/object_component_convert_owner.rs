@@ -24,7 +24,7 @@ use crate::commands::object_fill_owner::component_owner::object_component_place:
     plan_expose, plan_place, ExposeEntry,
 };
 use crate::commands::object_fill_owner::component_owner::object_duplicator_config::{
-    plan_duplicator_config, ConfigEdit, StaggerEdit, TimeEdit,
+    plan_duplicator_config, ConfigEdit, EffectorMove, StaggerEdit, TimeEdit,
 };
 use crate::commands::object_fill_owner::component_owner::object_duplicator_convert::{
     plan_duplicator_path, plan_duplicator_set, plan_object_duplicator,
@@ -205,6 +205,14 @@ fn config_edit(payload: &DuplicatorConfigPayload) -> Option<ConfigEdit> {
             direction: t.direction.value().cloned(),
         }),
     };
+    let effector_pos = match payload.effector_pos.value() {
+        None => None,
+        Some(e) => Some(EffectorMove {
+            index: e.index.as_u64().and_then(|v| u32::try_from(v).ok())?,
+            x: e.x.as_f64().filter(|v| v.is_finite())?,
+            y: e.y.as_f64().filter(|v| v.is_finite())?,
+        }),
+    };
     Some(ConfigEdit {
         mode: payload.mode.value().cloned(),
         rows: number_of(&payload.rows).ok()?,
@@ -219,6 +227,7 @@ fn config_edit(payload: &DuplicatorConfigPayload) -> Option<ConfigEdit> {
         seed,
         stagger_random: stagger,
         time_offset: time,
+        effector_pos,
     })
 }
 

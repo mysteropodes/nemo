@@ -32,6 +32,8 @@ enum K {
     DupStagger,
     /// `{enabled?, offsetFrames?, direction?}`: a boolean, a finite number and a direction label.
     DupTime,
+    /// `{index, x, y}`: a native u32 effector index and a finite world anchor (the Motion canvas effector handle).
+    EffectorPos,
     /// The instance playback mode label: `loop`, `once`, `pingpong` or `single`.
     InstMode,
     /// A native u32 frame number.
@@ -100,7 +102,7 @@ static SPECS: [(&str, &str, Receipt, &str); 8] = [
         "duplicator.config",
         "object.duplicator.config",
         Receipt::Command,
-        "layerUid:id mode:dupMode? rows:number? cols:number? spacingX:number? spacingY:number? count:number? radius:number? startAngle:number? radialOrient:boolean? pathAlignTangent:boolean? seed:seed? staggerRandom:dupStagger? timeOffset:dupTime?",
+        "layerUid:id mode:dupMode? rows:number? cols:number? spacingX:number? spacingY:number? count:number? radius:number? startAngle:number? radialOrient:boolean? pathAlignTangent:boolean? seed:seed? staggerRandom:dupStagger? timeOffset:dupTime? effectorPos:effectorPos?",
     ),
     // #2256 Q5: the Component Instance panel's closed partial edit of the stored playback record.
     (
@@ -158,6 +160,7 @@ fn kind(token: &str) -> Option<K> {
         "dupMode" => K::DupMode,
         "dupStagger" => K::DupStagger,
         "dupTime" => K::DupTime,
+        "effectorPos" => K::EffectorPos,
         "instMode" => K::InstMode,
         "frame" => K::Frame,
         "placedAt" => K::PlacedAt,
@@ -192,6 +195,12 @@ fn check(kind: K, value: &Value) -> bool {
         K::DupStagger => value.as_object().is_some_and(|map| {
             map.iter()
                 .all(|(key, flag)| DUP_CHANNELS.contains(&key.as_str()) && flag.is_boolean())
+        }),
+        K::EffectorPos => value.as_object().is_some_and(|map| {
+            map.len() == 3
+                && map.get("index").and_then(Value::as_u64).is_some_and(|i| i <= u64::from(u32::MAX))
+                && check(K::Number, &map["x"])
+                && check(K::Number, &map["y"])
         }),
         K::DupTime => value.as_object().is_some_and(|map| {
             map.iter().all(|(key, member)| match key.as_str() {
