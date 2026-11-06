@@ -50,10 +50,10 @@ the packaged-app invocation above.
 ## CS7 installed batch driver
 
 `cs7-run.cjs` is an explicit manual entry point. Book the Local app/input slot
-in #1062 and run the entire command under `lockf -k /tmp/nemo-heavy-job.lock`.
+in #2804 and run the entire command under `lockf -k /tmp/nemo-heavy-job.lock`.
 Build the normal app and the UI32 helper from the same clean, committed candidate.
 The private JSON config names `sourceSha`, `app`, `executableSha256`, `buildProof`,
-`helper`, `helperProof`, `taskId`, `grant` (`1062/<comment-id>`), an existing empty
+`helper`, `helperProof`, `taskId`, `grant` (`2804/<comment-id>`, a booking in the current log; #1062 is full and cannot hold a new one), an existing empty
 `reportDirectory`, and an optional supported `fixtureKind`.
 
 ```sh

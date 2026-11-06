@@ -22,7 +22,7 @@ desktop features may be explicitly unavailable without old-engine fallback, but
 temporary unavailability does not count toward desktop completion.
 
 Track execution on [Cyrill's Project #2](https://github.com/users/mysteropodes/projects/2/views/1)
-and team summaries in the [shared hourly log](https://github.com/mysteropodes/nemo/issues/1062).
+and team summaries in the [shared hourly log](https://github.com/mysteropodes/nemo/issues/2804).
 Detailed claims and handoffs stay in their task issues. Project #8 is a legacy snapshot.
 
 Read only the supporting reference needed for the selected task:

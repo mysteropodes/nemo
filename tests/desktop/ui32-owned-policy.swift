@@ -16,7 +16,7 @@ let ui32Tabs: Set<String> = ["General","Général","一般","General", "Updates"
   "Shortcuts","Raccourcis","ショートカット","Atajos","Labs","About","À propos","アプリについて","Acerca de"]
 func ui32Scope(_ mode:String, _ env:[String:String]) throws -> (reference:Bool,report:String) {
   try check(mode == "--ui32-persistent")
-  guard let grant=env["NEMO_UI32_GRANT"], grant.range(of:"^1062/[0-9]+$",options:.regularExpression) != nil,
+  guard let grant=env["NEMO_UI32_GRANT"], grant.range(of:"^2804/[0-9]+$",options:.regularExpression) != nil,
     let report=env["NEMO_UI32_REPORT_ROOT"], report.hasPrefix("/"), !report.isEmpty else { throw Refusal(code:"adapter-refused") }
   // The existing purpose grants cannot substitute for an explicit UI32 grant.
   return (false,report)
@@ -119,12 +119,12 @@ func ui32SelfTest() throws {
   for mode in ["--persistent","--reference-persistent","--png-persistent","--p38-cg-sample"] {
     try check(!ui32ModeAllowed(mode))
     var refused=false
-    do { _ = try ui32Scope(mode,["NEMO_UI32_GRANT":"1062/1","NEMO_UI32_REPORT_ROOT":"/private/proof"]) } catch { refused=true }
+    do { _ = try ui32Scope(mode,["NEMO_UI32_GRANT":"2804/1","NEMO_UI32_REPORT_ROOT":"/private/proof"]) } catch { refused=true }
     try check(refused)
   }
   for key in ["NEMO_P38_GRANT","NEMO_REFERENCE_GRANT","NEMO_PNG_UI_GRANT"] {
     var refused=false
-    do { _ = try ui32Scope("--ui32-persistent",[key:"1062/1","NEMO_UI32_REPORT_ROOT":"/private/proof"]) } catch { refused=true }
+    do { _ = try ui32Scope("--ui32-persistent",[key:"2804/1","NEMO_UI32_REPORT_ROOT":"/private/proof"]) } catch { refused=true }
     try check(refused)
   }
   try check(ui32PauseAllowed(["\u{e034}"]) && !ui32PauseAllowed(["\u{e037}"]) && !ui32PauseAllowed(["\u{e034}","\u{e037}"]) && !ui32PauseAllowed([]))
