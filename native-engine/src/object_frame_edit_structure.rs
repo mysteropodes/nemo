@@ -15,6 +15,7 @@
 use crate::commands::object_fill_owner::object_frame_edit_document::{
     clone_cell, insert_frame, remove_frames, DocumentEdit, FrameEditError,
 };
+use crate::commands::object_fill_owner::object_context_projection::{context_of, through};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
     object_deserialize, FrameScopeKind, ObjectDocument, ObjectRecord, Presence, TimingEdit,
@@ -43,6 +44,8 @@ struct FramePayload {
     layer_uid: Presence<String>,
     from: Presence<u32>,
     to: Presence<u32>,
+    /// #2256: the declared component the edit works inside; absent is the scene root.
+    context_id: Presence<String>,
 }
 object_deserialize!(FramePayload {
     command: String,
@@ -51,7 +54,8 @@ object_deserialize!(FramePayload {
     #[serde(default)] count: Presence<u32>,
     #[serde(default)] layer_uid: Presence<String>,
     #[serde(default)] from: Presence<u32>,
-    #[serde(default)] to: Presence<u32>
+    #[serde(default)] to: Presence<u32>,
+    #[serde(default)] context_id: Presence<String>
 });
 
 /// One typed operation; every command admits exactly its own fields.
@@ -99,6 +103,7 @@ impl FramePayload {
             layer_uid,
             from,
             to,
+            context_id: _,
         } = self;
         match command.as_str() {
             "object.frames.insert" => {
@@ -424,12 +429,15 @@ impl ObjectFillOwner {
         }
         let payload: FramePayload =
             serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        let context = context_of(&payload.context_id)?.to_owned();
         let operation = payload.operation()?;
         let origin = self.current_snapshot();
-        let document = match plan(origin.document(), &operation)? {
-            DocumentEdit::Changed(next) => Some(with_ranges(origin.document(), next, &operation)?),
-            DocumentEdit::NoChange => None,
-        };
+        let document = through(origin.document(), &context, |view| {
+            match plan(view, &operation)? {
+                DocumentEdit::Changed(next) => Ok(Some(with_ranges(view, next, &operation)?)),
+                DocumentEdit::NoChange => Ok(None),
+            }
+        })?;
         Ok(PreparedFrameStructure {
             origin,
             document,

@@ -5206,6 +5206,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-component-frame-edit.js",
+      "moduleId": "app.native.component.context.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 1,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-component-context.js",
       "moduleId": "app.native.component.context.adapter",
       "executionClass": "document-classic",

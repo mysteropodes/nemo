@@ -143,8 +143,11 @@
         'Native frame edit was not confirmed. Wait for synchronization.';
       try{if(typeof root.showToast==='function')root.showToast(message);}catch(_){}
     }
+    // #2256: inside an entered component the same actions edit the component (native-component-frame-edit.js); never the scene's rows.
+    function inComponent(){var c=root.NemoNativeComponentFrameEdit;return !!c&&!!c.held(root);}
     async function run(action){
       if(selectionPending()){var blocked=Object.freeze({status:'busy',code:'frame_selection_pending'});notice(blocked);return blocked;}
+      if(inComponent()){var inside=await root.NemoNativeComponentFrameEdit.run(root,action);notice(inside);return inside;}
       var before=capture(),result=await intent.run(action);
       if(mayNavigate(before,result)&&typeof root.goToFrame==='function'){
         try{await root.goToFrame(result.playhead);}catch(_){notice();}

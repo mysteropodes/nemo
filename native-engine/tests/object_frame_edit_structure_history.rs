@@ -15,6 +15,9 @@ use serde_json::{json, Value};
 pub(crate) mod build;
 #[path = "object_frame_edit_structure_controls.rs"]
 mod controls;
+// #2256: the same edits inside a declared component.
+#[path = "object_frame_edit_context_history.rs"]
+mod context_history;
 #[path = "object_frame_edit_structure_items.rs"]
 mod items;
 #[cfg(feature = "evaluation")]
