@@ -257,3 +257,39 @@ fn the_path_bound_fits_the_whole_request_with_every_other_field_at_its_maximum()
     assert!(parsed.validate().is_ok());
     assert!(at(2049).validate_input().is_err());
 }
+
+#[test]
+fn a_new_layer_may_name_the_declared_component_it_joins_and_the_receipt_must_echo_it() {
+    let (q, r) = pair(json!({"kind":"newLayer"}));
+    let inside = with(&q, "/payload/contextId", json!("sym_a"));
+    assert!(inside.validate_input().is_ok());
+    let mut echoed = r.clone();
+    echoed.result.as_mut().unwrap()["target"]["contextId"] = json!("sym_a");
+    assert!(validate_native_response(&echoed, &inside).is_ok());
+    // The receipt names the request's context, never another and never the scene root for a component request.
+    assert!(validate_native_response(&r, &inside).is_err(), "scene-root receipt for a component request");
+    let mut other = echoed.clone();
+    other.result.as_mut().unwrap()["target"]["contextId"] = json!("sym_b");
+    assert!(validate_native_response(&other, &inside).is_err());
+    // And a component receipt for a request that named no context is not the scene import it asked for.
+    assert!(validate_native_response(&echoed, &q).is_err());
+    assert!(revision_matches(&inside, 8, echoed.result.as_ref().unwrap()));
+    assert!(!revision_matches(&inside, 8, r.result.as_ref().unwrap()));
+}
+
+#[test]
+fn a_context_is_closed_it_is_opaque_and_a_replace_carries_none() {
+    let (q, _) = pair(json!({"kind":"newLayer"}));
+    for value in [json!(""), json!("  "), json!("a\u{0}b"), json!("c".repeat(256)), json!(7), json!(null)] {
+        assert!(with(&q, "/payload/contextId", value.clone()).validate_input().is_err(), "{value}");
+    }
+    let (replace, _) = pair(json!({"kind":"replace","placementId":"legacy placement:a"}));
+    assert!(with(&replace, "/payload/contextId", json!("sym_a")).validate_input().is_err());
+    // The largest accepted request (a new layer in a 255-byte context with the 2048-byte path) still fits the 4096-byte budget.
+    let widest = json!({"documentSnapshotId":"s".repeat(128),"lifecycleGeneration":9_007_199_254_740_991u64,
+        "source":{"kind":"file","path":format!("/{}", "a".repeat(2047))},"intent":{"kind":"newLayer"},"contextId":"c".repeat(255)});
+    assert!(crate::native_contract::import::video_link::request(&widest));
+    let request = json!({"apiVersion":2,"requestId":"r".repeat(128),"instanceId":"i".repeat(128),"documentId":"d".repeat(128),
+        "expectedRevision":9_007_199_254_740_991u64,"operation":OP,"payload":widest});
+    assert!(serde_json::to_vec(&request).unwrap().len() <= 4096);
+}

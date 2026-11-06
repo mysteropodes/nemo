@@ -15,13 +15,13 @@ fn text(value: &Value, max: usize) -> bool {
         .as_str()
         .is_some_and(|v| !v.is_empty() && v.len() <= max && !v.contains('\0'))
 }
-/// The anchor: a new editable vector path in an authored scene-root cell, 2..256 segments, with a bitmap brush.
+/// The anchor: a new editable vector path in an authored cell of the scene or of a declared component (#2361; the owner resolves the context), 2..256 segments, with a bitmap brush.
 fn anchor(value: &Value) -> bool {
     let target = &value["target"];
     let brush = &value["vectorExt"]["bitmapBrush"];
     value["family"] == "editable-vector-path"
         && target["strokeId"] == ""
-        && target["contextId"] == "scene-root"
+        && target["contextId"].as_str().is_some_and(bounded_identifier)
         && target["frameScope"]["kind"] == "authored"
         && target["frameScope"]["frame"]
             .as_u64()

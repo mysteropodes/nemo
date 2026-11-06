@@ -109,6 +109,30 @@
       });
     }
 
+    // convertComponentToLayer(layerIdx): the instance of `layerUid` baked back into an ordinary layer, ONE request on the scene root.
+    function breakApart(layerUid) {
+      return runner.exclusive(async (exec) => {
+        const operation = OP('component.breakApart');
+        if (typeof layerUid !== 'string' || !layerUid.length) return fail(operation, 'invalid_request', { reason: 'layerUid must name the instance layer' });
+        const ids = currentIds();
+        if (ids && core.stale([layerUid], ids).length) return fail(operation, 'stale_selection', { ids: [layerUid] });
+        return exec(operation, { contextId: contextNow(), layerUid }, 'component-break-apart');
+      });
+    }
+
+    // C-comp-owned-state: the camera keys and markers a declared component owns (sym.cameraKeys, sym.markers). `contextId` names the
+    // component, `edit` is the closed member set of the request (`kind` and the members that kind takes); ONE request, one revision,
+    // one history entry, and no legacy table (state.cameraKeys / state.markers) is touched.
+    function editState(contextId, edit) {
+      return runner.exclusive(async (exec) => {
+        const operation = OP('component.state.edit');
+        if (typeof contextId !== 'string' || !contextId.length || contextId === SCENE || !edit || typeof edit !== 'object' || Array.isArray(edit)) {
+          return fail(operation, 'invalid_request', { reason: 'a declared component and a state edit are required' });
+        }
+        return exec(operation, Object.assign({ contextId }, edit), 'component-state-edit');
+      });
+    }
+
     // #2256: the read-only native component model (contexts, one context's summary, its layers, the scene layers that instance it),
     // pinned to the presented revision and snapshot. Reads nothing from the legacy symbols table and opens no context. A response
     // is judged by the read contract at this edge, and an answer is discarded when the project moved on while it was read.
@@ -217,6 +241,9 @@
     // All layers of one context / all scene layers instancing one component, from one revision.
     function listLayers(contextId, via) { return listPages('component.layers', { kind: 'layers', contextId }, via); }
     function listInstances(contextId) { return listPages('component.instances', { kind: 'instances', contextId }); }
+    // C-comp-owned-state: every stored marker / camera key of one component in stored order, from one revision.
+    function listMarkers(contextId, via) { return listPages('component.markers', { kind: 'markers', contextId }, via); }
+    function listCameraKeys(contextId, via) { return listPages('component.cameraKeys', { kind: 'cameraKeys', contextId }, via); }
 
     // The same typed refusal, reported under the operation the caller asked for.
     function refail(operation, failed) { return fail(operation, failed.code, { reason: failed.reason, message: failed.message }); }
@@ -281,7 +308,7 @@
       return Object.freeze({ ok: true, operation, exited: true, contextId: SCENE });
     }
     return Object.freeze({
-      convert, convertLayer: (layerUid) => convert([layerUid]), place, expose, setInstance,
+      convert, convertLayer: (layerUid) => convert([layerUid]), place, expose, setInstance, breakApart, editState, listMarkers, listCameraKeys,
       readModel, storyboard, enter, exit, read, listContexts, listLayers, listInstances, workspaceTransition, workspaceNow,
     });
   }
@@ -297,6 +324,6 @@
   }
   return Object.freeze({
     createComponentIntent, desktop, exposedKey,
-    OPERATIONS: Object.freeze(['component.convert', 'component.place', 'component.expose', 'component.instance.set'].map(OP)),
+    OPERATIONS: Object.freeze(['component.convert', 'component.place', 'component.expose', 'component.instance.set', 'component.breakApart', 'component.state.edit'].map(OP)),
   });
 }));

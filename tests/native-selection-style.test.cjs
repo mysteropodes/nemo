@@ -125,13 +125,13 @@ test('a selection that changed before the commit restyles nothing and says so; a
   assert.deepEqual(refused.root.selectedPaths.map((p) => p.data.strokeId), ['A'], 'the selection stays');
 });
 
-test('bitmap brushes and dabs are skipped with a notice while the rest of the selection is restyled; nothing selectable means unavailable', async () => {
+test('a bitmap brush is a step of the restyle like any other item (the engine re-bakes it); nothing selectable means unavailable', async () => {
   const h = harness([quad('A', 10, 10, 30, 30), quad('M', 40, 40, 60, 60, { role: 'brush', brush: 'bitmap', group: 'g' })]);
   await h.select(['A', 'M']);
   Style.apply(h.root, { opacity: 0.5 });
   await h.fire();
-  assert.deepEqual(h.batches[0].steps.map((s) => s.restyle.stableTarget.strokeId), ['A']);
-  assert.match(h.toasts.join('|'), /bitmap brushes/);
+  assert.deepEqual(h.batches[0].steps.map((s) => s.restyle.stableTarget.strokeId), ['A', 'M']);
+  assert.deepEqual(h.toasts, [], 'no refusal notice');
   const none = harness([quad('A', 10, 10, 30, 30)]);
   assert.equal(Style.handles(none.root), false, 'no selection: the tool defaults change instead');
   assert.deepEqual(await Style.apply(none.root, { fill: '#000000' }), { status: 'unavailable' });

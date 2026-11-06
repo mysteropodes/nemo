@@ -33,6 +33,8 @@ pub(crate) use effector::{
     InlineEffector,
 };
 
+/// The effector handles one duplicator panel view lists (the canvas draws one handle each; the 4096-byte bound holds).
+pub(crate) const MAX_PANEL_EFFECTORS: usize = 16;
 pub(crate) const DUPLICATOR_SET_FORMAT: &str = "nemo.native-duplicator-set";
 pub(crate) const DUPLICATOR_SET_FORMAT_VERSION: u32 = 1;
 /// `_duplicatorCount` hard caps: grid `Math.min(900, ...)`, every other mode `Math.min(500, ...)`.
@@ -359,6 +361,8 @@ impl DuplicatorDescriptor {
             "sourceMode": if d.source_mode.value().map(String::as_str) == Some("objects") { "objects" } else { "shape" },
             "staggerRandom": {"position": flag(|r| &r.position), "rotation": flag(|r| &r.rotation),
                 "scale": flag(|r| &r.scale), "opacity": flag(|r| &r.opacity), "hue": flag(|r| &r.hue)},
+            "effectors": d.effectors().iter().take(MAX_PANEL_EFFECTORS).map(|e| serde_json::json!({
+                "pos": e.pos.value().map(|p| serde_json::json!({"x": p.x, "y": p.y})), "radius": shown(&e.radius, 0)})).collect::<Vec<_>>(),
             "timeOffset": {"enabled": time.is_some_and(|t| shown_flag(&t.enabled)),
                 "offsetFrames": time.and_then(|t| t.offset_frames.value().cloned()).unwrap_or_else(|| Number::from(1_u32)),
                 "direction": time.and_then(|t| t.direction.value()).filter(|d| !d.is_empty()).map_or("forward", String::as_str)},

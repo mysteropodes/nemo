@@ -69,3 +69,19 @@ test('decoder limits admit everything the engine can emit (long lists, empty and
   // Empty ids stay refused: engine admission never lets one through.
   assert.throws(()=>Metadata.decode(base([{layerUid:'a',mattesMore:[{uid:'',mode:'alpha'}]}]),request),/uncorrelated/);
 });
+// #2257: the hold-only blend keys of a layer row (the Blend stopwatch is on exactly when a row lists any).
+test('blend keys cross the metadata contract in frame order and malformed lists are refused',()=>{
+  const keys=[{frame:0,mode:'multiply'},{frame:12,mode:'screen'}];
+  const read=Metadata.decode(base([{layerUid:'k',blendKeys:keys},{layerUid:'big',blendKeysOversize:true}]),request);
+  assert.deepEqual(read.layers[0].blendKeys,keys);assert.notEqual(read.layers[0].blendKeys,keys);
+  assert.equal(read.layers[1].blendKeysOversize,true);
+  for(const extra of [{blendKeys:[]},{blendKeys:{}},{blendKeys:[{frame:-1,mode:'screen'}]},{blendKeys:[{frame:1.5,mode:'screen'}]},
+    {blendKeys:[{frame:1,mode:''}]},{blendKeys:[{frame:1,mode:'screen',extra:1}]},{blendKeys:[{frame:5,mode:'a'},{frame:5,mode:'b'}]},
+    {blendKeys:[{frame:9,mode:'a'},{frame:3,mode:'b'}]},{blendKeysOversize:false},{blendKeys:keys,blendKeysOversize:true}])
+    assert.throws(()=>Metadata.decode(base([{layerUid:'a',...extra}]),request),/uncorrelated/,JSON.stringify(extra));
+  const root={state:{},userLayers:[],selectedPaths:[]};
+  const info=Metadata.decode(base([{layerUid:'k',kind:'draw',blendKeys:keys}]),request);
+  Files.projectView(root,info);
+  assert.equal(Object.hasOwn(root.state.layers[0],'blendKeys'),false,'the UI state row stays free of the model members');
+  assert.equal(Files.projectionMatches(root,info),true);
+});

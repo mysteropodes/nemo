@@ -2,13 +2,13 @@
 // CS8-SDK (#2354): the real SMScript.run on the desktop host never reads or writes state.layers.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const SOURCE=fs.readFileSync(path.join(__dirname,'../src/js/nemo-script.js'),'utf8'),Native=require('../src/js/application/script-native-api.js');
-function boot({session,tauri=true,native=true,writes=null,extra=null,controller=undefined}){
+function boot({session,tauri=true,native=true,writes=null,extra=null,controller=undefined,solo=false}){
   const calls=[],toasts=[];
   const state={};Object.defineProperty(state,'layers',{get(){throw Error('LEGACY state.layers read');}});
   let info=session&&{instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,fps:24,canvasW:8,canvasH:8,totalFrames:4,
     layers:[{layerUid:'a',name:'A',visible:true},{layerUid:'b',name:'B',visible:true}]};
   const s=session&&{blocksLegacy:()=>true,isActive:()=>true,info:()=>info,...(extra||{})};
-  const context=vm.createContext({console,state,NemoScriptNativeWrites:writes?{create:(root,s)=>writes(()=>info,v=>{info=v;},s)}:undefined,_layerSel:[0],NemoScriptNativeApi:native?Native:undefined,NemoNativeLayerPlayheadCutUI:{scripting:()=>function(){}},goToFrame(){},showToast:m=>toasts.push(m),
+  const context=vm.createContext({console,state,NemoScriptNativeWrites:writes?{create:(root,s)=>writes(()=>info,v=>{info=v;},s)}:undefined,_layerSel:[0],NemoScriptNativeApi:native?Native:undefined,NemoNativeLayerPlayheadCutUI:{scripting:()=>function(){}},NemoNativeLayerSolo:solo?require('../src/js/adapters/native-layer-solo.js'):undefined,goToFrame(){},showToast:m=>toasts.push(m),
     __TAURI__:tauri?{core:{invoke(){}}}:undefined,NemoNativeObjectProject:{desktop:()=>s||null},NemoNativeCompositionController:controller,
     SM:{toggleLayerVis(index){calls.push(['vis',index]);info={...info,layers:info.layers.map((l,i)=>i===index?{...l,visible:!l.visible}:l)};return Promise.resolve(true);},
       toggleLayerLock(){calls.push(['lock']);return Promise.resolve(true);},toggleLayerShy(){calls.push(['shy']);return Promise.resolve(true);},t:k=>k}});
@@ -32,6 +32,20 @@ test('a native script reads the pinned model and commits its writes through the 
   assert.deepEqual(h.calls,[['vis',1]]);assert.equal(h.info.layers[1].visible,false);
   const explicit=h.SMScript.run('return nemo.layers().map(function(l){return l.name;}).join(",")');
   assert.equal(explicit.value,'A,B');
+});
+
+test('Layer.solo over the real session: the script reads the view set, and one toggle asks the preview for one more frame (#2371)',async()=>{
+  const presented=[];
+  const h=boot({session:true,solo:true,extra:{presentPreview:(frame,strict)=>{presented.push([frame,strict]);return Promise.resolve();}}});
+  const r=h.SMScript.run('var a=nemo.layer("A"),b=nemo.layer("B"); var before=a.solo+"/"+b.solo; a.solo=true; before+" "+a.solo');
+  assert.equal(r.ok,true);assert.equal(r.value,'false/false true');assert.deepEqual(presented,[],'nothing is shown while the script runs');
+  assert.deepEqual({...(await r.committed)},{ok:true,applied:1,pending:0});
+  assert.deepEqual(presented,[[0,true]]);assert.deepEqual(h.calls,[],'a solo is no layer-visibility write');
+  const again=h.SMScript.run('nemo.layer("A").solo+"/"+nemo.layer("B").solo');
+  assert.equal(again.value,'true/false','the next run reads the set the first one left');
+  assert.equal(h.info.contentRevision,0,'no document revision moved');
+  const off=h.SMScript.run('nemo.layer("A").solo=false');
+  assert.deepEqual({...(await off.committed)},{ok:true,applied:1,pending:0});
 });
 
 test('an unavailable row fails the run with a typed code and sends nothing already queued',async()=>{

@@ -57,12 +57,12 @@
       if(['applied-presented','unchanged'].includes(result.status)){if(!presented()&&!intent.isPending())result={status:'applied-unconfirmed',applied:result.applied};}
       else if(result.status!=='superseded'){setResume(null);refresh=null;}
       if(!['applied-presented','unchanged','superseded'].includes(result.status))notice(
-        result.status==='unavailable'?'Native project settings are unavailable.':'Project settings were not confirmed. Wait for synchronization before continuing.');
+        result.status==='unavailable'?(typeof result.message==='string'&&result.message||'Native project settings are unavailable.'):'Project settings were not confirmed. Wait for synchronization before continuing.');
       observe('outcome',{kind:action&&action.kind,status:result.status});return result;}
     function unavailable(){return {status:'unavailable'};}
     function prepare(action){
       return new Promise(function(resolve){var kind=action&&action.kind;
-        if(!['setCanvasSize','setFps','setCanvasBackground','setWorkArea'].includes(kind)){resolve(unavailable());return;}
+        if(!['setCanvasSize','setFps','setCanvasBackground','setWorkArea','setTotalFrames','trimToWorkArea'].includes(kind)){resolve(unavailable());return;}
         var item={action:Object.freeze(Object.assign({},action)),resolve:resolve},prior=preparing.items.get(kind);
         if(prior)prior.resolve({status:'superseded'});preparing.items.set(kind,item);
       });

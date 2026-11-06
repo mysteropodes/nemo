@@ -32,13 +32,16 @@ pub(super) const TWEEN: [&str; 4] = [
 ];
 
 /// G39 (#2376): the Motion preset apply shares the table; its own shapes are pinned in the preset tests.
-pub(super) const PRESET: [&str; 6] = [
-    "property.preset.apply",
+pub(super) const PRESET: [&str; 10] = [
+    "property.preset.apply", "property.keys.paste",
     "layer.compositing.edit",
     "layer.parent.set",
     "layer.timeLink.set",
     "layer.followPath.set",
     "layer.color.set",
+    "layer.kind.create",
+    "layer.folder.reparent",
+    "layer.range.arrange",
 ];
 
 pub(super) fn corpus() -> Value {
@@ -53,8 +56,8 @@ pub(super) fn envelope(operation: &str, payload: Value) -> NativeApplicationRequ
 }
 
 #[test]
-fn the_table_declares_exactly_the_twenty_four_operations_and_nothing_else() {
-    assert_eq!(table().len(), 24, "an unparsable table admits nothing");
+fn the_table_declares_exactly_the_twenty_eight_operations_and_nothing_else() {
+    assert_eq!(table().len(), 28, "an unparsable table admits nothing");
     for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
         assert!(admitted(&format!("{P}{suffix}")), "{suffix}");
     }
@@ -461,6 +464,11 @@ fn the_layer_compositing_edit_is_a_closed_union_by_edit() {
     assert!(ok(json!({"edit":"matteMoreAdd","source":"S"})));
     assert!(ok(json!({"edit":"matteMoreSet","index":0,"mode":"alpha"})));
     assert!(ok(json!({"edit":"folderCollapsed","collapsed":true})));
+    assert!(ok(json!({"edit":"blendKeySet","index":12,"mode":"multiply"})));
+    assert!(ok(json!({"edit":"blendKeyRemove","index":12})));
+    assert!(ok(json!({"edit":"blendKeysClear"})));
+    assert!(ok(json!({"edit":"blendKeysRemove","frames":[3,4]})) && ok(json!({"edit":"blendKeysMove","frames":[3,4],"by":-2})));
+    assert!(ok(json!({"edit":"blendKeysClear","mode":"screen"})));
     let blur = json!({"type":"blur","enabled":true,"p1":4,"p2":null,"keys":{"p1":{"keys":[]}}});
     assert!(ok(json!({"edit":"effects","effects":[blur, {"type":"vignette","enabled":false}]})));
     assert!(ok(json!({"edit":"effects","effects":[]})));
@@ -470,6 +478,12 @@ fn the_layer_compositing_edit_is_a_closed_union_by_edit() {
     assert!(!ok(json!({"edit":"blend","mode":"screen","source":"S"})), "closed members");
     assert!(!ok(json!({"edit":"matteClear","mode":"alpha"})));
     assert!(!ok(json!({"edit":"matteMoreRemove","index":-1})));
+    assert!(!ok(json!({"edit":"blendKeySet","index":12})), "a key needs its mode");
+    assert!(!ok(json!({"edit":"blendKeySet","mode":"screen"})), "a key needs its frame");
+    assert!(!ok(json!({"edit":"blendKeySet","index":12,"mode":"luma"})), "a matte mode is no blend mode");
+    assert!(!ok(json!({"edit":"blendKeyRemove","index":12,"mode":"screen"})));
+    assert!(!ok(json!({"edit":"blendKeysClear","index":1})));
+    for refused in [json!({"edit":"blendKeysRemove"}), json!({"edit":"blendKeysRemove","frames":[]}), json!({"edit":"blendKeysRemove","frames":[1],"by":1}), json!({"edit":"blendKeysMove","frames":[1]}), json!({"edit":"blendKeysMove","by":1}), json!({"edit":"blendKeysMove","frames":[-1],"by":1}), json!({"edit":"blendKeysMove","frames":[1],"by":1.5})] { assert!(!ok(refused.clone()), "{refused}"); }
     assert!(!ok(json!({"edit":"effects"})), "the stack is required");
     assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur"}]})));
     assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur","enabled":true,"p9":1}]})));

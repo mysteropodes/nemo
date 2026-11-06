@@ -133,6 +133,14 @@ fn vector_layer_holder_consumed(document: &ObjectDocument, holder: &PropertyHold
                     "anchor" | "rotation" | "scale" => {
                         contentless_unreferenced_layer(document, target)
                     }
+                    // A layer with nothing to place (Folder, Effect, widget, Null, empty drawing) has nothing for the 3D
+                    // keys to move; the baseline `toggleLayer3D` takes on any layer and the document keeps rendering.
+                    "positionZ" | "rotationX" | "rotationY" => {
+                        crate::evaluation::object_vector_kernels::render_vector_eval::plain_empty_layer(
+                            document,
+                            target.layer_uid(),
+                        )
+                    }
                     _ => false,
                 }
         })
@@ -279,6 +287,17 @@ pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &Property
         return true;
     }
     let target = holder.target();
+    // The 3D keys of a layer with nothing to place (Folder, Effect, widget, Null, empty drawing): nothing for them to move.
+    if target.context_id() == "scene-root"
+        && target.stroke_id().is_none()
+        && !holder.properties().is_empty()
+        && holder.properties().iter().all(|p| {
+            matches!(p.property(), "positionZ" | "rotationX" | "rotationY") && !p.expression.value().is_some_and(|c| c.enabled)
+        })
+        && crate::evaluation::object_vector_kernels::render_vector_eval::plain_empty_layer(document, target.layer_uid())
+    {
+        return true;
+    }
     if !scene_consumer_uses_layer(document, target) || holder.properties().is_empty() {
         return false;
     }
@@ -287,7 +306,7 @@ pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &Property
     let visible_vector = !layer_vectors_batchable(document, target)
         && document.layers().iter().any(|layer| {
             layer.layer_uid() == target.layer_uid()
-                && layer.visible()
+                && crate::object_frame_packet::solo_view::layer_visible("scene-root", document.layers(), layer)
                 && document.objects().iter().any(|record| {
                     record.target.context_id == target.context_id()
                         && record.target.layer_uid == target.layer_uid()
@@ -328,7 +347,7 @@ pub(crate) fn layer_vectors_batchable(document: &ObjectDocument, target: &Proper
 /// Other visible contour/vector parents still refuse without a Motion holder.
 pub(super) fn visible_vector_parents_supported(document: &ObjectDocument) -> bool {
     !document.layers().iter().any(|layer| {
-        layer.visible()
+        crate::object_frame_packet::solo_view::layer_visible("scene-root", document.layers(), layer)
             && layer.parent_layer_uid.value().is_some_and(Option::is_some)
             && !crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(document, &PropertyHolderTarget {
                 context_id: "scene-root".into(), layer_uid: layer.layer_uid().to_owned(), stroke_id: Presence::Missing,

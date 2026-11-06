@@ -1,8 +1,9 @@
 //! Stable selection edits prepared against one retained native snapshot.
 use crate::commands::object_fill_owner::property_edit::curves::{self, CurvePreset, InfluenceSide};
+use crate::commands::object_fill_owner::property_edit::key_batch::{self, KeyBatch, WarpFrame, WarpMode};
 use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::object_document::{
-    object_deserialize, KeyLockMode, OrderKey, OrderTrack, Presence, PropertyHolder,
+    object_deserialize, valid_key_color, KeyLockMode, OrderKey, OrderTrack, Presence, PropertyHolder,
     PropertyHolderTarget,
 };
 use crate::object_snapshot::ObjectSnapshot;
@@ -11,17 +12,24 @@ use serde::Deserialize;
 use serde_json::Number;
 type R<T> = Result<T, DispatchErrorCode>;
 const MAX_BYTES: usize = 4096; // Preserve the existing dispatch envelope bound.
-const MAX_SELECTIONS: usize = 32;
+/// Single-key addresses (`frame`) keep the original bound; a track can instead name whole runs of keys (`ranges`), so a
+/// selection of any size is limited by the request bytes alone, never by a key count.
+const MAX_FRAME_SELECTIONS: usize = 32;
+const MAX_ENTRIES: usize = 128;
+const MAX_RANGES: usize = 512;
+/// One entry names the key at `frame`, or every key of the track whose frame lies in one of the inclusive `ranges`.
 #[derive(Debug)]
 struct Selection {
     target: PropertyHolderTarget,
     property: String,
-    frame: Number,
+    frame: Option<Number>,
+    ranges: Option<Vec<[Number; 2]>>,
 }
 object_deserialize!(Selection {
     target: PropertyHolderTarget,
     property: String,
-    frame: Number
+    frame: Option<Number>,
+    ranges: Option<Vec<[Number; 2]>>
 });
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
@@ -34,6 +42,24 @@ enum Action {
         #[serde(deserialize_with = "Option::deserialize")]
         mode: Option<String>,
     },
+    // Batch key edits over the selection: nudge/drag retime, delete, flip, distribute.
+    Shift { delta: Number },
+    Delete {},
+    Flip {},
+    Distribute {},
+    // The key selection box (#2377): `mode` is top/bottom/left/right/liquify, `total` the drag in (fractional) frames, `grab` the
+    // frame a liquify is centred on. Rows are the selected tracks in the order the selections name them.
+    Warp {
+        mode: String,
+        total: Number,
+        #[serde(default)]
+        grab: Option<Number>,
+    },
+    // The key tint (baseline ctxColorKeys): `#rrggbb` / `#rrggbbaa`, or null to remove it. Required, never defaulted.
+    Color {
+        #[serde(deserialize_with = "Option::deserialize")]
+        color: Option<String>,
+    },
 }
 #[derive(Debug)]
 struct Payload {
@@ -45,12 +71,15 @@ object_deserialize!(Payload {
     command: String, selections: Vec<Selection>,
     #[serde(deserialize_with = "super::deserialize_action")] action: Action
 });
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum ValidAction {
     Preset(CurvePreset),
     Influence(InfluenceSide, f64),
     Subdivide,
     LockTo(Option<KeyLockMode>),
+    Batch(KeyBatch),
+    Warp(WarpMode, f64),
+    Color(Option<String>),
 }
 fn invalid() -> DispatchErrorCode {
     DispatchErrorCode::InvalidRequest
@@ -85,6 +114,36 @@ impl Action {
                 Some("layer") => Some(KeyLockMode::Layer),
                 Some(_) => return Err(invalid()),
             }),
+            Self::Shift { delta } => {
+                let by = delta.as_i64().ok_or_else(invalid)?;
+                if by.abs() > key_batch::MAX_SHIFT {
+                    return Err(invalid());
+                }
+                ValidAction::Batch(KeyBatch::Shift(by))
+            }
+            Self::Delete {} => ValidAction::Batch(KeyBatch::Delete),
+            Self::Flip {} => ValidAction::Batch(KeyBatch::Flip),
+            Self::Distribute {} => ValidAction::Batch(KeyBatch::Distribute),
+            Self::Warp { mode, total, grab } => {
+                let mode = match (mode.as_str(), grab) {
+                    ("top", None) => WarpMode::Top,
+                    ("bottom", None) => WarpMode::Bottom,
+                    ("left", None) => WarpMode::Left,
+                    ("right", None) => WarpMode::Right,
+                    ("liquify", Some(grab)) => WarpMode::Liquify { grab: finite(grab)? },
+                    _ => return Err(invalid()),
+                };
+                let total = finite(total)?;
+                if total.abs() > key_batch::MAX_SHIFT as f64 {
+                    return Err(invalid());
+                }
+                ValidAction::Warp(mode, total)
+            }
+            Self::Color { color } => ValidAction::Color(match color {
+                None => None,
+                Some(c) if valid_key_color(c) => Some(c.to_ascii_lowercase()),
+                Some(_) => return Err(invalid()),
+            }),
         })
     }
 }
@@ -104,7 +163,12 @@ impl ObjectFillOwner {
         let payload: Payload = serde_json::from_slice(bytes).map_err(|_| invalid())?;
         if payload.command != "object.property.track.edit"
             || payload.selections.is_empty()
-            || payload.selections.len() > MAX_SELECTIONS
+            || payload.selections.len() > MAX_ENTRIES
+            || payload.selections.iter().filter(|s| s.frame.is_some()).count() > MAX_FRAME_SELECTIONS
+            || payload.selections.iter().any(|s| {
+                s.frame.is_some() == s.ranges.is_some()
+                    || s.ranges.as_ref().is_some_and(|r| r.is_empty() || r.len() > MAX_RANGES)
+            })
         {
             return Err(invalid());
         }
@@ -120,7 +184,6 @@ impl ObjectFillOwner {
         // Phase 1: EVERY selector and property resolves in the ORIGINAL snapshot.
         // Selection order within each group is retained for preset/influence.
         for selection in &payload.selections {
-            let at = finite(&selection.frame)?;
             if matches!(selection.property.as_str(), "order" | "timeRemap") {
                 return Err(DispatchErrorCode::Unavailable);
             }
@@ -152,43 +215,105 @@ impl ObjectFillOwner {
                 .ok_or(DispatchErrorCode::NotFound)?;
             let record = &holder.properties[ri];
             let track = record.track.value().ok_or(DispatchErrorCode::NotFound)?;
-            let ki = track
-                .keys
-                .iter()
-                .position(|k| k.frame.as_f64() == Some(at))
-                .ok_or(DispatchErrorCode::NotFound)?;
-            if let Some(group) = groups
-                .iter_mut()
-                .find(|g| g.holder == hi && g.property == ri)
-            {
+            // The keys this entry names, as indices of the ORIGINAL track.
+            let mut named: Vec<usize> = Vec::new();
+            if let Some(frame) = &selection.frame {
+                let at = finite(frame)?;
+                named.push(
+                    track
+                        .keys
+                        .iter()
+                        .position(|k| k.frame.as_f64() == Some(at))
+                        .ok_or(DispatchErrorCode::NotFound)?,
+                );
+            }
+            for range in selection.ranges.iter().flatten() {
+                let (from, to) = (finite(&range[0])?, finite(&range[1])?);
+                if from > to {
+                    return Err(invalid());
+                }
+                let before = named.len();
+                for (ki, key) in track.keys.iter().enumerate() {
+                    if key.frame.as_f64().is_some_and(|f| f >= from && f <= to) {
+                        named.push(ki);
+                    }
+                }
+                if named.len() == before {
+                    return Err(DispatchErrorCode::NotFound);
+                }
+            }
+            let at_group = groups.iter().position(|g| g.holder == hi && g.property == ri);
+            let group = match at_group {
+                Some(at) => &mut groups[at],
+                None => {
+                    groups.push(Group {
+                        holder: hi,
+                        property: ri,
+                        selected: Vec::new(),
+                        original: track.clone(),
+                    });
+                    groups.last_mut().expect("just pushed")
+                }
+            };
+            for ki in named {
                 // A repeated stable key is malformed; never toggle Hold twice.
                 if group.selected.contains(&ki) {
                     return Err(invalid());
                 }
                 group.selected.push(ki);
-            } else {
-                groups.push(Group {
-                    holder: hi,
-                    property: ri,
-                    selected: vec![ki],
-                    original: track.clone(),
-                });
             }
         }
         // Phase 2: prepare all tracks and ALL native samples before touching even
         // the cloned document. No earlier midpoint can alter a later sample.
-        let mut proposals = Vec::with_capacity(groups.len());
-        for group in &groups {
-            let track = match action {
+        let mut proposals: Vec<Option<OrderTrack>> = Vec::with_capacity(groups.len());
+        // The extent of the whole selection, over every row, that the warp gestures measure from.
+        let extent = groups
+            .iter()
+            .flat_map(|g| g.selected.iter().filter_map(|&ki| g.original.keys[ki].frame.as_f64()))
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), f| (lo.min(f), hi.max(f)));
+        for (row, group) in groups.iter().enumerate() {
+            let track = match &action {
+                ValidAction::Batch(batch) => {
+                    proposals.push(key_batch::apply(
+                        *batch,
+                        &group.original,
+                        &group.selected,
+                        source.total_frames(),
+                    )?);
+                    continue;
+                }
+                ValidAction::Warp(mode, total) => {
+                    let frame = WarpFrame { row, rows: groups.len(), min: extent.0, max: extent.1 };
+                    proposals.push(key_batch::warp(
+                        *mode,
+                        *total,
+                        &group.original,
+                        &group.selected,
+                        frame,
+                        source.total_frames(),
+                    )?);
+                    continue;
+                }
+                ValidAction::Color(color) => {
+                    // Only keys whose tint differs are written, so a no-op publishes nothing.
+                    let mut proposed = group.original.clone();
+                    for &ki in &group.selected {
+                        let key = &mut proposed.keys[ki];
+                        if key.color.value() != color.as_ref() {
+                            key.color = color.clone().map_or(Presence::Missing, Presence::Present);
+                        }
+                    }
+                    proposed
+                }
                 ValidAction::Preset(preset) => {
-                    curves::apply_curve_preset(&group.original, &group.selected, preset)?.0
+                    curves::apply_curve_preset(&group.original, &group.selected, *preset)?.0
                 }
                 ValidAction::Influence(side, percent) => {
                     curves::apply_selected_influence(
                         &group.original,
                         &group.selected,
-                        side,
-                        percent,
+                        *side,
+                        *percent,
                     )?
                     .0
                 }
@@ -199,8 +324,8 @@ impl ObjectFillOwner {
                     let mut proposed = group.original.clone();
                     for &ki in &group.selected {
                         let key = &mut proposed.keys[ki];
-                        if key.lock_to.value().copied().flatten() != mode {
-                            key.lock_to = Presence::Present(mode);
+                        if key.lock_to.value().copied().flatten() != *mode {
+                            key.lock_to = Presence::Present(*mode);
                         }
                     }
                     proposed
@@ -246,6 +371,7 @@ impl ObjectFillOwner {
                             curve_points: Presence::Present(Some(insertion.curve_points)),
                             h_in: Presence::Present(vec![0.into(), 0.into()]),
                             h_out: Presence::Present(vec![0.into(), 0.into()]),
+                            color: Presence::Missing,
                         });
                     }
                     let mut proposed = group.original.clone();
@@ -259,13 +385,32 @@ impl ObjectFillOwner {
                     proposed
                 }
             };
-            proposals.push(track);
+            proposals.push(Some(track));
         }
         // Phase 3: one proposed document, full admission, one existing sealed token.
         let mut document = source.clone();
         if let Presence::Present(proposed) = &mut document.property_holders {
             for (group, track) in groups.iter().zip(proposals) {
-                proposed[group.holder].properties[group.property].track = Presence::Present(track);
+                proposed[group.holder].properties[group.property].track = match track {
+                    Some(track) => Presence::Present(track),
+                    None => Presence::Missing,
+                };
+            }
+            // A property whose last key was deleted and that carries nothing else is dropped,
+            // highest index first so the earlier record indices stay valid.
+            let mut emptied: Vec<(usize, usize)> = groups
+                .iter()
+                .map(|g| (g.holder, g.property))
+                .filter(|&(h, r)| {
+                    let rec = &proposed[h].properties[r];
+                    rec.track.value().is_none()
+                        && rec.static_value.value().is_none()
+                        && rec.expression.value().is_none()
+                })
+                .collect();
+            emptied.sort_unstable_by(|a, b| b.cmp(a));
+            for (h, r) in emptied {
+                proposed[h].properties.remove(r);
             }
         }
         let changed = &document != source;

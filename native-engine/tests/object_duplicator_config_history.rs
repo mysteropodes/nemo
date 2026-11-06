@@ -167,3 +167,55 @@ fn refusals_publish_nothing() {
         assert_eq!(owner.history_depths(), (0, 0), "{payload}");
     }
 }
+
+fn effector_base() -> Value {
+    let mut document = base();
+    let host = &mut document["componentTables"]["duplicators"]["duplicators"][0]["duplicator"];
+    host["effectors"] = json!([{"pos":{"x":100,"y":200},"radius":150,"falloff":"radial"}]);
+    document
+}
+fn move_effector(index: u64, x: f64, y: f64) -> Value {
+    config(json!({"effectorPos":{"index":index,"x":x,"y":y}}))
+}
+
+#[test]
+fn an_effector_move_is_one_revision_one_undo_entry_and_survives_save_and_reopen() {
+    let mut owner = NativeObjectHistory::new("config", super::fixture::decode(&effector_base())).unwrap();
+    let original = snapshot(&owner);
+    let revision = owner.content_revision();
+    let reply = send(&mut owner, &move_effector(0, 321.0, -45.5)).unwrap();
+    assert_eq!(reply, CompactResult::Command { applied: true, history_entries_added: 1 });
+    assert_eq!(owner.content_revision(), revision + 1);
+    assert_eq!(owner.history_depths(), (1, 0));
+    let after = snapshot(&owner);
+    let reopened = crate::object_codec::decode_storage_project(&after).unwrap();
+    let again = NativeObjectHistory::new("config", reopened).unwrap();
+    let stored = |o: &NativeObjectHistory| {
+        let s = o.acquire_snapshot(o.content_revision()).unwrap();
+        let tables = s.document().duplicator_set().unwrap().duplicator("scene-root", "ly_dup").unwrap().duplicator.effectors().to_vec();
+        serde_json::to_value(&tables).unwrap()
+    };
+    assert_eq!(stored(&again)[0]["pos"], json!({"x":321,"y":-45.5}));
+    assert_eq!(stored(&again)[0]["radius"], json!(150));
+    owner.undo(1).unwrap();
+    assert_eq!(snapshot(&owner), original);
+    owner.redo(2).unwrap();
+    assert_eq!(snapshot(&owner), after);
+}
+
+#[test]
+fn an_effector_move_to_the_stored_point_or_to_a_missing_effector_publishes_nothing() {
+    let mut owner = NativeObjectHistory::new("config", super::fixture::decode(&effector_base())).unwrap();
+    let bytes = snapshot(&owner);
+    let revision = owner.content_revision();
+    let reply = send(&mut owner, &move_effector(0, 100.0, 200.0)).unwrap();
+    assert_eq!(reply, CompactResult::Command { applied: false, history_entries_added: 0 });
+    for bad in [move_effector(1, 1.0, 1.0), config(json!({"effectorPos":{"index":-1,"x":1,"y":1}})),
+        config(json!({"effectorPos":{"index":0,"x":1}})), config(json!({"effectorPos":{"index":0,"x":"1","y":1}})),
+        config(json!({"effectorPos":{"index":0,"x":1,"y":1,"z":2}}))] {
+        assert_eq!(send(&mut owner, &bad).unwrap_err().0, DispatchErrorCode::InvalidRequest, "{bad}");
+    }
+    assert_eq!(owner.content_revision(), revision);
+    assert_eq!(owner.history_depths(), (0, 0));
+    assert_eq!(snapshot(&owner), bytes);
+}

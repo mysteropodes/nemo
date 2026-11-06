@@ -29,6 +29,11 @@ pub(super) fn request(value: &Value) -> bool {
                         |v| target(&v["target"]) && text(v.get("property")) && finite(&v["frame"]),
                     )
                 }
+                Some("layerBounds") => exact(&p["view"], &["kind", "target", "frame"], &[]).is_some_and(|v| {
+                    target(&v["target"])
+                        && v["target"].get("strokeId").is_none()
+                        && v["frame"].as_u64().is_some_and(|n| n <= u32::MAX as u64)
+                }),
                 Some("expressionSource") => {
                     exact(&p["view"], &["kind", "target", "property"], &[])
                         .is_some_and(|v| target(&v["target"]) && text(v.get("property")))
@@ -70,11 +75,18 @@ fn curve(value: &Value) -> bool {
                     || p[0]["x"].as_f64() == Some(0.0) && p[p.len() - 1]["x"].as_f64() == Some(1.0))
         })
 }
+/// `#rrggbb` or `#rrggbbaa`.
+pub(super) fn key_color(value: &str) -> bool {
+    value.len() > 1
+        && value.starts_with('#')
+        && matches!(value.len() - 1, 6 | 8)
+        && value[1..].bytes().all(|b| b.is_ascii_hexdigit())
+}
 pub(super) fn key(value: &Value, dimension: usize) -> bool {
     exact(
         value,
         &["frame", "v"],
-        &["hold", "curvePoints", "hIn", "hOut", "lockTo"],
+        &["hold", "curvePoints", "hIn", "hOut", "lockTo", "color"],
     )
     .is_some_and(|k| {
         finite(&k["frame"])
@@ -82,6 +94,7 @@ pub(super) fn key(value: &Value, dimension: usize) -> bool {
             && k.get("hold").is_none_or(Value::is_boolean)
             && k.get("lockTo")
                 .is_none_or(|v| v.is_null() || matches!(v.as_str(), Some("in" | "out" | "layer")))
+            && k.get("color").is_none_or(|v| v.as_str().is_some_and(key_color))
             && k.get("curvePoints").is_none_or(curve)
             && ["hIn", "hOut"]
                 .iter()
@@ -93,6 +106,9 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
         return false;
     }
     let view = &payload["view"];
+    if view["kind"] == "layerBounds" {
+        return layer_bounds(document, payload, value);
+    }
     let raw = view["kind"] == "rawSample";
     let context = view["kind"] == "expressionContext";
     let expression = view["kind"] == "expressionState";
@@ -168,6 +184,37 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
                             .filter(|n| *n <= u32::MAX as u64))
     };
     valid && serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= 3072)
+}
+
+/// #2520: the `layerBounds` result echoes the pinned selector, four finite bounds, the parent uid (or null) and the six-number ancestor map.
+fn layer_bounds(document: &str, payload: &Value, value: &Value) -> bool {
+    let view = &payload["view"];
+    exact(
+        value,
+        &[
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "target",
+            "frame",
+            "bounds",
+            "parentLayerUid",
+            "parentAffine",
+        ],
+        &[],
+    )
+    .is_some()
+        && value["instanceId"].as_str().is_some_and(bounded_identifier)
+        && value["documentId"].as_str() == Some(document)
+        && ["atRevision", "documentSnapshotId", "kind", "target", "frame"]
+            .iter()
+            .all(|k| value.get(*k) == payload.get(*k).or_else(|| view.get(*k)))
+        && vector(&value["bounds"], 4)
+        && vector(&value["parentAffine"], 6)
+        && (value["parentLayerUid"].is_null() || text(value.get("parentLayerUid")))
+        && serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= 3072)
 }
 
 fn expression_context(value: &Value) -> bool {

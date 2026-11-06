@@ -367,6 +367,21 @@ fn exact_authored_key_lock_metadata_is_nullable_and_kept_separate_from_original_
 }
 
 #[test]
+fn authored_key_tint_is_a_hex_colour_and_nothing_else() {
+    let q = payload(true);
+    for tint in ["#e8b64c", "#4EA9FF", "#4ea9ffcc"] {
+        let mut value = output(true);
+        value["items"][0]["color"] = json!(tint);
+        assert!(result("document", &q, &value), "{tint}");
+    }
+    for tint in [json!("red"), json!("#12345"), json!("e8b64c"), json!(null), json!(7), json!("#ggg000")] {
+        let mut value = output(true);
+        value["items"][0]["color"] = tint;
+        assert!(!result("document", &q, &value));
+    }
+}
+
+#[test]
 fn expression_state_is_closed_correlated_and_does_not_infer_missing_evaluations() {
     let mut p = payload(false);
     p["view"]["kind"] = json!("expressionState");
@@ -469,4 +484,25 @@ fn expression_source_is_exact_closed_frameless_and_correlated() {
     v["expression"] = json!({"enabled":true,"code":"y".repeat(3100)});
     assert!(!result("document", &p, &v));
     let _: NativeApplicationRequest = serde_json::from_value(json!({"apiVersion":2,"requestId":"source","instanceId":"instance","documentId":"document","operation":OP,"payload":p})).unwrap();
+}
+
+#[test]
+fn layer_bounds_view_is_closed_and_correlated_in_the_mcp_contract() {
+    let descriptor: Value = serde_json::from_str(include_str!("../../engineering/application/capabilities-v2/native-property-read.json")).unwrap();
+    let example = descriptor["examples"].as_array().unwrap().iter().find(|e| e["request"]["payload"]["view"]["kind"] == "layerBounds").unwrap();
+    let (p, v) = (&example["request"]["payload"], &example["response"]["result"]);
+    assert!(request(p) && result("native-object-document-1", p, v));
+    for (pointer, bad) in [("/bounds", json!([1, 2, 3])), ("/frame", json!(1)), ("/kind", json!("rawSample")), ("/parentLayerUid", json!("")), ("/parentAffine", json!([1, 0, 0, 1, 0])), ("/parentAffine", json!(null))] {
+        let mut wrong = v.clone();
+        *wrong.pointer_mut(pointer).unwrap() = bad;
+        assert!(!result("native-object-document-1", p, &wrong), "{pointer}");
+    }
+    let mut extra = v.clone();
+    extra["property"] = json!("opacity");
+    assert!(!result("native-object-document-1", p, &extra));
+    for (pointer, bad) in [("/view/frame", json!(-1)), ("/view/target/strokeId", json!("s")), ("/view/property", json!("opacity"))] {
+        let mut wrong = p.clone();
+        match wrong.pointer_mut(pointer) { Some(slot) => *slot = bad, None => { let (parent, key) = pointer.rsplit_once('/').unwrap(); wrong.pointer_mut(parent).unwrap()[key] = bad; } }
+        assert!(!request(&wrong), "{pointer}");
+    }
 }

@@ -284,6 +284,8 @@ test('classic browser helper/SDK expose the same read with the literal finite na
 test('authored-key read accepts only actual nullable standing lock modes while preserving DTO shape',async()=>{
  for(const lockTo of [null,'in','out','layer']){const q=request('authoredKeys'),r=response(q);r.result.items[0].lockTo=lockTo;assert.deepEqual((await read(q,r)).result.items[0],r.result.items[0]);}
  for(const lockTo of [false,0,'',{},'unknown']){const q=request('authoredKeys'),r=response(q);r.result.items[0].lockTo=lockTo;await assert.rejects(read(q,r),TypeError);}
+ for(const color of ['#e8b64c','#4EA9FF','#4ea9ffcc']){const q=request('authoredKeys'),r=response(q);r.result.items[0].color=color;assert.deepEqual((await read(q,r)).result.items[0],r.result.items[0]);}
+ for(const color of [null,false,7,'red','#12345','e8b64c','#gggggg']){const q=request('authoredKeys'),r=response(q);r.result.items[0].color=color;await assert.rejects(read(q,r),TypeError);}
 });
 
 test('expressionSource returns the exact authored code, frameless and correlated, and never truncates (#2376)', async () => {
@@ -312,4 +314,24 @@ test('expressionSource returns the exact authored code, frameless and correlated
   }
   const noProperty = {...q, payload:{...q.payload, view:{kind:'expressionSource', target:q.payload.view.target}}};
   assert.throws(() => SDK.validateRequest(noProperty));
+});
+
+test('layerBounds returns the layer bounds before its Motion, integer-framed, propertyless and correlated (#2520)', async () => {
+  const q = request();
+  q.payload.view = {kind:'layerBounds', target:{contextId:'scene-root', layerUid:'data:layer 雪'}, frame:3};
+  const make = (fields = {}) => {
+    const r = response(q, {});
+    const result = {instanceId:q.instanceId, documentId:q.documentId, atRevision:7, documentSnapshotId:q.payload.documentSnapshotId, kind:'layerBounds',
+      target:{...q.payload.view.target}, frame:3, bounds:[20, 30, 120, 90], parentLayerUid:null, parentAffine:[1, 0, 0, 1, 0, 0], ...fields};
+    return {...r, result};
+  };
+  for (const parent of [null, 'data:parent 雪']) { const r = make({parentLayerUid:parent}); assert.deepEqual(await read(q, r), r); }
+  const bad = [r => delete r.result.bounds, r => r.result.bounds = [1, 2, 3], r => r.result.bounds = [1, 2, 3, NaN], r => r.result.frame = 4,
+    r => r.result.kind = 'rawSample', r => r.result.property = 'opacity', r => r.result.dimension = 4, r => r.result.parentLayerUid = 7,
+    r => delete r.result.parentLayerUid, r => delete r.result.parentAffine, r => r.result.parentAffine = [1, 0, 0, 1, 0], r => r.result.parentAffine = [1, 0, 0, 1, 0, NaN], r => r.result.target.layerUid = 'foreign', r => r.result.target.strokeId = 's'];
+  for (const mutate of bad) { const r = make(); mutate(r); await assert.rejects(read(q, r)); }
+  for (const view of [{...q.payload.view, frame:-1}, {...q.payload.view, frame:1.5}, {...q.payload.view, property:'opacity'}, {...q.payload.view, target:{...q.payload.view.target, strokeId:'s'}},
+    {kind:'layerBounds', target:q.payload.view.target}]) {
+    assert.throws(() => SDK.validateRequest({...q, payload:{...q.payload, view}}));
+  }
 });

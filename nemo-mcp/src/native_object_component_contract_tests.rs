@@ -37,12 +37,22 @@ pub(super) fn valid() -> Vec<(&'static str, Value)> {
             json!({"command":"object.duplicator.config","layerUid":"layer-a","mode":"radial","rows":3,"cols":4,
             "spacingX":150.5,"spacingY":-20,"count":12,"radius":240,"startAngle":45,"radialOrient":true,
             "pathAlignTangent":false,"seed":482913,"staggerRandom":{"position":true,"hue":false},
-            "timeOffset":{"enabled":true,"offsetFrames":2.5,"direction":"centerOut"}}),
+            "timeOffset":{"enabled":true,"offsetFrames":2.5,"direction":"centerOut"},
+            "effectorPos":{"index":1,"x":120.5,"y":-40}}),
         ),
         (
             "component.instance.set",
             json!({"command":"object.component.instance.set","layerUid":"layer-a","mode":"single","singleFrame":9,
             "placedAt":-4,"speed":2.5,"atFrame":12}),
+        ),
+        (
+            "component.breakApart",
+            json!({"command":"object.component.breakApart","contextId":"scene-root","layerUid":"layer-a"}),
+        ),
+        (
+            "component.state.edit",
+            json!({"command":"object.component.state.edit","contextId":"component-a","kind":"setCameraKey","frame":4,
+            "x":160.5,"y":90,"w":320,"rot":-12,"hOut":[1,-2],"hIn":[0,0],"ease":[0.42,0,0.58,1]}),
         ),
     ]
 }
@@ -70,7 +80,7 @@ fn without(suffix: &str, key: &str) -> Value {
 }
 
 #[test]
-fn the_eight_declared_commands_are_exactly_the_admitted_operations() {
+fn the_ten_declared_commands_are_exactly_the_admitted_operations() {
     let expected = [
         "component.convert",
         "component.expose",
@@ -80,8 +90,10 @@ fn the_eight_declared_commands_are_exactly_the_admitted_operations() {
         "duplicator.path",
         "duplicator.config",
         "component.instance.set",
+        "component.breakApart",
+        "component.state.edit",
     ];
-    assert_eq!(SPECS.len(), 8);
+    assert_eq!(SPECS.len(), 10);
     assert_eq!(
         valid().iter().map(|(s, _)| *s).collect::<Vec<_>>(),
         expected
@@ -140,6 +152,10 @@ fn one_member_mutations_are_refused_by_shape_and_by_input_admission() {
         for key in payload.as_object().unwrap().keys() {
             let config_member = ["duplicator.config", "component.instance.set"].contains(&suffix)
                 && !["command", "layerUid"].contains(&key.as_str());
+            // `component.state.edit` names only the members its kind takes: the optional ones may be absent (a null is not a value).
+            let config_member = config_member
+                || suffix == "component.state.edit"
+                    && !["command", "contextId", "kind"].contains(&key.as_str());
             if !optional.contains(&(suffix, key.as_str())) && !config_member {
                 mutants.push(without(suffix, key));
             }

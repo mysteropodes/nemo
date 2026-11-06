@@ -290,6 +290,10 @@ test('an entered component paints its own timeline: baseline rows, no scene pain
   assert.equal(f.host.state.activeLayerIdx, 1, 'a row click activates the component layer');
   assert.deepEqual(f.host._layerSel, [1]);
   assert.ok(f.host.document.getElementById('layer-list').children[1].className.split(' ').includes('act'));
+  // #2256: the selected cells stay painted across a repaint (a click on a cell activates its layer, which repaints the grid).
+  f.host._sel = { frames: [{ layer: 1, frame: 3 }] }; f.host.updateUI();
+  const cells = f.host.document.getElementById('frame-grid').children;
+  assert.deepEqual([cells[1].children[3].className.split(' ').includes('sel'), cells[0].children[3].className.split(' ').includes('sel'), cells[1].children[2].className.split(' ').includes('sel')], [true, false, false]);
 });
 
 test('the entered grid shows the component\'s OWN frames and range from the pinned timing reads, never the scene\'s, and drops a stale answer', async () => {
@@ -535,14 +539,122 @@ test('a repaint of changed content rebuilds the grid but asks no read for an ans
   f.m.revision = 8; Context.revision(f.host, f.session.info()); await settle();
   assert.ok(f.calls.length > asked, 'a new revision reads again');
 });
+test('the shy switch hides the marked entered rows on BOTH panels alike, and the range edit binds each painted bar', async () => {
+  const f = fixture();
+  f.m.comps.sym_a.layers = [['ia', 'Inner A', 'drawing', { shy: true }], ['ib', 'Inner B', 'drawing', { shy: false }]];
+  f.session.readLayerCells = async () => null;
+  f.session.readLayerRange = async () => ({ kind: 'layerRange', range: { rawInPoint: 2, rawOutPoint: 9, inPoint: 2, outPoint: 9, hasCustomRange: true, hasTimeLink: false } });
+  const bound = [];
+  f.host.NemoNativeComponentRangeEdit = { bind: (host, bar, uid, range) => { bound.push([uid, range.rawInPoint]); return true; } };
+  f.host.state.shyEnabled = true;
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  const doc = f.host.document, list = doc.getElementById('layer-list'), grid = doc.getElementById('frame-grid');
+  assert.deepEqual(list.children.map((r) => r.hidden === true), [true, false]);
+  assert.deepEqual(grid.children.map((r) => r.hidden === true), [true, false], 'the two lists keep the same rows hidden (CLAUDE.md section 11)');
+  assert.deepEqual(bound.sort(), [['ia', 2], ['ib', 2]], 'each bar is bound to the range edit with its owner range');
+});
 test('the entered rows carry the owner\'s hidden / locked / parent / 3D / Motion facts that the drawing gates read', async () => {
   const f = fixture();
-  f.m.comps.sym_a.layers = [['ia', 'Inner A', 'drawing', { visible: false, locked: true, parentLayerUid: 'ib', threeD: true, hasMotion: true }], ['ib', 'Inner B', 'drawing', { visible: true, locked: false, parentLayerUid: null, threeD: false, hasMotion: false }]];
+  f.m.comps.sym_a.layers = [['ia', 'Inner A', 'drawing', { visible: false, locked: true, parentLayerUid: 'ib', threeD: true, hasMotion: true, shy: true }], ['ib', 'Inner B', 'drawing', { visible: true, locked: false, parentLayerUid: null, threeD: false, hasMotion: false }]];
   f.composed.bindPolicyEntries();
   f.row(1).fire('dblclick'); await settle();
   const rows = Context.layerRows(f.host);
-  assert.deepEqual(rows[0], { layerUid: 'ia', locked: true, visible: false, parentLayerUid: 'ib', threeD: true, hasMotion: true });
-  assert.deepEqual(rows[1], { layerUid: 'ib', locked: false, visible: true, parentLayerUid: null, threeD: false, hasMotion: false });
+  assert.deepEqual(rows[0], { layerUid: 'ia', locked: true, visible: false, parentLayerUid: 'ib', threeD: true, hasMotion: true, shy: true });
+  assert.deepEqual(rows[1], { layerUid: 'ib', locked: false, visible: true, parentLayerUid: null, threeD: false, hasMotion: false, shy: false });
   assert.deepEqual(Context.layers(f.host).map((r) => [r.layerUid, r.name, r.locked, r.visible]), [['ia', 'Inner A', true, false], ['ib', 'Inner B', false, true]]);
   assert.deepEqual(f.host.state.layers.map((r) => [r.locked, r.visible, r.parentLayerUid, r.threeD]), [[true, false, 'ib', true], [false, true, null, false]]);
+});
+
+test('the entered grid mounts the header "Select frames" strip once and keeps it across a scrub tick (the real paint hook)', async () => {
+  const f = fixture(), mounts = [];
+  f.host.NemoNativeComponentCellSelection = { mount: (host, st, caption, frameOnly) => { mounts.push({ name: st.name, caption, frameOnly, text: caption.textContent, total: st.totalFrames }); return true; } };
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  const header = f.host.document.getElementById('frame-hdr');
+  const full = mounts[mounts.length - 1];
+  assert.equal(full.frameOnly, false); assert.equal(full.caption, header.children[0], 'mounted on the caption the grid painted'); assert.equal(full.name, 'Comp A'); assert.equal(full.total, 12);
+  f.host.state.currentFrame = 4;
+  assert.equal(Context.paint(f.host, true), true);
+  const tick = mounts[mounts.length - 1];
+  assert.equal(tick.frameOnly, true, 'a scrub tick asks for the in-place remount');
+  assert.equal(tick.caption, full.caption, 'the same caption node (the grid did not rebuild)');
+  assert.match(tick.text, /Frame 5 \/ 12$/, 'the caption text the strip copies is already the new frame');
+});
+
+// #2256 E-comp-auto-split: Motion's double-click on an instance releases a single-layer component into one layer per shape (motion.js:6888).
+function splitRecorder(f, outcome) {
+  const calls = [];
+  f.host.NemoNativeComponentLayerEdit = { split: async (host, uid) => { calls.push({ uid, frame: host.state.currentFrame, presented: Context.presented(host).contextId }); return outcome || { ok: true, applied: true }; } };
+  return calls;
+}
+test('Motion: entering a component that holds one drawing layer splits it once, inside the entered context, and says how to undo', async () => {
+  const f = fixture(); f.composed.bindPolicyEntries();
+  const calls = splitRecorder(f); f.host.state.appMode = 'motion';
+  f.row(2).fire('dblclick'); await settle();
+  assert.deepEqual(calls, [{ uid: 'ic', frame: 0, presented: 'sym_b' }], 'one split request, for the lone layer, after the context is presented');
+  assert.deepEqual(f.toasts, ['toastSplitToLayersUndoHint'], 'the baseline hint (the fixture locale returns the key)');
+});
+test('Motion: a component with two layers, an Animation 2D entry, a refused split and a plain tab entry never split or toast', async () => {
+  const f = fixture(); f.composed.bindPolicyEntries();
+  const calls = splitRecorder(f, { ok: false, code: 'invalid_request' }); f.host.state.appMode = 'motion';
+  f.row(1).fire('dblclick'); await settle();
+  assert.deepEqual(calls, [], 'sym_a holds two layers: the baseline splits only a single-layer component');
+  await f.host.SM.exitToScene(); await settle();
+  f.row(2).fire('dblclick'); await settle();
+  assert.equal(calls.length, 1, 'the single-layer component asks once');
+  assert.deepEqual(f.toasts, [], 'a refusal (already one shape per layer) is the idempotent re-entry: silent');
+  await f.host.SM.exitToScene(); await settle();
+  f.host.state.appMode = 'anim2d';
+  f.row(2).fire('dblclick'); await settle();
+  assert.equal(calls.length, 1, 'Animation 2D enters without splitting');
+  await f.host.SM.exitToScene(); await settle();
+  f.host.state.appMode = 'motion';
+  f.host.SM.enterSymbol('sym_b'); await settle();
+  assert.equal(calls.length, 1, 'the tab / panel entry (enterSymbol) does not split');
+});
+
+// #2256 B-comp-edit-rest: NumpadEnter in Motion on the active instance row (1065e9d8:src/js/timeline.js:9728) is the row double-click's enter-and-split path.
+function keyboard(f) {
+  const listeners = [];
+  f.host.document.addEventListener = (type, fn, capture) => { if (type === 'keydown') listeners.push({ fn, capture }); };
+  f.host.document.removeEventListener = (type, fn) => { const at = listeners.findIndex((l) => l.fn === fn); if (type === 'keydown' && at >= 0) listeners.splice(at, 1); };
+  f.composed.bindPolicyEntries();
+  const press = (code, extra) => { const event = Object.assign({ key: 'Enter', code, target: f.host.document.getElementById('layer-list'), prevented: false, stopped: false,
+    preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } }, extra); listeners.forEach((l) => l.fn(event)); return event; };
+  return { listeners, press };
+}
+test('NumpadEnter in Motion enters the active component instance and splits a single-layer component, exactly as the row double-click', async () => {
+  const f = fixture(), keys = keyboard(f), calls = splitRecorder(f);
+  Object.assign(f.host.state.layers[2], { kind: 'component', componentId: 'sym_b' }); f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'motion';
+  assert.ok(keys.listeners.length === 1 && keys.listeners[0].capture === true, 'one capture listener on the document');
+  const event = keys.press('NumpadEnter'); await settle();
+  assert.ok(event.prevented && event.stopped, 'the key is consumed (regular Enter would toggle play)');
+  assert.equal(Context.presented(f.host).contextId, 'sym_b', 'the instance component is presented');
+  assert.deepEqual(calls, [{ uid: 'ic', frame: 0, presented: 'sym_b' }], 'the same one split request as the double-click');
+  assert.deepEqual(f.toasts, ['toastSplitToLayersUndoHint']);
+  assert.equal(f.workspaceRequests().find((r) => r.payload.action.kind === 'enter').payload.action.fromLayerUid, 'L3', 'enters at the frame the instance shows');
+});
+test('NumpadEnter does nothing for regular Enter, a plain layer, Animation 2D, modifiers, a text field or from inside a component', async () => {
+  const f = fixture(), keys = keyboard(f), calls = splitRecorder(f);
+  Object.assign(f.host.state.layers[2], { kind: 'component', componentId: 'sym_b' }); f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'motion';
+  const field = { tagName: 'INPUT', parentNode: null };
+  const idle = [keys.press('Enter'), keys.press('NumpadEnter', { altKey: true }), keys.press('NumpadEnter', { metaKey: true }), keys.press('NumpadEnter', { target: field })];
+  f.host.state.activeLayerIdx = 0; idle.push(keys.press('NumpadEnter'));
+  f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'anim2d'; idle.push(keys.press('NumpadEnter'));
+  await settle();
+  assert.ok(idle.every((e) => !e.prevented), 'none of them is consumed');
+  assert.equal(f.workspaceRequests().length, 0, 'no workspace request was sent');
+  f.host.state.appMode = 'motion'; keys.press('NumpadEnter'); await settle();
+  assert.equal(Context.presented(f.host).contextId, 'sym_b');
+  const inside = keys.press('NumpadEnter'); await settle();
+  assert.ok(!inside.prevented, 'inside a component the key is left alone (nested components are refused)');
+  assert.equal(calls.length, 1);
+});
+test('a legacy document keeps the key, and disposing the entries removes the listener', async () => {
+  const f = fixture({ legacyDocument: true }), keys = keyboard(f);
+  Object.assign(f.host.state.layers[2], { kind: 'component', componentId: 'sym_b' }); f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'motion';
+  assert.ok(!keys.press('NumpadEnter').prevented, 'not a native document');
+  f.composed.disposePolicyEntries();
+  assert.equal(keys.listeners.length, 0, 'the capture listener is removed on dispose');
 });

@@ -106,6 +106,9 @@ impl ObjectPaintPlan {
 #[path = "object_raster_paint_join.rs"]
 pub(crate) mod raster;
 use raster::PaintIndex;
+// #2371 U11: the Solo view of this plan (a derived plan, nothing copied).
+#[path = "object_paint_plan_solo.rs"]
+mod solo;
 // G16 option C (#2361): the dabs seeded brush-texture anchors paint, right after each anchor.
 #[path = "object_brush_dab_paint.rs"]
 pub(crate) mod dab_paint;

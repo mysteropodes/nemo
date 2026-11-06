@@ -1,5 +1,6 @@
 //! Layer descriptor replacement/removal through the existing sealed item owner.
 use crate::commands::object_fill_owner::item_commands::{ItemEdit, ItemPayload};
+use crate::commands::object_fill_owner::vector_edit::context;
 use crate::object_document::{object_text_layout_kernels::animator::TextAnimators, Presence};
 use crate::request_receipts::DispatchErrorCode as E;
 use crate::revision::ObjectSnapshot;
@@ -10,25 +11,39 @@ pub(crate) mod edit;
 pub(super) fn apply(origin: &ObjectSnapshot, p: &ItemPayload) -> Result<ItemEdit, E> {
     let upsert = p.command == "object.text.animator.upsert";
     let editing = p.command == "object.text.animator.edit";
-    p.expects(if editing {
-        &["layerUid", "animatorId", "edit"]
-    } else if upsert {
-        &["layerUid", "animator"]
-    } else {
-        &["layerUid", "animatorId"]
-    })?;
+    p.expects_with(
+        if editing {
+            &["layerUid", "animatorId", "edit"]
+        } else if upsert {
+            &["layerUid", "animator"]
+        } else {
+            &["layerUid", "animatorId"]
+        },
+        &["contextId"],
+    )?;
+    // #2267: a declared component's layer holds its own animators; its edit runs over a view of the document and is restored (an undeclared one is refused).
+    let context = p.context_id.value().map_or("scene-root", String::as_str);
+    if context.is_empty() {
+        return Err(E::InvalidRequest);
+    }
     let layer_uid = p
         .layer_uid
         .value()
         .filter(|s| !s.is_empty())
         .ok_or(E::InvalidRequest)?;
-    let mut document = origin.document().clone();
+    let view = context::view(origin.document(), context)?;
+    let mut document = view.clone().unwrap_or_else(|| origin.document().clone());
+    let locked = match &view {
+        // A component layer has its own lock; the scene's is the effective Drawing lock (folders included).
+        Some(_) => document.layers.iter().find(|l| l.layer_uid() == layer_uid).ok_or(E::NotFound)?.locked(),
+        None => origin.document().layer_is_locked(layer_uid),
+    };
     let layer = document
         .layers
         .iter_mut()
         .find(|l| l.layer_uid() == layer_uid)
         .ok_or(E::NotFound)?;
-    if origin.document().layer_is_locked(layer_uid) {
+    if locked {
         return Err(E::Unavailable);
     }
     if layer.widget.value().is_some() {
@@ -81,6 +96,9 @@ pub(super) fn apply(origin: &ObjectSnapshot, p: &ItemPayload) -> Result<ItemEdit
     };
     if changed {
         layer.text_animators = Presence::Present(TextAnimators(records));
+    }
+    if view.is_some() {
+        document = context::restore(document, origin.document(), context)?;
     }
     Ok(ItemEdit {
         document,

@@ -28,7 +28,7 @@ fn selector(value: &Value) -> bool {
         Some("contexts") => exact(value, &["kind", "cursor", "limit"], &[]).is_some_and(page),
         Some("context") => exact(value, &["kind", "contextId"], &[])
             .is_some_and(|o| context_id(o.get("contextId")).is_some()),
-        Some("layers" | "instances") => {
+        Some("layers" | "instances" | "markers" | "cameraKeys") => {
             exact(value, &["kind", "contextId", "cursor", "limit"], &[])
                 .is_some_and(|o| context_id(o.get("contextId")).is_some() && page(o))
         }
@@ -99,7 +99,7 @@ fn layer_item(value: &Value) -> bool {
     exact(
         value,
         &["layerUid", "name", "layerKind"],
-        &["visible", "locked", "parentLayerUid", "threeD", "hasMotion"],
+        &["visible", "locked", "parentLayerUid", "threeD", "hasMotion", "shy"],
     )
     .is_some_and(|o| {
         uid(o.get("layerUid"))
@@ -107,10 +107,36 @@ fn layer_item(value: &Value) -> bool {
             && o["layerKind"]
                 .as_str()
                 .is_some_and(|k| LAYER_KINDS.contains(&k))
-            && ["visible", "locked", "threeD", "hasMotion"]
+            && ["visible", "locked", "threeD", "hasMotion", "shy"]
                 .iter()
                 .all(|k| o.get(*k).map_or(true, Value::is_boolean))
             && o.get("parentLayerUid").map_or(true, |p| p.is_null() || uid(Some(p)))
+    })
+}
+/// C-comp-owned-state: one stored component marker, `{frame, name, color}`.
+fn marker_item(value: &Value) -> bool {
+    exact(value, &["frame", "name", "color"], &[]).is_some_and(|o| {
+        uint32(o.get("frame"))
+            && o["name"].as_str().is_some_and(|n| n.len() <= 256)
+            && o["color"].as_str().is_some_and(|c| !c.is_empty() && c.len() <= 256)
+    })
+}
+/// C-comp-owned-state: one stored component camera key; a member the key never stored reads `null`.
+fn camera_key_item(value: &Value) -> bool {
+    let numbers = |key: &str, count: usize, o: &Map<String, Value>| {
+        o.get(key).is_some_and(|v| {
+            v.is_null()
+                || v.as_array().is_some_and(|items| {
+                    items.len() == count && items.iter().all(|n| n.as_f64().is_some_and(f64::is_finite))
+                })
+        })
+    };
+    exact(value, &["frame", "x", "y", "w", "rot", "hOut", "hIn", "ease"], &[]).is_some_and(|o| {
+        ["frame", "x", "y", "w"].iter().all(|k| finite(o.get(*k)))
+            && (o["rot"].is_null() || finite(o.get("rot")))
+            && numbers("hOut", 2, o)
+            && numbers("hIn", 2, o)
+            && numbers("ease", 4, o)
     })
 }
 fn instance_item(value: &Value) -> bool {
@@ -213,6 +239,28 @@ pub(crate) fn result(payload: &Value, value: &Value) -> bool {
         .is_some_and(|o| {
             pins(o) && same_context(o) && paged(o, wanted, "layerCount", &|e, _| layer_item(e))
         }),
+        "markers" => exact(
+            value,
+            &with(&["contextId", "markerCount", "cursor", "items", "nextCursor"]),
+            &[],
+        )
+        .is_some_and(|o| {
+            pins(o)
+                && same_context(o)
+                && wanted.get("contextId").is_some_and(|id| id != SCENE)
+                && paged(o, wanted, "markerCount", &|e, _| marker_item(e))
+        }),
+        "cameraKeys" => exact(
+            value,
+            &with(&["contextId", "keyCount", "cursor", "items", "nextCursor"]),
+            &[],
+        )
+        .is_some_and(|o| {
+            pins(o)
+                && same_context(o)
+                && wanted.get("contextId").is_some_and(|id| id != SCENE)
+                && paged(o, wanted, "keyCount", &|e, _| camera_key_item(e))
+        }),
         "instances" => exact(
             value,
             &with(&[
@@ -248,6 +296,7 @@ pub(crate) fn result(payload: &Value, value: &Value) -> bool {
                 "seed",
                 "sourceMode",
                 "staggerRandom",
+                "effectors",
                 "timeOffset",
             ]),
             &[],
@@ -322,6 +371,17 @@ fn duplicator_view(o: &Map<String, Value>) -> bool {
                     .is_some_and(|d| DUP_DIRECTIONS.contains(&d))
         })
     });
+    let effectors = o.get("effectors").and_then(Value::as_array).is_some_and(|list| {
+        list.len() <= 16
+            && list.iter().all(|item| {
+                exact(item, &["pos", "radius"], &[]).is_some_and(|m| {
+                    finite(m.get("radius"))
+                        && (m["pos"].is_null()
+                            || exact(&m["pos"], &["x", "y"], &[])
+                                .is_some_and(|p| finite(p.get("x")) && finite(p.get("y"))))
+                })
+            })
+    });
     label("mode", &DUP_MODES)
         && label("sourceMode", &["shape", "objects"])
         && ["rows", "cols", "spacingX", "spacingY", "count", "radius", "startAngle"]
@@ -334,6 +394,7 @@ fn duplicator_view(o: &Map<String, Value>) -> bool {
         && o.get("pathLayerUid")
             .is_some_and(|p| p.is_null() || context_id(Some(p)).is_some())
         && flags(o.get("staggerRandom"), &DUP_CHANNELS)
+        && effectors
         && time
 }
 

@@ -26,6 +26,8 @@ fn every_member_is_optional_and_bounded_by_its_kind() {
         json!({"staggerRandom":{"position":true,"rotation":false,"scale":true,"opacity":false,"hue":true}}),
         json!({"timeOffset":{}}),
         json!({"timeOffset":{"enabled":true,"offsetFrames":-2,"direction":"random"}}),
+        json!({"effectorPos":{"index":0,"x":1,"y":-2.5}}),
+        json!({"effectorPos":{"index":4294967295_u64,"x":0,"y":0}}),
     ] {
         assert!(request(CONFIG, &config(ok.clone())), "{ok}");
         assert!(
@@ -56,6 +58,15 @@ fn every_member_is_optional_and_bounded_by_its_kind() {
         json!({"timeOffset":{"offsetFrames":"1"}}),
         json!({"timeOffset":{"extra":1}}),
         json!({"timeOffset":7}),
+        json!({"effectorPos":null}),
+        json!({"effectorPos":{}}),
+        json!({"effectorPos":{"index":0,"x":1}}),
+        json!({"effectorPos":{"index":-1,"x":1,"y":1}}),
+        json!({"effectorPos":{"index":1.5,"x":1,"y":1}}),
+        json!({"effectorPos":{"index":4294967296_u64,"x":1,"y":1}}),
+        json!({"effectorPos":{"index":0,"x":"1","y":1}}),
+        json!({"effectorPos":{"index":0,"x":1,"y":1,"z":2}}),
+        json!({"effectorPos":[0,1,2]}),
     ] {
         assert!(!request(CONFIG, &config(bad.clone())), "{bad}");
     }
@@ -147,6 +158,7 @@ fn a_malformed_duplicator_view_is_not_an_answer() {
         "mode":"grid","rows":2,"cols":3,"spacingX":150,"spacingY":150,"count":8,"radius":200,"startAngle":0,
         "radialOrient":false,"pathAlignTangent":true,"pathLayerUid":"ly_path","seed":17,"sourceMode":"shape",
         "staggerRandom":{"position":false,"rotation":false,"scale":false,"opacity":false,"hue":false},
+        "effectors":[{"pos":{"x":100,"y":-20.5},"radius":150},{"pos":null,"radius":0}],
         "timeOffset":{"enabled":false,"offsetFrames":1,"direction":"forward"}});
     assert!(read::result(&payload, &view));
     let patch = |key: &str, value: Value| {
@@ -169,6 +181,11 @@ fn a_malformed_duplicator_view_is_not_an_answer() {
         ),
         patch("kind", json!("context")),
         patch("atRevision", json!(8)),
+        patch("effectors", json!(null)),
+        patch("effectors", json!([{"pos":{"x":1},"radius":1}])),
+        patch("effectors", json!([{"pos":null,"radius":"1"}])),
+        patch("effectors", json!([{"pos":{"x":1,"y":2}}])),
+        patch("effectors", Value::Array(vec![json!({"pos":null,"radius":1}); 17])),
     ] {
         assert!(!read::result(&payload, &bad), "{bad}");
     }

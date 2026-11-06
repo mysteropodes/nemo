@@ -138,10 +138,10 @@ test('results answer their own pin, selector and page, and the model invariants 
   no({ kind: 'context', contextId: 'scene-root' }, (r) => { r.name = 'Scene'; }, 'scene summary is unnamed');
   no({ kind: 'layers', contextId: 'sym_a', cursor: 0, limit: 16 }, (r) => { r.items[0].layerKind = 'mystery'; }, 'layer kind');
   // The drawing-gate facts are optional booleans (the parent a uid or null); anything else is refused.
-  for (const [key, value] of [['visible', 'yes'], ['locked', 1], ['threeD', null], ['hasMotion', 'no'], ['parentLayerUid', 7], ['parentLayerUid', '']]) {
+  for (const [key, value] of [['visible', 'yes'], ['locked', 1], ['threeD', null], ['hasMotion', 'no'], ['shy', 'no'], ['parentLayerUid', 7], ['parentLayerUid', '']]) {
     no({ kind: 'layers', contextId: 'sym_a', cursor: 0, limit: 16 }, (r) => { r.items[0][key] = value; }, 'layer fact ' + key + ' = ' + String(value));
   }
-  run({ kind: 'layers', contextId: 'sym_a', cursor: 0, limit: 16 }, (r) => { Object.assign(r.items[0], { visible: false, locked: true, parentLayerUid: null, threeD: true, hasMotion: false }); }); // admitted
+  run({ kind: 'layers', contextId: 'sym_a', cursor: 0, limit: 16 }, (r) => { Object.assign(r.items[0], { visible: false, locked: true, parentLayerUid: null, threeD: true, hasMotion: false, shy: true }); }); // admitted
   no({ kind: 'layers', contextId: 'sym_a', cursor: 0, limit: 16 }, (r) => { r.contextId = 'sym_b'; }, 'layers of another context');
   no({ kind: 'instances', contextId: 'sym_a', cursor: 0, limit: 16 }, (r) => { r.items[0].extra = 1; }, 'closed instance item');
   assert.throws(() => contract.result('query.document.object', {}), TypeError);
@@ -269,7 +269,7 @@ test('the declaration, schema, composition and load order agree', () => {
   assert.equal(branch.allOf[1].properties.payload.$ref, '#/$defs/ObjectComponentReadPayload');
   assert.ok(schema.$defs.ResponseBase.properties.result.oneOf.some((b) => b.$ref === '#/$defs/ObjectComponentReadResult'));
   const kinds = schema.$defs.ObjectComponentReadResult.oneOf.map((b) => b.properties.kind.const);
-  assert.deepEqual(kinds, ['contexts', 'context', 'layers', 'instances', 'duplicator', 'instance']);
+  assert.deepEqual(kinds, ['contexts', 'context', 'layers', 'markers', 'cameraKeys', 'instances', 'duplicator', 'instance']);
   assert.deepEqual(schema.$defs.ObjectComponentReadPayload.properties.selector.oneOf.map((b) => b.properties.kind.const), kinds);
   assert.deepEqual(descriptor.examples[0].request.payload.selector, { kind: 'contexts', cursor: 0, limit: 16 });
   contract.payload(OP, descriptor.examples[0].request.payload);
@@ -331,4 +331,20 @@ test('a context whose name the owner had to cut is listed, flagged, and paging c
   // A forged flag is refused at the edge like any other unknown member.
   const forged = owner({ reply: (req, base, state) => { const plan = answer(req, state); plan.result.items[0].nameTruncated = true; return Object.assign(base, { ok: true, result: plan.result }); } });
   assert.equal((await forged.intent.listContexts()).code, 'transport_failed');
+});
+
+test('C-comp-owned-state: the markers and camera keys of a component are paged, closed and never the scene', () => {
+  const pin = { atRevision: 7, documentSnapshotId: SNAP(7) };
+  for (const [kind, countKey, item] of [['markers', 'markerCount', { frame: 2, name: 'a', color: '#e8b64c' }],
+    ['cameraKeys', 'keyCount', { frame: 0, x: 1, y: 2, w: 3, rot: null, hOut: null, hIn: [1, 2], ease: [0.42, 0, 0.58, 1] }]]) {
+    const selector = { kind, contextId: 'sym_a', cursor: 0, limit: 16 };
+    contract.payload(OP, request(selector).payload);
+    assert.throws(() => contract.payload(OP, request({ kind, contextId: 'sym_a', cursor: 0 }).payload), TypeError, kind + ' without limit');
+    const result = Object.assign({}, pin, { kind, contextId: 'sym_a', [countKey]: 1, cursor: 0, items: [item], nextCursor: null });
+    contract.result(OP, result, request(selector).payload);
+    assert.throws(() => contract.result(OP, Object.assign({}, result, { items: [Object.assign({}, item, { extra: 1 })] }), request(selector).payload), TypeError, kind + ' extra member');
+    assert.throws(() => contract.result(OP, Object.assign({}, result, { items: [Object.assign({}, item, { frame: '0' })] }), request(selector).payload), TypeError, kind + ' frame');
+    assert.throws(() => contract.result(OP, Object.assign({}, result, { contextId: 'sym_b' }), request(selector).payload), TypeError, kind + ' another context');
+    assert.throws(() => contract.result(OP, Object.assign({}, result, { contextId: 'scene-root' }), request({ kind, contextId: 'scene-root', cursor: 0, limit: 16 }).payload), TypeError, kind + ' scene');
+  }
 });

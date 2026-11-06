@@ -13,8 +13,8 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const corpus = JSON.parse(read('tests/native-object-rig-fixtures/public-corpus.json'));
 const schema = JSON.parse(read('engineering/application/native-transport-v2.schema.json'));
 const P = 'command.document.object.';
-const SUFFIXES = ['image.mesh.edit', 'widget.create', 'widget.write', 'widget.settings', 'rig.edit', 'rig.pose', 'labs.speedLines', 'labs.boil', 'labs.followPath', 'labs.referenceFill', 'labs.pingpong', 'labs.retime', 'labs.interval', 'labs.moveToLayer', 'tween.generate', 'tween.regenerate', 'tween.split', 'tween.reassign', 'property.preset.apply', 'layer.compositing.edit', 'layer.parent.set', 'layer.timeLink.set', 'layer.followPath.set', 'layer.color.set'];
-const COMMANDS = { 'image.mesh.edit': 'object.image.mesh.edit', 'widget.create': 'object.widget.create', 'widget.write': 'object.widget.write', 'widget.settings': 'object.widget.settings', 'rig.edit': 'object.rig.edit', 'rig.pose': 'object.rig.pose' , 'labs.speedLines': 'object.labs.speedLines', 'labs.boil': 'object.labs.boil', 'labs.followPath': 'object.labs.followPath', 'labs.referenceFill': 'object.labs.referenceFill', 'labs.pingpong': 'object.labs.pingpong', 'labs.retime': 'object.labs.retime', 'labs.interval': 'object.labs.interval', 'labs.moveToLayer': 'object.labs.moveToLayer', 'tween.generate': 'object.tween.generate', 'tween.regenerate': 'object.tween.regenerate', 'tween.split': 'object.tween.split', 'tween.reassign': 'object.tween.reassign', 'property.preset.apply': 'object.property.preset.apply', 'layer.compositing.edit': 'object.layer.compositing.edit', 'layer.parent.set': 'object.layer.parent.set', 'layer.timeLink.set': 'object.layer.timeLink.set', 'layer.followPath.set': 'object.layer.followPath.set', 'layer.color.set': 'object.layer.color.set' };
+const SUFFIXES = ['image.mesh.edit', 'widget.create', 'widget.write', 'widget.settings', 'rig.edit', 'rig.pose', 'labs.speedLines', 'labs.boil', 'labs.followPath', 'labs.referenceFill', 'labs.pingpong', 'labs.retime', 'labs.interval', 'labs.moveToLayer', 'tween.generate', 'tween.regenerate', 'tween.split', 'tween.reassign', 'property.preset.apply', 'property.keys.paste', 'layer.compositing.edit', 'layer.parent.set', 'layer.timeLink.set', 'layer.followPath.set', 'layer.color.set', 'layer.kind.create', 'layer.folder.reparent', 'layer.range.arrange'];
+const COMMANDS = { 'image.mesh.edit': 'object.image.mesh.edit', 'widget.create': 'object.widget.create', 'widget.write': 'object.widget.write', 'widget.settings': 'object.widget.settings', 'rig.edit': 'object.rig.edit', 'rig.pose': 'object.rig.pose' , 'labs.speedLines': 'object.labs.speedLines', 'labs.boil': 'object.labs.boil', 'labs.followPath': 'object.labs.followPath', 'labs.referenceFill': 'object.labs.referenceFill', 'labs.pingpong': 'object.labs.pingpong', 'labs.retime': 'object.labs.retime', 'labs.interval': 'object.labs.interval', 'labs.moveToLayer': 'object.labs.moveToLayer', 'tween.generate': 'object.tween.generate', 'tween.regenerate': 'object.tween.regenerate', 'tween.split': 'object.tween.split', 'tween.reassign': 'object.tween.reassign', 'property.preset.apply': 'object.property.preset.apply', 'property.keys.paste': 'object.property.keys.paste', 'layer.compositing.edit': 'object.layer.compositing.edit', 'layer.parent.set': 'object.layer.parent.set', 'layer.timeLink.set': 'object.layer.timeLink.set', 'layer.followPath.set': 'object.layer.followPath.set', 'layer.color.set': 'object.layer.color.set', 'layer.kind.create': 'object.layer.kind.create', 'layer.folder.reparent': 'object.layer.folder.reparent', 'layer.range.arrange': 'object.layer.range.arrange' };
 // The original agreement corpus covers the six lane-3 operations; the U36 Labs rows are tests/native-object-labs-public.test.cjs.
 const ORIGINAL = SUFFIXES.slice(0, 6).map((s) => P + s);
 const envelope = (operation, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 7, operation, payload }, extra);
@@ -25,7 +25,7 @@ const defOf = (operation) => {
   return branches[0].allOf[1].properties.payload.$ref.replace('#/$defs/', '');
 };
 
-test('the contract admits exactly the twenty-three declared operations, all revisioned commands, and nothing else', () => {
+test('the contract admits exactly the twenty-eight declared operations, all revisioned commands, and nothing else', () => {
   assert.deepEqual(contract.OPERATIONS, SUFFIXES.map((s) => P + s));
   for (const op of contract.OPERATIONS) {
     assert.equal(contract.admitted(op), true); assert.equal(contract.requiresRevision(op), true); assert.equal(seam.admitted(op), true);
@@ -90,15 +90,17 @@ test('identities are bounded in UTF-8 bytes: layer ids of the rig 128, widget la
 });
 
 test('results: command receipts correlate applied and the history count; a widget creation must name its minted layer', () => {
-  for (const suffix of SUFFIXES.filter((s) => s !== 'widget.create')) {
+  for (const suffix of SUFFIXES.filter((s) => s !== 'widget.create' && s !== 'layer.kind.create')) {
     contract.result(P + suffix, { applied: true, historyEntriesAdded: 1 });
     contract.result(P + suffix, { applied: false, historyEntriesAdded: 0 });
     for (const bad of [{ applied: true, historyEntriesAdded: 0 }, { applied: false, historyEntriesAdded: 1 }, { applied: true, historyEntriesAdded: 1, layerUid: 'x' },
       { applied: 1, historyEntriesAdded: 1 }, { applied: true }, null, []]) assert.throws(() => contract.result(P + suffix, bad), TypeError, suffix + JSON.stringify(bad));
   }
   contract.result(P + 'widget.create', { applied: true, historyEntriesAdded: 1, layerUid: 'native-layer:8:0' });
+  contract.result(P + 'layer.kind.create', { applied: true, historyEntriesAdded: 1, layerUid: 'native-layer:8:0' });
   for (const bad of [{ applied: true, historyEntriesAdded: 1 }, { applied: false, historyEntriesAdded: 0, layerUid: 'x' }, { applied: true, historyEntriesAdded: 1, layerUid: '' }]) {
     assert.throws(() => contract.result(P + 'widget.create', bad), TypeError);
+    assert.throws(() => contract.result(P + 'layer.kind.create', bad), TypeError);
   }
 });
 

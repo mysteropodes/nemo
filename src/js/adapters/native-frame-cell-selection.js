@@ -8,6 +8,10 @@
   'use strict';
   var works=new WeakMap(),pins=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'],CHUNK=1024;
   function same(a,b){return !!a&&!!b&&pins.every(function(k){return a[k]===b[k];});}
+  // #2256: an ENTERED component carries its own {contextId, totalFrames, layers} on the session pins (native-component-cell-selection.js); the scene view has no contextId.
+  function inside(info){return !!info&&typeof info.contextId==='string'&&info.contextId.length>0;}
+  function held(root,info){return (root.state.activeSymbolId||null)===(inside(info)?info.contextId:null);}
+  function sameView(a,b){return same(a,b)&&a.contextId===b.contextId&&a.totalFrames===b.totalFrames;}
   function rows(root,info){
     var selected=root._layerSel;
     if(!Array.isArray(selected)||!selected.length||new Set(selected).size!==selected.length||
@@ -19,6 +23,9 @@
   function presented(root,ports,info,soft){
     try{
       if(typeof ports.frameEditPending!=='function'||ports.frameEditPending()!==false)return null;
+      // A component has no presented-scene lease (the viewport presents its own context): the proof is the owner pins plus the context controller's projection of that very component.
+      if(inside(info)){var own=ports.currentSession();
+        return own&&own.isActive()&&same(own.info(),info)&&held(root,info)&&ports.projectionReady(info)===true?{session:own,shown:'component:'+info.contextId}:null;}
       var session=ports.currentSession(),why,shown=session&&session.readPresentedObjectSession(function(c){why=c;});
       if(session&&!shown&&soft&&why==='queue-pending'&&session.isActive()&&same(session.info(),info)&&ports.projectionReady(info)===true)
         return {session:session,shown:null,unproven:true};
@@ -35,8 +42,8 @@
   function sourceCurrent(root,w,c,soft){
     var p=presented(root,w.ports,c.info,soft),selection=rows(root,c.info);
     return connected(root,w)&&p&&p.session===c.session&&(p.unproven||p.shown===c.presentation)&&
-      same(w.info,c.info)&&root.FC===c.fc&&root.state.currentFrame===c.frame&&root.state.appMode===c.mode&&
-      root.state.activeSymbolId==null&&root.state.activeCompositionId==null&&root._sel===c.selection&&
+      sameView(w.info,c.info)&&root.FC===c.fc&&root.state.currentFrame===c.frame&&root.state.appMode===c.mode&&
+      held(root,c.info)&&root.state.activeCompositionId==null&&root._sel===c.selection&&
       root._sel.frames===c.frames&&cellsEqual(root._sel.frames,c.cells)&&JSON.stringify(selection)===c.rows&&
       w.node.getBoundingClientRect().left===c.left;
   }
@@ -112,7 +119,7 @@
        !selection.frames.every(function(v){return v&&Number.isSafeInteger(v.layer)&&v.layer>=0&&v.layer<w.info.layers.length&&
          Number.isSafeInteger(v.frame)&&v.frame>=0&&v.frame<w.info.totalFrames;})||
        !Number.isFinite(root.FC)||root.FC<=0||!Number.isFinite(root.FC*w.info.totalFrames)||
-       root.state.activeSymbolId!=null||root.state.activeCompositionId!=null)return;
+       !held(root,w.info)||root.state.activeCompositionId!=null)return;
     var c={info:Object.assign({},w.info),session:p.session,presentation:p.shown,fc:root.FC,
       left:w.node.getBoundingClientRect().left,frame:root.state.currentFrame,mode:root.state.appMode,
       selection:selection,frames:selection.frames,cells:selection.frames.map(function(v){return [v.layer,v.frame];}),
@@ -165,10 +172,10 @@
   function mount(root,caption,info,ports){
     var w=works.get(root);
     // #2371: a playback or scrub tick (same revision, same geometry, no gesture) keeps the strip and its ruler cells; only the frame label and highlight move.
-    if(w&&ports&&ports.frameOnly===true&&w.node&&w.frameLabel&&w.caption===caption&&same(w.info,info)&&!w.capture&&!w.dialog&&w.fc===root.FC&&w.width===stripWidth(root,info)){
+    if(w&&ports&&ports.frameOnly===true&&w.node&&w.frameLabel&&w.caption===caption&&sameView(w.info,info)&&!w.capture&&!w.dialog&&w.fc===root.FC&&w.width===stripWidth(root,info)){
       w.ports=ports;w.frameLabel.textContent=caption.textContent;caption.style.minWidth='100%';caption.replaceChildren(w.node);paintSelection(root,w);return true;
     }
-    if(w){cancel(root);if(!same(w.info,info))mode(w,false);}
+    if(w){cancel(root);if(!same(w.info,info)||w.info.contextId!==info.contextId)mode(w,false);}
     else{
       w={capture:null,timer:null,listeners:[],enabled:false};works.set(root,w);
       function listen(target,name,callback,capture){target.addEventListener(name,callback,capture);w.listeners.push([target,name,callback,capture]);}

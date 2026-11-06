@@ -10,12 +10,16 @@
   },
   "transportSchema": "../native-transport-v2.schema.json",
   "operations": [
-    "command.document.object.property.preset.apply"
+    "command.document.object.property.preset.apply",
+    "command.document.object.property.keys.paste"
   ],
   "input": {
     "oneOf": [
       {
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectPropertyPresetApplyPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectPropertyKeysPastePayload"
       }
     ]
   },
@@ -27,9 +31,9 @@
   "resourceBoundary": {
     "maxRequestBytes": 65536,
     "maxReadResponseBytes": 4096,
-    "policy": "Complete correlated retained receipt or typed refusal. The request carries the preset's authored tracks (at most five transform properties, 512 keys each); requests above 65536 encoded bytes are refused, never split."
+    "policy": "Complete correlated retained receipt or typed refusal. The request carries the preset's authored tracks (at most five transform properties, 512 keys each); requests above 65536 encoded bytes are refused, never split. The key paste packet (#2524/#2377) shares the 65536-byte bound: at most 128 tracks and 512 keys in all."
   },
-  "semantics": "G39 (#2376): the baseline Motion Preset apply (src/js/motion-preset-picker.js @1065e9d8, which replaced the layer's whole motion/motionStatic with the preset's copy) as one native transaction. Each listed transform property (position, anchor, rotation, scale, opacity) of the target layer holder has its authored keys (frame, value, hold, lock, curve points, handles) and its static value replaced by the preset's; a listed property with neither keys nor static is cleared. Unlisted properties, expressions, order and time remap are never touched. Keys must be strictly increasing by frame and match the property's dimension; every property validates before any is written, so a refusal publishes nothing. One history entry covers every property and undo restores the exact prior document; an apply that changes nothing adds no entry. The preset library itself (names, tabs) is application data outside the document. No JS/Paper writer or fallback.",
+  "semantics": "G39 (#2376): the baseline Motion Preset apply (src/js/motion-preset-picker.js @1065e9d8, which replaced the layer's whole motion/motionStatic with the preset's copy) as one native transaction. Each listed transform property (position, anchor, rotation, scale, opacity) of the target layer holder has its authored keys (frame, value, hold, lock, curve points, handles) and its static value replaced by the preset's; a listed property with neither keys nor static is cleared. Unlisted properties, expressions, order and time remap are never touched. Keys must be strictly increasing by frame and match the property's dimension; every property validates before any is written, so a refusal publishes nothing. One history entry covers every property and undo restores the exact prior document; an apply that changes nothing adds no entry. The preset library itself (names, tabs) is application data outside the document. No JS/Paper writer or fallback. Key paste (#2524/#2377, baseline motion.js pasteKeys @1065e9d8) is the same transaction shape for copied Motion keys: each track names its holder (layer, or layer element), its property and keys with an offset (dt) from the earliest copied key, a value, a hold flag and curve points; every key lands at the playhead frame plus dt, overwriting the value, hold and curve of a key already there (its handles, lock and tint stay) or becoming a new key with zero handles and the default curve when none is given. A key landing outside 0..totalFrames-1 is skipped; a paste where none lands changes nothing. A track whose layer or element is absent is not_found, an unknown or non-animatable property unavailable, a value of the wrong dimension invalid_request, and any refusal publishes nothing. One history entry covers every track and undo restores the exact prior document. The packet is built by the adapter from the ordinary authoredKeys read; the engine holds no clipboard.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -100,6 +104,59 @@
       "response": {
         "apiVersion": 2,
         "requestId": "preset-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "#2524 paste copied Motion keys at the playhead; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "keys-paste-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.property.keys.paste",
+        "payload": {
+          "command": "object.property.keys.paste",
+          "frame": 12,
+          "tracks": [
+            {
+              "target": {
+                "contextId": "scene-root",
+                "layerUid": "layer-1"
+              },
+              "property": "position",
+              "keys": [
+                {
+                  "dt": 0,
+                  "v": [
+                    10,
+                    20
+                  ]
+                },
+                {
+                  "dt": 6,
+                  "v": [
+                    300,
+                    40
+                  ],
+                  "hold": true
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "keys-paste-1",
         "instanceId": "instance-A",
         "documentId": "document-A",
         "contentRevision": 8,

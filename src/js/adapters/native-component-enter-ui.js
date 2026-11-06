@@ -30,8 +30,18 @@
     route('enterSymbol', function (context, args) { return context.enter(root, args[0], null); });
     route('exitToScene', function (context) { return context.exit(root); });
     route('closeSymbolTab', function (context, args) { return context.close(root, args[0]); });
+    // NumpadEnter (1065e9d8:src/js/timeline.js:9728): Motion mode, the active scene row is a component instance. Regular Enter keeps its play meaning.
+    function onKey(event) {
+      var s = root.state, c = root.NemoNativeComponentContext, row = s && Array.isArray(s.layers) ? s.layers[s.activeLayerIdx] : null, node = event.target;
+      if (retired || event.code !== 'NumpadEnter' || event.altKey || event.ctrlKey || event.metaKey || !owned() || s.appMode !== 'motion' || !c || c.presented(root) || !row || row.kind !== 'component') return;
+      for (; node; node = node.parentNode) if (['INPUT', 'SELECT', 'TEXTAREA'].indexOf(node.tagName) >= 0 || node.isContentEditable) return;
+      event.preventDefault(); if (event.stopPropagation) event.stopPropagation();
+      c.openInstance(root, row);
+    }
+    if (root.document && typeof root.document.addEventListener === 'function') root.document.addEventListener('keydown', onKey, true);
     var binding = Object.freeze({ dispose: function () {
       retired = true;
+      if (root.document && typeof root.document.removeEventListener === 'function') root.document.removeEventListener('keydown', onKey, true);
       // An active or indeterminate native owner keeps the refusing entries.
       if (owned()) return false;
       NAMES.forEach(function (name) { if (root.SM === target && target[name] === installed[name]) target[name] = original[name]; });

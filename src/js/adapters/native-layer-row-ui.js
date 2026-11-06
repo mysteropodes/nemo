@@ -2,7 +2,8 @@
  * Baseline 1065e9d8 (src/js/timeline.js renderLayerList / startLayerRename / openLayerColorSwatches): double-click or F2 renames
  * in place (Enter or blur commits the trimmed name, Escape cancels), the colour dot opens the swatches (Shift+click selects every
  * layer wearing the colour), the folder chevron folds the folder, a vertical drag reorders, and the right-click menu offers
- * duplicate, delete, rename, split into layers, cut at the playhead and the colour. Every write is one native command from
+ * duplicate, delete, rename, group into a folder, split into layers, cut at the playhead, the shy mark, convert to component and the
+ * colour (Ctrl/Cmd+G is the same group). Every write is one native command from
  * native-layer-row-writes.js; this file renders nothing of its own state, reads the pinned project info at the moment of the
  * gesture, and has no fallback writer: with no native project every entry answers false so the caller keeps its own path. */
 (function (root, factory) {
@@ -19,6 +20,9 @@
     ctxDuplicateLayer: 'Duplicate the layer', ctxDeleteLayer: 'Delete the layer', elementsRename: 'Rename', hsLayerColour: 'Layer colour',
     ctxSplitIntoLayers: 'Split into layers (one shape per layer)', ctxCutAtPlayhead: 'Cut at the playhead  (⌘⇧D)', hsCannotDeleteLastLayer: 'The last layer cannot be deleted',
     toastLayerColorApplied: 'Color applied to {n} layers', toastLayersSelectedByColor: '{n} layers selected by color', autoNameShape: 'Shape', autoNameStroke: 'Stroke',
+    ctxGroupIntoFolder: 'Group into a folder', ctxConvertToComponent: 'Convert to component', ctxMarkAsShy: 'Mark as « shy »', ctxRemoveShyMark: 'Remove the « shy » mark',
+    toastSelectAtLeast2LayersCap: 'Select at least 2 layers', toastLayersMustBeConsecutive: 'Layers must be consecutive — reorder them first',
+    toastSelectedLayerAlreadyInFolder: 'A selected layer is already in a folder', toastLayerMarkedShyHint: 'Layer marked « shy » — turn on the switch to hide it',
     layerColorDotTitle: 'Layer color label — click to change it (applies to the whole selection), Shift+click to select every layer with this color',
   };
   const REFUSALS = { stale_selection: 'The layers changed - nothing was applied.', unavailable: 'This layer is locked or cannot be edited right now.', invalid_request: 'The layer change was not valid.' };
@@ -38,7 +42,7 @@
     let held = bindings.get(host);
     if (!held || held.session !== session) {
       const comp = () => { const m = host.NemoNativeObjectLayerCompositing; try { return m && typeof m.desktop === 'function' ? m.desktop(host) : null; } catch (_) { return null; } };
-      held = { session, writes: Writes.create(session, { compositing: comp, labels: () => ({ shape: word(host, 'autoNameShape'), stroke: word(host, 'autoNameStroke') }) }) };
+      held = { session, writes: Writes.create(session, { compositing: comp, frame: () => (host.state ? host.state.currentFrame : 0), labels: () => ({ shape: word(host, 'autoNameShape'), stroke: word(host, 'autoNameStroke') }) }) };
       bindings.set(host, held);
     }
     return held;
@@ -140,6 +144,32 @@
     if (layer && layer.kind === 'folder') finish(host, b.writes.setFolderCollapsed(uid, layer.folderCollapsed !== true));
   }
 
+  // The environment of one reorder gesture: the pinned writes and info, the selection and the list the gap is measured on.
+  function dragEnv(host, live, info, uid) {
+    return {
+      writes: live.writes, session: live.session, info, uid, selection: selectionOf(host, info), list: listOf(host),
+      intoFolder: (uids, folder) => (host.NemoNativeLayerKindsUi ? host.NemoNativeLayerKindsUi.moveIntoFolderUids(host, uids, folder) : Promise.resolve({ status: 'unavailable' })),
+      stale: 'The layers changed - the move was cancelled.', toast: (t) => toast(host, t), refused: (r) => refusal(host, r),
+    };
+  }
+  // The sticky grip at the left of an Animation 2D frame-grid row (baseline installLayerReorderGrip) starts the same reorder as the
+  // layer list: a capture listener takes the press before the legacy grip handler, whose writer a native project has closed.
+  const gripped = new WeakSet();
+  function installGrip(host) {
+    if (gripped.has(host) || !host.document || typeof host.document.addEventListener !== 'function') return;
+    gripped.add(host);
+    const down = (e) => {
+      const grip = e.target && typeof e.target.closest === 'function' ? e.target.closest('.layer-reorder-grip') : null;
+      if (!grip || e.button !== 0) return;
+      const live = native(host), info = live && !inComponent(host) && infoOf(live), at = Number(grip.parentNode && grip.parentNode.dataset && grip.parentNode.dataset.layer);
+      const layer = info && Number.isInteger(at) ? info.layers[at] : null;
+      if (!layer) return;
+      e.preventDefault(); e.stopPropagation();
+      Drag.arm(host, dragEnv(host, live, info, layer.layerUid), e);
+    };
+    host.document.addEventListener('mousedown', down, true); host.document.addEventListener('pointerdown', down, true);
+  }
+
   // Binds the writes of one finished row: called by the presenter once per row with the row's layer and index.
   function bind(host, layer, index, row) {
     const b = native(host);
@@ -162,13 +192,40 @@
       if (e.button !== 0 || !dragStart(e.target, row)) return;
       const live = native(host), info = live && infoOf(live);
       if (!info || !info.layers.some((l) => l.layerUid === uid)) return;
-      Drag.arm(host, {
-        writes: live.writes, session: live.session, info, uid, selection: selectionOf(host, info), list: listOf(host),
-        stale: 'The layers changed - the move was cancelled.', toast: (t) => toast(host, t), refused: (r) => refusal(host, r),
-      }, e);
+      Drag.arm(host, dragEnv(host, live, info, uid), e);
     };
+    installGrip(host);
     row.addEventListener('mousedown', begin); row.addEventListener('pointerdown', begin);
     return true;
+  }
+
+  // Baseline groupSelectionIntoFolder (timeline.js @1065e9d8): two or more consecutive layers that sit in no folder are grouped under one
+  // new folder; each refusal explains itself with the baseline notice and writes nothing. The folder is the native Folder layer that adopts
+  // the selection (ONE layer.kind.create, so one revision and one history entry). Returns true when it owned the gesture.
+  function group(host) {
+    const b = native(host);
+    if (!b) return false;
+    const info = infoOf(b);
+    if (!info || inComponent(host)) { refusal(host, { ok: false, code: 'unavailable' }); return true; }
+    const L = info.layers, picked = (Array.isArray(host._layerSel) ? host._layerSel : []).filter((i, k, all) => Number.isInteger(i) && i >= 0 && i < L.length && all.indexOf(i) === k).sort((a, c) => a - c);
+    if (picked.length < 2) { toast(host, word(host, 'toastSelectAtLeast2LayersCap')); return true; }
+    if (picked.some((i, k) => k && i !== picked[k - 1] + 1)) { toast(host, word(host, 'toastLayersMustBeConsecutive')); return true; }
+    const inFolder = (l) => typeof l.folderId === 'string' || (typeof l.parentLayerUid === 'string' && L.some((o) => o.layerUid === l.parentLayerUid && o.kind === 'folder'));
+    if (picked.some((i) => inFolder(L[i]))) { toast(host, word(host, 'toastSelectedLayerAlreadyInFolder')); return true; }
+    const kinds = host.NemoNativeLayerKindsUi;
+    if (!kinds) { refusal(host, { ok: false, code: 'unavailable' }); return true; }
+    Promise.resolve(kinds.add(host, 'folder', picked)).catch(() => null);
+    return true;
+  }
+  // The shy mark (SM.toggleLayerShy is the native layer-policy edit). Marking a layer while the shy switch is off turns the switch on
+  // (the policy edit does it) and, like the baseline, says so.
+  function toggleShy(host, b, uid, index) {
+    const sm = host.SM, before = host.state && host.state.shyEnabled === true;
+    if (!sm || typeof sm.toggleLayerShy !== 'function') return;
+    Promise.resolve(sm.toggleLayerShy(index)).then(() => {
+      const now = infoOf(b), row = now && now.layers.find((l) => l.layerUid === uid);
+      if (row && row.shy === true && !before) toast(host, word(host, 'toastLayerMarkedShyHint'));
+    }).catch(() => null);
   }
 
   // The right-click entries of a native layer row (the caller appends its Parent / Link / Duplicator entries).
@@ -181,15 +238,20 @@
     if (!Array.isArray(host._layerSel) || host._layerSel.indexOf(index) < 0) selectUid(host, b, uid, null);
     const menu = () => { const now = infoOf(b), sel = now && selectionOf(host, now); return sel && sel.selected.includes(uid) ? sel : { active: uid, selected: [uid] }; };
     const plain = layer.kind === 'component';
-    const items = [
+    // #2371 D36: the Insert submenu leads the menu and Remove from the folder / Add an effector layer follow it (layer-kinds module).
+    const kinds = host.NemoNativeLayerKindsUi ? host.NemoNativeLayerKindsUi.rowItems(host, index, rowFor(host, uid)) : [];
+    const items = kinds.slice(0, 1).concat([
       { label: word(host, 'ctxDuplicateLayer'), action: () => finish(host, b.writes.duplicate(uid), (r) => { if (r && r.layerUid) selectUid(host, b, r.layerUid, null); }) },
       { label: word(host, 'ctxDeleteLayer'), action: () => finish(host, b.writes.remove(menu())) },
       { sep: true },
       { label: word(host, 'elementsRename'), action: () => { startRename(host, uid); } },
+      { label: word(host, 'ctxGroupIntoFolder'), disabled: !Array.isArray(host._layerSel) || host._layerSel.length < 2, action: () => { group(host); } },
       { label: word(host, 'ctxSplitIntoLayers'), disabled: plain, action: () => finish(host, b.writes.split(uid, host.state.currentFrame)) },
       { label: word(host, 'ctxCutAtPlayhead'), action: () => { if (host.SM && typeof host.SM.splitLayerAtPlayhead === 'function') host.SM.splitLayerAtPlayhead(index); } },
+      { label: layer.shy === true ? word(host, 'ctxRemoveShyMark') : word(host, 'ctxMarkAsShy'), action: () => toggleShy(host, b, uid, index) },
+      { label: word(host, 'ctxConvertToComponent'), disabled: plain, action: () => { if (host.SM && typeof host.SM.convertActiveLayerToComponent === 'function') host.SM.convertActiveLayerToComponent(); } },
       { label: word(host, 'hsLayerColour'), action: () => { const row = rowFor(host, uid); if (row) openSwatches(host, b, uid, row); } },
-    ];
+    ], kinds.slice(1));
     if (layer.kind === 'folder') items.push({ label: layer.folderCollapsed ? 'Déplier le dossier' : 'Replier le dossier', action: () => toggleFolder(host, b, uid) });
     return items.concat([{ sep: true }]);
   }
@@ -197,6 +259,7 @@
   function toolbar(host, kind) {
     const b = native(host);
     if (!b) return false;
+    if (host.NemoNativeComponentLayerEdit && host.NemoNativeComponentLayerEdit.held(host)) return host.NemoNativeComponentLayerEdit.toolbar(host, kind); // #2256: the entered component's own layers
     const info = infoOf(b), sel = info && !inComponent(host) && selectionOf(host, info);
     if (!sel) { refusal(host, { ok: false, code: 'unavailable' }); return true; }
     if (kind === 'delete') finish(host, b.writes.remove(sel));
@@ -213,5 +276,5 @@
     if (sel) startRename(host, sel.active);
     return true;
   }
-  return Object.freeze({ bind, menuItems, toolbar, shortcut, startRename, native });
+  return Object.freeze({ bind, menuItems, toolbar, shortcut, group, startRename, native });
 }));

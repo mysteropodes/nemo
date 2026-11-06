@@ -162,7 +162,8 @@ fn real_history_and_full_project_reopen_keep_brush_fields_and_retained_snapshot(
 }
 
 #[test]
-fn genuine_component_table_with_bitmap_anchor_refuses_before_silent_component_paint() {
+fn genuine_component_table_with_bitmap_anchor_is_admitted_and_round_trips() {
+    // #2361: a bitmap-brush stroke can be drawn inside an entered component, so a component's anchor is stored like the scene's.
     let original = include_str!("fixtures/object-component-evaluate/oracle.txt")
         .lines()
         .find_map(|line| line.strip_prefix("G\t"))
@@ -178,10 +179,10 @@ fn genuine_component_table_with_bitmap_anchor_refuses_before_silent_component_pa
     anchor["target"] = target.clone();
     *record = anchor;
     assert_ne!(target["contextId"], json!("scene-root"));
-    let error = decode(&wire).unwrap_err();
-    assert_eq!(error.kind(), ObjectCodecErrorKind::Unsupported);
-    assert_eq!(
-        error.message(),
-        "bitmap brushes inside component contexts are unavailable"
-    );
+    let doc = decode(&wire).unwrap();
+    assert_eq!(serde_json::from_slice::<Value>(&encode_storage_project(&doc).unwrap()).unwrap(), wire);
+    // The anchor still has to be a camouflaged editable vector with a valid brush body.
+    let mut bad = wire.clone();
+    bad["componentTables"]["components"]["components"][0]["objects"][0]["vectorExt"]["bitmapBrush"]["bitmapBrushSpec"]["color"] = json!("red");
+    assert!(decode(&bad).is_err());
 }

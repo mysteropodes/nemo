@@ -1,5 +1,5 @@
 /* #2256: JS side of query.document.object.component.read, the read-only native component model. Pure validation; it owns no
- * document, copies no model and issues no request. One pinned read answers one of six selectors: the contexts of the
+ * document, copies no model and issues no request. One pinned read answers one of eight selectors: the contexts of the
  * document (scene-root first, then every component in table order), one context's summary, a page of its layers, the page
  * of scene layers that instance one component, the stored duplicator descriptor of a scene layer, or (Q5) the playback facts of an instance layer. Pages are at most 16 items and the native owner also cuts them by the 4096-byte
  * response bound, so `nextCursor` (the first unread index, null at the end) is the only trustworthy end of a page. A context whose
@@ -12,7 +12,7 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   const OP = 'query.document.object.component.read', SCENE = 'scene-root', MAX_PAGE = 16, MAX_ID = 128;
-  const KINDS = ['contexts', 'context', 'layers', 'instances', 'duplicator', 'instance'];
+  const KINDS = ['contexts', 'context', 'layers', 'instances', 'markers', 'cameraKeys', 'duplicator', 'instance'];
   const INSTANCE_MODES = ['loop', 'once', 'pingpong', 'single'];
   const DUP_MODES = ['grid', 'radial', 'path'], DUP_DIRECTIONS = ['forward', 'backward', 'centerOut', 'random'], DUP_CHANNELS = ['position', 'rotation', 'scale', 'opacity', 'hue'];
   const LAYER_KINDS = ['drawing', 'folder', 'effect', 'widget', 'null', 'instance'];
@@ -57,11 +57,22 @@
     if (!idText(item.contextId) || scene !== first || item.contextKind !== (scene ? 'scene' : 'component') || !nameOk(item.name) ||
       (scene && item.name !== null) || !uint32(item.totalFrames) || !uint32(item.layerCount)) fail('invalid component context');
   }
+  // C-comp-owned-state: one stored component marker / camera key (a member a key never stored reads null).
+  function markerItem(item) {
+    exact(item, ['frame', 'name', 'color'], 'component marker');
+    if (!uint32(item.frame) || typeof item.name !== 'string' || item.name.length > 256 || typeof item.color !== 'string' || !item.color.length || item.color.length > 256) fail('invalid component marker');
+  }
+  function cameraKeyItem(item) {
+    exact(item, ['frame', 'x', 'y', 'w', 'rot', 'hOut', 'hIn', 'ease'], 'component camera key');
+    const finite = (n) => typeof n === 'number' && Number.isFinite(n);
+    const list = (v, count) => v === null || (Array.isArray(v) && v.length === count && v.every(finite));
+    if (!['frame', 'x', 'y', 'w'].every((k) => finite(item[k])) || !(item.rot === null || finite(item.rot)) || !list(item.hOut, 2) || !list(item.hIn, 2) || !list(item.ease, 4)) fail('invalid component camera key');
+  }
   function layerItem(item) {
     // The drawing-gate facts (visible, locked, parented, 3D, Motion-transformed) are optional on the wire; the owner always sends them (#2256).
-    exact(item, ['layerUid', 'name', 'layerKind'], 'component layer', ['visible', 'locked', 'parentLayerUid', 'threeD', 'hasMotion']);
+    exact(item, ['layerUid', 'name', 'layerKind'], 'component layer', ['visible', 'locked', 'parentLayerUid', 'threeD', 'hasMotion', 'shy']);
     if (!idText(item.layerUid) || !nameOk(item.name) || !LAYER_KINDS.includes(item.layerKind)) fail('invalid component layer');
-    if (['visible', 'locked', 'threeD', 'hasMotion'].some((key) => has(item, key) && typeof item[key] !== 'boolean') ||
+    if (['visible', 'locked', 'threeD', 'hasMotion', 'shy'].some((key) => has(item, key) && typeof item[key] !== 'boolean') ||
       has(item, 'parentLayerUid') && item.parentLayerUid !== null && !idText(item.parentLayerUid)) fail('invalid component layer facts');
   }
   function instanceItem(item) {
@@ -80,7 +91,7 @@
   // The duplicator view: the panel's fields with their baseline display defaults, closed members only.
   function duplicatorView(value, head, selector) {
     exact(value, head.concat(['layerUid', 'mode', 'rows', 'cols', 'spacingX', 'spacingY', 'count', 'radius', 'startAngle', 'radialOrient', 'pathAlignTangent',
-      'pathLayerUid', 'seed', 'sourceMode', 'staggerRandom', 'timeOffset']), 'component duplicator result');
+      'pathLayerUid', 'seed', 'sourceMode', 'staggerRandom', 'effectors', 'timeOffset']), 'component duplicator result');
     const finite = (n) => typeof n === 'number' && Number.isFinite(n);
     if (!idText(value.layerUid) || (selector && value.layerUid !== selector.layerUid)) fail('component read result names another layer');
     if (!DUP_MODES.includes(value.mode) || !['shape', 'objects'].includes(value.sourceMode)) fail('invalid duplicator mode');
@@ -89,6 +100,13 @@
     if (!(value.pathLayerUid === null || idText(value.pathLayerUid))) fail('invalid duplicator path layer');
     exact(value.staggerRandom, DUP_CHANNELS, 'duplicator staggerRandom');
     if (!DUP_CHANNELS.every((key) => typeof value.staggerRandom[key] === 'boolean')) fail('invalid duplicator staggerRandom');
+    // The Motion canvas effector handles: at most 16, each an optional world anchor and a finite radius.
+    if (!Array.isArray(value.effectors) || value.effectors.length > 16) fail('invalid duplicator effectors');
+    value.effectors.forEach((item) => {
+      exact(item, ['pos', 'radius'], [], 'duplicator effector');
+      if (!finite(item.radius)) fail('invalid duplicator effector radius');
+      if (item.pos !== null) { exact(item.pos, ['x', 'y'], [], 'duplicator effector pos'); if (!finite(item.pos.x) || !finite(item.pos.y)) fail('invalid duplicator effector pos'); }
+    });
     exact(value.timeOffset, ['enabled', 'offsetFrames', 'direction'], 'duplicator timeOffset');
     if (typeof value.timeOffset.enabled !== 'boolean' || !finite(value.timeOffset.offsetFrames) || !DUP_DIRECTIONS.includes(value.timeOffset.direction)) fail('invalid duplicator timeOffset');
   }
@@ -117,6 +135,13 @@
       sameContext();
       if (value.contextId === SCENE) fail('the scene is not instanced');
       pagedCall('instanceCount', instanceItem); return;
+    }
+    for (const [kind, countKey, each] of [['markers', 'markerCount', markerItem], ['cameraKeys', 'keyCount', cameraKeyItem]]) {
+      if (value.kind !== kind) continue;
+      exact(value, head.concat(['contextId', countKey, 'cursor', 'items', 'nextCursor']), 'component ' + kind + ' result');
+      sameContext();
+      if (value.contextId === SCENE) fail('the scene markers and camera have their own owners');
+      pagedCall(countKey, each); return;
     }
     if (value.kind === 'duplicator') { duplicatorView(value, head, selector); return; }
     if (value.kind === 'instance') { instanceView(value, head, selector); return; }

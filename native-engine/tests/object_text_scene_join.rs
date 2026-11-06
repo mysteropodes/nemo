@@ -23,6 +23,8 @@ mod mixed_subselect;
 mod font_refusal;
 #[path = "object_text_rotation.rs"]
 mod rotation;
+#[path = "object_text_scene_three_d.rs"]
+mod three_d;
 
 pub(super) fn block() -> Value {
     json!({"text":"A","font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":24,

@@ -32,6 +32,8 @@ enum K {
     DupStagger,
     /// `{enabled?, offsetFrames?, direction?}`: a boolean, a finite number and a direction label.
     DupTime,
+    /// `{index, x, y}`: a native u32 effector index and a finite world anchor (the Motion canvas effector handle).
+    EffectorPos,
     /// The instance playback mode label: `loop`, `once`, `pingpong` or `single`.
     InstMode,
     /// A native u32 frame number.
@@ -40,6 +42,8 @@ enum K {
     PlacedAt,
     /// A finite number above zero.
     Speed,
+    /// C-comp-owned-state: a member of `object.component.state.edit` (its kind label, a camera handle or ease, a marker label or colour).
+    State(&'static str),
 }
 const INSTANCE_MODES: [&str; 4] = ["loop", "once", "pingpong", "single"];
 const DUP_MODES: [&str; 3] = ["grid", "radial", "path"];
@@ -58,7 +62,7 @@ enum Receipt {
 }
 
 /// (operation suffix, command, receipt, "member:kind" in wire order; a trailing `?` marks an optional member).
-static SPECS: [(&str, &str, Receipt, &str); 8] = [
+static SPECS: [(&str, &str, Receipt, &str); 10] = [
     (
         "component.convert",
         "object.component.convert",
@@ -100,7 +104,7 @@ static SPECS: [(&str, &str, Receipt, &str); 8] = [
         "duplicator.config",
         "object.duplicator.config",
         Receipt::Command,
-        "layerUid:id mode:dupMode? rows:number? cols:number? spacingX:number? spacingY:number? count:number? radius:number? startAngle:number? radialOrient:boolean? pathAlignTangent:boolean? seed:seed? staggerRandom:dupStagger? timeOffset:dupTime?",
+        "layerUid:id mode:dupMode? rows:number? cols:number? spacingX:number? spacingY:number? count:number? radius:number? startAngle:number? radialOrient:boolean? pathAlignTangent:boolean? seed:seed? staggerRandom:dupStagger? timeOffset:dupTime? effectorPos:effectorPos?",
     ),
     // #2256 Q5: the Component Instance panel's closed partial edit of the stored playback record.
     (
@@ -108,6 +112,21 @@ static SPECS: [(&str, &str, Receipt, &str); 8] = [
         "object.component.instance.set",
         Receipt::Command,
         "layerUid:id mode:instMode? singleFrame:frame? placedAt:placedAt? speed:speed? atFrame:frame?",
+    ),
+    // D-comp-break-apart: the inverse of convert, one instance layer baked back into an ordinary layer.
+    (
+        "component.breakApart",
+        "object.component.breakApart",
+        Receipt::Command,
+        "contextId:text layerUid:id",
+    ),
+    // C-comp-owned-state: the camera keys and markers a declared component owns, one closed edit per request.
+    (
+        "component.state.edit",
+        "object.component.state.edit",
+        Receipt::Command,
+        "contextId:id kind:stateKind frame:frame? x:number? y:number? w:speed? rot:number? hOut:pair? hIn:pair? ease:quad? \
+         name:label? color:colour? newFrame:frame?",
     ),
 ];
 const PREFIX: &str = "command.document.object.";
@@ -123,6 +142,10 @@ fn spec(operation: &str) -> Option<(&'static str, Receipt, &'static str)> {
 pub(crate) fn admitted(operation: &str) -> bool {
     spec(operation).is_some()
 }
+
+/// C-comp-owned-state: the member kinds of the component camera / marker edit.
+#[path = "native_component_state_contract.rs"]
+mod state;
 
 /// #2256: the one read of the component model, kept beside its commands but a pinned query (no expectedRevision).
 #[path = "native_component_read_contract.rs"]
@@ -158,10 +181,12 @@ fn kind(token: &str) -> Option<K> {
         "dupMode" => K::DupMode,
         "dupStagger" => K::DupStagger,
         "dupTime" => K::DupTime,
+        "effectorPos" => K::EffectorPos,
         "instMode" => K::InstMode,
         "frame" => K::Frame,
         "placedAt" => K::PlacedAt,
         "speed" => K::Speed,
+        token if state::admits(token) => K::State(state::token(token)),
         _ => return None,
     })
 }
@@ -188,10 +213,17 @@ fn check(kind: K, value: &Value) -> bool {
         K::Frame => value.as_u64().is_some_and(|f| f <= u64::from(u32::MAX)),
         K::PlacedAt => value.as_i64().is_some_and(|v| i32::try_from(v).is_ok()),
         K::Speed => value.as_f64().is_some_and(|v| v.is_finite() && v > 0.0),
+        K::State(token) => state::check(token, value),
         K::DupMode => value.as_str().is_some_and(|mode| DUP_MODES.contains(&mode)),
         K::DupStagger => value.as_object().is_some_and(|map| {
             map.iter()
                 .all(|(key, flag)| DUP_CHANNELS.contains(&key.as_str()) && flag.is_boolean())
+        }),
+        K::EffectorPos => value.as_object().is_some_and(|map| {
+            map.len() == 3
+                && map.get("index").and_then(Value::as_u64).is_some_and(|i| i <= u64::from(u32::MAX))
+                && check(K::Number, &map["x"])
+                && check(K::Number, &map["y"])
         }),
         K::DupTime => value.as_object().is_some_and(|map| {
             map.iter().all(|(key, member)| match key.as_str() {

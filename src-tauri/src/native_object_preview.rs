@@ -59,6 +59,8 @@ pub(super) struct ObjectPreview {
     pending: Option<ScheduledFrame>,
     pending_filter: Option<ViewportDisplayFilter>,
     blocked: Option<String>,
+    /// #2371: the Solo set of the export being run (set from its request, read when its witnesses are made); empty otherwise.
+    pub(super) export_solo: Vec<String>,
     released: bool,
     cancelled_on_release: BTreeSet<WorkId>,
     #[cfg(test)]
@@ -238,6 +240,7 @@ impl NativeObjectHost {
             None,
             None,
             false,
+            &[],
             &mut (),
         )
     }
@@ -251,6 +254,7 @@ impl NativeObjectHost {
         alpha_checker: Option<f64>,
         current_outline: Option<f64>,
         hide_shadow_guides: bool,
+        solo_layers: &[String],
         observer: &mut dyn crate::native_dispatch::ObjectPreviewObserver,
     ) -> Result<ObjectPresentedFrame, String> {
         let mut prepared = self
@@ -262,6 +266,7 @@ impl NativeObjectHost {
         prepared.checker_scale = alpha_checker;
         prepared.outline_scale = current_outline; // #2372, likewise
         prepared.hide_shadow_guides = hide_shadow_guides; // #2373, likewise
+        prepared.solo_layers = solo_layers.to_vec(); // #2371, likewise
         self.preview.presented_mesh_view = None;
         self.preview.presented_vectors = None;
         if self.released.is_some() || self.preview.released || self.preview.blocked.is_some() {
@@ -352,13 +357,16 @@ impl NativeObjectHost {
                 .ok_or("preview requires an actual viewport witness")?,
             composition.viewport_stored_camera_available(),
         )?;
+        // #2371: the hit-test geometry follows the Solo view too (baseline: a layer the solo hides has no live item to pick).
         let vector_source = (!composition.has_scene_images() && !media.draws_video(expected.frame))
-            .then(|| composition.clone());
+            .then(|| composition.clone().with_viewport_solo(solo_layers))
+            .transpose()
+            .map_err(|e| format!("preview solo hit-test source: {e:?}"))?;
         let composition = media.witness(expected.frame, composition)?;
         // #2358 GHOST-UNDER: onion / Ghost All composed UNDER the live frame (preview witness only, never an export).
         let (composition, ghost_receipt) = prepare::attach_ghosts(composition, ghosts.as_ref(), &snapshot, expected.frame)?;
         // #2373 checker / #2372 outline: view-only aids of this viewport witness (never the retained hit-test source).
-        let composition = prepare::attach_view_aids(composition, key.output_spec().dimensions(), alpha_checker, current_outline, hide_shadow_guides)?;
+        let composition = prepare::attach_view_aids(composition, key.output_spec().dimensions(), alpha_checker, current_outline, hide_shadow_guides, solo_layers)?;
         let key = if media.draws_video(expected.frame) {
             EvaluationKey::new(
                 key.document_snapshot_id(),

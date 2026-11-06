@@ -11,14 +11,18 @@
 //! `commit_layer_create`; a plan that changes nothing publishes nothing. No
 //! history, receipt or id state lives here: the revision-derived identity
 //! comes from the kernel and the one history entry from `NativeObjectHistory`.
-//! Lock and transform-parent decisions belong to Root F06, so the owner hands
-//! the kernel the stand-in policy that answers "unavailable".
+//! The baseline never gated delete, duplicate, rename, recolour or reorder on a
+//! lock or a transform parent, so the owner hands the kernel the policy that
+//! permits every decision.
+use crate::commands::object_fill_owner::object_context_projection::{context_of, project};
+use crate::commands::object_fill_owner::object_frame_bulk_move::plan_arrange_json;
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
-    plan_delete, plan_duplicate, plan_rename, plan_reorder, LayerSelection, LifecycleError,
-    LifecyclePlan, SelectionOutcome, UnavailableLayerEditPolicy,
+    plan_delete, plan_duplicate, plan_rename, plan_reorder, BaselineLayerEditPolicy, LayerSelection,
+    LifecycleError,
+    LifecyclePlan, SelectionOutcome,
 };
-use crate::object_document::{object_deserialize, ObjectDocument};
+use crate::object_document::{object_deserialize, ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
@@ -33,10 +37,18 @@ use parent::plan_parent;
 #[path = "object_layer_lifecycle_link.rs"]
 mod link;
 use link::{plan_follow_path, plan_time_link, TimeLinkRequest};
-// #2371 U11: the layer colour label and the label policy rename shares with it.
+// #2371 U11: the layer colour label.
 #[path = "object_layer_lifecycle_color.rs"]
 mod color;
-use color::LabelEditPolicy;
+// #2256: a lifecycle kernel inside a declared component.
+#[path = "object_layer_lifecycle_context.rs"]
+mod context_plan;
+use context_plan::plan_in;
+// #2371 U11 / D36: Null, Effect, Guide, Folder and Effector creation, and folder membership.
+#[path = "object_layer_kind_create.rs"]
+mod kind_create;
+#[path = "object_layer_folder_reparent.rs"]
+mod folder_reparent;
 
 const MAX_PAYLOAD_BYTES: usize = 4096;
 
@@ -56,20 +68,25 @@ object_deserialize!(SelectionPayload {
 struct DeletePayload {
     command: String,
     selection: SelectionPayload,
+    /// #2256: the declared component the edit works inside; absent is the scene root.
+    context_id: Presence<String>,
 }
 object_deserialize!(DeletePayload {
     command: String,
-    selection: SelectionPayload
+    selection: SelectionPayload,
+    #[serde(default)] context_id: Presence<String>
 });
 
 #[derive(Debug)]
 struct DuplicatePayload {
     command: String,
     layer_uid: String,
+    context_id: Presence<String>,
 }
 object_deserialize!(DuplicatePayload {
     command: String,
-    layer_uid: String
+    layer_uid: String,
+    #[serde(default)] context_id: Presence<String>
 });
 
 #[derive(Debug)]
@@ -90,12 +107,14 @@ struct ReorderPayload {
     layer_uids: Vec<String>,
     gap: Number,
     selection: SelectionPayload,
+    context_id: Presence<String>,
 }
 object_deserialize!(ReorderPayload {
     command: String,
     layer_uids: Vec<String>,
     gap: Number,
-    selection: SelectionPayload
+    selection: SelectionPayload,
+    #[serde(default)] context_id: Presence<String>
 });
 
 #[derive(Debug)]
@@ -209,6 +228,8 @@ pub(crate) enum LayerLifecycleKind {
     Parent,
     TimeLink,
     FollowPath,
+    FolderReparent,
+    RangeArrange,
 }
 
 /// A detached candidate sealed to the snapshot it was planned from. Only this
@@ -276,9 +297,12 @@ impl ObjectFillOwner {
         if payload.command != "object.layer.delete" {
             return Err(DispatchErrorCode::InvalidRequest);
         }
+        let context = context_of(&payload.context_id)?.to_owned();
         let selection = payload.selection.into_selection()?;
         let origin = self.current_snapshot();
-        let plan = plan_delete(origin.document(), &selection, &UnavailableLayerEditPolicy);
+        let plan = plan_in(&origin, &context, |view| {
+            plan_delete(view, &selection, &BaselineLayerEditPolicy)
+        })?;
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Delete, plan)
     }
     pub(crate) fn prepare_layer_duplicate_json(
@@ -289,18 +313,16 @@ impl ObjectFillOwner {
         if payload.command != "object.layer.duplicate" || payload.layer_uid.is_empty() {
             return Err(DispatchErrorCode::InvalidRequest);
         }
+        let context = context_of(&payload.context_id)?.to_owned();
         let origin = self.current_snapshot();
         // The kernel bounds the embedded revision (2^53 - 1) like layer-create.
         let next = origin
             .content_revision()
             .checked_add(1)
             .ok_or(DispatchErrorCode::Unavailable)?;
-        let plan = plan_duplicate(
-            origin.document(),
-            &payload.layer_uid,
-            next,
-            &UnavailableLayerEditPolicy,
-        );
+        let plan = plan_in(&origin, &context, |view| {
+            plan_duplicate(view, &payload.layer_uid, next, &BaselineLayerEditPolicy)
+        })?;
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Duplicate, plan)
     }
     pub(crate) fn prepare_layer_rename_json(
@@ -316,7 +338,7 @@ impl ObjectFillOwner {
             origin.document(),
             &payload.layer_uid,
             &payload.name,
-            &LabelEditPolicy,
+            &BaselineLayerEditPolicy,
         );
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Rename, plan)
     }
@@ -333,31 +355,31 @@ impl ObjectFillOwner {
             .as_f64()
             .filter(|gap| gap.is_finite())
             .ok_or(DispatchErrorCode::InvalidRequest)?;
+        let context = context_of(&payload.context_id)?.to_owned();
         let selection = payload.selection.into_selection()?;
         let origin = self.current_snapshot();
         // Targets are identities; a repeated one is a malformed set, not a
         // silently merged one.
         let mut seen: HashSet<&str> = HashSet::new();
-        let mut moving: Vec<i64> = Vec::with_capacity(payload.layer_uids.len());
         for uid in &payload.layer_uids {
             if uid.is_empty() || !seen.insert(uid.as_str()) {
                 return Err(DispatchErrorCode::InvalidRequest);
             }
-            let slot = origin
-                .document()
+        }
+        // The slots are those of the context's own layer stack.
+        let stack = project(origin.document(), &context)?;
+        let mut moving: Vec<i64> = Vec::with_capacity(payload.layer_uids.len());
+        for uid in &payload.layer_uids {
+            let slot = stack
                 .layers
                 .iter()
                 .position(|layer| layer.layer_uid == *uid)
                 .ok_or(DispatchErrorCode::NotFound)?;
             moving.push(i64::try_from(slot).map_err(|_| DispatchErrorCode::InvalidRequest)?);
         }
-        let plan = plan_reorder(
-            origin.document(),
-            &moving,
-            gap,
-            &selection,
-            &UnavailableLayerEditPolicy,
-        );
+        let plan = plan_in(&origin, &context, |view| {
+            plan_reorder(view, &moving, gap, &selection, &BaselineLayerEditPolicy)
+        })?;
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::Reorder, plan)
     }
     /// #2372 U12: Parent A set or clear (`parentLayerUid: null`) that keeps the child's world pose at `frame`.
@@ -437,6 +459,33 @@ impl ObjectFillOwner {
             payload.align,
         );
         PreparedLayerLifecycle::seal(origin, LayerLifecycleKind::FollowPath, plan)
+    }
+    /// #2371 / #2372: the in/out bar context menu (reset, align, distribute, flip, stagger) as one candidate document.
+    pub(crate) fn prepare_layer_range_arrange_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerLifecycle, DispatchErrorCode> {
+        let origin = self.current_snapshot();
+        let arranged = plan_arrange_json(&origin, bytes)?;
+        let changed = arranged.document != *origin.document();
+        if changed {
+            ObjectSnapshot::validate_drawing(&arranged.document)
+                .map_err(|_| DispatchErrorCode::Unavailable)?;
+        }
+        let plan = LifecyclePlan {
+            document: arranged.document,
+            changed,
+            selection: None,
+            removed: Vec::new(),
+            touched: arranged.touched,
+            spared: None,
+            created: None,
+        };
+        Ok(PreparedLayerLifecycle {
+            origin,
+            plan,
+            kind: LayerLifecycleKind::RangeArrange,
+        })
     }
     pub(crate) fn commit_layer_lifecycle(
         &mut self,

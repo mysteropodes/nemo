@@ -344,6 +344,9 @@ fn a_witness_carries_only_a_plan_joined_from_its_own_packet_and_the_plan_is_part
         (witness, plan)
     };
     let (witness, plan) = build("join-identity");
+    // #2257: production joins on construction; the identity test starts from a witness without any plan.
+    assert!(witness.scene_effects().is_some());
+    let witness = witness.without_scene_effects();
     assert!(witness.scene_effects().is_none());
     let attached = witness.clone().with_scene_effects(plan.clone()).unwrap();
     assert!(Arc::ptr_eq(attached.scene_effects().unwrap(), &plan));
@@ -388,48 +391,70 @@ fn packet_is_refused(document: &serde_json::Value, instance: &str) -> bool {
 }
 
 #[test]
-fn a_keyed_matte_on_track_is_refused_at_packet_admission_and_by_the_join_guard() {
+fn a_keyed_matte_on_track_is_sampled_at_the_frame_and_an_expressed_one_is_refused() {
     use super::inputs::first_animated_composition_property as first;
+    use super::layer_inputs;
     let mut document = base_document();
     set_layer(
         &mut document,
         "L0",
         json!({"matteMode": "alpha", "matteSourceLayerUid": "L1"}),
     );
-    // Control: no track, and the packet joins.
+    let matte_at = |document: &serde_json::Value, instance: &str| {
+        let snap = snapshot(document, instance);
+        layer_inputs(&packet(&snap, FRAME)).map(|layers| {
+            layers
+                .iter()
+                .find(|layer| layer.layer_uid == "L0")
+                .and_then(|layer| layer.matte_mode.clone())
+        })
+    };
+    // Control: no track, the matte stays.
     assert!(!packet_is_refused(&document, "guard-matte-plain"));
+    assert_eq!(matte_at(&document, "guard-matte-plain"), Ok(Some("alpha".to_owned())));
+    // The track runs 100 at frame 0 to 0 at FRAME: below 50 the matte is switched off for that frame.
     key_layer_property(&mut document, "L0", "matteOn");
-    // Today no packet exists for such a document, so no join can substitute the neutral value either.
-    assert!(packet_is_refused(&document, "guard-matte"));
-    // The join's own guard names the animated property and ignores static ones and other properties.
+    assert!(!packet_is_refused(&document, "guard-matte"), "a matteOn track is admitted");
+    assert_eq!(matte_at(&document, "guard-matte"), Ok(None), "off at the last key");
+    // An enabled expression on matteOn is never replaced by the raw track.
+    let holder = &mut document["propertyHolders"][0]["properties"][0];
+    holder["expression"] = json!({"code": "100", "enabled": true});
+    let snap = snapshot(&document, "guard-matte-expr");
+    if let Ok(packet) = crate::object_frame_packet::prepare_object_frame(&snap, &selector(&snap, FRAME)) {
+        assert!(matches!(
+            layer_inputs(&packet),
+            Err(SceneEffectJoinError::LayerCompositionPropertyUnavailable { property: "matteOn", .. })
+        ));
+    }
+    // The join's own guard names an animated blend or an expressed matteOn and ignores the rest.
     assert_eq!(first([("position", true), ("matteOn", true)]), Some("matteOn"));
     assert_eq!(first([("blend", true)]), Some("blend"));
     assert_eq!(first([("matteOn", false), ("opacity", true)]), None);
 }
 
 #[test]
-fn a_blend_track_or_blend_keys_cannot_be_authored_so_no_neutral_blend_can_stand_in() {
+fn a_blend_property_track_cannot_be_authored_but_the_layers_own_blend_keys_are_a_record() {
     use crate::object_codec::decode_storage_project;
     let mut document = base_document();
     set_layer(&mut document, "L1", json!({"blendMode": "multiply"}));
     key_layer_property(&mut document, "L1", "blend");
     assert!(decode_storage_project(&serde_json::to_vec(&document).unwrap()).is_err());
-    // `blendKeys` on the layer record is likewise not admitted: animated blend belongs to the property provider.
+    // The baseline's hold-only `blendKeys` are the layer's own record (sampled by `blend_mode_at`), not a property track.
     let mut document = base_document();
     set_layer(
         &mut document,
         "L1",
         json!({"blendKeys": [{"frame": 0, "mode": "multiply"}]}),
     );
-    assert!(decode_storage_project(&serde_json::to_vec(&document).unwrap()).is_err());
+    assert!(decode_storage_project(&serde_json::to_vec(&document).unwrap()).is_ok());
 }
 
 #[test]
-fn an_enabled_item_effect_is_a_typed_input_refusal_on_its_layer() {
+fn an_enabled_item_effect_is_an_input_of_its_layer_and_a_mask_or_disabled_stack_is_not() {
     use super::layer_inputs;
     let inputs = |document: &serde_json::Value, instance: &str| {
         let snap = snapshot(document, instance);
-        layer_inputs(&packet(&snap, FRAME)).map(|layers| layers.len())
+        layer_inputs(&packet(&snap, FRAME))
     };
     let mut document = base_document();
     let uid = document["objects"][0]["target"]["layerUid"]
@@ -442,17 +467,50 @@ fn an_enabled_item_effect_is_a_typed_input_refusal_on_its_layer() {
         .iter()
         .position(|layer| layer["layerUid"] == uid.as_str())
         .unwrap();
-    assert_eq!(inputs(&document, "guard-fx-plain"), Ok(3));
+    let plain = inputs(&document, "guard-fx-plain").unwrap();
+    assert_eq!(plain.len(), 3);
+    assert!(plain.iter().all(|l| !l.item_effect_enabled && l.item_effects.is_empty()));
     document["objects"][0]["effects"] = json!([{"type": "blur", "enabled": true, "p1": 4}]);
-    assert_eq!(
-        inputs(&document, "guard-fx"),
-        Err(SceneEffectJoinError::LayerCompositionPropertyUnavailable {
-            layer: source,
-            property: "itemEffects"
-        })
-    );
+    let layers = inputs(&document, "guard-fx").unwrap();
+    let layer = layers.iter().find(|l| l.source_layer_index == source).unwrap();
+    assert!(layer.item_effect_enabled);
+    assert_eq!(layer.item_effects.len(), 1, "one planned stack per effected object");
+    assert_eq!(layer.item_effects[0].0, 0, "keyed by source object index");
+    assert_eq!(layer.item_effects[0].1[0].params[0], Some(4.0));
+    assert_eq!(layers.iter().filter(|l| l.item_effect_enabled).count(), 1);
     // A disabled stack is not an input. Mask objects carry a blur stack that the mask-feather path owns; the
     // stored-mask joins in scene_effect_scene_join_stack.rs fail if the guard counted them.
     document["objects"][0]["effects"] = json!([{"type": "blur", "enabled": false, "p1": 4}]);
-    assert_eq!(inputs(&document, "guard-fx-off"), Ok(3));
+    assert!(inputs(&document, "guard-fx-off").unwrap().iter().all(|l| !l.item_effect_enabled));
+}
+
+/// #2371 (baseline `layerIsEffectivelyVisible` feeds the scene's `visible`): a layer that is not soloed is a hidden slot, so a
+/// non-soloed effect layer stops applying and a non-soloed matte layer and its source leave the stack.
+#[test]
+fn the_solo_view_empties_every_slot_that_is_not_soloed_effect_and_matte_layers_included() {
+    use crate::object_frame_packet::solo_view;
+    let mut document = base_document();
+    set_layer(&mut document, "L0", json!({"matteMode": "alpha", "matteSourceLayerUid": "L1"}));
+    set_layer(&mut document, "L2", json!({"effectsFrom": "E0"}));
+    let effect = json!({"isEffectLayer": true, "visible": false, "effects": [{"type": "blur", "enabled": true, "p1": 12}]});
+    push_layer(&mut document, "E0", 3, effect);
+    let snap = snapshot(&document, "join-solo");
+    let roles = |soloed: &[&str]| {
+        let soloed: Vec<String> = soloed.iter().map(|uid| (*uid).to_owned()).collect();
+        let _view = solo_view::enter("scene-root", &soloed);
+        let pk = packet(&snap, FRAME);
+        let joined = pinned(&pk, vec![contour_claims(&render_scene(&pk), "contour", &[])]);
+        let plan = plan_scene_effects(&pk, &joined, &options()).unwrap();
+        plan.layers().iter().map(|l| (l.layer_uid.clone(), l.role)).collect::<Vec<_>>()
+    };
+    let want = |roles: [SlotRole; 4]| -> Vec<(String, SlotRole)> {
+        ["L0", "L1", "L2", "E0"].iter().map(|u| (*u).to_owned()).zip(roles).collect()
+    };
+    use SlotRole::{Effect, Empty, Plain};
+    // The effect layer's own eye is off: the plain stack leaves it empty.
+    assert_eq!(roles(&[]), want([Plain, Plain, Plain, Empty]));
+    // Soloing the eye-off effect layer applies it (the eye plays no part) and empties every other slot.
+    assert_eq!(roles(&["E0"]), want([Empty, Empty, Empty, Effect]));
+    // Soloing a plain layer leaves the effect layer and the matte pair out.
+    assert_eq!(roles(&["L2"]), want([Empty, Empty, Plain, Empty]));
 }

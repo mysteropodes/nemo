@@ -21,6 +21,9 @@ mod fill_trace_tests;
 #[cfg(test)]
 #[path = "../tests/object_fill_brush_history.rs"]
 mod fill_brush_tests;
+#[cfg(test)]
+#[path = "../tests/object_boolean_ops_erase_flat.rs"]
+mod erase_flat_tests;
 
 impl NativeObjectHistory {
     pub(crate) fn prepare_fill_trace_json(
@@ -77,6 +80,30 @@ impl NativeObjectHistory {
         }
         Ok(after_revision)
     }
+    /// An eraser bite that continues the gesture whose entry is on top of the undo stack: the revision advances, but the
+    /// entry grows to end at it instead of a second one being pushed (the baseline pushes one undo per drag). Only an entry
+    /// that was left by an eraser bite and ends at the current revision can be continued - an undo, a redo or any other edit in between breaks the chain.
+    fn joinable(&self) -> bool {
+        self.undo.last().is_some_and(|top| {
+            top.after_revision == self.content_revision() && self.labels.is_erase(top.after_revision)
+        })
+    }
+    fn commit_boolean_joined(
+        &mut self,
+        candidate: PreparedBooleanEdit,
+    ) -> Result<u64, DispatchErrorCode> {
+        let before_revision = self.content_revision();
+        let after_revision = self.owner.commit_boolean_edit(candidate)?;
+        if after_revision != before_revision {
+            if let Some(top) = self.undo.last_mut() {
+                let old = top.after_revision;
+                top.after_revision = after_revision;
+                self.labels.rekey(old, after_revision);
+            }
+            self.redo.clear();
+        }
+        Ok(after_revision)
+    }
     /// Operations the staged dispatcher routes here.
     pub(crate) fn boolean_operation(operation: &str) -> bool {
         matches!(
@@ -108,13 +135,26 @@ impl NativeObjectHistory {
         };
         let candidate =
             prepared.map_err(|code| (code, "Boolean payload is invalid or target is absent."))?;
+        // `joinHistory` (eraser bites after the first of a drag): refused when there is no entry to continue, never
+        // silently turned into a second undo step.
+        let join = operation == OP_BOOLEAN_ERASE
+            && payload.get("joinHistory").and_then(serde_json::Value::as_bool) == Some(true);
+        if join && !self.joinable() {
+            return Err((
+                DispatchErrorCode::Unavailable,
+                "There is no eraser entry to continue.",
+            ));
+        }
         let before = self.content_revision();
-        let after = self
-            .commit_boolean_edit(candidate)
-            .map_err(|code| (code, "Boolean edit could not commit."))?;
+        let after = if join {
+            self.commit_boolean_joined(candidate)
+        } else {
+            self.commit_boolean_edit(candidate)
+        }
+        .map_err(|code| (code, "Boolean edit could not commit."))?;
         Ok(CompactResult::Command {
             applied: after != before,
-            history_entries_added: u64::from(after != before),
+            history_entries_added: u64::from(after != before && !join),
         })
     }
 }

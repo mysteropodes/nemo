@@ -174,3 +174,95 @@ fn a_malformed_instance_view_is_not_an_answer() {
     missing.as_object_mut().unwrap().remove("explicit");
     assert!(!read::result(&payload, &missing));
 }
+
+const BREAK: &str = "command.document.object.component.breakApart";
+
+fn break_apart(extra: Value) -> Value {
+    let mut payload = json!({"command":"object.component.breakApart","contextId":"scene-root","layerUid":"layer-a"});
+    for (key, value) in extra.as_object().expect("object") {
+        payload[key] = value.clone();
+    }
+    payload
+}
+
+#[test]
+fn break_apart_names_a_context_and_a_layer_and_nothing_else() {
+    assert!(request(BREAK, &break_apart(json!({}))));
+    assert!(crate::native_contract::validate_request(BREAK, &break_apart(json!({}))));
+    for bad in [
+        json!({"extra":1}),
+        json!({"layerUid":""}),
+        json!({"layerUid":null}),
+        json!({"layerUid":7}),
+        json!({"contextId":null}),
+        json!({"command":"object.component.convert"}),
+    ] {
+        assert!(!request(BREAK, &break_apart(bad.clone())), "{bad}");
+    }
+    let mut missing = break_apart(json!({}));
+    missing.as_object_mut().unwrap().remove("layerUid");
+    assert!(!request(BREAK, &missing));
+    let mut no_context = break_apart(json!({}));
+    no_context.as_object_mut().unwrap().remove("contextId");
+    assert!(!request(BREAK, &no_context));
+}
+
+const STATE: &str = "command.document.object.component.state.edit";
+
+fn state_edit(extra: Value) -> Value {
+    let mut payload = json!({"command":"object.component.state.edit","contextId":"component-a","kind":"clearMarkers"});
+    for (key, value) in extra.as_object().expect("object") {
+        payload[key] = value.clone();
+    }
+    payload
+}
+
+#[test]
+fn state_edit_admits_each_kind_with_its_members_and_nothing_else() {
+    for good in [
+        json!({}),
+        json!({"kind":"clearCamera"}),
+        json!({"kind":"setCameraKey","frame":0,"x":1,"y":2,"w":3}),
+        json!({"kind":"setCameraKey","frame":9,"x":-1.5,"y":0,"w":640,"rot":90,"hOut":[1,2],"hIn":[3,4],"ease":[0.25,0.1,0.25,1]}),
+        json!({"kind":"removeCameraKey","frame":4}),
+        json!({"kind":"setCameraEase","frame":4,"ease":[0,0,1,1]}),
+        json!({"kind":"addMarker","frame":3}),
+        json!({"kind":"addMarker","frame":3,"name":"","color":"#e8b64c"}),
+        json!({"kind":"updateMarker","frame":3,"newFrame":5,"name":"x","color":"#000"}),
+        json!({"kind":"removeMarker","frame":3}),
+    ] {
+        assert!(request(STATE, &state_edit(good.clone())), "{good}");
+        assert!(crate::native_contract::validate_request(STATE, &state_edit(good.clone())), "{good}");
+    }
+    for bad in [
+        json!({"kind":"nope"}),
+        json!({"kind":null}),
+        json!({"contextId":""}),
+        json!({"contextId":7}),
+        json!({"extra":1}),
+        json!({"frame":-1}),
+        json!({"frame":1.5}),
+        json!({"frame":4294967296u64}),
+        json!({"x":"1"}),
+        json!({"w":0}),
+        json!({"w":-3}),
+        json!({"hOut":[1]}),
+        json!({"hIn":[1,2,3]}),
+        json!({"ease":[0,0,1]}),
+        json!({"ease":[2,0,0.5,1]}),
+        json!({"ease":[0.5,0,-1,1]}),
+        json!({"name":7}),
+        json!({"name":"a".repeat(257)}),
+        json!({"color":""}),
+        json!({"newFrame":-2}),
+        json!({"command":"object.component.convert"}),
+    ] {
+        assert!(!request(STATE, &state_edit(bad.clone())), "{bad}");
+    }
+    let mut no_kind = state_edit(json!({}));
+    no_kind.as_object_mut().unwrap().remove("kind");
+    assert!(!request(STATE, &no_kind));
+    let mut no_context = state_edit(json!({}));
+    no_context.as_object_mut().unwrap().remove("contextId");
+    assert!(!request(STATE, &no_context));
+}

@@ -3791,6 +3791,7 @@ test('L02-H selection edit and clipboard transactions stay private owner/history
     ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_duplicate.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_split.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_split_literals.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_selection_alt_drag.rs'],
   ]) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
@@ -5411,13 +5412,13 @@ test('L04-M setup and convert transactions stay private owner children behind th
   const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
   assert.match(read('native-engine/src/object_fill_owner.rs'), /#\[path = "object_component_owner_kernels\.rs"\]\s*pub\(crate\) mod component_owner;/);
   const aggregator = read('native-engine/src/object_component_owner_kernels.rs');
-  for (const name of ['object_component_convert_support', 'object_component_convert', 'object_component_place', 'object_duplicator_convert', 'object_component_convert_owner']) {
+  for (const name of ['object_component_convert_support', 'object_component_convert', 'object_component_place', 'object_component_break_apart', 'object_component_state_edit', 'object_duplicator_convert', 'object_component_convert_owner']) {
     assert.match(aggregator, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*pub\\(crate\\) mod ${name};`));
   }
   const ownerText = read('native-engine/src/object_component_convert_owner.rs');
   assert.match(ownerText, /#\[path = "object_component_convert_wire\.rs"\]\s*mod wire;/);
   const sources = ['object_component_owner_kernels.rs', 'object_component_convert_support.rs', 'object_component_convert.rs',
-    'object_component_place.rs', 'object_duplicator_convert.rs', 'object_component_convert_owner.rs',
+    'object_component_place.rs', 'object_component_break_apart.rs', 'object_component_state_edit.rs', 'object_duplicator_convert.rs', 'object_component_convert_owner.rs',
     'object_component_convert_wire.rs', 'object_component_convert_history.rs'];
   for (const file of sources) {
     const text = read(`native-engine/src/${file}`);
@@ -5432,7 +5433,7 @@ test('L04-M setup and convert transactions stay private owner children behind th
   assert.equal((dispatchText.match(/self\.dispatch_component_setup\(/g) || []).length, 1, 'one component dispatch body');
   const historyText = read('native-engine/src/object_component_convert_history.rs');
   assert.equal((historyText.match(/fn dispatch_component_setup\(/g) || []).length, 1);
-  for (const operation of ['component.convert', 'component.expose', 'component.place', 'component.instance.set', 'duplicator.set', 'duplicator.objects', 'duplicator.path', 'duplicator.config']) {
+  for (const operation of ['component.convert', 'component.expose', 'component.place', 'component.instance.set', 'component.breakApart', 'component.state.edit', 'duplicator.set', 'duplicator.objects', 'duplicator.path', 'duplicator.config']) {
     assert.ok(historyText.includes(`"command.document.object.${operation}"`), operation);
   }
   // Conversion is explicit only: no Motion or timeline writer reaches the plans.
@@ -5601,6 +5602,11 @@ test('F2 scene-join family parity tests stay private test children of the compos
   for (const file of [
     'native-engine/tests/scene_effect_scene_join_families.rs',
     'native-engine/tests/scene_effect_scene_join_families_docs.rs',
+    'native-engine/tests/scene_effect_scene_join_folder.rs',
+    'native-engine/tests/scene_effect_scene_join_items.rs',
+    'native-engine/tests/scene_effect_scene_join_item_families.rs',
+    'native-engine/tests/scene_effect_scene_join_expressed_matte.rs',
+    'native-engine/tests/scene_effect_layered_view.rs',
   ]) {
     const owner = profile.modules.find((entry) => entry.id === 'rust.native.engine.tests');
     assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, 'tests owner must own ' + file);

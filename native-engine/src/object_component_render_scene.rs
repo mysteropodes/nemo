@@ -4,10 +4,10 @@
 //! A placed component's images join the scene's raster sources and paint at the
 //! host slot in the inner stack order (`sequence`).
 use crate::evaluation::object_component_kernels::object_component_evaluate::evaluate_packet;
+use crate::evaluation::object_component_kernels::object_component_camera_ports::RecordPorts;
 use crate::evaluation::object_component_kernels::object_component_override_port::{
     absent_source_allowed, PacketOverrides,
 };
-use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_join::NoPorts;
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_scene::{
     ComponentOutcome, ComponentScene,
 };
@@ -56,6 +56,9 @@ pub(crate) struct ComponentPaint {
     pub(crate) svg_rgba: Option<[f64; 4]>,
     /// The post-override inner record as the baseline's dict holds it (untransformed geometry).
     pub(crate) record: crate::object_frame_packet::ObjectRecord,
+    /// The opacity a texture dab of this paint is painted with: the host's factor times the inner layer's raw opacity (the element's own
+    /// opacity belongs to its anchor, not to the dabs stamped from it).
+    pub(crate) dab_opacity: f64,
 }
 
 pub(crate) fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
@@ -116,11 +119,17 @@ pub(crate) fn prepare(
         scope_kind: expected.scope_kind.clone(),
         frame: expected.frame,
     };
+    // The component cameras are sampled against the project canvas; a snapshot without a project has no canvas, and then
+    // an instance with camera keys is an unavailable slot instead of a guess.
+    let canvas = packet.snapshot().project().map(|p| {
+        let (w, h) = p.project().canvas_dimensions();
+        (f64::from(w), f64::from(h))
+    });
     let scene = evaluate_packet(
         packet,
         &pin,
-        None,
-        &mut NoPorts,
+        canvas,
+        &mut RecordPorts::new(table),
         &mut PacketOverrides::new(packet),
     )
     .map_err(|_| unavailable(first_host, "component production or pin join refused"))?
@@ -373,3 +382,9 @@ pub(crate) fn prepare(
         sequence,
     })
 }
+#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_component_break_apart_render.rs"]
+mod break_apart_render_tests;
+#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_component_break_apart_images.rs"]
+mod break_apart_images_tests;

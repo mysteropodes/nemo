@@ -8,7 +8,7 @@ const descriptor=JSON.parse(fs.readFileSync(path.join(root,'engineering/applicat
 test('F06 descriptor and closed schema declare one exact revisioned flag command',()=>{
  const schema=JSON.parse(fs.readFileSync(path.join(root,'engineering/application/native-transport-v2.schema.json'),'utf8'));
  assert.deepEqual(descriptor.operations,[OP]);assert.equal(descriptor.id,'native.layer-policy');assert.equal(descriptor.authority.adapterOwnsWritableMirror,false);assert.equal(descriptor.authority.fallback,'none');
- const def=schema.$defs.ObjectLayerPolicyPayload;assert.equal(def.additionalProperties,false);assert.deepEqual(def.required,['command','layerUid','flag','value']);assert.deepEqual(def.properties.flag.enum,['locked','shy','keyLock']);assert.deepEqual(def.oneOf.map(b=>b.properties.flag.enum||b.properties.flag.const),[['locked','shy'],'keyLock']);assert.equal(def.oneOf[0].properties.value.type,'boolean');assert.deepEqual(def.properties.value.oneOf.map(v=>v.type||v.enum),['boolean','null',['in','out','layer']]);
+ const def=schema.$defs.ObjectLayerPolicyPayload;assert.equal(def.additionalProperties,false);assert.deepEqual(def.required,['command','layerUid','flag','value']);assert.deepEqual(def.properties.flag.enum,['locked','shy','threeD','keyLock']);assert.deepEqual(def.oneOf.map(b=>b.properties.flag.enum||b.properties.flag.const),[['locked','shy','threeD'],'keyLock']);assert.equal(def.oneOf[0].properties.value.type,'boolean');assert.deepEqual(def.properties.value.oneOf.map(v=>v.type||v.enum),['boolean','null',['in','out','layer']]);
  const branches=schema.$defs.Request.oneOf.filter(v=>v.allOf[1].properties.operation.const===OP);assert.equal(branches.length,1);assert.equal(branches[0].allOf[0].$ref,'#/$defs/RequiredRevisionRequest');assert.equal(branches[0].allOf[1].properties.payload.$ref,'#/$defs/ObjectLayerPolicyPayload');
  assert.equal(descriptor.examples[0].request.operation,OP);assert.equal(descriptor.examples[0].request.payload.flag,'locked');assert.equal(descriptor.examples[0].response.result.historyEntriesAdded,1);
 });
@@ -60,4 +60,14 @@ test('SDK explicit policy method cannot dispatch as a read or another mutation o
 test('SDK generic dispatcher and explicit method retain literal exact replay receipts without local state',async()=>{
  const q=request(),r=reply(q,true);let calls=0;const adapter=SDK.createNativeApplicationAdapter('policy-test',{dispatch(){calls++;return structuredClone(r);}});
  assert.deepEqual(await adapter.dispatch(q),r);assert.deepEqual(await adapter.editLayerPolicy(q),r);assert.equal(calls,2,'both calls reach the authority; SDK must not invent its own writable receipt owner');
+});
+
+test('#2520: only the 3D switch may be saved with a revision and no history entry',async()=>{
+ const saved=q=>({...reply(q,true),result:{applied:true,historyEntriesAdded:0}});
+ const three=request('threeD',true),locked=request('locked',true);
+ const adapter=SDK.createNativeApplicationAdapter('policy-test',{dispatch(r){return saved(r);}});
+ const ok=await adapter.editLayerPolicy(three);assert.deepEqual(ok.result,{applied:true,historyEntriesAdded:0});assert.equal(ok.contentRevision,three.expectedRevision+1);
+ await assert.rejects(adapter.editLayerPolicy(locked),'a lock without a history entry is not a valid receipt');
+ const noop=SDK.createNativeApplicationAdapter('policy-test',{dispatch(r){return {...reply(r,false),result:{applied:false,historyEntriesAdded:1}};}});
+ await assert.rejects(noop.editLayerPolicy(three));
 });

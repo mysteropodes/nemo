@@ -8,15 +8,20 @@
 //! * a `Layered` plan becomes a `GpuLayerStack` (L08-G) whose per-wire-layer fills are the paint plan's commands
 //!   grouped by SOURCE layer and placed at that layer's paint-order wire index, validated as a whole, and checked to
 //!   cover the plan exactly once (`covers_plan`), so a layer can neither lose nor duplicate a command.
-//! Every layered feature G cannot render yet (layer and element effect stacks, effect-layer grading, folder passes,
-//! mask feather) comes back as the typed `GpuBlendError::Unavailable` it already is; nothing is dropped.
+//! Every layered feature G cannot render (a custom shader, an item stack no supported entry owns) comes back as the typed
+//! `GpuBlendError::Unavailable` it already is; nothing is dropped. Layer, folder, effect-layer and item stacks are the
+//! join's planned `EffectStackPlan`s, admitted against each layer's or item's box when the stack is composed.
 //! No texture, device or scheduler state is touched: the compositor entries run the returned stack.
 use crate::compositor::scene_effect_gpu_blend::{
     layer_runs_from_plan, GpuBlendError, GpuFill, GpuLayerInput, GpuLayerPaint, GpuLayerStack,
-    GpuMask, GpuMaskMode,
+    GpuMask, GpuMaskMode, GpuUnavailable,
 };
+use crate::compositor::object_compositor::layered::claimed_object;
+use crate::object_render_scene::layered_entries;
 use crate::object_render_scene::mask_inputs::ObjectMaskMode;
-use crate::object_render_scene::scene_effect_kernels::scene_effect_order::CompositionPlan;
+use crate::object_render_scene::scene_effect_kernels::scene_effect_order::{
+    CompositionPlan, LayerStep, PaintSource, SkipReason,
+};
 use crate::object_render_scene::scene_effect_kernels::scene_effect_scene_join::SceneEffectPlan;
 use crate::object_render_scene::ObjectPaintPlan;
 
@@ -46,9 +51,51 @@ pub(crate) enum PathSelectionError {
     PlanNotCovered,
 }
 
+/// True for a layered scene whose ONLY layered feature is folders holding plain Normal layers (no blend, matte, mask,
+/// effect, effect layer or canvas background). Such a scene is the flat sequence with each folder's children moved to
+/// the folder's place (Normal compositing is associative: `folder_ranks`, applied by `compose_object`), so every family
+/// the flat path paints keeps working inside a folder: Text, images, video, components, duplicators, brushes, the
+/// camera and the outline. Any other layered scene goes to the layer stack.
+pub(crate) fn folds_only(join: &SceneEffectPlan) -> bool {
+    let CompositionPlan::Layered { background: None, steps } = join.plan() else {
+        return false;
+    };
+    let mut folders = 0;
+    for step in steps {
+        match step {
+            LayerStep::Skipped {
+                reason: SkipReason::FolderChild,
+                ..
+            } => {}
+            LayerStep::Paint(paint)
+                if paint.mask_count == 0
+                    && paint.mattes.is_empty()
+                    && !paint.layer_effects
+                    && paint.blend == 0 =>
+            {
+                match &paint.source {
+                    PaintSource::Plain => {}
+                    PaintSource::Folder(children) => {
+                        folders += 1;
+                        if children
+                            .iter()
+                            .any(|c| c.item_effects || c.layer_effects || c.blend != 0)
+                        {
+                            return false;
+                        }
+                    }
+                    PaintSource::ElementEffects => return false,
+                }
+            }
+            _ => return false,
+        }
+    }
+    folders > 0
+}
+
 /// Select the compositor path for `plan`, the paint plan of the packet `join` was built from.
 pub(crate) fn select_composition_path<'a>(
-    join: &SceneEffectPlan,
+    join: &'a SceneEffectPlan,
     plan: &'a ObjectPaintPlan,
 ) -> Result<PathSelection<'a>, PathSelectionError> {
     if !join.is_for_packet(plan.packet()) || !plan.mask_inputs().is_for_packet(plan.packet()) {
@@ -71,10 +118,42 @@ pub(crate) fn select_composition_path<'a>(
         }
         return Ok(PathSelection::Flat);
     }
+    // Folders only: the flat sequence, folded (see `folds_only`); `compose_object` applies the same ranks.
+    if plan.mask_inputs().layers().is_empty() && folds_only(join) {
+        return Ok(PathSelection::Flat);
+    }
     let runs = layer_runs_from_plan(plan).map_err(PathSelectionError::Stack)?;
     let mut inputs: Vec<GpuLayerInput<'a>> = (0..join.layers().len())
         .map(|_| GpuLayerInput::default())
         .collect();
+    for (slot, layer) in join.layers().iter().enumerate() {
+        inputs[slot].source_layer = Some(layer.source_layer_index);
+        inputs[slot].effects = layer.stack.as_ref();
+        inputs[slot].item_effects = layer
+            .item_stacks
+            .iter()
+            .map(|(object, stack)| (*object, stack))
+            .collect();
+    }
+    // Every item stack is drawn by exactly the entry that owns its record; a stack no entry claims (a record
+    // nothing draws, a video slot) is refused typed, never dropped. The one exception is a duplicator host: it paints
+    // its copies in place of its original records, so the stack of an original no copy claims (the output is empty)
+    // has nothing to grade and stays unused, as the baseline draws nothing for that layer. The layer stack looks a
+    // stack up only by the record an entry draws, so the unclaimed one is never run.
+    if join.layers().iter().any(|layer| !layer.item_stacks.is_empty()) {
+        let claimed: std::collections::BTreeSet<usize> = layered_entries(plan)
+            .filter_map(|(_, entry)| claimed_object(plan, &entry))
+            .collect();
+        for (slot, layer) in join.layers().iter().enumerate() {
+            if !plan.is_duplicator_host(layer.source_layer_index)
+                && layer.item_stacks.iter().any(|(object, _)| !claimed.contains(object))
+            {
+                return Err(PathSelectionError::Stack(GpuBlendError::Unavailable(
+                    GpuUnavailable::ElementEffects { layer: slot },
+                )));
+            }
+        }
+    }
     for run in runs {
         let slot = join.wire_index_of_source(run.source_layer_index).ok_or(
             PathSelectionError::UnknownLayer {
@@ -125,3 +204,6 @@ mod tests;
 #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/scene_effect_scene_join_families.rs"]
 mod families_tests;
+#[cfg(all(test, feature = "history", feature = "project_media_codec"))]
+#[path = "../tests/scene_effect_layered_view.rs"]
+mod layered_view_tests;

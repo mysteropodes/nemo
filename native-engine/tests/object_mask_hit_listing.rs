@@ -5,6 +5,9 @@ use super::*;
 use crate::object_render_scene::prepare_object_viewport_composition;
 
 fn listing(doc: &Value) -> Result<Vec<Value>, &'static str> {
+    full(doc).map(|result| result["items"].as_array().cloned().unwrap_or_default())
+}
+fn full(doc: &Value) -> Result<Value, &'static str> {
     let o = owner(doc);
     let s = o.acquire_snapshot(0).unwrap();
     let plan = prepare_object_paint_plan(&scene(&s), &pins(&s, 7)).unwrap();
@@ -22,10 +25,7 @@ fn listing(doc: &Value) -> Result<Vec<Value>, &'static str> {
         .unwrap();
     let response = serde_json::to_value(response).unwrap();
     assert_eq!(response["ok"], true, "{response}");
-    Ok(response["result"]["items"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default())
+    Ok(response["result"].clone())
 }
 fn rows(items: &[Value]) -> Vec<(String, String)> {
     items
@@ -140,4 +140,23 @@ fn a_layer_with_path_effects_lists_no_vector_item_but_is_not_refused() {
         rows.is_empty(),
         "every record of the effect layer is left out item by item: {rows:?}"
     );
+}
+
+#[test]
+fn the_hit_listing_names_the_pose_the_layers_motion_applies_to_a_pointer_on_the_canvas() {
+    // The fixture moves L0 by Position [7,-3]; a pointer at world (W) reaches a record at W - (7,-3).
+    let result = full(&masked_content()).unwrap();
+    assert_eq!(result["layerMatrix"], json!([1.0, 0.0, 0.0, 1.0, 7.0, -3.0]), "{result}");
+    let item = result["items"].as_array().unwrap().iter().find(|i| i["role"] != "mask").unwrap();
+    assert_eq!(item["matrix"], result["layerMatrix"], "an ordinary record is posed by exactly the layer's pose");
+    // A rotation about the content's own centre is part of the same pose.
+    let mut turned = paint_test_document(&[7]);
+    turned["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0"},
+        "properties":[{"property":"position","static":[7,-3]}, {"property":"rotation","static":[90]}]}]);
+    let pose = full(&turned).unwrap()["layerMatrix"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<_>>();
+    assert!(pose[0].abs() < 1e-9 && (pose[1] - 1.0).abs() < 1e-9 && (pose[2] + 1.0).abs() < 1e-9 && pose[3].abs() < 1e-9, "{pose:?}");
+    // No Motion at all is the identity, and the empty layer too (nothing to pivot on).
+    let mut still = masked_content();
+    still.as_object_mut().unwrap().remove("propertyHolders");
+    assert_eq!(full(&still).unwrap()["layerMatrix"], json!([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
 }

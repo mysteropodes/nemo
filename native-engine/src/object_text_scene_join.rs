@@ -165,9 +165,14 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
                 record: &input.entry.block,
                 glyph_stages: &[],
                 chain,
-                item_opacity: packet.layer_opacity(input.layer_index).map_err(|_| {
-                    unavailable(input.source_index, "Text layer opacity is unavailable")
-                })?,
+                // A 3D layer ignores its 2D Motion opacity (baseline `is3D`: `motionMat = null`).
+                item_opacity: if packet.source_layers()[input.layer_index].three_d.value() == Some(&true) {
+                    1.0
+                } else {
+                    packet.layer_opacity(input.layer_index).map_err(|_| {
+                        unavailable(input.source_index, "Text layer opacity is unavailable")
+                    })?
+                },
                 admission: GeometryAdmission::DropCoincidentCurves,
             },
         )
@@ -288,6 +293,14 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
                 "native Text animator parent chain unavailable",
             )
         })?;
+        // #2520: a 3D layer's glyph vertices go through the layer projector around the union bounds (its chain is empty).
+        if let Some(projector) = chains
+            .projector_3d(input.layer_index)
+            .map_err(|e| unavailable(input.source_index, e.reason()))?
+        {
+            crate::object_render_scene::object_scene_producer_text::animator::apply_projection(&mut raw, &projector)
+                .map_err(|_| unavailable(input.source_index, "native Text 3D projection unavailable"))?;
+        }
         let item = raw;
         entries.push(TextSource {
             source_index: input.source_index,

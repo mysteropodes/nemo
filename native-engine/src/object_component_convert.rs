@@ -97,6 +97,9 @@ pub(crate) fn facts_from_document(document: &ObjectDocument, layer: &ObjectLayer
             .component_set()
             .is_some_and(|set| set.instance(SCENE_CONTEXT, layer.layer_uid()).is_some()),
         effect_layer: layer.is_effect_layer(),
+        // A Folder is a Null that groups (it stores `isNullLayer` too), so it reads as a Null here, as in the baseline.
+        null_layer: layer.is_null_layer(),
+        guide_layer: layer.is_guide_layer(),
         widget_layer: layer.widget.value().is_some(),
         ..SourceFacts::default()
     }
@@ -217,6 +220,11 @@ fn convert_single(
         layers: vec![inner],
         objects: moved,
         exposed_props: Presence::Missing,
+        camera_keys: Presence::Missing,
+        markers: Presence::Missing,
+        motion_arcs: Presence::Missing,
+        tween_overrides: Presence::Missing,
+        tween_easing: Presence::Missing,
     };
     let mut candidate = document.clone();
     let order = items::move_images(
@@ -314,6 +322,11 @@ fn convert_merge(
         layers: inner_layers,
         objects: moved,
         exposed_props: Presence::Missing,
+        camera_keys: Presence::Missing,
+        markers: Presence::Missing,
+        motion_arcs: Presence::Missing,
+        tween_overrides: Presence::Missing,
+        tween_easing: Presence::Missing,
     };
     let lifted = document
         .duplicator_set()

@@ -160,7 +160,7 @@ test('an already aligned selection writes nothing', async () => {
 });
 
 test('an item with no native transform refuses the whole gesture with the Select notice and writes nothing', async () => {
-  const h = harness([...ITEMS.slice(0, 2), quad('L1', 'c', 130, 40, 140, 45, { role: 'brush', brush: 'bitmap', group: 'g' })]);
+  const h = harness([...ITEMS.slice(0, 2), quad('L1', 'c', 130, 40, 140, 45, { role: 'unknown-family', group: 'g' })]);
   await h.select();
   assert.equal(h.ids().length, 3);
   const before = JSON.stringify(h.store);
@@ -168,7 +168,16 @@ test('an item with no native transform refuses the whole gesture with the Select
   assert.equal(h.batches.length, 0);
   assert.equal(JSON.stringify(h.store), before, 'nothing moved');
   assert.equal(h.toasts.length, 1);
-  assert.match(h.toasts[0], /bitmap brushes.*not available on native projects/);
+  assert.match(h.toasts[0], /this item.*not available on native projects/);
+  assert.deepEqual(h.legacy, []);
+});
+
+test('a bitmap brush aligns with the rest: the engine maps its anchor and re-bakes its image, so the gesture is one batch', async () => {
+  const h = harness([...ITEMS.slice(0, 2), quad('L1', 'c', 130, 40, 140, 45, { role: 'brush', brush: 'bitmap', group: 'g' })]);
+  await h.select();
+  await h.align('left');
+  assert.equal(h.batches.length, 1, 'one commit');
+  assert.deepEqual(h.toasts, []);
   assert.deepEqual(h.legacy, []);
 });
 

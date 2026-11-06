@@ -24,7 +24,12 @@ pub(crate) fn layer_supported(
     layer: &ObjectLayer,
     host: usize,
 ) -> Result<(), ObjectSceneError> {
-    if layer.blend_mode().is_some_and(|mode| mode != "normal") {
+    // #2257: blend, matte and effect properties of a layer in the packet's own context are composition inputs the
+    // layered compositor joins (`SceneEffectPlan`); a layer inside a component's own stack has no such join.
+    let joined = context == packet.context_id();
+    if !joined
+        && (layer.blend_mode().is_some_and(|mode| mode != "normal") || !layer.blend_keys().is_empty())
+    {
         return Err(unavailable(
             host,
             "component layer blend mode requires a layered consumer",
@@ -32,14 +37,15 @@ pub(crate) fn layer_supported(
     }
     if layer.parent_layer_uid.value().is_some_and(Option::is_some)
         || layer.rig().is_some()
-        || layer.is_effect_layer()
         || layer.is_folder_layer()
-        || layer
-            .effects()
-            .is_some_and(|effects| effects.iter().any(|effect| effect.enabled))
-        || layer.effects_from().is_some()
-        || layer.matte_on()
-        || !layer.mattes_more().is_empty()
+        || (!joined
+            && (layer.is_effect_layer()
+                || layer
+                    .effects()
+                    .is_some_and(|effects| effects.iter().any(|effect| effect.enabled))
+                || layer.effects_from().is_some()
+                || layer.matte_on()
+                || !layer.mattes_more().is_empty()))
     {
         return Err(unavailable(
             host,
@@ -133,12 +139,6 @@ pub(crate) fn compile(
             "component held source differs from resolved inner frame",
         ));
     }
-    if source.has_enabled_effects() {
-        return Err(unavailable(
-            host,
-            "component element effects are unavailable",
-        ));
-    }
     let layer_target = PropertyHolderTarget {
         context_id: symbol.to_owned(),
         layer_uid: target.layer_uid().to_owned(),
@@ -148,8 +148,8 @@ pub(crate) fn compile(
         stroke_id: Presence::Present(target.stroke_id().to_owned()),
         ..layer_target.clone()
     };
-    let inner = raw_opacity(packet, &layer_target, inner_frame, host)?
-        * raw_opacity(packet, &element_target, inner_frame, host)?;
+    let layer_raw = raw_opacity(packet, &layer_target, inner_frame, host)?;
+    let inner = layer_raw * raw_opacity(packet, &element_target, inner_frame, host)?;
     let factor = host_factor * inner;
     // The dict `getEffectiveStrokes` returns: inner layer and element Motion opacity folded in, the
     // host's own opacity not (it applies when the scene is drawn).
@@ -225,6 +225,7 @@ pub(crate) fn compile(
     Ok(ComponentPaint {
         record,
         host_layer_index: host,
+        dab_opacity: host_factor * layer_raw,
         target: target.clone(),
         contour,
         path: validated.path,

@@ -31,6 +31,7 @@ mod reference;
 pub(crate) mod viewport_checker;
 pub use viewport_checker::{
     outline::viewport_outline_quality_suffix, shadow::viewport_shadow_guides_quality_suffix,
+    solo::viewport_solo_quality_suffix,
     viewport_checker_quality_suffix,
 };
 // #2358 GHOST-UNDER: onion / Ghost All frames composed under the live frame of a viewport witness.
@@ -72,10 +73,15 @@ pub(crate) mod raster_scene;
 // T12 / T28.media: video placements drawn from decoded source frames.
 #[path = "object_media_scene_join.rs"]
 pub(crate) mod media_scene;
-pub(crate) use paint::raster::{ordered_entries, PaintEntry, PaintIndex};
+pub(crate) use paint::raster::{
+    folder_ranks, layered_entries, ordered_entries, ordered_entries_ranked, PaintEntry, PaintIndex,
+};
 pub(crate) use raster_scene::declared_versions as object_raster_resource_versions;
 #[path = "object_mask_inputs.rs"]
 pub(crate) mod mask_inputs;
+// #2257: the production join of a witness' packet to its layer-composition and effect-stack plan.
+#[path = "object_layer_join.rs"]
+mod layer_join;
 #[path = "object_paint_plan.rs"]
 mod paint;
 // L07-F (#2113): contour scene producer joined through the L07-C pin registry.
@@ -182,7 +188,8 @@ pub fn prepare_object_composition(
     };
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     {
-        return brush_paint::attach(text_scene::attach(raster_scene::attach(witness, None)?)?);
+        return brush_paint::attach(text_scene::attach(raster_scene::attach(witness, None)?)?)?
+            .with_joined_layers(1.);
     }
     #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
     {
@@ -192,7 +199,7 @@ pub fn prepare_object_composition(
                 "native raster resources require project media support",
             ));
         }
-        text_scene::attach(witness)
+        text_scene::attach(witness)?.with_joined_layers(1.)
     }
 }
 
@@ -246,6 +253,12 @@ impl ObjectCompositionWitness {
     }
     pub(crate) fn scene_effects(&self) -> Option<&Arc<SceneEffectPlan>> {
         self.scene_effects.as_ref()
+    }
+    /// Test control: the witness as it was before the layer join (production joins on construction).
+    #[cfg(test)]
+    pub(crate) fn without_scene_effects(mut self) -> Self {
+        self.scene_effects = None;
+        self
     }
     /// Set equality with an evaluation key's declaration; an absent set is empty.
     pub(crate) fn verify_scene_resources(

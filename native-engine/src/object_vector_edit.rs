@@ -30,9 +30,9 @@ mod batch_ops;
 #[path = "object_vector_create.rs"]
 mod create_ops;
 #[path = "object_vector_edit_context.rs"]
-mod context;
+pub(crate) mod context;
 #[path = "object_vector_edit_cells.rs"]
-mod cells;
+pub(crate) mod cells;
 use create_ops::{create, create_many, Placement};
 use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
 use order::OrderEditError;
@@ -129,6 +129,8 @@ pub(crate) struct PreparedVectorEdit {
     origin: ObjectSnapshot,
     document: ObjectDocument,
     result: VectorEditResult,
+    /// The candidate project when the edit re-baked or dropped a bitmap brush companion (its image joins the asset catalog in the same revision).
+    project: Option<crate::object_document::ProjectEnvelope>,
 }
 impl PreparedVectorEdit {
     /// The result the commit will report (`applied` is false for an exact no-op).
@@ -383,6 +385,7 @@ impl ObjectFillOwner {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let skip_unavailable = payload.skip_unavailable.value() == Some(&true);
+        let mut rebakes: Vec<batch_ops::rebake::Rebake> = Vec::new();
         let mut edit = match (
             payload.command.as_str(),
             payload.record,
@@ -423,7 +426,9 @@ impl ObjectFillOwner {
                 let Presence::Present(ops) = payload.ops else {
                     return Err(DispatchErrorCode::InvalidRequest);
                 };
-                batch_ops::batch(&origin, base, &context, ops, copy_key, trim, skip_unavailable)?
+                let (edit, steps) = batch_ops::batch(&origin, base, &context, ops, copy_key, trim, skip_unavailable)?;
+                rebakes = steps;
+                edit
             }
             _ => return Err(DispatchErrorCode::InvalidRequest),
         };
@@ -441,13 +446,21 @@ impl ObjectFillOwner {
                     .map_err(|error| Self::fill_plan_error(&error))?;
             }
         }
+        // The companions are document items, not part of a component's view: they are re-baked against the restored full document,
+        // where the anchor and its companion are addressed by their full target (context id included).
         if view.is_some() {
             edit.document = context::restore(edit.document, origin.document(), &context)?;
         }
         ObjectSnapshot::validate_drawing(&edit.document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        let project = if rebakes.is_empty() || !edit.changed {
+            None
+        } else {
+            Some(batch_ops::rebake::apply(&origin, edit.document.clone(), &rebakes)?)
+        };
         Ok(PreparedVectorEdit {
             origin,
+            project,
             document: edit.document,
             result: VectorEditResult {
                 kind: edit.kind,
@@ -480,9 +493,12 @@ impl ObjectFillOwner {
         if !candidate.result.applied {
             return Ok(self.content_revision());
         }
-        self.revisions
-            .publish(candidate.document)
-            .map_err(|_| DispatchErrorCode::Unavailable)
+        // A re-baked companion publishes with its image: the one candidate project is the revision.
+        match candidate.project {
+            Some(project) => self.revisions.publish_tween_resources(project),
+            None => self.revisions.publish(candidate.document),
+        }
+        .map_err(|_| DispatchErrorCode::Unavailable)
     }
 }
 

@@ -2906,11 +2906,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-project-file.js"
+        "native-object-project-file.js",
+        "native-legacy-import.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-project-file.js"
+        "native-object-project-file.js",
+        "native-legacy-import.js"
       ]
     },
     {
@@ -2939,6 +2941,7 @@
         "native-select-overlay.js",
         "native-view-aids-ui.js",
         "native-select-gesture.js",
+        "native-select-alt-duplicate.js",
         "native-selection-steps.js",
         "native-selection-style.js",
         "native-inspector-unavailable.js",
@@ -2948,6 +2951,7 @@
         "native-selection-boolean.js",
         "native-select-group.js",
         "native-selection-clipboard.js",
+        "native-selection-order.js",
         "native-select-menu.js",
         "native-selection-transform.js",
         "native-selection-align.js",
@@ -2988,7 +2992,12 @@
       "dir": "src/js/adapters",
       "files": [
         "native-component-grid.js",
-        "native-component-context.js"
+        "native-component-context.js",
+        "native-component-frame-edit.js",
+        "native-component-layer-edit.js",
+        "native-component-range-edit.js",
+        "native-component-cell-selection.js",
+        "native-component-state-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -3365,6 +3374,14 @@
         "native-motion-property-binding.js",
         "native-motion-property-keys.js",
         "native-motion-key-lock-menu.js",
+        "native-motion-key-edit.js",
+        "native-motion-key-clipboard.js",
+        "native-motion-key-gesture.js",
+        "native-motion-key-box.js",
+        "native-motion-canvas-math.js",
+        "native-motion-effector.js",
+        "native-motion-gizmo-3d.js",
+        "native-motion-canvas.js",
         "native-motion-property-value.js",
         "native-motion-control-rows.js",
         "native-motion-expression-snippets.js",
@@ -3600,11 +3617,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-layer-compositing.js"
+        "native-object-layer-compositing.js",
+        "native-blend-key-grid.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-layer-compositing.js"
+        "native-object-layer-compositing.js",
+        "native-blend-key-grid.js"
       ]
     },
     {
@@ -3613,11 +3632,13 @@
       "dir": "src/js/adapters",
       "files": [
         "native-layer-parent.js",
+        "native-layer-range-menu.js",
         "native-motion-layer-link-rows.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-layer-parent.js",
+        "native-layer-range-menu.js",
         "native-motion-layer-link-rows.js"
       ]
     },
@@ -3628,13 +3649,75 @@
       "files": [
         "native-layer-row-writes.js",
         "native-layer-row-drag.js",
-        "native-layer-row-ui.js"
+        "native-layer-row-ui.js",
+        "native-layer-kinds-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-layer-row-writes.js",
         "native-layer-row-drag.js",
-        "native-layer-row-ui.js"
+        "native-layer-row-ui.js",
+        "native-layer-kinds-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.project-length.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-project-length.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-project-length.js"
+      ]
+    },
+    {
+      "id": "app.native.layer-solo.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-layer-solo.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-layer-solo.js"
+      ]
+    },
+    {
+      "id": "app.native.layer-three-d.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-layer-three-d.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-layer-three-d.js"
+      ]
+    },
+    {
+      "id": "app.native.motion-key-spans.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-motion-key-spans.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-motion-key-spans.js"
+      ]
+    },
+    {
+      "id": "app.native.motion-connector-drag.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-motion-connector-drag.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-motion-connector-drag.js"
       ]
     },
     {
@@ -3790,7 +3873,11 @@
         "native-object-draw-paint.js",
         "native-object-draw-symmetry.js",
         "native-object-draw-bitmap.js",
-        "native-object-draw-resize.js"
+        "native-object-draw-resize.js",
+        "native-layer-motion-pose.js",
+        "native-object-perspective-snap.js",
+        "native-object-pen-continue.js",
+        "native-object-eraser-tool.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [

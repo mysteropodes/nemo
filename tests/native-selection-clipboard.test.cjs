@@ -51,7 +51,8 @@ function harness(items = FLAT(), opts = {}) {
       return { items: store.filter((i) => i.stableTarget.layerUid === selector.layerUid).map((item) => { const { segments, ...rest } = item; return wanted(rest) ? { ...rest, segments } : rest; }) };
     } };
   let fresh = 0;
-  const shifted = (item, by) => ({ ...item, bounds: item.bounds.map((n) => n + by), segments: item.segments.map((s) => ({ ...s, point: [s.point[0] + by, s.point[1] + by] })) });
+  const shifted = (item, by) => { const [dx, dy] = Array.isArray(by) ? by : [by, by]; // a number moves both axes, a pair is [dx, dy] (an Alt-drag duplicate)
+    return { ...item, bounds: item.bounds.map((n, at) => n + (at % 2 ? dy : dx)), segments: item.segments.map((s) => ({ ...s, point: [s.point[0] + dx, s.point[1] + dy] })) }; };
   const clone = (item, layer, by, id) => { const c = shifted(JSON.parse(JSON.stringify(item)), by); c.stableTarget = { ...c.stableTarget, layerUid: layer, strokeId: id }; return c; };
   const clipOf = (p) => ({ contextId: p.contextId, layerUid: p.layerUid, frame: p.frame, records: p.strokeIds.map((id) => {
     const item = find(id);
@@ -60,7 +61,11 @@ function harness(items = FLAT(), opts = {}) {
   }) });
   const own = (request) => {
     const p = request.payload, op = request.operation;
-    if (op.endsWith('selection.duplicate')) { p.strokeIds.forEach((id) => store.push(clone(find(id), p.layerUid, SHIFT, id + '-d' + (++fresh)))); return { applied: true, historyEntriesAdded: 1 }; }
+    if (op.endsWith('selection.duplicate')) {
+      p.strokeIds.forEach((id) => store.push(clone(find(id), p.layerUid, p.offset || SHIFT, id + '-d' + (++fresh))));
+      (p.others || []).forEach((other) => other.strokeIds.forEach((id) => store.push(clone(find(id), p.layerUid, p.offset || SHIFT, id + '-d' + (++fresh))))); // the other layers' shapes join the destination
+      return { applied: true, historyEntriesAdded: 1 };
+    }
     if (op.endsWith('clipboard.copy')) return { applied: false, historyEntriesAdded: 0, clipboard: p.strokeIds.length ? clipOf(p) : null };
     if (op.endsWith('clipboard.cut')) {
       const clip = p.strokeIds.length ? clipOf(p) : null;
@@ -125,6 +130,40 @@ test('Dupliquer / Cmd+D is ONE object.selection.duplicate request over the selec
   assert.deepEqual(h.layer('L1'), ['a', 'b', 'c', 'a-d1', 'b-d2'], 'the owner put the copies on top of the layer');
   assert.deepEqual(h.ids(), ['a-d1', 'b-d2'], 'the copies are selected, the sources are not (baseline)');
   assert.deepEqual(h.toasts, [], 'the baseline duplicate says nothing');
+});
+
+test('an Alt-drag duplicate (duplicateAt) is the same ONE request with the drag distance as `offset`; the copies land there and are selected, the originals stay', async () => {
+  const h = harness();
+  await h.pick('b', 'a');
+  const out = await Clipboard.duplicateAt(h.root, [30, -7.5], { pin: h.session.info() });
+  assert.equal(out.status, 'applied');
+  assert.equal(h.sent.length, 1, 'one revision and one history entry');
+  assert.deepEqual(h.sent[0].payload, { command: 'object.selection.duplicate', contextId: 'scene-root', layerUid: 'L1', frame: 0, mode: 'animation2d', strokeIds: ['a', 'b'], offset: [30, -7.5] });
+  assert.deepEqual(h.legacy, []);
+  assert.deepEqual(h.layer('L1'), ['a', 'b', 'c', 'a-d1', 'b-d2']);
+  assert.deepEqual(h.find('a-d1').segments[0].point, [40, 2.5], 'a (10,10) moved by (30,-7.5)');
+  assert.deepEqual(h.find('a').segments[0].point, [10, 10], 'the original is untouched');
+  assert.deepEqual(h.ids(), ['a-d1', 'b-d2']);
+  const plain = harness();
+  await plain.pick('a');
+  await Clipboard.duplicate(plain.root);
+  assert.equal('offset' in plain.sent[0].payload, false, 'Cmd+D still sends no offset (the engine keeps the 12 px nudge)');
+});
+
+test('duplicateAt with a pin the document has moved past, or an Escape, or a runaway distance sends nothing', async () => {
+  const h = harness();
+  await h.pick('a');
+  const stale = await Clipboard.duplicateAt(h.root, [5, 5], { pin: { ...h.session.info(), contentRevision: 6, documentSnapshotId: 's6' } });
+  assert.equal(stale.status, 'stale');
+  const cancelled = await Clipboard.duplicateAt(h.root, [5, 5], { pin: h.session.info(), cancelled: () => true });
+  assert.equal(cancelled.status, 'cancelled');
+  let released = 0;
+  await Clipboard.duplicateAt(h.root, [5, 5], { pin: h.session.info(), cancelled: () => false, release: () => { released++; } });
+  assert.equal(released, 1, 'the drag lets go of Escape just before the request');
+  assert.equal(h.sent.length, 1, 'only the last one was sent');
+  const far = await Clipboard.duplicateAt(h.root, [2e6, 0], { pin: h.session.info() });
+  assert.equal(far.status !== 'applied', true, 'a distance past the contract bound is refused before it leaves');
+  assert.equal(h.sent.length, 1);
 });
 
 test('Motion mode sends the owner the "motion" edit mode (the key the held frame inherits is edited, not promoted)', async () => {
@@ -202,8 +241,8 @@ test('shapes of two layers, a selection the document moved on from, and a missin
   const layers = harness();
   const first = await Intent.layerPaths(layers.root, (i) => i.stableTarget.strokeId === 'a', false, 0), second = await Intent.layerPaths(layers.root, (i) => i.stableTarget.strokeId === 'z', false, 1);
   layers.root.selectedPaths = [...first.paths, ...second.paths];
-  await Clipboard.duplicate(layers.root);
-  assert.deepEqual(layers.toasts, ['Select shapes on one layer to duplicate them.']);
+  await Clipboard.copy(layers.root);
+  assert.deepEqual(layers.toasts, ['Select shapes on one layer to copy them.'], 'a clip is one layer\'s');
   const gone = harness();
   await gone.pick('a', 'b');
   gone.store.splice(0, 1);
@@ -215,6 +254,50 @@ test('shapes of two layers, a selection the document moved on from, and a missin
   await Clipboard.cut(none.root);
   assert.deepEqual(none.toasts, ['Cut is not available for this selection (locked, hidden or unsupported shapes are refused).'], 'no declared owner route is a typed unavailable, not a write');
   for (const h of [layers, gone, none]) { assert.equal(h.sent.length, 0); assert.deepEqual(h.legacy, []); }
+});
+
+// R-lane-a-fixes: baseline duplicateSelection materialises every selected path into the ACTIVE layer, whatever layer it came from.
+test('a selection that spans layers is duplicated by ONE request into the active layer, the other layers\' shapes named as `others`', async () => {
+  const h = harness();
+  const a = await Intent.layerPaths(h.root, (i) => i.stableTarget.strokeId === 'a', false, 0), z = await Intent.layerPaths(h.root, (i) => i.stableTarget.strokeId === 'z', false, 1);
+  h.root.selectedPaths = [...a.paths, ...z.paths];
+  const out = await Clipboard.duplicate(h.root);
+  assert.equal(out.status, 'applied');
+  assert.equal(h.sent.length, 1, 'one request is one revision and one history entry');
+  assert.deepEqual(h.sent[0].payload, { command: 'object.selection.duplicate', contextId: 'scene-root', layerUid: 'L1', frame: 0, mode: 'animation2d', strokeIds: ['a'],
+    others: [{ layerUid: 'L2', strokeIds: ['z'] }] });
+  assert.deepEqual(h.layer('L1'), ['a', 'b', 'c', 'a-d1', 'z-d2'], 'both copies landed in the active layer');
+  assert.deepEqual(h.layer('L2'), ['z'], 'the other layer is untouched');
+  assert.deepEqual(h.toasts, []);
+  assert.deepEqual(h.legacy, []);
+  // The destination is the ACTIVE layer, even one the selection does not touch; the Alt-drag distance applies to every copy.
+  const g = harness();
+  const b = await Intent.layerPaths(g.root, (i) => i.stableTarget.strokeId === 'z', false, 1);
+  g.root.selectedPaths = [...b.paths, ...(await Intent.layerPaths(g.root, (i) => i.stableTarget.strokeId === 'c', false, 0)).paths];
+  g.root.state.activeLayerIdx = 1;
+  assert.equal((await Clipboard.duplicateAt(g.root, [30, -7.5], { pin: g.session.info() })).status, 'applied');
+  assert.deepEqual(g.sent[0].payload, { command: 'object.selection.duplicate', contextId: 'scene-root', layerUid: 'L2', frame: 0, mode: 'animation2d', strokeIds: ['z'],
+    offset: [30, -7.5], others: [{ layerUid: 'L1', strokeIds: ['c'] }] });
+  g.root.state.activeLayerIdx = 'none';
+  g.root.selectedPaths = [...b.paths, ...(await Intent.layerPaths(g.root, (i) => i.stableTarget.strokeId === 'c', false, 0)).paths];
+  g.toasts.length = 0;
+  await Clipboard.duplicate(g.root);
+  assert.equal(g.sent.length, 1, 'no active layer to clone into: nothing is sent');
+  assert.deepEqual(g.toasts, ['Select a layer to duplicate into.']);
+});
+
+test('a selection on one layer sends no `others`, and the other layer\'s read that moved on sends nothing', async () => {
+  const h = harness();
+  await h.pick('a');
+  await Clipboard.duplicate(h.root);
+  assert.equal('others' in h.sent[0].payload, false);
+  const gone = harness();
+  const a = await Intent.layerPaths(gone.root, (i) => i.stableTarget.strokeId === 'a', false, 0), z = await Intent.layerPaths(gone.root, (i) => i.stableTarget.strokeId === 'z', false, 1);
+  gone.root.selectedPaths = [...a.paths, ...z.paths];
+  gone.store.splice(gone.store.findIndex((i) => i.stableTarget.strokeId === 'z'), 1);
+  await Clipboard.duplicate(gone.root);
+  assert.deepEqual(gone.toasts, ['The selection changed — nothing was changed.']);
+  assert.equal(gone.sent.length, 0);
 });
 
 test('an owner refusal is a notice and a resolved status; nothing is selected, kept or thrown', async () => {

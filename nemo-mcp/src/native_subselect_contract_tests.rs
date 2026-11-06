@@ -360,7 +360,7 @@ fn a_hit_test_page_may_be_shorter_than_the_limit_when_the_engine_shortened_it_to
 }
 
 #[test]
-fn a_hit_test_listing_and_geometry_may_name_the_entered_component_but_never_free_text() {
+fn a_listing_geometry_and_edit_may_name_the_entered_component_but_never_free_text() {
     let comp = |id: &str| json!({"contextId":id,"layerUid":"inner","frameScope":{"kind":"authored","frame":0},"strokeId":"c-a"});
     let listing = |id: &str| {
         let view = json!({"kind":"subselect","contextId":id,"layerUid":"inner","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8,"hitTest":true});
@@ -386,8 +386,10 @@ fn a_hit_test_listing_and_geometry_may_name_the_entered_component_but_never_free
     assert!(public_read(&geometry, &answer));
     geometry["stableTarget"]["contextId"] = json!("a b");
     assert!(!request(&geometry));
-    // The edit intent keeps the scene root.
-    let edit = json!({"command":"object.subselect.edit","stableTarget":comp("comp-a"),"intent":{"kind":"move","indices":[0],"delta":[1,2]}});
+    // The edit intent names the record's own context: the entered component, never free text.
+    let mut edit = json!({"command":"object.subselect.edit","stableTarget":comp("comp-a"),"intent":{"kind":"move","indices":[0],"delta":[1,2]}});
+    assert!(edit_request(&edit));
+    edit["stableTarget"]["contextId"] = json!("a b");
     assert!(!edit_request(&edit));
 }
 
@@ -413,4 +415,30 @@ fn point_types_are_the_four_owner_kinds_and_the_read_lists_one_valid_type_per_ve
     let mut hit = query();
     hit["subselect"]["hitTest"] = json!(true);
     assert!(!public_read(&hit, &marked), "a hit-test page carries no point types");
+}
+
+#[test]
+fn a_hit_test_listing_may_carry_the_layers_pose_as_six_finite_non_singular_numbers() {
+    let view = json!({"kind":"subselect","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8,"hitTest":true});
+    let q = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","view":view});
+    let r = json!({"kind":"subselect","atRevision":7,"documentSnapshotId":"native-object:document:7","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"total":0,"nextCursor":null,"preview":false,"hitTest":true,"items":[]});
+    assert!(public_read(&q, &r), "an empty layer lists nothing");
+    for pose in [json!([1, 0, 0, 1, 7, -3]), json!([0, 1, -1, 0, 0.5, 0.25]), json!([2, 0, 0, 0.5, 0, 0])] {
+        let mut listed = r.clone();
+        listed["layerMatrix"] = pose.clone();
+        assert!(public_read(&q, &listed), "{pose}");
+    }
+    for pose in [json!([1, 0, 0, 1, 7]), json!([1, 0, 0, 1, 7, -3, 0]), json!([1, 0, 0, 1, "7", -3]), json!([0, 0, 0, 0, 0, 0]), json!([1, 2, 2, 4, 0, 0]), json!(null), json!({}), json!(1)] {
+        let mut listed = r.clone();
+        listed["layerMatrix"] = pose.clone();
+        assert!(!public_read(&q, &listed), "{pose}");
+    }
+    // The pose belongs to the hit-test listing only.
+    let plain_view = json!({"kind":"subselect","contextId":"scene-root","layerUid":"layer-a","frame":0,"workId":"native-work-1","viewGeneration":1,"cursor":0,"limit":8});
+    let plain_q = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","view":plain_view});
+    let mut plain = r.clone();
+    plain.as_object_mut().unwrap().remove("hitTest");
+    assert!(public_read(&plain_q, &plain));
+    plain["layerMatrix"] = json!([1, 0, 0, 1, 7, -3]);
+    assert!(!public_read(&plain_q, &plain));
 }

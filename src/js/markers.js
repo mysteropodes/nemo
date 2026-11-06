@@ -14,10 +14,12 @@
 (function () {
   var DEFAULT_COLOR = '#e8b64c';
   function native() { return !!(window.__TAURI__ && window.__TAURI__.core); }
-  function projection() { var c = window.NemoNativeCompositionController; return c && c.read(); }
+  // Inside an entered component the markers are the component's own (sym.markers); the scene keeps the composition controller.
+  function owner() { var s = window.NemoNativeComponentState; return s && s.active() ? s : window.NemoNativeCompositionController; }
+  function projection() { var c = owner(); return c && c.read(); }
   function unavailable() { if (window.showToast) showToast('Native markers are unavailable.'); }
   function intent(action, origin) {
-    var c = window.NemoNativeCompositionController;
+    var c = owner();
     if (!c || !origin) { unavailable(); return null; }
     c.edit(action, origin); return true;
   }
@@ -241,7 +243,7 @@
           { label: 'Repère suivant  (Maj+→)', action: function () { gotoAdjacent(1); } },
           { label: 'Repère précédent  (Maj+←)', action: function () { gotoAdjacent(-1); } },
           { sep: true },
-          { label: 'Grille BPM…', action: function () { if (window.SMBpm) SMBpm.openSettings(origin); } },
+          { label: 'Grille BPM…', action: function () { if (window.SMBpm) { if (origin && origin.context) SMBpm.openSettings(); else SMBpm.openSettings(origin); } } },
           { label: 'Réduire la composition à la zone de travail', action: function () { if (window.SM && SM.trimToWorkArea) SM.trimToWorkArea(); } },
           { sep: true },
           { label: 'Supprimer tous les repères', disabled: !compMarkers().length, action: function () {

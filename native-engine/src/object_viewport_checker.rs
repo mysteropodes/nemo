@@ -10,6 +10,9 @@ pub(crate) mod outline;
 // #2373: and the Shadow guides switch, the third.
 #[path = "object_viewport_shadow.rs"]
 pub(crate) mod shadow;
+// #2371: and the Solo view of the layers, the fourth.
+#[path = "object_viewport_solo.rs"]
+pub(crate) mod solo;
 use vello::kurbo::{Affine, Rect};
 use vello::peniko::{Color, Fill};
 
@@ -119,6 +122,11 @@ impl ObjectCompositionWitness {
         ));
         self.viewport_checker = Some(checker);
         Ok(self)
+    }
+
+    /// Whether a transparency checker sits under this witness' artwork (viewport witnesses only).
+    pub(crate) fn has_viewport_checker(&self) -> bool {
+        self.viewport_checker.is_some()
     }
 
     /// The checker as the bottom item of `scene`, under the witness' own camera / navigation (the baseline artboard rect): behind a

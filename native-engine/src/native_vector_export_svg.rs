@@ -330,6 +330,17 @@ fn emit_frame(
         if let PaintEntry::Video(index) = entry {
             return Err(unsupported_video(plan, index));
         }
+        // A copy and a placed component's inner record carry the item effects of their source, which SVG cannot show.
+        let effects = "per-element effects have no admitted SVG representation";
+        match entry {
+            PaintEntry::Duplicator(copy) if copy.record.has_enabled_effects() => {
+                return Err(SvgExportError::Unsupported { source_object_index: copy.source_index, reason: effects });
+            }
+            PaintEntry::Component(paint) if paint.record.has_enabled_effects() => {
+                return Err(SvgExportError::UnsupportedComponent { source_layer_index: paint.host_layer_index, reason: effects });
+            }
+            _ => {}
+        }
         if let PaintEntry::Duplicator(copy) = entry {
             if copy.svg_contour.is_none() || copy.svg_rgba.is_none() {
                 return Err(SvgExportError::Unsupported {

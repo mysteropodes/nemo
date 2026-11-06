@@ -3,19 +3,10 @@ use crate::compositor::object_compositor::prepare_command;
 use crate::compositor::{Compositor, CompositorError};
 use crate::object_render_scene::object_scene_style_emit::PreparedItem;
 use crate::object_render_scene::viewport_checker::shadow::is_shadow_guide;
-use crate::object_render_scene::{ordered_entries, ObjectCompositionWitness, PaintEntry};
+use crate::object_render_scene::{
+    folder_ranks, ordered_entries, ordered_entries_ranked, ObjectCompositionWitness, PaintEntry,
+};
 use vello::kurbo::Affine;
-/// T12: the layered path draws solid layers only, so a video is refused, never omitted.
-pub(super) fn refuse_layered_video(
-    plan: &crate::object_render_scene::ObjectPaintPlan,
-) -> Result<(), CompositorError> {
-    if plan.video_slots().is_empty() {
-        return Ok(());
-    }
-    Err(CompositorError::new(
-        "native video layered effects are unavailable",
-    ))
-}
 impl Compositor {
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     pub(super) fn retire_raster_cache(
@@ -55,25 +46,29 @@ impl Compositor {
     pub(crate) fn ghost_cache_resets(&self) -> u64 {
         self.ghost_cache_resets
     }
+    /// Restore every live native image before a Vello render that draws them: a solid-only resolve replaces the image atlas
+    /// with a 1x1 texture while retaining residency, and the layered path renders many scenes per frame.
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    pub(super) fn restore_object_images(&mut self, prepared: &ObjectCompositionWitness) {
+        if prepared.has_scene_images() {
+            self.retained_object_reference = Some(prepared.without_media());
+        }
+        // Vello can replace an image atlas on a solid-only pass. Every live native asset is
+        // explicitly restored before use; instances of the same asset share one ImageData ID.
+        for image in prepared.raster_images().chain(prepared.brush_images()) {
+            self.renderer.mark_override_image_dirty(image);
+        }
+        // #2358 GHOST-UNDER: the ghost frames' images are restored like any live native asset.
+        for image in prepared.ghost_underlay().into_iter().flat_map(|g| g.images()) {
+            self.renderer.mark_override_image_dirty(image);
+        }
+    }
     pub(super) fn emit_object_paint_sequence(
         &mut self,
         prepared: &ObjectCompositionWitness,
     ) -> Result<(), CompositorError> {
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
-        {
-            if prepared.has_scene_images() {
-                self.retained_object_reference = Some(prepared.without_media());
-            }
-            // Vello can replace an image atlas on a solid-only pass. Every live native asset is
-            // explicitly restored before use; instances of the same asset share one ImageData ID.
-            for image in prepared.raster_images().chain(prepared.brush_images()) {
-                self.renderer.mark_override_image_dirty(image);
-            }
-            // #2358 GHOST-UNDER: the ghost frames' images are restored like any live native asset.
-            for image in prepared.ghost_underlay().into_iter().flat_map(|g| g.images()) {
-                self.renderer.mark_override_image_dirty(image);
-            }
-        }
+        self.restore_object_images(prepared);
         // Append the whole artwork after all per-item paint, preserving stroke,
         // gradient, glyph and image transforms. No affine is applied twice.
         let camera = prepared.camera_matrix();
@@ -102,67 +97,19 @@ impl Compositor {
         let outline = prepared.viewport_outline();
         // #2373: the viewport-only hidden Shadow guides (an export witness hides none).
         let hide_shadow = prepared.viewport_hides_shadow_guides();
-        for entry in ordered_entries(prepared.plan()) {
+        // A folder's children paint at the folder's own place in the stack (see `folder_ranks`).
+        let ranks = folder_ranks(prepared.plan().packet());
+        let entries: Vec<PaintEntry<'_>> = match &ranks {
+            Some(ranks) => ordered_entries_ranked(prepared.plan(), &|layer| {
+                ranks.get(&layer).copied().unwrap_or((usize::MAX, 0))
+            }),
+            None => ordered_entries(prepared.plan()).collect(),
+        };
+        for entry in entries {
             if hide_shadow && is_shadow_guide(&entry) {
                 continue;
             }
-            match entry {
-                PaintEntry::Contour(command) => {
-                    paint_item(&prepare_command(command)?, scene, command.path(), outline)
-                }
-                PaintEntry::Text(source) => source.draw(scene),
-                PaintEntry::Component(source) => {
-                    paint_item(&source.prepared, scene, &source.path, outline)
-                }
-                // T12: a video slot draws only from its decoded frame, never blank.
-                PaintEntry::Video(index) => {
-                    let (image, transform, opacity) = prepared
-                        .video_image(index)
-                        .ok_or_else(|| CompositorError::new("native video frame is unavailable"))?;
-                    let brush =
-                        vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
-                    scene.draw_image(&brush, transform);
-                }
-                PaintEntry::Duplicator(source) => {
-                    paint_item(&source.prepared, scene, &source.path, outline)
-                }
-                PaintEntry::Dab(dab) => dab.prepared.draw(scene, Affine::IDENTITY, &dab.path),
-                #[cfg(all(feature = "application", feature = "project_media_codec"))]
-                PaintEntry::Brush(index) => {
-                    if let Some((image, transform, opacity)) = prepared
-                        .brush_image(index)
-                        .map_err(|_| CompositorError::new("admitted brush image unavailable"))?
-                    {
-                        let brush =
-                            vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
-                        scene.draw_image(&brush, transform);
-                    }
-                }
-                PaintEntry::Raster(index) => {
-                    #[cfg(all(feature = "application", feature = "project_media_codec"))]
-                    {
-                        if !prepared
-                            .replay_raster_mesh(index, scene)
-                            .map_err(CompositorError::new)?
-                        {
-                            let (image, transform, opacity) =
-                                prepared.raster_image(index).ok_or_else(|| {
-                                    CompositorError::new("native raster resource is unavailable")
-                                })?;
-                            let brush = vello::peniko::ImageBrush::new(image.clone())
-                                .multiply_alpha(opacity);
-                            scene.draw_image(&brush, transform);
-                        }
-                    }
-                    #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
-                    {
-                        let _ = index;
-                        return Err(CompositorError::new(
-                            "native raster resources require project media support",
-                        ));
-                    }
-                }
-            }
+            emit_entry(prepared, entry, scene, outline)?;
         }
         if let Some(matrix) = camera {
             let (width, height) = clip.expect("camera clip preflighted");
@@ -178,6 +125,74 @@ impl Compositor {
     }
 }
 
+/// One paint entry drawn into `scene` exactly as the flat sequence draws it (shared with the layered path, which draws one
+/// layer's entries at a time), so a family renders the same whichever compositor entry reaches it.
+pub(super) fn emit_entry(
+    prepared: &ObjectCompositionWitness,
+    entry: PaintEntry<'_>,
+    scene: &mut vello::Scene,
+    outline: Option<f64>,
+) -> Result<(), CompositorError> {
+    match entry {
+        PaintEntry::Contour(command) => {
+            paint_item(&prepare_command(command)?, scene, command.path(), outline)
+        }
+        PaintEntry::Text(source) => source.draw(scene),
+        PaintEntry::Component(source) => {
+            paint_item(&source.prepared, scene, &source.path, outline)
+        }
+        // T12: a video slot draws only from its decoded frame, never blank.
+        PaintEntry::Video(index) => {
+            let (image, transform, opacity) = prepared
+                .video_image(index)
+                .ok_or_else(|| CompositorError::new("native video frame is unavailable"))?;
+            let brush =
+                vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
+            scene.draw_image(&brush, transform);
+        }
+        PaintEntry::Duplicator(source) => {
+            paint_item(&source.prepared, scene, &source.path, outline)
+        }
+        PaintEntry::Dab(dab) => dab.prepared.draw(scene, Affine::IDENTITY, &dab.path),
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        PaintEntry::Brush(index) => {
+            if let Some((image, transform, opacity)) = prepared
+                .brush_image(index)
+                .map_err(|_| CompositorError::new("admitted brush image unavailable"))?
+            {
+                let brush =
+                    vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
+                scene.draw_image(&brush, transform);
+            }
+        }
+        PaintEntry::Raster(index) => {
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            {
+                if !prepared
+                    .replay_raster_mesh(index, scene)
+                    .map_err(CompositorError::new)?
+                {
+                    let (image, transform, opacity) =
+                        prepared.raster_image(index).ok_or_else(|| {
+                            CompositorError::new("native raster resource is unavailable")
+                        })?;
+                    let brush = vello::peniko::ImageBrush::new(image.clone())
+                        .multiply_alpha(opacity);
+                    scene.draw_image(&brush, transform);
+                }
+            }
+            #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+            {
+                let _ = index;
+                return Err(CompositorError::new(
+                    "native raster resources require project media support",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// One vector item: as authored, or as the baseline outline when the viewport asked for it.
 fn paint_item(
     item: &PreparedItem,
@@ -189,29 +204,6 @@ fn paint_item(
         Some(width) => item.draw_outline(scene, Affine::IDENTITY, path, width),
         None => item.draw(scene, Affine::IDENTITY, path),
     }
-}
-
-/// A layered GPU result needs its own final whole-image camera pass; do not
-/// pretend that transforming only the flat source paints covers that path.
-pub(super) fn check_layered_camera(
-    prepared: &ObjectCompositionWitness,
-) -> Result<(), CompositorError> {
-    if prepared.camera_matrix().is_some() {
-        return Err(CompositorError::new(
-            "stored camera with layered effects is unavailable",
-        ));
-    }
-    if prepared.viewport_outline().is_some() {
-        return Err(CompositorError::new(
-            "current frame outline with layered effects is unavailable",
-        ));
-    }
-    if prepared.viewport_hides_shadow_guides() {
-        return Err(CompositorError::new(
-            "hidden shadow guides with layered effects is unavailable",
-        ));
-    }
-    Ok(())
 }
 
 #[cfg(all(feature = "application", feature = "project_media_codec"))]

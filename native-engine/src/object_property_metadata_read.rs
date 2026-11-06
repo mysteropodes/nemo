@@ -18,6 +18,19 @@ const MAX_PAGE: u8 = 8;
 const BASE: [&str; 6] = [
     "position", "anchor", "rotation", "scale", "opacity", "order",
 ];
+/// #2520/#2525: baseline `PROPS_WITH_3D` (motion.js@1065e9d8): a layer with its 3D switch on lists Position Z, Rotation X and
+/// Rotation Y in their baseline places.
+const BASE_3D: [&str; 9] = [
+    "position",
+    "positionZ",
+    "anchor",
+    "rotation",
+    "rotationX",
+    "rotationY",
+    "scale",
+    "opacity",
+    "order",
+];
 
 #[derive(Debug)]
 struct Selector {
@@ -322,7 +335,12 @@ impl ObjectSnapshot {
                     return Err(invalid());
                 }
                 let holder = self.metadata_holder(&target)?;
-                let mut keys: Vec<&str> = BASE.to_vec();
+                let three_d = target.stroke_id().is_none()
+                    && metadata_context_parts(self.document(), target.context_id())
+                        .0
+                        .iter()
+                        .any(|l| l.layer_uid() == target.layer_uid() && l.three_d.value() == Some(&true));
+                let mut keys: Vec<&str> = if three_d { BASE_3D.to_vec() } else { BASE.to_vec() };
                 // Actual admitted family has a solid fill. This describes the
                 // opt-in Fill row; null default means inherit actual source paint.
                 // No conversion/sampling of that paint is performed here.

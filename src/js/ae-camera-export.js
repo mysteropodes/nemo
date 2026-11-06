@@ -111,6 +111,8 @@
   }
 
   async function exportAECamera(opts){
+    // E-export-guard-rive-ae: no native camera route yet; state.cameraKeys is only a projection on a native project.
+    var blocked=exportNativeUnavailable('After Effects camera');if(blocked)return blocked;
     var camActive=!!(window.SMCamera&&state.cameraLayerOn&&state.cameraKeys&&state.cameraKeys.length);
     if(!camActive)return{ok:false,error:'Aucun calque caméra actif — rien à exporter.'};
     var script=buildCameraScript();

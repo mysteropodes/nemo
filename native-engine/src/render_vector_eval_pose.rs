@@ -88,6 +88,42 @@ pub(crate) fn common_layer_motion_target(
     document: &ObjectDocument,
     target: &PropertyHolderTarget,
 ) -> bool {
+    motion_target(document, target, false)
+}
+
+/// A layer with nothing of its own to place in 3D: no drawn record, no image or text item, no component instance and no
+/// duplicator. That covers a drawing layer with nothing on it yet and the kinds that never draw (Null, Folder, Guide, Effect
+/// and widget layers: the baseline `toggleLayer3D` takes on any of them and the document keeps rendering). Its switch takes,
+/// and a later stroke or image is then a record the common batch joins.
+pub(crate) fn plain_empty_layer(document: &ObjectDocument, layer_uid: &str) -> bool {
+    if !document.layers().iter().any(|l| l.layer_uid() == layer_uid) {
+        return false;
+    }
+    !(document.component_set().is_some_and(|set| set.instance("scene-root", layer_uid).is_some())
+        || document.duplicator_set().is_some_and(|set| set.duplicator("scene-root", layer_uid).is_some())
+        || document.objects().iter().any(|r| r.target.context_id == "scene-root" && r.target.layer_uid == layer_uid)
+        || document.item_records().is_some_and(|items| {
+            items.targets().any(|t| t.context_id() == "scene-root" && t.layer_uid() == layer_uid)
+        }))
+}
+
+/// Whether the layer, with its 3D switch ON, still joins the common batch (#2520: the switch is refused where it would not,
+/// instead of leaving the whole frame unavailable). A layer parented to it keeps the baseline chain (the 3D parent contributes
+/// its 2D Motion), a gradient fill keeps its raw endpoints (the baseline projects the geometry only), and images and
+/// sequences take the projected rect.
+pub(crate) fn three_d_joins_batch(document: &ObjectDocument, layer_uid: &str) -> bool {
+    if plain_empty_layer(document, layer_uid) {
+        return true;
+    }
+    let target = PropertyHolderTarget {
+        context_id: "scene-root".into(),
+        layer_uid: layer_uid.to_owned(),
+        stroke_id: crate::object_document::Presence::Missing,
+    };
+    motion_target(document, &target, true)
+}
+
+fn motion_target(document: &ObjectDocument, target: &PropertyHolderTarget, assume_three_d: bool) -> bool {
     if document.format_version() != 2
         || target.context_id() != "scene-root"
         || target.stroke_id().is_some()
@@ -119,16 +155,16 @@ pub(crate) fn common_layer_motion_target(
             layer_uid: uid.to_owned(),
             stroke_id: crate::object_document::Presence::Missing,
         };
-        if !common_layer_content_target(document, &current, layer) {
+        // Original3D suppresses its single-parent affine; retain that existing boundary. The target's own 3D layer also
+        // takes still images (their rect is projected); an ancestor never does.
+        let own_three_d = uid == target.layer_uid() && (assume_three_d || layer.three_d.value() == Some(&true));
+        if !common_layer_content_target(document, &current, layer, own_three_d) {
             return false;
         }
-        // Original3D suppresses its single-parent affine; retain that existing boundary.
-        if uid == target.layer_uid() && layer.three_d.value() == Some(&true) {
+        if own_three_d {
             return true;
         }
-        if layer.three_d.value() == Some(&true) {
-            return false;
-        }
+        // A 3D ancestor still contributes its 2D Motion to the layers parented to it (baseline `computeMotionMat`).
         next = layer.parent_layer_uid.value().and_then(Option::as_deref);
     }
     true
@@ -138,14 +174,15 @@ fn common_layer_content_target(
     document: &ObjectDocument,
     target: &PropertyHolderTarget,
     layer: &crate::object_document::ObjectLayer,
+    still_images: bool,
 ) -> bool {
     if layer.is_effect_layer()
-        || layer.is_folder_layer()
         || layer.widget.value().is_some()
-        || document.duplicator_set().is_some_and(|set| {
+        // A 3D host's clones are projected by the duplicator scene (each with its own `dup3D` delta).
+        || (!still_images && document.duplicator_set().is_some_and(|set| {
             set.duplicator(target.context_id(), target.layer_uid())
                 .is_some_and(|d| d.duplicator.effective_clone_count() > 1.)
-        })
+        }))
         || has_unjoined_parent_blend(document, target)
     {
         return false;
@@ -163,17 +200,38 @@ fn common_layer_content_target(
                 record.family.as_str(),
                 VECTOR_FAMILY | "closed-solid-fill-cubic-path"
             )
-            || record.is_mask()
+            // A mask joins only under the layer's own 3D switch (its contour is projected with the layer).
+            || (record.is_mask() && !(still_images && record.family == VECTOR_FAMILY))
         {
             return false;
         }
     }
-    found
-        && document.item_records().is_none_or(|items| {
-            !items.targets().any(|item| {
-                item.context_id() == target.context_id() && item.layer_uid() == target.layer_uid()
-            })
-        })
+    let on_layer = |t: &crate::object_document::ObjectTarget| {
+        t.context_id() == target.context_id() && t.layer_uid() == target.layer_uid()
+    };
+    let Some(items) = document.item_records() else {
+        return found;
+    };
+    // A 3D layer places plain still images and Text (glyph vertices through the layer projector); bitmap-brush and
+    // brush-texture items stay unjoined.
+    let images = still_images
+        && items.raster_entries().iter().filter(|e| on_layer(&e.target)).all(|e| {
+            e.item.is_bitmap_brush() != Some(true)
+                && e.item.brush_group_id().is_none()
+                && e.item.is_brush_texture_copy() != Some(true)
+        });
+    let has_images = items.targets().any(|t| on_layer(t));
+    if has_images {
+        images && !layer_has_duplicator_item(document, target)
+    } else {
+        found
+    }
+}
+
+fn layer_has_duplicator_item(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
+    document
+        .duplicator_set()
+        .is_some_and(|set| set.duplicator(target.context_id(), target.layer_uid()).is_some())
 }
 
 /// No native multiple-parent descriptor exists in this storage version: strict

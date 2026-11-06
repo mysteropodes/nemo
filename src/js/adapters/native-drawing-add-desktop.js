@@ -33,7 +33,11 @@
     });
     function notice(message){try{if(typeof root.showToast==='function')root.showToast(message);}catch(_){} }
     var controller=Object.freeze({
-      add:async function(){var result=await intent.add();
+      add:async function(){
+        // #2256: inside an entered component the new layer joins the component's own stack.
+        var inside=root.NemoNativeComponentLayerEdit;
+        if(inside&&inside.held(root)){var made=await inside.create(root);if(!made.ok)notice('The layer change was not applied.');return {status:made.ok?'created-selected':'unavailable'};}
+        var result=await intent.add();
         if(result.status==='unavailable')notice('Native Drawing Add is unavailable.');
         else if(result.status==='unconfirmed')notice('Drawing creation was not confirmed. Do not retry until the document is synchronized.');
         else if(result.status==='created-unselected')notice('Drawing created; the current selection was left unchanged.');

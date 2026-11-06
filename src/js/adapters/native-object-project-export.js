@@ -26,6 +26,9 @@
       if (signal && signal.aborted) return { status: 'cancelled' };
 
       var request = ports.frameRequest(requested[0], pin);
+      // Layer Solo (#2371): the baseline export paints only the soloed layers; the set rides the request like the preview's.
+      var solo = typeof ports.soloLayers === 'function' ? ports.soloLayers(pin) : [];
+      if (Array.isArray(solo) && solo.length) request.soloLayers = solo.slice();
       if (sequence) request.frameRange = { start: requested[0], end: requested[requested.length - 1] };
       else if (requested.length > 1) request.frames = requested;
       var manifest = requested.map(function (_, index) {

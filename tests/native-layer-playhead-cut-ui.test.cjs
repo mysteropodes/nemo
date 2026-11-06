@@ -359,3 +359,20 @@ test('a split whose playhead moved during the wait still refuses and sends nothi
     f.root.state.currentFrame=11;f.hide(false);assert.equal(await work,false);assert.equal(f.calls.length,0);
   }finally{/* the wait module is per-root */}
 });
+test('a playhead outside the layer shows the baseline notice; refusals and applied cuts stay silent',async()=>{
+  const outside=r=>({apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:'document',contentRevision:7,ok:true,result:{applied:false,historyEntriesAdded:0}});
+  const notices=f=>f.effects.filter(value=>Array.isArray(value)&&value[0]==='notice');
+  const f=fixture();f.control.receipt=outside;f.api.bindCutEntries();
+  assert.equal(await f.root.SM.splitLayerAtPlayhead(),false);assert.deepEqual(notices(f),[['notice','toastPlayheadInsideLayerToCut']]);
+  f.root.SM.t=key=>'T:'+key;assert.equal(await f.root.SM.splitLayerAtPlayhead(1),false);
+  assert.deepEqual(notices(f).pop(),['notice','T:toastPlayheadInsideLayerToCut'],'the baseline i18n key is the notice');
+  const refused=fixture();refused.control.receipt=r=>({apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:'document',contentRevision:7,ok:false,error:{code:'unavailable',message:'No provider'}});
+  refused.api.bindCutEntries();assert.equal(await refused.root.SM.splitLayerAtPlayhead(),false);assert.deepEqual(notices(refused),[]);
+  const applied=fixture();applied.api.bindCutEntries();assert.equal(await applied.root.SM.splitLayerAtPlayhead(),true);assert.deepEqual(notices(applied),[]);
+});
+test('both layer menus and Cmd+Shift+D reach the one bound split entry with the row index',()=>{
+  const read=name=>fs.readFileSync(path.join(__dirname,'../src/js',name),'utf8');
+  assert.match(read('timeline.js'),/label:SM\.t\('ctxCutAtPlayhead'\),action:function\(\)\{window\.SM\.splitLayerAtPlayhead\(idx4\);\}/);
+  assert.match(read('motion.js'),/label: SM\.t\('ctxCutAtPlayhead'\), action: function \(\) \{ window\.SM\.splitLayerAtPlayhead\(li\); \}/);
+  assert.match(read('timeline.js'),/\(event\.metaKey\|\|event\.ctrlKey\)&&event\.shiftKey&&\(event\.key==='d'\|\|event\.key==='D'\)\)\{\s*event\.preventDefault\(\);\s*window\.SM\.splitLayerAtPlayhead\(\);/);
+});

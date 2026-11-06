@@ -1,0 +1,102 @@
+{
+ "frames": [
+  {
+   "strokes": [
+    {
+     "segments": [
+      {
+       "point": [
+        5,
+        5
+       ],
+       "handleIn": [
+        0,
+        0
+       ],
+       "handleOut": [
+        0,
+        0
+       ]
+      },
+      {
+       "point": [
+        25,
+        5
+       ],
+       "handleIn": [
+        0,
+        0
+       ],
+       "handleOut": [
+        0,
+        0
+       ]
+      },
+      {
+       "point": [
+        25,
+        25
+       ],
+       "handleIn": [
+        0,
+        0
+       ],
+       "handleOut": [
+        0,
+        0
+       ]
+      }
+     ],
+     "closed": true,
+     "strokeColor": "#fff",
+     "strokeWidth": 0,
+     "fillColor": "#0f0"
+    }
+   ],
+   "isKeyframe": true
+  },
+  {
+   "strokes": []
+  },
+  {
+   "strokes": [
+    {
+     "segments": [
+      {
+       "point": [
+        1,
+        1
+       ],
+       "handleIn": [
+        0,
+        0
+       ],
+       "handleOut": [
+        0,
+        0
+       ]
+      },
+      {
+       "point": [
+        2,
+        2
+       ],
+       "handleIn": [
+        0,
+        0
+       ],
+       "handleOut": [
+        0,
+        0
+       ]
+      }
+     ],
+     "closed": false,
+     "strokeColor": "#000000"
+    }
+   ],
+   "isKeyframe": true,
+   "isInterpolated": false
+  }
+ ]
+}

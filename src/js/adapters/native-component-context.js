@@ -51,7 +51,7 @@
   function contextId(host) { var st = live(host); return st ? st.contextId : SCENE; }
   function layerRows(host) {
     var st = live(host);
-    return st ? st.rows.map(function (row) { return { layerUid: row.layerUid, locked: row.locked === true, visible: row.visible !== false, parentLayerUid: row.parentLayerUid || null, threeD: row.threeD === true, hasMotion: row.hasMotion === true }; }) : null;
+    return st ? st.rows.map(function (row) { return { layerUid: row.layerUid, locked: row.locked === true, visible: row.visible !== false, parentLayerUid: row.parentLayerUid || null, threeD: row.threeD === true, hasMotion: row.hasMotion === true, shy: row.shy === true }; }) : null;
   }
   function frameBound(host, pin) { var st = live(host); return st ? st.totalFrames : pin.totalFrames; }
   // #2256: what a pinned timing read of the held context is judged by: the component's own id, frame count and layer uids (null at the scene root).
@@ -94,7 +94,7 @@
       // The facts the scene's drawing gates read come from the owner's layer read (absent only from an older owner: then the permissive default).
       rows.push({ layerUid: layer.layerUid, name: layer.name === null ? 'Layer ' + (rows.length + 1) : layer.name, layerKind: layer.layerKind,
         visible: layer.visible !== false, locked: layer.locked === true, color: '#5FA875', parentLayerUid: layer.parentLayerUid || null,
-        threeD: layer.threeD === true, hasMotion: layer.hasMotion === true, frames: [], motion: {} });
+        threeD: layer.threeD === true, hasMotion: layer.hasMotion === true, shy: layer.shy === true, frames: [], motion: {} });
     });
     return rows;
   }
@@ -311,9 +311,33 @@
       var ctx = all.contexts[i];
       if (ctx.contextKind !== 'component') continue;
       var found = await c.listInstances(ctx.contextId);
-      if (found.ok && found.items.some(function (item) { return item.layerUid === layerUid; })) return enter(host, ctx.contextId, null, layerUid);
+      if (found.ok && found.items.some(function (item) { return item.layerUid === layerUid; })) {
+        var opened = await enter(host, ctx.contextId, null, layerUid);
+        if (opened === true) await autoSplit(host);
+        return opened;
+      }
     }
     return false;
+  }
+  // NumpadEnter on the active instance row (1065e9d8:src/js/timeline.js:9728): the same enter-and-split path as the row double-click, for a row that
+  // already names its component (kind 'component' + componentId), so no instance scan is needed.
+  async function openInstance(host, row) {
+    if (!row || row.kind !== 'component' || typeof row.componentId !== 'string' || !row.componentId || typeof row.layerUid !== 'string' || !intent(host) || !session(host) || live(host)) return false;
+    var opened = await enter(host, row.componentId, null, row.layerUid);
+    if (opened === true) await autoSplit(host);
+    return opened;
+  }
+  // Motion's double-click on an instance (1065e9d8:src/js/motion.js:6888 enterComponentLayer) silently releases a component that holds exactly ONE
+  // drawing layer into one layer per shape, at the entered playhead, as ONE history entry (the layer.split of the held context: the owner applies
+  // the kernel's plan, a layer of fewer than two shapes is its typed refusal and the idempotent re-entry). The Animation 2D entry never splits.
+  async function autoSplit(host) {
+    var st = live(host), edit = host.NemoNativeComponentLayerEdit;
+    if (!st || !host.state || host.state.appMode !== 'motion' || st.rows.length !== 1 || st.rows[0].layerKind !== 'drawing' || !edit || typeof edit.split !== 'function') return false;
+    var done;
+    try { done = await edit.split(host, st.rows[0].layerUid); } catch (_) { return false; }
+    if (!done || done.ok !== true || done.applied !== true) return false;
+    toast(host, t(host, 'toastSplitToLayersUndoHint', 'Split into layers — right-click › « Merge selected layers » to undo it'));
+    return true;
   }
 
   function node(host, tag, text, cls) { var el = host.document.createElement(tag); el.textContent = text; if (cls) el.className = cls; return el; }
@@ -346,6 +370,8 @@
     var st = live(host);
     if (!st) return false;
     if (Grid) Grid.paint(host, st, timingPort(host, st), frameOnly === true);
+    // The header's "Select frames" mode works on the entered component too (native-component-cell-selection.js).
+    if (host.NemoNativeComponentCellSelection && st.gridView) host.NemoNativeComponentCellSelection.mount(host, st, st.gridView.caption, frameOnly === true);
     var doc = host.document, frame = host.state.currentFrame;
     var field = doc.getElementById('tl-cf');
     if (field) { if (doc.activeElement !== field) field.value = frame + 1; field.max = st.totalFrames; }
@@ -376,5 +402,5 @@
     });
     return true;
   }
-  return Object.freeze({ SCENE: SCENE, presented: presented, contextId: contextId, layerRows: layerRows, layers: layers, readScope: readScope, selectLayer: selectLayer, frameBound: frameBound, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, fault: fault, openLayer: openLayer, paint: paint, renderTabs: renderTabs });
+  return Object.freeze({ SCENE: SCENE, presented: presented, contextId: contextId, layerRows: layerRows, layers: layers, readScope: readScope, selectLayer: selectLayer, frameBound: frameBound, enter: enter, exit: exit, close: close, revision: revision, projectionReady: projectionReady, fault: fault, openLayer: openLayer, openInstance: openInstance, paint: paint, renderTabs: renderTabs });
 }));

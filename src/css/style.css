@@ -1196,6 +1196,15 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .motion-key-connect.tinted{fill:var(--key-color,#2E6B60);}
 .motion-key-connect.tinted:hover{fill:var(--key-color,#3E8C7E);filter:brightness(1.25);}
 .motion-key-connect.tinted.sel{fill:var(--key-color,#6FD9C4);filter:brightness(1.45);}
+/* Native property rows draw the same spans as divs behind the key buttons (native-motion-key-spans.js): the duration block and the connector bar. */
+.native-key-durblock{background:var(--accent);opacity:.13;pointer-events:none;}
+.native-key-durblock.tinted{background:var(--key-color,var(--accent));}
+.native-key-connect{background:#2E6B60;border-radius:2px;pointer-events:auto;cursor:ew-resize;transition:background .1s linear;}
+.native-key-connect:hover{background:#3E8C7E;}
+.native-key-connect.sel{background:#6FD9C4;}
+.native-key-connect.tinted{background:var(--key-color,#2E6B60);}
+.native-key-connect.tinted:hover{background:var(--key-color,#3E8C7E);filter:brightness(1.25);}
+.native-key-connect.tinted.sel{background:var(--key-color,#6FD9C4);filter:brightness(1.45);}
 /* Alt = retime (first key planted, second one slides). Driven by the SAME
    #frame-grid.timelink-alt class layer-inout.js already toggles for the
    Parent-in-Time dot reveal, mirroring the spec's own .kstage.alt container
@@ -1932,7 +1941,7 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    plain ld.folderId/.lfolder grouping above (which has no transform/effects
    of its own). Drop-target highlight while dragging a layer onto its
    middle band (moveLayerReorder, timeline.js) to reparent it. */
-.lrow.folder-drop-target,#frame-grid .frow.folder-drop-target{outline:2px solid var(--accent);outline-offset:-2px;background:color-mix(in srgb,var(--accent) 14%,transparent);}
+.lrow.folder-drop-target,.native-object-layer.folder-drop-target,#frame-grid .frow.folder-drop-target{outline:2px solid var(--accent);outline-offset:-2px;background:color-mix(in srgb,var(--accent) 14%,transparent);}
 
 /* TOOLTIP */
 #ui-tip{position:fixed;z-index:400;background:var(--panel3);border:1px solid var(--border2);color:var(--text);

@@ -176,6 +176,32 @@
         }
       }
     },
+    "ObjectTextReadTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "frameScope": {
+          "$ref": "#/$defs/ObjectFrameScope"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "strokeId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        }
+      }
+    },
     "ObjectContextTarget": {
       "type": "object",
       "additionalProperties": false,
@@ -1249,6 +1275,35 @@
                     "$ref": "#/$defs/ObjectContextTarget"
                   }
                 }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "stableTarget",
+                  "placement"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "order"
+                  },
+                  "stableTarget": {
+                    "$ref": "#/$defs/ObjectContextTarget"
+                  },
+                  "placement": {
+                    "enum": [
+                      "front",
+                      "back"
+                    ],
+                    "description": "#2372 Bring to front / Send to back: the named record or stored item goes to this end of its layer's stack in its cell, with a ribbon's linked fill and a texture anchor's dabs."
+                  },
+                  "frame": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The cell the step edits (the held cell a copy key has just made); absent: the target's own frame."
+                  }
+                }
               }
             ]
           }
@@ -1269,7 +1324,7 @@
           "description": "Optional (absent or false = atomic: any step the engine refuses refuses the whole batch with nothing written). true lets restyle steps the engine cannot do (a texture anchor the edit would unhide) be skipped while the rest apply; the receipt then reports skippedSteps. A batch whose every step is skipped is still refused."
         }
       },
-      "description": "#2361/#2362: 1..64 ordered create/replace/delete steps on the layers of ONE context, the scene root or a declared component (one or, for a Select spanning layers, several; a trimEnds batch is one layer) as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
+      "description": "#2361/#2362: 1..64 ordered create/replace/delete/order steps on the layers of ONE context, the scene root or a declared component (one or, for a Select spanning layers, several; a trimEnds batch is one layer) as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
     },
     "ObjectVectorEditPayload": {
       "oneOf": [
@@ -2162,6 +2217,34 @@
                   "type": "number"
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frames"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setTotalFrames"
+                },
+                "frames": {
+                  "type": "number"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "trimToWorkArea"
+                }
+              }
             }
           ]
         }
@@ -2175,6 +2258,10 @@
         "name"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.create"
         },
@@ -3909,6 +3996,11 @@
           "minLength": 1,
           "maxLength": 255
         },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
         "options": {
           "$ref": "#/$defs/ObjectTweenOptions"
         },
@@ -3953,6 +4045,11 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 255
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
         },
         "options": {
           "$ref": "#/$defs/ObjectTweenOptions"
@@ -4147,6 +4244,132 @@
         }
       }
     },
+    "ObjectPropertyKeysPastePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "frame",
+        "tracks"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.property.keys.paste"
+        },
+        "frame": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000000,
+          "description": "The playhead the offsets are added to."
+        },
+        "tracks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target",
+              "property",
+              "keys"
+            ],
+            "properties": {
+              "target": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "contextId",
+                  "layerUid"
+                ],
+                "properties": {
+                  "contextId": {
+                    "$ref": "#/$defs/ObjectOpaqueId"
+                  },
+                  "layerUid": {
+                    "$ref": "#/$defs/ObjectOpaqueId"
+                  },
+                  "strokeId": {
+                    "$ref": "#/$defs/ObjectOpaqueId"
+                  }
+                }
+              },
+              "property": {
+                "$ref": "#/$defs/ObjectOpaqueId"
+              },
+              "keys": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 512,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "dt",
+                    "v"
+                  ],
+                  "properties": {
+                    "dt": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000000,
+                      "description": "Offset from the earliest copied key."
+                    },
+                    "v": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "number",
+                        "minimum": -1000000000,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "hold": {
+                      "type": "boolean"
+                    },
+                    "curvePoints": {
+                      "type": "array",
+                      "maxItems": 64,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "x",
+                          "y"
+                        ],
+                        "properties": {
+                          "x": {
+                            "type": "number",
+                            "minimum": -1000000000,
+                            "maximum": 1000000000
+                          },
+                          "y": {
+                            "type": "number",
+                            "minimum": -1000000000,
+                            "maximum": 1000000000
+                          },
+                          "tx": {
+                            "type": "number",
+                            "minimum": -1000000000,
+                            "maximum": 1000000000
+                          },
+                          "ty": {
+                            "type": "number",
+                            "minimum": -1000000000,
+                            "maximum": 1000000000
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "ObjectTweenSplitPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -4163,6 +4386,11 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 255
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
         },
         "frame": {
           "type": "integer",
@@ -4190,6 +4418,11 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 255
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
         },
         "span": {
           "$ref": "#/$defs/ObjectTweenSpan"
@@ -4260,6 +4493,10 @@
         "visible"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.visibility.set"
         },
@@ -4281,6 +4518,10 @@
         "value"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.policy.edit"
         },
@@ -4291,11 +4532,12 @@
           "enum": [
             "locked",
             "shy",
+            "threeD",
             "keyLock"
           ]
         },
         "value": {
-          "description": "Boolean for locked and shy; null or in/out/layer for keyLock (null clears the layer key-lock mode).",
+          "description": "Boolean for locked, shy and threeD; null or in/out/layer for keyLock (null clears the layer key-lock mode).",
           "oneOf": [
             {
               "type": "boolean"
@@ -4319,7 +4561,8 @@
             "flag": {
               "enum": [
                 "locked",
-                "shy"
+                "shy",
+                "threeD"
               ]
             },
             "value": {
@@ -4372,6 +4615,113 @@
           }
         }
       }
+    },
+    "ObjectComponentBreakApartPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.component.breakApart"
+        },
+        "contextId": {
+          "type": "string"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectComponentId"
+        }
+      }
+    },
+    "ObjectComponentStateEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "kind"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.component.state.edit"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectComponentId"
+        },
+        "kind": {
+          "enum": [
+            "setCameraKey",
+            "removeCameraKey",
+            "setCameraEase",
+            "clearCamera",
+            "addMarker",
+            "updateMarker",
+            "removeMarker",
+            "clearMarkers"
+          ]
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "w": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rot": {
+          "type": "number"
+        },
+        "hOut": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "hIn": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "ease": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "Cubic-bezier handles x1,y1,x2,y2 of the segment leaving the key; x1 and x2 lie in 0..1."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "color": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "newFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      },
+      "description": "One closed edit of the camera keys or the markers a declared component stores (contextId is the component symbol id, never scene-root). setCameraKey needs frame and, for a new key, x, y and w; removeCameraKey, removeMarker need frame; setCameraEase needs frame and ease; addMarker needs frame (name and color optional); updateMarker needs frame and any of newFrame, name, color; clearCamera and clearMarkers take no other member."
     },
     "ObjectComponentExposePayload": {
       "type": "object",
@@ -4647,6 +4997,28 @@
               ]
             }
           }
+        },
+        "effectorPos": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "index",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          }
         }
       }
     },
@@ -4746,6 +5118,10 @@
         "selection"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.delete"
         },
@@ -4762,6 +5138,10 @@
         "layerUid"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.duplicate"
         },
@@ -4800,6 +5180,10 @@
         "selection"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.reorder"
         },
@@ -5096,6 +5480,37 @@
           "items": {
             "$ref": "#/$defs/ObjectEditId"
           }
+        },
+        "offset": {
+          "$ref": "#/$defs/ObjectVectorPair",
+          "description": "Where the copies land, in the records' own space: the distance of an Alt-drag duplicate. Each component is finite and at most 1e6 in magnitude. Absent: the baseline 12 px nudge on both axes."
+        },
+        "others": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "description": "Shapes of OTHER layers the copy also takes: a selection that spans layers is cloned into the destination layer (baseline duplicateSelection materialises every selected path into the active layer), in the same transaction. Each layer is named once and is not the destination; its shapes are read at the cell its playhead shows and are never written. Absent: the selection is the destination layer's alone.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "layerUid",
+              "strokeIds"
+            ],
+            "properties": {
+              "layerUid": {
+                "$ref": "#/$defs/ObjectEditId"
+              },
+              "strokeIds": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1024,
+                "items": {
+                  "$ref": "#/$defs/ObjectEditId"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -5261,6 +5676,10 @@
               "type": "number"
             }
           }
+        },
+        "joinHistory": {
+          "type": "boolean",
+          "description": "A bite after the first of one eraser drag: the revision advances but the undo entry the drag began grows to end at it (historyEntriesAdded 0). Refused unavailable when no such entry is on top of the undo stack."
         }
       }
     },
@@ -5316,6 +5735,10 @@
         "cell"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.insert"
         },
@@ -5342,6 +5765,10 @@
         "count"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.extend"
         },
@@ -5364,6 +5791,10 @@
         "cell"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.duplicate"
         },
@@ -5384,6 +5815,10 @@
         "to"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.remove"
         },
@@ -5403,6 +5838,10 @@
         "cells"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.key.promote"
         },
@@ -5435,6 +5874,10 @@
         "cell"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.key.blank"
         },
@@ -5455,6 +5898,10 @@
         "cell"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.key.clear"
         },
@@ -5474,6 +5921,10 @@
         "targets"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.key.clear_cells"
         },
@@ -5498,6 +5949,10 @@
         "to"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.tween.remove"
         },
@@ -5522,6 +5977,10 @@
         "to"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.key.move"
         },
@@ -5549,6 +6008,10 @@
         "selection"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.clipboard.duplicate"
         },
@@ -5578,6 +6041,10 @@
         "times"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.repeat"
         },
@@ -6967,8 +7434,19 @@
           "items": {
             "$ref": "#/$defs/ObjectFrame"
           }
+        },
+        "soloLayers": {
+          "$ref": "#/$defs/ExportSoloLayers"
         }
       }
+    },
+    "ExportSoloLayers": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "$ref": "#/$defs/Identifier"
+      },
+      "description": "The Solo view of the layers (baseline layerIsEffectivelyVisible): while any listed layer belongs to the exported context only the listed layers, and the children of a listed folder layer, are exported, whatever their eyes say. Strictly ascending (so unique): an ordering rule the JSON Schema cannot express, repeated by the contract. A session view fact, never document data; absent or empty means no solo."
     },
     "ExportMediaRange": {
       "type": "object",
@@ -7083,6 +7561,9 @@
         },
         "video": {
           "$ref": "#/$defs/ExportMediaVideo"
+        },
+        "soloLayers": {
+          "$ref": "#/$defs/ExportSoloLayers"
         }
       },
       "description": "Three exclusive shapes: PNG still or sequence (outputSpec, no video), SVG still or sequence (neither outputSpec nor video), video of PNG frames (outputSpec, video optional). A still names its frame (start === end), range.end never precedes range.start, a sequence receipt lists at most 120 frames, absent range members mean the project work area: contract rules the JSON Schema cannot express.",
@@ -7631,6 +8112,40 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectComponentInstanceSetPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.component.breakApart"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectComponentBreakApartPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.component.state.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectComponentStateEditPayload"
                 }
               }
             }
@@ -8358,6 +8873,23 @@
             {
               "properties": {
                 "operation": {
+                  "const": "command.document.object.property.keys.paste"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectPropertyKeysPastePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "command.document.object.layer.compositing.edit"
                 },
                 "payload": {
@@ -8430,6 +8962,57 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectLayerColorSetPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.kind.create"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerKindCreatePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.folder.reparent"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerFolderReparentPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.range.arrange"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerRangeArrangePayload"
                 }
               }
             }
@@ -10666,14 +11249,36 @@
         "selections": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 32,
+          "maxItems": 128,
           "items": {
             "type": "object",
             "additionalProperties": false,
+            "description": "One key (frame) or the keys of one track inside inclusive runs of frames (ranges): exactly one of the two. At most 32 single-key entries; the request bytes bound everything else.",
+            "oneOf": [
+              {
+                "required": [
+                  "frame"
+                ],
+                "not": {
+                  "required": [
+                    "ranges"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "ranges"
+                ],
+                "not": {
+                  "required": [
+                    "frame"
+                  ]
+                }
+              }
+            ],
             "required": [
               "target",
-              "property",
-              "frame"
+              "property"
             ],
             "properties": {
               "target": {
@@ -10700,6 +11305,19 @@
               },
               "frame": {
                 "type": "number"
+              },
+              "ranges": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 512,
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number"
+                  }
+                }
               }
             }
           }
@@ -10783,6 +11401,118 @@
                     "layer",
                     null
                   ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "delta"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "shift"
+                },
+                "delta": {
+                  "description": "Whole frames to move every selected key (nudge or drag release); zero changes nothing. All selected keys move together or none does: a key may not land before frame 0, past the last frame or on a key that stays.",
+                  "type": "integer",
+                  "minimum": -1000000,
+                  "maximum": 1000000
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "delete"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "flip"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "distribute"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "mode",
+                "total"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "warp"
+                },
+                "mode": {
+                  "description": "The key selection box gesture: top/bottom skew the selected rows (the dragged edge's row moves the whole distance, the opposite row stays, rows between interpolate in the order the selections first name each track), left/right space the selection along time (the opposite edge of the selected frames stays), liquify moves keys by a Gaussian falloff around grab.",
+                  "enum": [
+                    "top",
+                    "bottom",
+                    "left",
+                    "right",
+                    "liquify"
+                  ]
+                },
+                "total": {
+                  "description": "The drag in frames, fractional allowed. Every selected key moves round(total x its share) frames from where it was; all keys land inside the composition and on no key that stays, or the whole gesture is refused.",
+                  "type": "number",
+                  "minimum": -1000000,
+                  "maximum": 1000000
+                },
+                "grab": {
+                  "description": "The frame a liquify is centred on; required for liquify and refused for every other mode.",
+                  "type": "number",
+                  "minimum": -1000000,
+                  "maximum": 1000000
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "color"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "color"
+                },
+                "color": {
+                  "description": "The timeline tint written on every selected key (#rrggbb or #rrggbbaa, stored lowercase), or null to remove it.",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
                 }
               }
             }
@@ -11000,6 +11730,28 @@
                   "minLength": 1
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "target",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "layerBounds"
+                },
+                "target": {
+                  "$ref": "#/$defs/ObjectPropertyReadTarget"
+                },
+                "frame": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              }
             }
           ]
         }
@@ -11098,11 +11850,16 @@
             "out",
             "layer"
           ]
+        },
+        "color": {
+          "description": "The key's timeline tint (baseline key.color): #rrggbb or #rrggbbaa. Presentation only; absent when the key is untinted.",
+          "type": "string",
+          "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
         }
       }
     },
     "ObjectPropertyReadResult": {
-      "description": "Exact authored storage DTO or raw native sample. Native/shared runtime validators additionally correlate owner, revision, snapshot, target, property, frame and cursor; enforce increasing key/curve coordinates and actual native curve endpoints. Missing/null/empty curve distinctions are preserved. Provider result limit3072 and full envelope limit4096 are encoded UTF8 byte bounds, not JSON string lengths. Oversized pages refuse unavailable; no dynamic truncation. The expressionSource view returns the exact authored code (null when no expression is authored); an oversized source refuses unavailable.",
+      "description": "Exact authored storage DTO or raw native sample. Native/shared runtime validators additionally correlate owner, revision, snapshot, target, property, frame and cursor; enforce increasing key/curve coordinates and actual native curve endpoints. Missing/null/empty curve distinctions are preserved. Provider result limit3072 and full envelope limit4096 are encoded UTF8 byte bounds, not JSON string lengths. Oversized pages refuse unavailable; no dynamic truncation. The expressionSource view returns the exact authored code (null when no expression is authored); an oversized source refuses unavailable. The layerBounds view returns the layer's own tight bounds before its Motion (a Null is its rest point) at an integer frame, plus its parent layer uid or null.",
       "oneOf": [
         {
           "type": "object",
@@ -11975,6 +12732,79 @@
               ]
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "target",
+            "frame",
+            "bounds",
+            "parentLayerUid",
+            "parentAffine"
+          ],
+          "properties": {
+            "instanceId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "documentId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "const": "layerBounds"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectPropertyReadTarget"
+            },
+            "frame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "bounds": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              }
+            },
+            "parentLayerUid": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "minLength": 1
+                }
+              ]
+            },
+            "parentAffine": {
+              "type": "array",
+              "minItems": 6,
+              "maxItems": 6,
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              }
+            }
+          }
         }
       ]
     },
@@ -12037,6 +12867,41 @@
                   "type": "array",
                   "minItems": 1,
                   "maxItems": 4,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "keepPose": {
+                  "const": true
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frame",
+                "handle",
+                "values"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setKeyHandle"
+                },
+                "frame": {
+                  "type": "number"
+                },
+                "handle": {
+                  "enum": [
+                    "hIn",
+                    "hOut"
+                  ]
+                },
+                "values": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
                   "items": {
                     "type": "number"
                   }
@@ -12256,7 +13121,9 @@
       ],
       "properties": {
         "contextId": {
-          "const": "scene-root"
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
         },
         "layerUid": {
           "type": "string",
@@ -12493,7 +13360,7 @@
                   "const": "inspect"
                 },
                 "target": {
-                  "$ref": "#/$defs/ObjectTarget"
+                  "$ref": "#/$defs/ObjectTextReadTarget"
                 }
               }
             },
@@ -12511,7 +13378,7 @@
                   "const": "text"
                 },
                 "target": {
-                  "$ref": "#/$defs/ObjectTarget"
+                  "$ref": "#/$defs/ObjectTextReadTarget"
                 },
                 "offset": {
                   "type": "integer",
@@ -12550,6 +13417,11 @@
                   "maximum": 1024
                 },
                 "layerUid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "contextId": {
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 255
@@ -12623,7 +13495,7 @@
                 ],
                 "properties": {
                   "target": {
-                    "$ref": "#/$defs/ObjectTarget"
+                    "$ref": "#/$defs/ObjectTextReadTarget"
                   }
                 }
               }
@@ -12674,7 +13546,7 @@
               "const": "inspect"
             },
             "target": {
-              "$ref": "#/$defs/ObjectTarget"
+              "$ref": "#/$defs/ObjectTextReadTarget"
             },
             "textBytes": {
               "type": "integer",
@@ -12720,7 +13592,7 @@
               "const": "text"
             },
             "target": {
-              "$ref": "#/$defs/ObjectTarget"
+              "$ref": "#/$defs/ObjectTextReadTarget"
             },
             "textBytes": {
               "type": "integer",
@@ -12811,6 +13683,11 @@
               ]
             },
             "layerUid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "contextId": {
               "type": "string",
               "minLength": 1,
               "maxLength": 255
@@ -12963,6 +13840,10 @@
         "selection"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.clipboard.copy"
         },
@@ -12986,6 +13867,10 @@
         "selection"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.clipboard.cut"
         },
@@ -13013,6 +13898,10 @@
         "cells"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.clipboard.paste"
         },
@@ -13219,6 +14108,10 @@
         "frame"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.move"
         },
@@ -14482,7 +15375,9 @@
               ],
               "properties": {
                 "contextId": {
-                  "const": "scene-root"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
                 },
                 "strokeId": {
                   "const": ""
@@ -18557,8 +19452,13 @@
         "source",
         "intent"
       ],
-      "description": "T12: link one desktop video file. The host canonicalizes the path inside the request filesystem scope and probes width, height and frame count; the owner publishes one revision. Whitespace-only or NUL-bearing ids and paths are refused by the contract. The path bound (2048 bytes) fits the 4096-byte request with every other field at its maximum.",
+      "description": "T12: link one desktop video file. The host canonicalizes the path inside the request filesystem scope and probes width, height and frame count; the owner publishes one revision. Whitespace-only or NUL-bearing ids and paths are refused by the contract. The path bound (2048 bytes) fits the 4096-byte request with every other field at its maximum. The optional contextId (a newLayer only) names the declared component the new layer joins; absent is the scene root.",
       "properties": {
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
         "documentSnapshotId": {
           "$ref": "#/$defs/Identifier"
         },
@@ -19325,6 +20225,62 @@
               ],
               "properties": {
                 "kind": {
+                  "const": "markers"
+                },
+                "contextId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "cursor": {
+                  "$ref": "#/$defs/Revision"
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "contextId",
+                "cursor",
+                "limit"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "cameraKeys"
+                },
+                "contextId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "cursor": {
+                  "$ref": "#/$defs/Revision"
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "contextId",
+                "cursor",
+                "limit"
+              ],
+              "properties": {
+                "kind": {
                   "const": "instances"
                 },
                 "contextId": {
@@ -19385,7 +20341,7 @@
           ]
         }
       },
-      "description": "Read-only component model pinned to (atRevision, documentSnapshotId): the contexts of the document, one context's summary, its layers, the scene layers that instance one component, the stored duplicator descriptor of one scene layer, or the playback facts of one component-instance layer at an outer frame. Paged and byte-bounded; no expectedRevision."
+      "description": "Read-only component model pinned to (atRevision, documentSnapshotId): the contexts of the document, one context's summary, its layers, a page of the markers or of the camera keys a component stores, the scene layers that instance one component, the stored duplicator descriptor of one scene layer, or the playback facts of one component-instance layer at an outer frame. Paged and byte-bounded; no expectedRevision."
     },
     "ObjectComponentReadResult": {
       "oneOf": [
@@ -19638,6 +20594,9 @@
                   },
                   "hasMotion": {
                     "type": "boolean"
+                  },
+                  "shy": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -19651,6 +20610,198 @@
                   "$ref": "#/$defs/Revision"
                 }
               ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "contextId",
+            "markerCount",
+            "cursor",
+            "items",
+            "nextCursor"
+          ],
+          "properties": {
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "kind": {
+              "const": "markers"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "cursor": {
+              "$ref": "#/$defs/Revision"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "frame",
+                  "name",
+                  "color"
+                ],
+                "properties": {
+                  "frame": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 256
+                  },
+                  "color": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              }
+            },
+            "nextCursor": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/Revision"
+                }
+              ]
+            },
+            "markerCount": {
+              "$ref": "#/$defs/Revision"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "contextId",
+            "keyCount",
+            "cursor",
+            "items",
+            "nextCursor"
+          ],
+          "properties": {
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "kind": {
+              "const": "cameraKeys"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "cursor": {
+              "$ref": "#/$defs/Revision"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "frame",
+                  "x",
+                  "y",
+                  "w",
+                  "rot",
+                  "hOut",
+                  "hIn",
+                  "ease"
+                ],
+                "properties": {
+                  "frame": {
+                    "type": "number"
+                  },
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "w": {
+                    "type": "number"
+                  },
+                  "rot": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "hOut": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "hIn": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "ease": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 4,
+                    "maxItems": 4
+                  }
+                }
+              }
+            },
+            "nextCursor": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/Revision"
+                }
+              ]
+            },
+            "keyCount": {
+              "$ref": "#/$defs/Revision"
             }
           }
         },
@@ -19740,6 +20891,7 @@
             "seed",
             "sourceMode",
             "staggerRandom",
+            "effectors",
             "timeOffset"
           ],
           "properties": {
@@ -19835,6 +20987,46 @@
                 },
                 "hue": {
                   "type": "boolean"
+                }
+              }
+            },
+            "effectors": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "pos",
+                  "radius"
+                ],
+                "properties": {
+                  "pos": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "x",
+                          "y"
+                        ],
+                        "properties": {
+                          "x": {
+                            "type": "number"
+                          },
+                          "y": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "radius": {
+                    "type": "number"
+                  }
                 }
               }
             },
@@ -23893,6 +25085,176 @@
         }
       }
     },
+    "ObjectLayerKindCreatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "kind",
+        "name",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.kind.create"
+        },
+        "kind": {
+          "enum": [
+            "null",
+            "effect",
+            "guide",
+            "folder",
+            "effector"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "pos": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "children": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "ObjectLayerFolderReparentPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUids",
+        "folderUid",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.folder.reparent"
+        },
+        "layerUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "folderUid": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "reorder": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "gap",
+            "selection"
+          ],
+          "properties": {
+            "gap": {
+              "type": "number"
+            },
+            "selection": {
+              "$ref": "#/$defs/ObjectLayerSelection"
+            }
+          }
+        }
+      }
+    },
+    "ObjectLayerRangeArrangePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUids",
+        "action",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.range.arrange"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "layerUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "action": {
+          "enum": [
+            "reset",
+            "alignLeft",
+            "alignCenter",
+            "alignRight",
+            "distribute",
+            "flip",
+            "stagger"
+          ]
+        },
+        "step": {
+          "type": "integer",
+          "minimum": -1000000000,
+          "maximum": 1000000000
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
     "ObjectLayerCompositingEditPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -23922,7 +25284,12 @@
             "effects",
             "effectsFromSet",
             "effectsFromClear",
-            "folderCollapsed"
+            "folderCollapsed",
+            "blendKeySet",
+            "blendKeyRemove",
+            "blendKeysClear",
+            "blendKeysRemove",
+            "blendKeysMove"
           ]
         },
         "mode": {
@@ -23967,6 +25334,24 @@
           "maxItems": 32,
           "items": {
             "$ref": "#/$defs/ObjectLayerCompositingEffect"
+          }
+        },
+        "frames": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        },
+        "by": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647,
+          "not": {
+            "const": 0
           }
         }
       },
@@ -24029,6 +25414,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -24071,6 +25470,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -24110,6 +25523,20 @@
               "not": {
                 "required": [
                   "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
                 ]
               }
             }
@@ -24159,6 +25586,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -24201,6 +25642,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -24234,6 +25689,20 @@
               "not": {
                 "required": [
                   "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
                 ]
               }
             }
@@ -24277,6 +25746,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -24318,6 +25801,20 @@
                   "collapsed"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -24357,6 +25854,20 @@
               "not": {
                 "required": [
                   "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
                 ]
               }
             }
@@ -24406,6 +25917,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -24438,6 +25963,322 @@
               "not": {
                 "required": [
                   "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "blendKeySet"
+            },
+            "mode": {
+              "enum": [
+                "normal",
+                "multiply",
+                "screen",
+                "overlay",
+                "darken",
+                "lighten",
+                "colorDodge",
+                "colorBurn",
+                "hardLight",
+                "softLight",
+                "difference",
+                "exclusion",
+                "hue",
+                "saturation",
+                "color",
+                "luminosity"
+              ]
+            }
+          },
+          "required": [
+            "edit",
+            "mode",
+            "index"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "blendKeyRemove"
+            }
+          },
+          "required": [
+            "edit",
+            "index"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "blendKeysClear"
+            },
+            "mode": {
+              "enum": [
+                "normal",
+                "multiply",
+                "screen",
+                "overlay",
+                "darken",
+                "lighten",
+                "colorDodge",
+                "colorBurn",
+                "hardLight",
+                "softLight",
+                "difference",
+                "exclusion",
+                "hue",
+                "saturation",
+                "color",
+                "luminosity"
+              ]
+            }
+          },
+          "required": [
+            "edit"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "blendKeysRemove"
+            }
+          },
+          "required": [
+            "edit",
+            "frames"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "blendKeysMove"
+            }
+          },
+          "required": [
+            "edit",
+            "frames",
+            "by"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
                 ]
               }
             },

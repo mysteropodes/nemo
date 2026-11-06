@@ -46,6 +46,11 @@ enum ObjectExportFormat<'c> {
 }
 
 impl NativeObjectHost {
+    /// #2371: the layers a Solo view paints alone in the next export (the baseline export honours layer solo); empty for none.
+    pub(crate) fn set_export_solo(&mut self, solo: Vec<String>) {
+        self.preview.export_solo = solo;
+    }
+
     #[cfg(test)]
     pub(crate) fn export_test_state(&mut self) -> Result<(u64, (usize, usize)), String> {
         Ok((
@@ -157,6 +162,9 @@ impl NativeObjectHost {
         {
             return Err("native object export frames are invalid".into());
         }
+        // #2371: the Solo view of this export holds while its packets, joins and media preflight are built, so a layer the
+        // Solo view shows is exported even when its eye is off, and a non-soloed effect, matte or mask layer does not apply.
+        let _solo_view = native_engine::object_frame_packet::solo_view::enter(expected.context_id, &self.preview.export_solo);
         // T12: every drawn video is preflighted (typed MissingLink) before
         // staging; its decoded frames are released once the witnesses are gone.
         let mut decoder = crate::native_dispatch::video::video_decoder();
@@ -172,6 +180,7 @@ impl NativeObjectHost {
         )
         .map_err(|refusal| refusal.to_string())?;
         let session_request_id = request_id.clone();
+        let solo = self.preview.export_solo.clone();
         let request = ObjectHostExportRequest {
             request_id,
             target,
@@ -247,7 +256,9 @@ impl NativeObjectHost {
                             })
                             .map_err(|error| format!("export brush resources: {error:?}"))?;
                         let base = prepare_object_composition(&plan, &selector)
-                            .map_err(|error| format!("export composition: {error:?}"))?;
+                            .map_err(|error| format!("export composition: {error:?}"))?
+                            .with_export_solo(&solo)
+                            .map_err(|error| format!("export solo layers: {error:?}"))?;
                         media.witness(frame, base)
                     },
                 )
@@ -271,7 +282,9 @@ impl NativeObjectHost {
                     let plan = prepare_object_paint_plan(&scene, &selector)
                         .map_err(|error| format!("object export paint: {error:?}"))?;
                     let base = prepare_object_composition(&plan, &selector)
-                        .map_err(|error| format!("object export witness: {error:?}"))?;
+                        .map_err(|error| format!("object export witness: {error:?}"))?
+                        .with_export_solo(&solo)
+                        .map_err(|error| format!("object export solo layers: {error:?}"))?;
                     media.witness(frame, base)
                 };
                 let mut prepared = std::collections::BTreeMap::new();

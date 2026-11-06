@@ -180,3 +180,93 @@ fn behind_places_the_anchor_under_the_layer_artwork_with_its_companion_directly_
     sideways.payload["placement"] = json!("front");
     assert!(!owner.dispatch_bitmap_stroke(&sideways, &png).unwrap().is_ok(), "only behind is a placement");
 }
+
+/// A scene layer `L1` and a host layer placing component `comp-a` (8 frames, layer `inner`, keyed at 0 only).
+fn component_project() -> Vec<u8> {
+    let layers = |uids: &[&str]| json!(uids.iter().enumerate().map(|(i, l)| json!({"layerUid":l,"naturalPosition":i,"order":{}})).collect::<Vec<_>>());
+    let timing = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let mut drawing = json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":24,
+        "layers":[{"layerUid":"L1","timing":timing},{"layerUid":"host-a","timing":timing}],"objects":[]});
+    drawing["compositionOrder"] = json!({"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+        "migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[
+        {"contextId":"scene-root","layers":layers(&["L1","host-a"]),"scopes":[]},{"contextId":"comp-a","layers":layers(&["inner"]),"scopes":[]}]});
+    drawing["componentTables"] = json!({"components":{"format":"nemo.native-component-set","formatVersion":1,
+        "components":[{"symbolId":"comp-a","totalFrames":8,"layers":[{"layerUid":"inner","timing":timing}],"objects":[]}],
+        "instances":[{"contextId":"scene-root","layerUid":"host-a","symbolId":"comp-a","symPlayMode":"loop"}]}});
+    serde_json::to_vec(&json!({"format":"nemo.native-project-document","formatVersion":1,"project":{"canvasW":320,"canvasH":180,"fps":24},
+        "drawing":drawing,"viewportReference":null,"assets":[]})).unwrap()
+}
+fn in_component(frame: u32) -> Value {
+    let mut record = anchor(frame);
+    record["target"]["contextId"] = json!("comp-a");
+    record["target"]["layerUid"] = json!("inner");
+    record
+}
+
+#[test]
+fn a_bitmap_brush_stroke_in_a_component_lands_in_that_component_keying_a_held_cell_as_one_undo_step() {
+    let png = oracle_bytes("blue-2x1");
+    let mut owner = NativeObjectHistory::from_project_file("desktop", &component_project()).unwrap();
+    let before = state(&owner);
+    // Frame 3 of the component is held: the cell is keyed first, then the anchor and its companion land there, in the same revision.
+    let reply = owner.dispatch_bitmap_stroke(&request(&owner, "comp-held", in_component(3)), &png).unwrap();
+    assert!(reply.is_ok(), "{}", serde_json::to_value(&reply).unwrap());
+    assert_eq!((owner.content_revision(), owner.history_depths()), (1, (1, 0)));
+    let after = state(&owner);
+    let comp = &after["drawing"]["componentTables"]["components"]["components"][0];
+    let anchors = comp["objects"].as_array().unwrap();
+    assert_eq!(anchors.len(), 1, "the anchor joined the component");
+    assert_eq!((&anchors[0]["target"]["contextId"], &anchors[0]["target"]["frameScope"]["frame"]), (&json!("comp-a"), &json!(3)));
+    assert!(after["drawing"]["objects"].as_array().unwrap().is_empty(), "the scene root holds no record");
+    let rasters = after["drawing"]["items"]["raster"].as_array().unwrap();
+    assert_eq!(rasters.len(), 1);
+    assert_eq!((&rasters[0]["target"]["contextId"], &rasters[0]["item"]["isBitmapBrush"], &rasters[0]["item"]["brushGroupId"]),
+        (&json!("comp-a"), &json!(true), &json!(GROUP)));
+    let keys: Vec<&Value> = comp["layers"][0]["timing"]["keys"].as_array().unwrap().iter().map(|k| &k["frame"]).collect();
+    assert_eq!(keys, [&json!(0), &json!(3)], "the held cell became a key");
+    let reopened = NativeObjectHistory::from_project_file("desktop", &serde_json::to_vec(&after).unwrap()).unwrap();
+    assert_eq!(state(&reopened), after, "saves and reopens unchanged");
+    owner.undo(1).unwrap();
+    assert_eq!(state(&owner), before, "one undo removes the key, the stroke, its companion and its PNG");
+    owner.redo(2).unwrap();
+    assert_eq!(state(&owner), after);
+    // Past the component's 8 frames, an undeclared component and a layer the component does not hold are refused with nothing written.
+    let mut stray = in_component(0);
+    stray["target"]["layerUid"] = json!("L1");
+    let mut elsewhere = in_component(0);
+    elsewhere["target"]["contextId"] = json!("comp-b");
+    for (id, record) in [("past", in_component(8)), ("stray", stray), ("elsewhere", elsewhere)] {
+        let mut fresh = NativeObjectHistory::from_project_file("desktop", &component_project()).unwrap();
+        let refused = fresh.dispatch_bitmap_stroke(&request(&fresh, id, record), &png).unwrap();
+        assert!(!refused.is_ok(), "{id}");
+        assert_eq!((fresh.content_revision(), fresh.history_depths(), state(&fresh)), (0, (0, 0), state(&NativeObjectHistory::from_project_file("desktop", &component_project()).unwrap())), "{id}");
+    }
+}
+
+#[test]
+fn a_component_bitmap_stroke_is_painted_by_the_component_at_the_frame_it_was_drawn_on() {
+    use crate::object_frame_packet::{prepare_object_exposure_frame, ObjectFrameSelector};
+    use crate::object_document::FrameScopeKind;
+    use crate::object_render_scene::{ordered_entries, prepare_object_paint_plan, prepare_object_render_scene, PaintEntry};
+    let png = oracle_bytes("blue-2x1");
+    let mut owner = NativeObjectHistory::from_project_file("desktop", &component_project()).unwrap();
+    let painted = |owner: &NativeObjectHistory, frame: u32| {
+        let s = owner.acquire_snapshot(owner.content_revision()).unwrap();
+        let expected = ObjectFrameSelector {
+            instance_id: s.instance_id(), document_id: s.document_id(), content_revision: s.content_revision(), document_snapshot_id: s.snapshot_id(),
+            context_id: "scene-root", scope_kind: FrameScopeKind::Authored, frame,
+        };
+        let packet = prepare_object_exposure_frame(&s, &expected).unwrap_or_else(|e| panic!("{e:?}"));
+        let scene = prepare_object_render_scene(&packet, &expected).unwrap_or_else(|e| panic!("the component scene is admitted: {e:?}"));
+        let plan = prepare_object_paint_plan(&scene, &expected).unwrap_or_else(|e| panic!("{e:?}"));
+        // (component contours, placed images): a component's image is a Raster entry the component scene appended.
+        let entries: Vec<PaintEntry> = ordered_entries(&plan).collect();
+        let contours = entries.iter().filter(|e| matches!(e, PaintEntry::Component(c) if c.target.context_id() == "comp-a")).count();
+        (contours, entries.iter().filter(|e| matches!(e, PaintEntry::Raster(_))).count())
+    };
+    assert_eq!(painted(&owner, 3), (0, 0), "nothing drawn yet");
+    assert!(owner.dispatch_bitmap_stroke(&request(&owner, "paint", in_component(3)), &png).unwrap().is_ok());
+    // The camouflaged anchor is component contour paint and the companion's baked PNG is a placed image at frame 3; frame 0 (the key) shows neither.
+    assert_eq!(painted(&owner, 3), (1, 1), "anchor contour and companion image");
+    assert_eq!(painted(&owner, 0), (0, 0));
+}

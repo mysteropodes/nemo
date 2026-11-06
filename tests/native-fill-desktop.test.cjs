@@ -184,3 +184,28 @@ test('a queue that never frees gives a Fill click one clear notice and no fill',
  const f=busyFill();f.pointer();await spin(40);
  assert.deepEqual(f.toasts,['The canvas is still busy - click again.']);assert.equal(f.dispatched.length,0);
 });
+
+// #2256 Fill inside an entered component: the target carries the component context and its layer rows, the write rides the component route, and a frame past the component refuses.
+test('Fill inside an entered component targets the component layer and rides the component route',async()=>{
+  const f=cameraPointerFixture(),routes=[],scene=f.session.runResourceCommand;
+  f.session.runComponentCommand=action=>{routes.push('component');return scene(action);};
+  f.session.readPresentedObjectSession().presentation.contextId='comp-a';
+  f.root.NemoNativeComponentContext={contextId:()=> 'comp-a',layerRows:()=>[{layerUid:'inner',locked:false}],frameBound:()=>8};
+  assert.equal(f.pointer(),true);await spin(3);
+  assert.deepEqual(routes,['component']);assert.equal(f.dispatched.length,1);
+  assert.equal(f.dispatched[0].payload.contextId,'comp-a');assert.equal(f.dispatched[0].payload.layerUid,'inner');assert.equal(f.dispatched[0].payload.frame,3);
+  // The scene presentation while a component is entered is not the component's: refused, nothing sent.
+  const stale=cameraPointerFixture();stale.session.runComponentCommand=scene;
+  stale.root.NemoNativeComponentContext={contextId:()=> 'comp-a',layerRows:()=>[{layerUid:'inner',locked:false}],frameBound:()=>8};
+  stale.pointer();await spin(3);assert.equal(stale.dispatched.length,0);
+  // A playhead past the component's frames refuses.
+  const past=cameraPointerFixture();past.session.runComponentCommand=scene;
+  past.session.readPresentedObjectSession().presentation.contextId='comp-a';
+  past.root.NemoNativeComponentContext={contextId:()=> 'comp-a',layerRows:()=>[{layerUid:'inner',locked:false}],frameBound:()=>3};
+  past.pointer();await spin(3);assert.equal(past.dispatched.length,0);
+  // A locked component layer yields no target: nothing sent.
+  const locked=cameraPointerFixture();locked.session.runComponentCommand=scene;
+  locked.session.readPresentedObjectSession().presentation.contextId='comp-a';
+  locked.root.NemoNativeComponentContext={contextId:()=> 'comp-a',layerRows:()=>[{layerUid:'inner',locked:true}],frameBound:()=>8};
+  locked.pointer();await spin(3);assert.equal(locked.dispatched.length,0);
+});

@@ -68,11 +68,29 @@ pub(super) fn file_request(raw: &str) -> Option<FileRequest> {
         .flatten()
 }
 
+/// The bytes the strict native codec reads. A baseline project is converted first (the file itself is never modified);
+/// `legacy` then carries the field-path report the opened document is presented with.
+pub(super) struct Loaded {
+    pub(super) bytes: Vec<u8>,
+    pub(super) legacy: Option<serde_json::Value>,
+}
+
+/// The desktop's media converter for a baseline project (JPEG/WebP images and MP3/M4A audio become PNG and WAV), installed once
+/// by the shell; without one only PNG and WAV payloads import.
+static TRANSCODER: std::sync::OnceLock<&'static dyn native_engine::history::legacy_project_import::MediaTranscoder> =
+    std::sync::OnceLock::new();
+
+pub(super) fn install_transcoder(
+    transcoder: &'static dyn native_engine::history::legacy_project_import::MediaTranscoder,
+) {
+    let _ = TRANSCODER.set(transcoder);
+}
+
 pub(super) fn read_file(
     state: &ApplicationMcp,
     request: &FileRequest,
     allowed: impl Fn(&Path) -> bool,
-) -> HostResult<Vec<u8>> {
+) -> HostResult<Loaded> {
     require_api_instance(
         request.api_version,
         &request.instance_id,
@@ -121,13 +139,31 @@ pub(super) fn read_file(
         let format: Format = serde_json::from_slice(&bytes)
             .map_err(|_| host_error("invalid_request", "invalid project file"))?;
         if format.format.as_deref() != Some("nemo.native-project-document") {
-            return Err(host_error(
-                "unsupported_format",
-                "file is not a native project",
-            ));
+            // Baseline projects become a new native document; any other file keeps the typed unsupported refusal.
+            if !native_engine::history::legacy_project_import::looks_like_legacy_project(&bytes) {
+                return Err(host_error(
+                    "unsupported_format",
+                    "file is not a native project",
+                ));
+            }
+            let converted = native_engine::history::legacy_project_import::convert_admitted_with(
+                &bytes,
+                TRANSCODER
+                    .get()
+                    .copied()
+                    .unwrap_or(&native_engine::history::legacy_project_import::NoTranscoder),
+            )
+                .map_err(|error| host_error(error.code(), error.message()))?;
+            return Ok(Loaded {
+                bytes: converted.project_file,
+                legacy: Some(converted.report.to_json()),
+            });
         }
     }
-    Ok(bytes)
+    Ok(Loaded {
+        bytes,
+        legacy: None,
+    })
 }
 
 /// #2269: a project file the UI names directly (a recent entry or a crash-recovery generation) was never picked in a
@@ -167,8 +203,10 @@ pub(super) fn bootstrap_request(
         }
         // Nothing is installed until the file is read, so a refused read leaves the
         // slot as it was and the caller may retry instead of fencing (#2511).
-        let bytes = read_file(state, &request, allowed).map_err(not_dispatched)?;
-        return bootstrap_file_bytes(state, request.request_id, &bytes);
+        let loaded = read_file(state, &request, allowed).map_err(not_dispatched)?;
+        let mut receipt = bootstrap_file_bytes(state, request.request_id, &loaded.bytes)?;
+        receipt.legacy_import = loaded.legacy;
+        return Ok(receipt);
     }
     bootstrap_raw(state, raw)
 }

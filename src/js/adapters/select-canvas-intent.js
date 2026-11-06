@@ -64,6 +64,7 @@
       gesture = null; cancel();
       if (g) try { // a drag commits through the gesture; a click that never dragged selects, except on a handle (which selects nothing)
         if (!accept) return g.end(e);
+        if (typeof g.altClick === 'function' && g.altClick(e)) return; // Alt+click inside the selection: the copy the baseline cloned at the press stays
         g.cancel();
         if (g.owns()) return;
       } catch (_) { return; }
@@ -210,7 +211,7 @@
     var now = presentedSession(root);
     if (!now || !samePin(now.pin, s.pin) || now.presentation.frame !== s.presentation.frame) return null;
     var Path = root.Path || root.paper.Path, Matrix = root.Matrix || root.paper.Matrix;
-    return { pin: s.pin, presentation: s.presentation, frame: s.presentation.frame, layerUid: layer.layerUid, items: data.items, paths: data.items.filter(function (item) {
+    return { pin: s.pin, presentation: s.presentation, frame: s.presentation.frame, layerUid: layer.layerUid, items: data.items, layerMatrix: data.layerMatrix || null, paths: data.items.filter(function (item) {
       return Array.isArray(item.segments); }).map(function (item) {
       var path = new Path({ insert: false, closed: item.closed, segments: item.segments.map(function (a) { return [a.point, a.handleIn, a.handleOut]; }) });
       path.transform(new Matrix(item.matrix[0], item.matrix[1], item.matrix[2], item.matrix[3], item.matrix[4], item.matrix[5]));

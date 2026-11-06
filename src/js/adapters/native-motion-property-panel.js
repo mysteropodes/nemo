@@ -6,10 +6,12 @@
   var api=factory(typeof module==='object'&&module.exports?require('./native-motion-property-view.js'):root.NemoNativeMotionPropertyView,
     typeof module==='object'&&module.exports?require('./native-motion-property-keys.js'):root.NemoNativeMotionPropertyKeys,
     typeof module==='object'&&module.exports?require('./native-motion-property-value.js'):root.NemoNativeMotionPropertyValue,
-    typeof module==='object'&&module.exports?require('./native-motion-expression-editor.js'):root.NemoNativeMotionExpressionEditor);
+    typeof module==='object'&&module.exports?require('./native-motion-expression-editor.js'):root.NemoNativeMotionExpressionEditor,
+    typeof module==='object'&&module.exports?require('./native-motion-key-edit.js'):root.NemoNativeMotionKeyEdit);
   if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeMotionPropertyPanel=api;
-}(typeof globalThis==='object'?globalThis:this,function(View,Keys,Value,Expr){
+}(typeof globalThis==='object'?globalThis:this,function(View,Keys,Value,Expr,KeyEdit){
   'use strict';
+  var MAX_SELECTED=4096; // a guard against a runaway selection; the edit request names runs of keys, so the count never sizes it
   var shortcuts={p:'position',a:'anchor',r:'rotation',s:'scale',t:'opacity'};
   // Baseline propsFor() order (motion.js PROPS / PROPS_WITH_3D); anything else keeps its native order after these.
   var baselineOrder=['position','positionZ','anchor','rotation','rotationX','rotationY','scale','opacity','order'];
@@ -45,7 +47,7 @@
         if(base&&!sameView(base,view))return false;base=view;count+=view.items.filter(function(k){return k.selected;}).length;
       }
       var own=entry.editor.readKeyTimeline();
-      return !!own&&(!base||sameView(base,own))&&count<=32;
+      return !!own&&(!base||sameView(base,own))&&count<=MAX_SELECTED;
     }
     function makeKeyEditor(){
       if(!Keys||typeof Keys.create!=='function'||typeof ports.readProperty!=='function')return null;
@@ -95,6 +97,25 @@
       if(!entry)entry=keyEditors.find(function(item){return item.id===null;})||makeKeyEditor();
       if(!entry)return false;entry.id=id;entry.property=property;entry.target=target;keyEditor=entry.editor;place(entry);return entry.editor.open(target,property);
     }
+    // #2524: a drawer closed by the refresh after a write is reopened with its selection; the keys editor reads it back from the native owner.
+    async function reopenKeys(target,property,frames){
+      if(retired||!validAccepted()||await openKeys(target,property)!==true)return false;
+      var entry=keyEditors.find(function(item){return item.id===rowId(target,property);}),view=entry&&entry.editor.readKeyTimeline();
+      var wanted=view?frames.filter(function(frame){return view.items.some(function(k){return k.frame===frame;});}):[];
+      return !!view&&(!wanted.length||view.selectFrames(wanted));
+    }
+        // #2524: the key clipboard's two ports - where a paste lands (playhead, layers present, the active layer) and the one paste write.
+    function pasteContext(){var c=ports.readContext(),names=typeof ports.layerNames==='function'?ports.layerNames():null,primary=accepted&&accepted.selection.primary;
+      return {frame:c.frame,layers:Array.isArray(names)?names.map(function(l){return l.layerUid;}):null,active:primary?{contextId:primary.contextId,layerUid:primary.layerUid}:null};}
+    function pasteKeys(payload){
+      var token=!retired&&validAccepted()&&typeof ports.editPropertyKeysPaste==='function'?View.captureContext(ports.readContext()):null;
+      if(!token)return Promise.reject(new Error('Native key paste is unavailable'));
+      return ports.editPropertyKeysPaste(payload,token.pin,function(){try{return !retired&&View.isCurrentContext(token,ports.readContext());}catch(_){return false;}});
+    }
+    var keyEdit=KeyEdit&&typeof KeyEdit.createEditor==='function'?KeyEdit.createEditor({readKeyTimelines:function(){return readKeyTimelines();},translate:tr,reopen:reopenKeys,context:pasteContext,pasteKeys:pasteKeys,
+      localKeys:function(){return [serial].concat(keyEditors.filter(function(entry){return entry.id!==null;}).map(function(entry){return [entry.id,entry.editor.selectionKey()];}));},
+      get editPropertyTrack(){return ports.editPropertyTrack;},notify:function(message){if(typeof ports.showToast==='function')ports.showToast(message);else notify(message);}}):null;
+    function editKeys(action,opts){return keyEdit&&typeof ports.editPropertyTrack==='function'&&!retired&&validAccepted()?keyEdit.edit(action,opts):Promise.resolve(false);}
     function readKeyTimelines(){
       if(retired||!validAccepted())return null;
       var entries=keyEditors.filter(function(entry){return entry.id!==null;}),views=entries.map(function(entry){return entry.editor.readKeyTimeline();});
@@ -102,7 +123,7 @@
       function isCurrent(){return !retired&&validAccepted()&&entries.length===keyEditors.filter(function(entry){return entry.id!==null;}).length&&entries.every(function(entry,i){return keyEditors.includes(entry)&&views[i].isCurrent();});}
       function selectKeys(keys){
         try{
-        if(!isCurrent()||!Array.isArray(keys)||keys.length>32)return false;
+        if(!isCurrent()||!Array.isArray(keys)||keys.length>MAX_SELECTED)return false;
         var proposed=new Map(entries.map(function(entry){return [entry,[]];})),seen=new Set();
         for(var address of keys){
           if(!address||typeof address!=='object'||Array.isArray(address)||Object.keys(address).length!==2||!Object.prototype.hasOwnProperty.call(address,'target')||!Object.prototype.hasOwnProperty.call(address,'frame')||!Number.isFinite(address.frame))return false;
@@ -131,7 +152,7 @@
       if(!keyEditors.some(function(entry){return entry.id!==null;}))return keyEditor?keyEditor.captureSelectedKeys():null;
       var view=readKeyTimelines();if(!view)return null;
       var keys=[];view.tracks.forEach(function(track){track.items.forEach(function(item){if(item.selected)keys.push(Object.freeze({target:Object.freeze({kind:'property',target:track.target,property:track.property}),frame:item.frame}));});});
-      if(keys.length>32)return null;Object.freeze(keys);
+      if(keys.length>MAX_SELECTED)return null;Object.freeze(keys);
       var value={pin:view.pin,frame:view.frame,viewGeneration:view.viewGeneration,keys:keys};
       var capturedAccepted=accepted,ticket=serial,entries=keyEditors.filter(function(entry){return entry.id!==null;}),ids=entries.map(function(entry){return entry.id;});
       var proofs=entries.map(function(entry){return entry.editor.captureSelectedKeys();});
@@ -398,11 +419,11 @@
     button('Cancel',cancel);
     function setSearch(value){if(retired)return false;search=String(value||'').toLowerCase();return paint();}
     container.addEventListener('keydown',onKey);readPreference();
-    return Object.freeze({refresh:refresh,notice:notify,setFilter:setFilter,setSearch:setSearch,select:function(target){return validAccepted()?select(target,accepted.token,serial,accepted.selection.signature,false):Promise.resolve(false);},reveal:reveal,revealContent:revealContent,refuseReveal:function(){notify('This Motion reveal is unavailable.');return false;},cancel:cancel,dispose:dispose,element:section,readKeyTimeline:function(){return !retired&&validAccepted()&&keyEditor?keyEditor.readKeyTimeline():null;},readKeyTimelines:readKeyTimelines,captureSelectedKeys:captureSelectedKeys});
+    return Object.freeze({refresh:refresh,notice:notify,setFilter:setFilter,setSearch:setSearch,select:function(target){return validAccepted()?select(target,accepted.token,serial,accepted.selection.signature,false):Promise.resolve(false);},reveal:reveal,revealContent:revealContent,refuseReveal:function(){notify('This Motion reveal is unavailable.');return false;},cancel:cancel,dispose:dispose,element:section,readKeyTimeline:function(){return !retired&&validAccepted()&&keyEditor?keyEditor.readKeyTimeline():null;},readKeyTimelines:readKeyTimelines,captureSelectedKeys:captureSelectedKeys,editKeys:editKeys});
   }
   function createCaller(ports){var panel=null,retired=false;
     async function update(force){if(retired)return false;if(!ports.isMotion()){if(panel)panel.dispose();panel=null;return false;}if(!panel)panel=create(ports.container,ports);return panel.refresh(force);}
-    return Object.freeze({update:update,notice:function(message){if(panel&&!retired)panel.notice(message);},shortcut:function(k,shift){if(retired||!ports.isMotion())return Promise.resolve(false);if(!panel)panel=create(ports.container,ports);k=String(k).toLowerCase();return shortcuts[k]?panel.reveal(shortcuts[k],!!shift):k==='u'?panel.revealContent():['e','m'].includes(k)?Promise.resolve(panel.refuseReveal()):Promise.resolve(false);},readKeyTimeline:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimeline():null;},readKeyTimelines:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimelines():null;},captureSelectedKeys:function(){return !retired&&panel?panel.captureSelectedKeys():null;},isMounted:function(){return !panel||panel.element.parentNode===ports.container;},setFilter:function(mode){return panel?panel.setFilter(mode):false;},setSearch:function(value){return panel?panel.setSearch(value):false;},select:function(target){return panel?panel.select(target):Promise.resolve(false);},cancel:function(){return panel?panel.cancel():false;},dispose:function(){retired=true;if(panel)panel.dispose();panel=null;}});
+    return Object.freeze({update:update,notice:function(message){if(panel&&!retired)panel.notice(message);},shortcut:function(k,shift){if(retired||!ports.isMotion())return Promise.resolve(false);if(!panel)panel=create(ports.container,ports);k=String(k).toLowerCase();return shortcuts[k]?panel.reveal(shortcuts[k],!!shift):k==='u'?panel.revealContent():['e','m'].includes(k)?Promise.resolve(panel.refuseReveal()):Promise.resolve(false);},readKeyTimeline:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimeline():null;},readKeyTimelines:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimelines():null;},captureSelectedKeys:function(){return !retired&&panel?panel.captureSelectedKeys():null;},editKeys:function(action,opts){return !retired&&ports.isMotion()&&panel?panel.editKeys(action,opts):Promise.resolve(false);},isMounted:function(){return !panel||panel.element.parentNode===ports.container;},setFilter:function(mode){return panel?panel.setFilter(mode):false;},setSearch:function(value){return panel?panel.setSearch(value):false;},select:function(target){return panel?panel.select(target):Promise.resolve(false);},cancel:function(){return panel?panel.cancel():false;},dispose:function(){retired=true;if(panel)panel.dispose();panel=null;}});
   }
   return Object.freeze({create:create,createCaller:createCaller});
 }));

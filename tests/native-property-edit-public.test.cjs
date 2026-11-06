@@ -40,7 +40,7 @@ test('D36 declaration keeps mutation admission separate from read-only metadata 
   assert.deepEqual(payload.properties.target.required, ['contextId', 'layerUid']);
   assert.equal(payload.properties.target.additionalProperties, false);
   assert.deepEqual(payload.properties.action.oneOf.map(v => v.properties.kind.const),
-    ['setValue', 'setKey', 'removeKey', 'setAnimated', 'bake', 'setExpression', 'setExpressionEnabled', 'removeExpression', 'addControl', 'renameControl', 'removeControl', 'moveControl']);
+    ['setValue', 'setKeyHandle', 'setKey', 'removeKey', 'setAnimated', 'bake', 'setExpression', 'setExpressionEnabled', 'removeExpression', 'addControl', 'renameControl', 'removeControl', 'moveControl']);
   for (const action of payload.properties.action.oneOf) {
     assert.equal(action.additionalProperties, false);
     if (/^(?:add|rename|remove|move)Control$/.test(action.properties.kind.const)) {
@@ -62,9 +62,17 @@ test('D36 declaration keeps mutation admission separate from read-only metadata 
       assert.equal(action.properties.frame.minimum, undefined);
     }
     assert.equal(action.properties.curvePoints, undefined);
-    if (action.properties.values) {
+    if (action.properties.kind.const === 'setKeyHandle') { // #2520: one spatial handle of an existing 2-D key
+      assert.deepEqual(action.required, ['kind', 'frame', 'handle', 'values']);
+      assert.deepEqual(action.properties.handle.enum, ['hIn', 'hOut']);
+      assert.deepEqual([action.properties.values.minItems, action.properties.values.maxItems], [2, 2]);
+    } else if (action.properties.values) {
       assert.equal(action.properties.values.minItems, 1);
       assert.equal(action.properties.values.maxItems, 4);
+    }
+    if (action.properties.kind.const === 'setValue') { // `keepPose` is optional and only ever true
+      assert.deepEqual(action.required, ['kind', 'frame', 'values']);
+      assert.deepEqual(action.properties.keepPose, {const: true});
     }
   }
   const metadata = JSON.parse(fs.readFileSync(path.join(ROOT,
@@ -291,4 +299,23 @@ test('D18-B control declaration edits are strict frameless intents through the o
   let calls = 0; const port = adapter(() => {calls++;});
   for (const q of refused) assert.throws(() => port.editProperty(q), TypeError, JSON.stringify(q.payload.action));
   assert.equal(calls, 0);
+});
+
+test('keepPose is an anchor-only setValue and setKeyHandle names one handle, both through the one edit operation (#2520)', async () => {
+  const sent = [];
+  const edit = adapter(async q => { sent.push(q); return reply(q); });
+  const on = (property, action) => { const q = request(action); q.payload.property = property; delete q.payload.target.strokeId; return q; };
+  const keep = {kind:'setValue', frame:3, values:[4, 5], keepPose:true};
+  await edit.dispatch(on('anchor', keep));
+  assert.deepEqual(sent[0].payload.action, keep);
+  const handle = {kind:'setKeyHandle', frame:-2.5, handle:'hOut', values:[-30, 5.5]};
+  await edit.dispatch(on('position', handle));
+  assert.deepEqual(sent[1].payload.action, handle);
+  for (const bad of [on('position', keep), on('opacity', keep), on('anchor', {...keep, keepPose:false}), on('anchor', {...keep, keepPose:1}),
+    on('anchor', {kind:'setKey', frame:3, values:[4, 5], keepPose:true}),
+    on('position', {...handle, handle:'tangent'}), on('position', {...handle, values:[1]}), on('position', {...handle, values:[1, 2, 3]}),
+    on('position', {kind:'setKeyHandle', handle:'hIn', values:[1, 2]}), on('position', {...handle, extra:1}), on('position', {...handle, values:[1, NaN]})]) {
+    await assert.rejects(async () => edit.dispatch(bad));
+  }
+  assert.equal(sent.length, 2, 'a refused shape never reaches the transport');
 });

@@ -8,15 +8,26 @@
   function isNative(root){var s=session(root);return !!s&&s.blocksLegacy();}
   function owner(p){return p&&JSON.stringify([p.instanceId,p.documentId,p.lifecycleGeneration]);}
   function clone(v){return JSON.parse(JSON.stringify(v));}
+  // #2267: inside an entered component the context, its layer rows and its frame count are the component's (the ones the workspace controller holds).
+  function held(root){var c=root.NemoNativeComponentContext;return c&&typeof c.contextId==='function'?c.contextId(root):'scene-root';}
   function context(root,s){
     var p=s.info(),state=root.state,current=session(root);
-    if(current!==s||!p||!s.isActive()||!s.projectionReady||!state||state.playing||state.activeSymbolId||state.shadowMode||state.maskMode||!['anim2d','motion'].includes(state.appMode))return null;
-    var layer=Array.isArray(p.layers)&&p.layers[state.activeLayerIdx],frame=state.currentFrame;
-    if(!layer||layer.locked||!Number.isInteger(frame)||frame<0||frame>=p.totalFrames)return null;
-    return {pin:p,layerUid:layer.layerUid,frame:frame,selectionKey:JSON.stringify([state.activeLayerIdx,root._layerSel||[]])};
+    if(current!==s||!p||!s.isActive()||!s.projectionReady||!state||state.playing||state.shadowMode||state.maskMode||!['anim2d','motion'].includes(state.appMode))return null;
+    var id=held(root),comp=id!=='scene-root'&&root.NemoNativeComponentContext;
+    if(state.activeSymbolId&&state.activeSymbolId!==id)return null;
+    var rows=comp?comp.layerRows(root):p.layers,layer=Array.isArray(rows)&&rows[state.activeLayerIdx],frame=state.currentFrame;
+    if(!layer||layer.locked||!Number.isInteger(frame)||frame<0||frame>=(comp?comp.frameBound(root,p):p.totalFrames))return null;
+    return {pin:p,contextId:id,layerUid:layer.layerUid,frame:frame,selectionKey:JSON.stringify([id,state.activeLayerIdx,root._layerSel||[]])};
   }
+  // The scene's writes ride the resource route, an entered component's ride the component route.
+  function routed(root,s){var scene=root.NemoNativeObjectItemCommand.create(s,'item'),inside=null;
+    return {execute:function(op,build,finish){
+      if(held(root)==='scene-root')return scene.execute(op,build,finish);
+      if(typeof s.runComponentCommand!=='function')return Promise.reject(Object.assign(new Error('Native component route is unavailable'),{code:'unavailable'}));
+      inside=inside||root.NemoNativeObjectItemCommand.create(Object.freeze({info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:s.runComponentCommand.bind(s)}),'item');
+      return inside.execute(op,build,finish);}};}
   function binding(root){var s=session(root),p=s&&s.info(),b=bindings.get(root);if(!s||!root.NemoNativeTextAnimator||!root.NemoNativeTextRead||!root.NemoNativeObjectItemCommand)return null;
-    if(!b||b.session!==s||b.owner!==owner(p)){b={session:s,owner:owner(p),ticket:0,key:null,data:null,error:null,loading:false,writing:false};b.model=root.NemoNativeTextAnimator.create(s,function(){var m=mounts.get(root);return bindings.get(root)===b&&(!m||!m.retired&&root.document.body.contains(m.section))?context(root,s):null;},{reader:root.NemoNativeTextRead.create(s),command:root.NemoNativeObjectItemCommand.create(s,'item'),samePin:root.NemoNativeTextRead.samePin});bindings.set(root,b);}return b;
+    if(!b||b.session!==s||b.owner!==owner(p)){b={session:s,owner:owner(p),ticket:0,key:null,data:null,error:null,loading:false,writing:false};b.model=root.NemoNativeTextAnimator.create(s,function(){var m=mounts.get(root);return bindings.get(root)===b&&(!m||!m.retired&&root.document.body.contains(m.section))?context(root,s):null;},{reader:root.NemoNativeTextRead.create(s),command:routed(root,s),samePin:root.NemoNativeTextRead.samePin});bindings.set(root,b);}return b;
   }
   function node(root,tag,text){var n=root.document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
   function status(root,text){var n=element(root,'p-textanim-empty');if(n){n.style.display='';n.textContent=text;}}

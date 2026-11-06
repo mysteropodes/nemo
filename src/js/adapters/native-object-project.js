@@ -20,7 +20,7 @@
   function create(ports){
     if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
     if(!Exposure||typeof Exposure.navigation!=='function'||typeof Exposure.previewScheduling!=='function')throw new Error('Native project view ports are unavailable');
-    var previewFailures=new WeakMap(),view=Exposure.navigation(ports.viewMode,openDiagnostic,ports.displayFilter,ports.ghosts,ports.alphaChecker,ports.currentOutline,ports.hideShadowGuides),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,openingRequested=false;
+    var previewFailures=new WeakMap(),view=Exposure.navigation(ports.viewMode,openDiagnostic,ports.displayFilter,ports.ghosts,ports.alphaChecker,ports.currentOutline,ports.hideShadowGuides,ports.soloLayers),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,openingRequested=false;
     var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,revisionAttempt=null,presentationBounds=null,openExposure=null,openingCancelled=false;
     var observation=Desktop.attemptObserver(function(){return ports.invoke.apply(ports,arguments);},openDiagnostic,
       function(){return openAttempt;},function(){return revisionAttempt;},previewFailures),invokeTracked=observation.invoke;
@@ -232,7 +232,7 @@
       if(revisionSync)request.revisionSync=revisionSync;
       var bounds=Object.assign({},request.viewport.cssBounds);
       var receipt;
-      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&(allowSuperseded||Exposure.sameView(selected,view.read(info))),allowDeferred,mode,selected.navigation,selected.displayFilter,selected.ghosts,selected.alphaChecker,selected.currentOutline,selected.hideShadowGuides);}
+      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&(allowSuperseded||Exposure.sameView(selected,view.read(info))),allowDeferred,mode,selected.navigation,selected.displayFilter,selected.ghosts,selected.alphaChecker,selected.currentOutline,selected.hideShadowGuides,selected.solo);}
         catch(error){throw previewFailure('receipt-access',error);}}
       try{receipt=exposure?await exposure.run(function(){return raw('nemo_native_object_preview',request);},function(){return verifyOwner(pin);},inspect):inspect(await raw('nemo_native_object_preview',request),!!occlusion&&!revisionSync);}
       catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
@@ -287,7 +287,7 @@
       try{await inspect();await changed();}catch(unknown){throw fence(unknown);}
       if(!receipt.ok){
         try{await present(ports.frame?ports.frame():0);}catch(unpresented){if(!historyAction&&ports.notice)ports.notice(unpresented.message);}
-        throw new Error('Native command refused: '+(receipt.error&&receipt.error.code||'unavailable'));
+        throw Object.assign(new Error('Native command refused: '+(receipt.error&&receipt.error.code||'unavailable')),{refusal:receipt.error&&typeof receipt.error.message==='string'?{code:receipt.error.code,message:receipt.error.message}:undefined});
       }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
@@ -338,7 +338,7 @@
       return {apiVersion:2,requestId:requestId('import-batch'),instanceId:pin.instanceId,documentId:pin.documentId,operation:'command.document.object.import.batch',expectedRevision:pin.contentRevision,payload:payload};
     },'nemo_native_dispatch');}
     function editLayerPolicy(payload,expected){return mutation(function(pin){
-      if(!same(pin,expected)||!payload||Array.isArray(payload)||Object.keys(payload).length!==4||!['command','layerUid','flag','value'].every(function(k){return Object.prototype.hasOwnProperty.call(payload,k);})||payload.command!=='object.layer.policy.edit'||!(['locked','shy'].includes(payload.flag)&&typeof payload.value==='boolean'||payload.flag==='keyLock'&&(payload.value===null||['in','out','layer'].includes(payload.value)))||typeof payload.layerUid!=='string'||!payload.layerUid||pin.layers.filter(function(l){return l.layerUid===payload.layerUid;}).length!==1)throw new Error('Native layer policy intent is stale or invalid');
+      if(!same(pin,expected)||!payload||Array.isArray(payload)||Object.keys(payload).length!==4||!['command','layerUid','flag','value'].every(function(k){return Object.prototype.hasOwnProperty.call(payload,k);})||payload.command!=='object.layer.policy.edit'||!(['locked','shy','threeD'].includes(payload.flag)&&typeof payload.value==='boolean'||payload.flag==='keyLock'&&(payload.value===null||['in','out','layer'].includes(payload.value)))||typeof payload.layerUid!=='string'||!payload.layerUid||pin.layers.filter(function(l){return l.layerUid===payload.layerUid;}).length!==1)throw new Error('Native layer policy intent is stale or invalid');
       return {apiVersion:2,requestId:requestId('layer-policy'),instanceId:pin.instanceId,documentId:pin.documentId,
         operation:'command.document.object.layer.policy.edit',expectedRevision:pin.contentRevision,
         payload:{command:'object.layer.policy.edit',layerUid:payload.layerUid,flag:payload.flag,value:payload.value}};
@@ -388,7 +388,7 @@
       state:function(){return {info:info,presented:presentedSession(),ticket:subscriptionTicket,active:active(),
         opening:openingRequested,pending:pending,synchronizing:synchronizing,
         projectionReady:typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true};}});
-    var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,
+    var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,held:function(){return ports.context?ports.context():null;},runComponent:function(action){return runFontResource(action,true);},
       dispatchApplication:function(request){if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');return ports.dispatchApplication(request);},
       state:function(){return {info:info,presentation:presentation,ticket:subscriptionTicket,active:active(),opening:openingRequested,pending:pending,
         synchronizing:synchronizing,subscribed:!!subscription,presentationCurrent:active()&&!synchronizing&&presentation&&same(info,presentation),
@@ -403,7 +403,7 @@
       if(!Exports||typeof Exports.run!=='function')return Promise.reject(new Error('Native object export adapter is unavailable'));
       var submitted=epoch(info);return Exports.run({
         enqueue:function(action){return enqueue(function(){guardEpoch(submitted);return action(requireActive());});},
-        frameRequest:frameRequest,invoke:function(request){return raw('nemo_native_object_export',request);}
+        frameRequest:frameRequest,soloLayers:ports.soloLayers,invoke:function(request){return raw('nemo_native_object_export',request);}
       },destination,frames,onProgress,signal,format);
     }
     function exportPng(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'png');}
@@ -411,7 +411,7 @@
     return Object.freeze({openPath:openPath,newProject:newProject,activateProject:activateProject,closeProject:function(){var C=typeof module==='object'&&module.exports?require('./native-object-project-close.js'):globalThis.NemoNativeObjectProjectClose;return C?C.run(closeHooks):Promise.reject(new Error('Native project Close is unavailable'));},cancelOpen:function(){if(!openingRequested)return false;openingCancelled=true;if(openExposure)openExposure.cancel();return true;},isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       readSubscriptionGeneration:function(){return subscriptionTicket;},
       readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
-      get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},
+      get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},get editPropertyKeysPaste(){return properties.available()?properties.editPropertyKeysPaste:undefined;},
       get editProperty(){return properties.available()?properties.editProperty:undefined;},
       info:function(){return info;},requestId:requestId,runFontResource:function(action){return runFontResource(action);},runResourceCommand:function(action){return runFontResource(action);},runComponentCommand:function(action){return runFontResource(action,true);},runResourceQuery:function(action){return runFontResource(action,'query');},reference:reference,historyFromUi:function(action){return history(action);},jumpHistory:history,readHistory:function(offset){try{return reads.readHistory(requireActive(),offset);}catch(error){return Promise.reject(error);}},setLayerVisibility:setLayerVisibility,readLayerTiming:reads.readLayerTiming,readLayerRange:reads.readLayerRange,readLayerPlacement:reads.readLayerPlacement,readLayerCells:reads.readLayerCells,readImageMesh:reads.readImageMesh,readWidgets:reads.readWidgets,readGhosts:reads.readGhosts,readRig:reads.readRig,readRigWeights:reads.readRigWeights,readSubselect:reads.readSubselect,readPresentedStrokes:reads.readPresentedStrokes,previewSubselect:reads.previewSubselect,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
@@ -453,7 +453,7 @@
         return session.readPropertyMetadata(selector);
       },
       readProperty:function(selector){var session=uiSession(root);if(!session)return Promise.reject(new Error('Native property session is unavailable'));return session.readProperty(selector);},
-      get editPropertyTrack(){var session=uiSession(root);return session&&session.editPropertyTrack;},
+      get editPropertyTrack(){var session=uiSession(root);return session&&session.editPropertyTrack;},get editPropertyKeysPaste(){var session=uiSession(root);return session&&session.editPropertyKeysPaste;},
       get editProperty(){var session=uiSession(root);return session&&session.editProperty;},
       selectLayer:function(index,preserve,uid,expected){return selectLayerUI(root,index,preserve,uid,expected);},
       projectSettings:function(){return root.NemoNativeProjectSettingsController||null;},
@@ -475,7 +475,7 @@
       if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.restoreInspector)root.NemoNativeObjectUI.restoreInspector(root);
       return false;
     }
-    var entered=root.NemoNativeComponentContext;if(entered&&!session.isIndeterminate()&&entered.paint(root,frameOnly))return true; // #2256: an entered component paints read-only
+    var entered=root.NemoNativeComponentContext;if(entered&&!session.isIndeterminate()&&entered.paint(root,frameOnly)){if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.paintMotionHeld)root.NemoNativeObjectUI.paintMotionHeld(root,nativeObjectUiPorts(root));return true;} // #2256: an entered component paints its own timeline; the Motion inspector reads the entered rows
     var ports=nativeObjectUiPorts(root);
     try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info(),frameOnly,ports)!==true)
       throw new Error('Native document UI presentation is unavailable');
@@ -489,7 +489,7 @@
   function selectLayerUI(root,index,preserveLayerSel,uid,expected){
     var session=uiSession(root);if(!session)return false;
     if(expected&&!same(session.info(),expected))return true;
-    if(root.NemoNativeComponentContext&&root.NemoNativeComponentContext.presented(root))return true; // #2256: no scene selection inside a component
+    var inside=root.NemoNativeComponentContext;if(inside&&inside.presented(root)){inside.selectLayer(root,index);return true;} // #2256: inside a component the component's own layer is activated, never a scene row
     try{if(!root.NemoNativeObjectUI)throw new Error('Native document UI selection is unavailable');
       root.NemoNativeObjectUI.select(root,session.info(),index,preserveLayerSel,uid,session.readPresentedObjectSession(),nativeObjectUiPorts(root));}
     catch(error){return uiFailure(root,error);}

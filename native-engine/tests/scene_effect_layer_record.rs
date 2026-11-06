@@ -100,7 +100,8 @@ fn disposition(id: &str) -> Disposition {
         | "effects-null-becomes-empty"
         | "collapsed-without-folder-dropped"
         | "effects-from-empty-dropped" => Refused(Invalid),
-        "blend-keys-retained" => Refused(Unsupported),
+        // #2257: the hold-only `blendKeys` are the layer's own record now, kept exactly as the baseline keeps them.
+        "blend-keys-retained" => Same,
         "effect-layer-false-dropped" => ExplicitFalse,
         "effects-absent-becomes-empty" | "folder-layer-defaults-collapsed-false" => {
             AbsentStaysAbsent
@@ -131,7 +132,7 @@ fn every_baseline_import_row_has_its_pinned_native_disposition() {
             Disposition::Refused(kind) => {
                 let error = decoded.unwrap_err();
                 assert_eq!(error.kind(), kind, "{id}: {error}");
-                if id != "matte-source-empty-string-kept" && id != "blend-keys-retained" {
+                if id != "matte-source-empty-string-kept" {
                     assert!(
                         input
                             .iter()
@@ -294,9 +295,15 @@ fn admission_refusals_have_typed_kinds_and_nothing_is_rewritten() {
             Unsupported,
         ),
         (
-            r#""blendKeys":[{"frame":0,"mode":"multiply"}]"#,
+            r#""blendKeys":[{"frame":0,"mode":"multiply","ease":1}]"#,
             Unsupported,
         ),
+        (r#""blendKeys":[{"frame":0}]"#, Invalid),
+        (r#""blendKeys":[]"#, Invalid),
+        (r#""blendKeys":[{"frame":2,"mode":"hue"},{"frame":2,"mode":"hue"}]"#, Invalid),
+        (r#""blendKeys":[{"frame":2,"mode":"hue"},{"frame":1,"mode":"hue"}]"#, Invalid),
+        (r#""blendKeys":[{"frame":2,"mode":""}]"#, Invalid),
+        (r#""blendKeys":[{"frame":-1,"mode":"multiply"}]"#, Invalid),
         (r#""isCanvasBackground":true"#, Unsupported),
     ] {
         assert_eq!(kind_of(members), Err(expected), "{members}");

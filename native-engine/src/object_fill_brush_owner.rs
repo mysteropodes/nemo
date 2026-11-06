@@ -5,6 +5,7 @@ use crate::commands::object_fill_owner::group_edit::boolean_edit::fill_trace::{
 use crate::commands::object_fill_owner::group_edit::boolean_edit::{
     BooleanEditKind, PreparedBooleanEdit,
 };
+use crate::commands::object_fill_owner::vector_edit::context;
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_boolean_ops::plan::check_scope;
 use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit};
@@ -136,12 +137,15 @@ impl ObjectFillOwner {
             frame: p.frame,
         };
         let origin = self.current_snapshot();
-        check_scope(origin.document(), &scope).map_err(|error| Self::fill_plan_error(&error))?;
-        let promoted = promoted(origin.document(), &scope)?;
-        if p.stamps.iter().any(|f| *f >= origin.document().total_frames) {
+        // #2256: a component target edits that component's own layers and records through a view of the document, as the vector owner does.
+        let view = context::view(origin.document(), &scope.context_id)?;
+        let document: &ObjectDocument = view.as_ref().unwrap_or_else(|| origin.document());
+        check_scope(document, &scope).map_err(|error| Self::fill_plan_error(&error))?;
+        let promoted = promoted(document, &scope)?;
+        if p.stamps.iter().any(|f| *f >= document.total_frames) {
             return Err(DispatchErrorCode::InvalidRequest);
         }
-        let base = promoted.as_ref().unwrap_or_else(|| origin.document());
+        let base = promoted.as_ref().unwrap_or(document);
         let keyed = key_stamps(base, &scope, &p.stamps)?;
         let (mut plan, shown) = plan_brush(
             keyed.as_ref().unwrap_or(base),
@@ -159,6 +163,9 @@ impl ObjectFillOwner {
         let stamped = stamp(&mut plan.document, &scope, &shown, &p.stamps, origin.content_revision())?;
         plan.changed |= !stamped.is_empty();
         plan.created.extend(stamped);
+        if view.is_some() {
+            plan.document = context::restore(plan.document, origin.document(), &scope.context_id)?;
+        }
         ObjectSnapshot::validate_drawing(&plan.document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
         Ok(PreparedBooleanEdit {

@@ -22,7 +22,6 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   var QUIET = 220, MAX_STEPS = 64, MAX_BYTES = 60000; // under the 65536-byte vector request cap
-  var SKIPPED = { bitmap: 'bitmap brushes', copy: 'brush dabs' }; // their image derives from more than the record
   var jobs = new WeakMap();
   function notice(root, text) { if (typeof root.showToast === 'function') try { root.showToast(text); } catch (_) {} }
   function timer(root) { return typeof root.setTimeout === 'function' ? root.setTimeout.bind(root) : setTimeout; }
@@ -89,8 +88,8 @@
     if (!labs || !I || !job.pin || job.frame === undefined) { notice(root, 'Restyling is not available right now.'); return { status: 'unavailable' }; }
     if (!samePin(livePin(root), job.pin) || (root.state && (root.state.activeSymbolId || null) !== job.symbol)) { notice(root, 'The selection changed \u2014 nothing was restyled.'); return { status: 'stale' }; }
     var here = owns(root); // false when the app has left the context the edit was made in (a flushed edit): the stale selection is dropped after the commit
-    var apply = job.paths.filter(function (p) { return !SKIPPED[p.data.nativeBrush]; }), skipped = job.paths.filter(function (p) { return SKIPPED[p.data.nativeBrush]; });
-    if (skipped.length) notice(root, 'Restyling ' + skipped.map(function (p) { return SKIPPED[p.data.nativeBrush]; }).filter(function (l, i, all) { return all.indexOf(l) === i; }).join(', ') + ' is not available on native projects yet.');
+    // A bitmap brush is restyled and re-baked, a texture anchor re-stamps its dabs, by the engine (A-bitmap-brush-edit): every selected item is a step.
+    var apply = job.paths;
     if (!apply.length) return { status: 'unavailable' };
     var S = root.NemoNativeSelectionSteps, layerUid = job.layerUid, frame = job.frame, steps;
     if (job.style.smooth !== undefined) {
@@ -232,7 +231,7 @@
     try { layers = await I.layerPaths(root, null, false, root.state.activeLayerIdx); } catch (_) { layers = null; }
     if (!layers) { notice(root, 'This layer cannot be read right now (locked or hidden).'); return { status: 'unavailable', count: 0 }; }
     if (I.pickContext(root) !== ctx || !samePin(livePin(root), layers.pin)) { notice(root, 'The document changed \u2014 nothing was replaced.'); return { status: 'stale', count: 0 }; }
-    var items = layers.paths.filter(function (p) { return !(p.data.nativeRole === 'fill' && p.data.nativeOwner) && !SKIPPED[p.data.nativeBrush]; });
+    var items = layers.paths.filter(function (p) { return !(p.data.nativeRole === 'fill' && p.data.nativeOwner) && p.data.nativeBrush !== 'copy'; }); // a dab takes the colour of its anchor, which is a step of its own
     var steps = S.recolourSteps(items, a, b);
     if (!steps.length) return { status: 'nomatch', count: 0 };
     if (JSON.stringify(steps).length > MAX_BYTES) { notice(root, 'Too much to replace at once.'); return { status: 'too_large', count: 0 }; }

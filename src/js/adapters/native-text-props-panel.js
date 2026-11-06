@@ -35,7 +35,8 @@
   // Reads the selected block's stored settings; null when it cannot be proven current. The result is a detached copy.
   async function read(root, p) {
     var I = root.NemoSelectCanvasIntent, s = session(root), R = reader(root, s), shown = I && I.presentedState(root), tg = p.data.nativeStableTarget;
-    if (!R || !shown || !tg || tg.frameScope.kind !== 'authored' || tg.contextId !== 'scene-root' || I.heldId(root) !== 'scene-root') return null;
+    // #2267: the block lives in the context the workspace holds (the scene root or the entered component), in the key cell the playhead shows it from.
+    if (!R || !shown || !tg || tg.frameScope.kind !== 'authored' || tg.contextId !== I.heldId(root)) return null;
     var v = await R.readBlock({ contextId: tg.contextId, layerUid: tg.layerUid, frameScope: { kind: 'authored', frame: tg.frameScope.frame }, strokeId: tg.strokeId }, shown.pin);
     return JSON.parse(JSON.stringify(v.block));
   }
@@ -94,7 +95,7 @@
     // A selection that outlived a frame, layer, tool or revision change is dropped by the overlay: it is never edited.
     if (!(O && typeof O.selectionContext === 'function' && O.selectionContext(root) === ctx)) { notice(root, 'The selection no longer applies here — select the text again.'); return { status: 'unavailable' }; }
     var tg = p.data.nativeStableTarget, shown = I.presentedState(root);
-    if (!tg || tg.frameScope.kind !== 'authored' || I.heldId(root) !== 'scene-root' || tg.contextId !== 'scene-root') { notice(root, 'Text settings cannot be edited here yet.'); return { status: 'unavailable' }; }
+    if (!tg || tg.frameScope.kind !== 'authored' || tg.contextId !== I.heldId(root)) { notice(root, 'Text settings cannot be edited here yet.'); return { status: 'unavailable' }; }
     if (!shown) { notice(root, 'The text settings are not available right now.'); return { status: 'unavailable' }; }
     var stored, patch, receipt;
     try {
@@ -106,7 +107,10 @@
     if (!Object.keys(patch).length) { refresh(root); return { status: 'noop' }; }
     var target = { contextId: tg.contextId, frameScope: { kind: 'authored', frame: tg.frameScope.frame }, layerUid: tg.layerUid, strokeId: tg.strokeId };
     try {
-      receipt = await W.editBlock(target, patch, shown.pin, function () { return I.pickContext(root) === ctx; });
+      // A held frame shows the text of an earlier key: Animation 2D keys the playhead cell with a copy of what it showed first (ensureKeyframe) and edits that
+      // copy; Motion edits the key it inherits in place (as every Select edit does).
+      var frame = root.state.currentFrame, copy = root.state.appMode !== 'motion' && Number.isInteger(frame) && frame !== tg.frameScope.frame;
+      receipt = await W.editBlock(target, patch, shown.pin, function () { return I.pickContext(root) === ctx; }, copy ? { copy: true, frame: frame } : undefined);
     } catch (error) {
       notice(root, t(root, 'toastTextEditRebuildFailed', 'The text could not be changed.'));
       refresh(root);

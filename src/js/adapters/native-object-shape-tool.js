@@ -3,9 +3,9 @@
 (function(root,factory){var node=typeof module==='object'&&module.exports;
   var api=factory(node?require('./native-object-draw-paint.js'):root.NemoNativeDrawPaint,node?require('./native-object-draw-symmetry.js'):root.NemoNativeDrawSymmetry,
     node?require('./native-object-draw-bitmap.js'):root.NemoNativeDrawBitmap,
-    node?require('./native-object-draw-resize.js'):root.NemoNativeDrawResize);
+    node?require('./native-object-draw-resize.js'):root.NemoNativeDrawResize,node?require('./native-layer-motion-pose.js'):root.NemoNativeLayerMotionPose||{needs:function(l){return !!l&&l.hasMotion===true;},read:function(){return Promise.reject(new Error('Motion'));},localize:function(t,e){return {t:t,end:e};},message:'The layer\u2019s Motion transform could not be read \u2014 nothing was drawn.'},node?require('./native-object-perspective-snap.js'):root.NemoNativePerspectiveSnap||{line:function(p,s,e){return e;},pull:function(p,s,w){return w;}},node?require('./native-object-pen-continue.js'):root.NemoNativePenContinue||{begin:function(){return null;},commit:function(){return Promise.resolve({status:'unavailable'});}});
   if(node)module.exports=api;else root.NemoNativeObjectShapeTool=api;
-}(typeof globalThis==='object'?globalThis:this,function(Paint,Symmetry,Bitmap,Resize){
+}(typeof globalThis==='object'?globalThis:this,function(Paint,Symmetry,Bitmap,Resize,Pose,Snap,Cont){
   'use strict';
   var tools=['line','rect','ellipse'],shapeTools=tools.concat(['star','speechbubble']); var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});} function fail(message){throw new Error(message);}
@@ -16,7 +16,7 @@
   function create(root,ports){
     var Mapping=ports.mapping,sizer=ports.freehand&&Resize?Resize.create(root,{Mapping:Mapping,session:session,bounds:bounds,scale:presentedScale,notice:notice,consume:consume}):null; // Alt+drag brush resize: UI state only
     var admitted=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:tools,handled=ports.freehand?['draw','fillbrush']:ports.pen?['pen']:shapeTools;
-    var drag=null,pending=null,uncertain=null,overlay=null,retired=false,gate=null,settled=Promise.resolve({status:'idle'});
+    var drag=null,pending=null,uncertain=null,overlay=null,retired=false,gate=null,moving=false,settled=Promise.resolve({status:'idle'});
     function session(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);} function nativeMode(){try{var s=session();return !!s&&s.blocksLegacy();}catch(_){return true;}}
     function notice(message){if(typeof root.showToast==='function')root.showToast(message);}
     function stageOrigin(e){var d=root.document;return e.target===d.getElementById('drawing-canvas')||e.target===d.getElementById('canvas-area');}
@@ -42,7 +42,7 @@
     function style(tool,proof){
       var s=root.state,current=session(),ownerInfo=current&&current.info(),port=root.NemoNativePerspectiveController;
       var perspective=port&&(proof?typeof port.readForCommand==='function'&&port.readForCommand(proof):port.read());
-      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
+      if(!(s.appMode==='anim2d'||s.appMode==='motion')||s.playing||s.spaceDown||s.isPanning||!perspective||!same(perspective.info,ownerInfo))fail('This drawing mode is unavailable in native shape tools.');
       if(ports.freehand)return ports.style();
       if(ports.pen)return Paint.shadowStyle(root,s,penStyle(s));
       // Shadow mode inks the shape in the swatch whatever Stroke/Fill say (applyShadowBrushTag).
@@ -79,8 +79,8 @@
       // The baseline draws on the ACTIVE layer; a canvas click on empty stage leaves _layerSel=[]. Only other/several layers are ambiguous.
       if(!Number.isSafeInteger(index)||!row||!Array.isArray(selected)||selected.length>1||selected.length===1&&selected[0]!==index)fail('Select one native Drawing layer.');
       var layer=(root.NemoNativeComponentContext&&root.NemoNativeComponentContext.layerRows(root)||info.layers).filter(function(l){return l.layerUid===row.layerUid;});
-      if(layer.length!==1||layer[0].locked===true||layer[0].visible===false||layer[0].parentLayerUid||layer[0].threeD===true||layer[0].hasMotion===true||row.threeD||row.motion&&Object.keys(row.motion).length)fail('The selected native layer is unavailable for this gesture.');
-      return row.layerUid;
+      if(layer.length!==1||layer[0].locked===true||layer[0].visible===false||layer[0].parentLayerUid||layer[0].threeD===true||row.threeD)fail('The selected native layer is unavailable for this gesture.');
+      moving=Pose.needs(layer[0]);return row.layerUid;
     }
     function capture(e){
       if(!Mapping||['point','transform','matchesView'].some(function(key){return typeof Mapping[key]!=='function';}))fail('Native canvas mapping is unavailable.');
@@ -90,7 +90,7 @@
           !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!root.NemoNativeObjectVector)fail('Native Drawing is not ready.');
       var perspective=root.NemoNativePerspectiveController&&root.NemoNativePerspectiveController.read();
       var t={context:contextId(root),perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),sel:JSON.stringify(root._layerSel),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
-      t.behind=root.state.drawMode==='behind';t.start=point(e,t);t.scale=presentedScale(t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
+      t.behind=root.state.drawMode==='behind';t.start=point(e,t);t.scale=presentedScale(t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);t.pose=moving?Pose.read(root,state.activeLayerIdx,pin,frame):null;return t;
     }
     // draw-bridge/shape-bridge @1065e9d8 keep the tool the gesture began with: a tool switch mid-drag still commits on release.
     // The brush style reads state.tool, so it is checked as that tool; a Pen gesture keeps its own switch rule (finalizePen).
@@ -107,7 +107,7 @@
     }
     function clear(){if(overlay){overlay.remove();overlay=null;}} function release(t){try{var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.releasePointerCapture)el.releasePointerCapture(t.pointer);}catch(_){} }
     function cancel(){if(gate)gate.cancel();if(sizer)sizer.cancel();if(drag){var t=drag;drag=null;t.cancelled=true;clear();release(t);}return {status:'cancelled'};}
-    function endpoint(t,e){var end=point(e,t);return !ports.freehand&&e.shiftKey?ports.constrain(t.tool,t.start,end):end;}
+    function endpoint(t,e){var end=point(e,t);if(!ports.freehand&&t.tool==='line')end=Snap.line(t.perspective,t.start,end);return !ports.freehand&&e.shiftKey?ports.constrain(t.tool,t.start,end):end;}
     function dictionary(t,end,final){
       if(ports.pen){
         var anchors=t.anchors.concat(end&&!t.handleDrag?[{point:end}]:[]);
@@ -142,7 +142,7 @@
       if(!current(t,true))return Promise.resolve({status:'cancelled'});
       if(ports.pen&&t.anchors.length<2)return Promise.resolve({status:'cancelled'});
       if(!ports.freehand&&!ports.pen&&Math.hypot(end[0]-t.start[0],end[1]-t.start[1])<2)return Promise.resolve({status:'cancelled'});
-      var dict=dictionary(t,end,true),s=t.session,companion=linkedCompanions.get(dict)||null;
+      var L=Pose.localize(t,end,t.local),dict=dictionary(L.t,L.end,true),s=t.session,companion=linkedCompanions.get(dict)||null; // Motion: stored in the layer's own space
       if(ports.freehand&&dict&&!dict.isFillShape&&!dict.isVectorBrush&&dict.segments&&dict.segments.length<2)return Promise.resolve({status:'cancelled'}); // tap: a one-anchor Path draws nothing
       // Labs predictive stroke (draw-bridge.js onStrokeCommitted @1065e9d8) reshapes a freehand stroke before it is committed.
       if(ports.freehand&&root.SMLabs&&typeof root.SMLabs.predictStrokeDict==='function')dict=root.SMLabs.predictStrokeDict(dict)||dict;
@@ -154,16 +154,18 @@
         if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});
         return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
       });};};
-      var guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:wrap('runResourceCommand'),runComponentCommand:typeof s.runComponentCommand==='function'?wrap('runComponentCommand'):undefined};
+      var guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:wrap('runResourceCommand'),runComponentCommand:typeof s.runComponentCommand==='function'?wrap('runComponentCommand'):undefined};if(ports.pen&&t.cont&&t.cont.ready)return Cont.commit(root,root.NemoNativeObjectVector.create(guarded,function(){return t.context;}),t,dict); // B-pen-continue: the press began on an open path's endpoint
       // draw-bridge.js Fill Brush: one native command places the shape (fillBrushMode) and merges same-colour fills.
       // Labs multi-frame draw stamps the path the merge hands back on the other selected frames, in the same commit.
       var fbStamps=dict.isFillShape&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'?root.SMLabs.multiframeTargets(t.frame):[];
-      if(dict.isFillShape)return root.NemoNativeFillDesktop.create({current:function(){return guarded;},ready:function(){return true;},
-        target:function(){return {layerUid:t.layerUid,frame:t.frame,contextId:'scene-root'};}}).brush({outline:dict.segments,color:dict.fillColor,opacity:dict.opacity,placement:root.state.fillBrushMode,mask:root.state.maskMode?root.state.maskModeType||'add':false,copies:Symmetry.matrices(root,t.pin),stamps:fbStamps})
+      var fillRoute=t.context!=='scene-root'&&guarded.runComponentCommand?Object.assign({},guarded,{runResourceCommand:guarded.runComponentCommand}):guarded; // an entered component: the resource route is scene-only (runFontResource)
+      if(dict.isFillShape)return root.NemoNativeFillDesktop.create({current:function(){return fillRoute;},ready:function(){return true;},
+        target:function(){return {layerUid:t.layerUid,frame:t.frame,contextId:t.context};}}).brush({outline:dict.segments,color:dict.fillColor,opacity:dict.opacity,placement:root.state.fillBrushMode,mask:root.state.maskMode?root.state.maskModeType||'add':false,copies:Symmetry.matrices(root,t.pin),stamps:fbStamps})
         .then(function(r){if(r&&r.applied&&fbStamps.length&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(fbStamps.length);
           return {status:r&&r.applied?'applied':'noop'};},root.NemoNativeObjectVector.statusOf);
       // draw-bridge.js Bitmap Brush: the anchor, its baked companion and the PNG in one native command.
-      if(t.style&&t.style.bitmap)return Bitmap.commit(root,guarded,t,dict,root.NemoNativeObjectVector.statusOf);
+      if(t.style&&t.style.bitmap){var bitmapRoute=t.context==='scene-root'?guarded:guarded.runComponentCommand?Object.assign({},guarded,{runResourceCommand:guarded.runComponentCommand}):null;if(!bitmapRoute){t.refusal='Bitmap brushes are not available inside a component.';return Promise.resolve({status:'unavailable',reason:'bitmap_component_unavailable'});}
+        return Bitmap.commit(root,bitmapRoute,t,dict,root.NemoNativeObjectVector.statusOf);} // an entered component: the stroke rides the component route (the resource route is scene-only)
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
       // G23 (symmetry-bridge.js onStrokeCommitted @1065e9d8): the stroke and its copies, each linked fill below its ribbon,
       // in one createMany (behind keeps the order at the bottom).
@@ -198,7 +200,8 @@
       return W.until(root,{readPresentedObjectSession:read},function(){return !!read();},function(){return current(t,true);},{notice:'The canvas is still busy - the stroke was not drawn.'}).then(function(ok){return ok?go():{status:'cancelled'};});
     }
     function submit(t,end){
-      pending=t;settled=commitAttempt(t,end).catch(function(){return {status:'unconfirmed'};}).then(function(result){
+      var run=function(local){t.local=local;return commitAttempt(t,end);};
+      pending=t;settled=(t.pose?t.pose.then(run,function(){t.refusal=Pose.message;return {status:'unavailable',reason:'motion_unavailable'};}):run(null)).catch(function(){return {status:'unconfirmed'};}).then(function(result){
         if(result.status==='indeterminate'||result.status==='unconfirmed')uncertain=t;
         if(!retired&&result.status!=='applied'&&result.status!=='noop'&&result.status!=='cancelled')notice(t.refusal||'Native shape drawing was not confirmed.');return result;
       }).finally(function(){if(pending===t)pending=null;});
@@ -227,7 +230,7 @@
             if(uncertain){var owner=session(),pin=owner&&owner.info();
               if(owner===uncertain.session&&pin&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===uncertain.pin[k];})){notice('Reopen the native project before drawing again; the previous result is unconfirmed.');return true;}
               uncertain=null;}
-            drag=capture(e);drag.pointerType=e.pointerType||'mouse';drag.anchors=[{point:drag.start,client:client}];drag.handleDrag=true;drag.last={time:now,client:client};
+            drag=capture(e);drag.pointerType=e.pointerType||'mouse';drag.anchors=[{point:drag.start,client:client}];drag.handleDrag=true;drag.last={time:now,client:client};Cont.begin(root,drag,Mapping);
             grab(e);preview(drag,drag.start);return true;
           }
           var t=drag;if(!current(t,true)){cancel();return true;}
@@ -269,7 +272,7 @@
             var events=kind==='move'&&typeof e.getCoalescedEvents==='function'?e.getCoalescedEvents():null;
             (events&&events.length?events:[e]).forEach(function(sample){
               if(sample.pointerId!==undefined&&sample.pointerId!==t.pointer)fail('Brush sample belongs to another pointer.');
-              ports.sample(t.samples,point(sample,t),sample,kind,t);});
+              ports.sample(t.samples,Snap.pull(t.perspective,t.start,point(sample,t)),sample,kind,t);});
           }
           if(kind==='move'){preview(t,end);return true;}
           if(kind==='up'){drag=null;clear();submit(t,end);release(t);return true;}

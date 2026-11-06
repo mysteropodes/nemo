@@ -30,15 +30,25 @@ pub(crate) enum PropertyAction {
         enabled: bool,
     },
     RemoveExpression {},
+    // `keepPose` (anchor only): Position follows the new anchor in the same revision, so the artwork stays where it is
+    // (the baseline anchor drag with Rotation or Scale set).
     SetValue {
         frame: Number,
         values: Vec<Number>,
+        #[serde(default, rename = "keepPose")]
+        keep_pose: bool,
     },
     SetKey {
         frame: Number,
         values: Vec<Number>,
         #[serde(default, rename = "curvePoints")]
         curve_points: Presence<Option<Vec<OrderCurvePoint>>>,
+    },
+    // One spatial handle (`hIn` or `hOut`, a 2-vector relative to the key's own point) of an existing key of a 2-D track.
+    SetKeyHandle {
+        frame: Number,
+        handle: String,
+        values: Vec<Number>,
     },
     RemoveKey {
         frame: Number,

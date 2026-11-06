@@ -24,7 +24,8 @@
 use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
     finish, layer_position, scene_authored, timing_refusal,
 };
-use crate::commands::object_fill_owner::object_frame_clipboard_repeat_wire::parse_repeat_payload;
+use crate::commands::object_fill_owner::object_context_projection::through;
+use crate::commands::object_fill_owner::object_frame_clipboard_repeat_wire::parse_repeat_payload_in;
 use crate::commands::object_fill_owner::object_frame_clipboard_tracks::repeat_motion_tracks;
 use crate::commands::object_fill_owner::object_frame_edit_document::{
     clone_cell, drop_cells, DocumentEdit,
@@ -351,22 +352,42 @@ impl ObjectFillOwner {
         &self,
         request: &RepeatRequest,
     ) -> Result<PreparedFrameRepeat, DispatchErrorCode> {
+        self.prepare_frame_repeat_in(request, CONTEXT)
+    }
+
+    /// #2256: the cycle inside `context` (a declared component is the scene of the unchanged kernel; its frame count grows on its own
+    /// record and the project settings, a scene fact, are never touched).
+    pub(crate) fn prepare_frame_repeat_in(
+        &self,
+        request: &RepeatRequest,
+        context: &str,
+    ) -> Result<PreparedFrameRepeat, DispatchErrorCode> {
         let origin = self.current_snapshot();
-        let document = match repeat_cells(origin.document(), request)? {
-            DocumentEdit::Changed(next) => Some(next),
-            DocumentEdit::NoChange => None,
+        let mut counts = None;
+        let document = through(origin.document(), context, |view| {
+            let edited = match repeat_cells(view, request)? {
+                DocumentEdit::Changed(next) => Some(next),
+                DocumentEdit::NoChange => None,
+            };
+            // repeat_cells validated these bounds before preparing the detached result.
+            let first =
+                layer_position(view, &request.from_layer).ok_or(DispatchErrorCode::NotFound)?;
+            let last =
+                layer_position(view, &request.to_layer).ok_or(DispatchErrorCode::NotFound)?;
+            let skipped = view.layers[first..=last]
+                .iter()
+                .filter(|layer| is_component_layer(view, &layer.layer_uid))
+                .count();
+            counts = Some((last - first + 1 - skipped, skipped));
+            Ok(edited)
+        })?;
+        let metadata = if context == CONTEXT {
+            repeat_project_metadata(&origin, document.as_ref())?
+        } else {
+            None
         };
-        let metadata = repeat_project_metadata(&origin, document.as_ref())?;
-        // repeat_cells validated these bounds before preparing the detached result.
-        let source = origin.document();
-        let first =
-            layer_position(source, &request.from_layer).ok_or(DispatchErrorCode::NotFound)?;
-        let last = layer_position(source, &request.to_layer).ok_or(DispatchErrorCode::NotFound)?;
-        let skipped_component_layers = source.layers[first..=last]
-            .iter()
-            .filter(|layer| is_component_layer(source, &layer.layer_uid))
-            .count();
-        let cycled_layers = last - first + 1 - skipped_component_layers;
+        let (cycled_layers, skipped_component_layers) =
+            counts.ok_or(DispatchErrorCode::Internal)?;
         Ok(PreparedFrameRepeat {
             origin,
             document,
@@ -380,7 +401,8 @@ impl ObjectFillOwner {
         &self,
         bytes: &[u8],
     ) -> Result<PreparedFrameRepeat, DispatchErrorCode> {
-        self.prepare_frame_repeat(&parse_repeat_payload(bytes)?)
+        let (request, context) = parse_repeat_payload_in(bytes)?;
+        self.prepare_frame_repeat_in(&request, &context)
     }
 
     /// Publish a prepared cycle: instance, document, snapshot and content revision must still be the candidate's

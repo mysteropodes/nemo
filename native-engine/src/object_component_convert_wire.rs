@@ -23,6 +23,19 @@ object_deserialize!(ConvertPayload {
     layer_uids: Vec<String>
 });
 
+/// `object.component.breakApart`: the instance layer to bake back into an ordinary layer (scene root only).
+#[derive(Debug)]
+pub(super) struct BreakApartPayload {
+    pub(super) command: String,
+    pub(super) context_id: String,
+    pub(super) layer_uid: String,
+}
+object_deserialize!(BreakApartPayload {
+    command: String,
+    context_id: String,
+    layer_uid: String
+});
+
 #[derive(Debug)]
 pub(super) struct ExposePayload {
     pub(super) command: String,
@@ -136,6 +149,7 @@ pub(super) struct DuplicatorConfigPayload {
     pub(super) seed: Presence<Number>,
     pub(super) stagger_random: Presence<StaggerPayload>,
     pub(super) time_offset: Presence<TimeOffsetPayload>,
+    pub(super) effector_pos: Presence<EffectorPosPayload>,
 }
 object_deserialize!(DuplicatorConfigPayload {
     command: String, layer_uid: String,
@@ -146,8 +160,18 @@ object_deserialize!(DuplicatorConfigPayload {
     #[serde(default)] radial_orient: Presence<bool>,
     #[serde(default)] path_align_tangent: Presence<bool>, #[serde(default)] seed: Presence<Number>,
     #[serde(default)] stagger_random: Presence<StaggerPayload>,
-    #[serde(default)] time_offset: Presence<TimeOffsetPayload>
+    #[serde(default)] time_offset: Presence<TimeOffsetPayload>,
+    #[serde(default)] effector_pos: Presence<EffectorPosPayload>
 });
+
+/// The Motion canvas effector handle drag: the inline effector at `index` takes the world anchor (`x`, `y`).
+#[derive(Debug)]
+pub(super) struct EffectorPosPayload {
+    pub(super) index: Number,
+    pub(super) x: Number,
+    pub(super) y: Number,
+}
+object_deserialize!(EffectorPosPayload { index: Number, x: Number, y: Number });
 
 /// `object.component.instance.set`: the Component Instance panel's closed partial edit, every member but the layer optional.
 #[derive(Debug)]

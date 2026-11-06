@@ -51,6 +51,7 @@
     if(!paintMotionInspector(root))return false;var surface=motionSurfaces.get(root);if(!surface)return false;
     var result=surface.shortcut(key,shift);if(result===null)return false;Promise.resolve(result).catch(function(){});return true;
   }
+  function routeMotionKeyEdit(root,action,opts){var surface=paintMotionInspector(root)?motionSurfaces.get(root):null;return Promise.resolve(surface?surface.editKeys(action,opts):null);}
   function readMotion(root,info,method){
     try{
       var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),surface=motionSurface(root);
@@ -60,8 +61,7 @@
     }catch(_){return null;}
   }
   function readSelectedMotionKeys(root,info){return readMotion(root,info,'captureSelectedKeys');}
-  function readMotionKeyTimeline(root,info){return readMotion(root,info,'readKeyTimeline');}
-  function readMotionKeyTimelines(root,info){return readMotion(root,info,'readKeyTimelines');}
+  function readMotionKeyTimeline(root,info){return readMotion(root,info,'readKeyTimeline');} function readMotionKeyTimelines(root,info){return readMotion(root,info,'readKeyTimelines');}
   function setKeyTimelineRows(root,layout,info){
     var view=views.get(root);
     if(!view||!sameTimingPin(view.pin,info)||!Array.isArray(layout)||!view.rows.every(function(row,i){return row.parentNode===view.list&&row.children.length===view.controls[i].length&&view.controls[i].every(function(n,k){return row.children[k]===n;});}))return false;
@@ -288,7 +288,7 @@
           if(row.parentNode!==list||!views.get(root)||!views.get(root).rows.includes(row))return false;
           return setLayerPolicy(root,layer.layerUid,flag,value,info,ports);
         },
-        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);},rowEdit:root.NemoNativeLayerRowUi?function(layer,i,row){return root.NemoNativeLayerRowUi.bind(root,layer,i,row);}:null,parentCell:root.NemoNativeLayerParent?function(layer,i,row){return root.NemoNativeLayerParent.cell(root,info,layer,i,row);}:null,duplicatorCell:root.NemoNativeObjectDuplicatorUi?function(layer,i,row){return root.NemoNativeObjectDuplicatorUi.cell(root,info,layer,i,row);}:null,layerKind:root.SMLayerKind,blendLabels:root.BLEND_MODE_LABELS,matteLabel:typeof root.matteModeLabel==='function'?root.matteModeLabel:null});
+        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);},rowEdit:root.NemoNativeLayerRowUi?function(layer,i,row){return root.NemoNativeLayerRowUi.bind(root,layer,i,row);}:null,parentCell:root.NemoNativeLayerParent?function(layer,i,row){return root.NemoNativeLayerParent.cell(root,info,layer,i,row);}:null,threeDCell:root.NemoNativeLayerThreeD?function(layer,toggle){return root.NemoNativeLayerThreeD.cell(root.document,layer,toggle);}:null,duplicatorCell:root.NemoNativeObjectDuplicatorUi?function(layer,i,row){return root.NemoNativeObjectDuplicatorUi.cell(root,info,layer,i,row);}:null,soloCell:root.NemoNativeLayerSolo?function(layer,i,row){return root.NemoNativeLayerSolo.cell(root,info,layer,i,row);}:null,layerKind:root.SMLayerKind,blendLabels:root.BLEND_MODE_LABELS,matteLabel:typeof root.matteModeLabel==='function'?root.matteModeLabel:null});
       caption=createNativeObjectUiText(root,'div','');
       unavailable=createNativeObjectUiText(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
       unavailable.setAttribute('role','status');unavailable.className='native-object-timing-unavailable';
@@ -296,7 +296,7 @@
       list.replaceChildren.apply(list,rows);header.replaceChildren(caption);grid.replaceChildren(unavailable);
     }
     if(root.NemoNativeLayerRangeDesktop&&typeof root.NemoNativeLayerRangeDesktop.mount==='function')
-      root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{setKeyTimelineRows:function(layout,expected){return setKeyTimelineRows(root,layout,expected);},readMotionKeyTimelines:function(expected){return readMotionKeyTimelines(root,expected);},readMotionKeyTimeline:function(expected){return readMotionKeyTimeline(root,expected);},readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
+      root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{setKeyTimelineRows:function(layout,expected){return setKeyTimelineRows(root,layout,expected);},readMotionKeyTimelines:function(expected){return readMotionKeyTimelines(root,expected);},readMotionKeyTimeline:function(expected){return readMotionKeyTimeline(root,expected);},readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},editSelectedKeys:function(action,opts){return routeMotionKeyEdit(root,action,opts);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
     caption.textContent='Frame '+(root.state.currentFrame+1)+' / '+info.totalFrames;
     if(root.NemoNativeFrameCellSelection)root.NemoNativeFrameCellSelection.mount(root,caption,info,Object.assign({},ports,{frameOnly:reuse===true,
       frameEditPending:function(){var controller=root.NemoNativeFrameEditController;return !!(controller&&controller.isPending());}}));
@@ -394,9 +394,9 @@
   function retirePolicy(root){policyEpochs.set(root,(policyEpochs.get(root)||0)+1);policyTasks.delete(root);views.delete(root);}
   function policySelection(root){return JSON.stringify([root.state.appMode,root.state.activeLayerIdx,root._layerSel||[]]);}
   function setLayerPolicy(root,uid,flag,value,expected,ports){
-    function refused(){if(root.showToast)root.showToast('Native layer policy was not confirmed.');return false;}
+    function refused(error){var no3d=flag==='threeD'&&value===true&&/refused: unavailable/.test(String(error&&error.message||''));if(root.showToast)root.showToast(no3d?'3D is not available for this layer yet.':'Native layer policy was not confirmed.');return false;} // #2520: a refused 3D switch is the engine's typed unavailable (no revision): this layer cannot be placed in 3D yet
     try{
-      if(!nativeObjectUiPortsReady(ports)||!['locked','shy'].includes(flag)||typeof value!=='boolean'||typeof ports.readTransportGeneration!=='function'||!Number.isSafeInteger(ports.readTransportGeneration())||ports.readTransportGeneration()<0||policyTasks.has(root))return Promise.resolve(false);
+      if(!nativeObjectUiPortsReady(ports)||!['locked','shy','threeD'].includes(flag)||typeof value!=='boolean'||typeof ports.readTransportGeneration!=='function'||!Number.isSafeInteger(ports.readTransportGeneration())||ports.readTransportGeneration()<0||policyTasks.has(root))return Promise.resolve(false);
       var owner=policyPort(ports),session=ports.currentSession(),info=session&&session.info(),view=views.get(root),epoch=policyEpochs.get(root)||0;
       var layer=info&&info.layers.filter(function(l){return l.layerUid===uid;});
       if(!view||!sameTimingPin(view.pin,info)||!owner||!session||!session.isActive()||!sameTimingPin(expected,info)||!confirmed(root,info,session.readPresentedObjectSession())||!layer||layer.length!==1||ports.projectionReady(info)!==true)return Promise.resolve(false);
@@ -412,7 +412,7 @@
       }).then(function(result){
         if(result!==true||policyTasks.get(root)!==ticket||(policyEpochs.get(root)||0)!==epoch||policySelection(root)!==signature||ports.currentSession()!==session||!session.isActive()||!views.get(root)||views.get(root).ports!==ports||views.get(root).list!==view.list||policyPort(ports)!==owner||ports.readTransportGeneration&&ports.readTransportGeneration()!==transport)return refused();
         var next=session.info(),target=next&&next.layers.filter(function(l){return l.layerUid===uid;});
-        if(!next||!['instanceId','documentId','lifecycleGeneration'].every(function(k){return next[k]===pin[k];})||next.contentRevision<=pin.contentRevision||next.documentSnapshotId===pin.documentSnapshotId||!target||target.length!==1||target[0][flag]!==value||ports.projectionReady(next)!==true||!confirmed(root,next,session.readPresentedObjectSession()))return refused();
+        if(!next||!['instanceId','documentId','lifecycleGeneration'].every(function(k){return next[k]===pin[k];})||next.contentRevision<=pin.contentRevision||next.documentSnapshotId===pin.documentSnapshotId||!target||target.length!==1||(target[0][flag]===true)!==value||ports.projectionReady(next)!==true||!confirmed(root,next,session.readPresentedObjectSession()))return refused();
         // Only UI-owned selection/presentation ports run after native confirmation.
         if(flag==='locked'&&value&&root.state.appMode==='drawing'&&typeof ports.clearDrawingSelection==='function')ports.clearDrawingSelection(uid,next);
         if(flag==='shy'&&value&&typeof ports.setShyMode==='function')ports.setShyMode(true,next);
@@ -496,5 +496,5 @@
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }
-  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,readImageMeshSelection:readImageMeshSelection,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,isFrameSelectionPending:isFrameSelectionPending,showRepeatDialog:showRepeatDialog,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
+  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,readImageMeshSelection:readImageMeshSelection,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,isFrameSelectionPending:isFrameSelectionPending,showRepeatDialog:showRepeatDialog,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut,routeMotionKeyEdit:routeMotionKeyEdit,paintMotionHeld:function(root,ports){var prior=inspectors.get(root);if(prior&&root.NemoNativeComponentContext&&root.NemoNativeComponentContext.presented(root))paintMotion(root,ports,prior);}});
 }));

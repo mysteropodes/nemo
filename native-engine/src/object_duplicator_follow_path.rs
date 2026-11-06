@@ -43,7 +43,7 @@ fn centre(records: &[ObjectRecord]) -> Result<[f64; 2], Unavailable> {
     let mut bounds: Option<kurbo::Rect> = None;
     for record in records {
         // A rig/shape/style-specific pivot needs its actual geometry consumer.
-        if record.vector_ext.value().is_some() || record.has_enabled_effects() {
+        if record.vector_ext.value().is_some() {
             return Err(Unavailable::LayerMotion);
         }
         let ring = segments(record)?

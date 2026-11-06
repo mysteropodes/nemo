@@ -82,9 +82,16 @@ pub(crate) fn raster(
         return Err(unavailable(host, "component source layer is unavailable"));
     }
     layer_supported(packet, target.context_id(), layer, host)?;
-    if item.is_bitmap_brush() == Some(true)
-        || item.brush_group_id().is_some()
-        || item.is_brush_texture_copy() == Some(true)
+    // #2361: a bitmap-brush companion is the baked stamps of the stroke -- its PNG painted at its rect, which is exactly what the baseline's Raster is.
+    // Any other brush tag on an image (a half-formed companion, a stored raster dab) still needs the scene brush producer. The texture dabs of a
+    // seeded vector anchor ARE painted inside a component (object_brush_dab_paint expands the placed anchor), so they never reach this image path.
+    let bitmap_companion = item.is_bitmap_brush() == Some(true)
+        && item.is_brush_texture_copy() == Some(true)
+        && item.brush_group_id().is_some_and(|group| !group.is_empty());
+    if !bitmap_companion
+        && (item.is_bitmap_brush() == Some(true)
+            || item.brush_group_id().is_some()
+            || item.is_brush_texture_copy() == Some(true))
     {
         return Err(unavailable(
             host,

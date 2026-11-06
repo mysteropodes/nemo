@@ -1,10 +1,12 @@
 //! Sealed tween edit using the existing native object revision owner.
+use crate::commands::object_fill_owner::object_context_projection::{context_of, embed, project};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::ObjectDocument;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
 use crate::tween_kernels::{
-    plan_tween, prepare_tween_resources, PreparedTweenResources, TweenRequest,
+    plan_tween, prepare_tween_resources, prepare_tween_resources_in, PreparedTweenResources, TweenPlan,
+    TweenRequest,
 };
 #[derive(Debug)]
 pub(crate) struct PreparedTween {
@@ -27,13 +29,36 @@ impl ObjectFillOwner {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let origin = self.current_snapshot();
-        let planned = plan_tween(
-            origin.document(),
-            &request,
-            origin
-                .project()
-                .and_then(|p| p.project().custom_brush_presets()),
-        )?;
+        let custom = origin
+            .project()
+            .and_then(|p| p.project().custom_brush_presets());
+        // #2358: a declared component is the "scene" of the tween kernels, exactly as the baseline's enterSymbol swapped `state.layers`
+        // for the component's: project, plan, embed (the scene, the other components and the placement tables stay as they were).
+        // A tween that re-bakes a bitmap brush publishes a project resource: the bakes run on the projected component (its raster records are the
+        // scene of the kernels) and the baked drawing is embedded back into the real document before it is validated and published.
+        let context = context_of(&request.context_id)?;
+        let planned = if context == "scene-root" {
+            plan_tween(origin.document(), &request, custom)?
+        } else {
+            let view = project(origin.document(), context)?;
+            match plan_tween(&view, &request, custom)? {
+                None => None,
+                Some(plan) if !plan.bakes.is_empty() => {
+                    let resources = prepare_tween_resources_in(&origin, plan.document, plan.bakes, |baked| {
+                        embed(origin.document(), context, &view, baked)
+                    })?;
+                    return Ok(PreparedTween {
+                        origin,
+                        resources: Some(resources),
+                        document: None,
+                    });
+                }
+                Some(plan) => Some(TweenPlan {
+                    document: embed(origin.document(), context, &view, plan.document)?,
+                    bakes: Vec::new(),
+                }),
+            }
+        };
         let (document, resources) = match planned {
             None => (None, None),
             Some(plan) => {

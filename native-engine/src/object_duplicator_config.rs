@@ -17,7 +17,7 @@ use crate::commands::object_fill_owner::component_owner::object_component_conver
 };
 use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
 use crate::object_document::object_component_record_kernels::object_duplicator_records::{
-    DuplicatorDescriptor, StaggerRandom, TimeOffset,
+    DuplicatorDescriptor, EffectorPos, StaggerRandom, TimeOffset,
 };
 use crate::object_document::{ObjectDocument, Presence};
 use serde_json::Number;
@@ -47,6 +47,15 @@ pub(crate) struct TimeEdit {
     pub(crate) direction: Option<String>,
 }
 
+/// #2520/#2525: the Motion canvas effector handle drag, `eff.pos = {x, y}` of `motion.js@1065e9d8` onDrag 'effector': the
+/// inline effector at `index` of the descriptor takes this world anchor; every other member of it keeps its bytes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct EffectorMove {
+    pub(crate) index: u32,
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+}
+
 /// The members of one `object.duplicator.config` request (every one optional).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct ConfigEdit {
@@ -63,6 +72,7 @@ pub(crate) struct ConfigEdit {
     pub(crate) seed: Option<u64>,
     pub(crate) stagger_random: Option<StaggerEdit>,
     pub(crate) time_offset: Option<TimeEdit>,
+    pub(crate) effector_pos: Option<EffectorMove>,
 }
 
 /// A JSON number: an integer when the value is one (so a stored `2` stays `2`), else the float.
@@ -95,6 +105,22 @@ fn label(wanted: &Option<String>, allowed: &[&str]) -> Result<(), SetupError> {
     }
 }
 
+/// Move the named inline effector; an index past the stored list or a non-finite point is a typed refusal.
+fn move_effector(descriptor: &mut DuplicatorDescriptor, wanted: &EffectorMove) -> Result<(), SetupError> {
+    if !wanted.x.is_finite() || !wanted.y.is_finite() {
+        return Err(SetupError::ConfigInvalid);
+    }
+    let Presence::Present(list) = &mut descriptor.effectors else {
+        return Err(SetupError::ConfigInvalid);
+    };
+    let effector = list.get_mut(wanted.index as usize).ok_or(SetupError::ConfigInvalid)?;
+    let same = effector.pos.value().is_some_and(|p| p.x.as_f64() == Some(wanted.x) && p.y.as_f64() == Some(wanted.y));
+    if !same {
+        effector.pos = Presence::Present(EffectorPos { x: number(wanted.x), y: number(wanted.y) });
+    }
+    Ok(())
+}
+
 fn apply(descriptor: &mut DuplicatorDescriptor, edit: &ConfigEdit) -> Result<(), SetupError> {
     label(&edit.mode, &MODES)?;
     if let Some(time) = &edit.time_offset {
@@ -102,6 +128,9 @@ fn apply(descriptor: &mut DuplicatorDescriptor, edit: &ConfigEdit) -> Result<(),
     }
     if edit.seed.is_some_and(|seed| seed > MAX_SEED) {
         return Err(SetupError::SeedRange);
+    }
+    if let Some(wanted) = &edit.effector_pos {
+        move_effector(descriptor, wanted)?;
     }
     if let Some(mode) = &edit.mode {
         if descriptor.mode.value() != Some(mode) {

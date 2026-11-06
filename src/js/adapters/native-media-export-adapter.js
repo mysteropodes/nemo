@@ -16,11 +16,11 @@
   const AUDIO_DISPOSITION = 'silent_baseline';
   const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 
-  // input: { outputHandle, kind, frameFormat, range: { start?, end? }, size?: { width, height }, video?: { fps?, quality? } }
+  // input: { outputHandle, kind, frameFormat, range: { start?, end? }, size?: { width, height }, video?: { fps?, quality? }, soloLayers?: [uid ...] }
   // range members absent = the project work area; PNG frames need size (the pinned OutputSpec), SVG frames take none.
   function build(pinned, input) {
     core.rejectRaw(input);
-    core.exact(input, ['outputHandle', 'kind', 'frameFormat', 'range'], ['size', 'video'], 'media export input');
+    core.exact(input, ['outputHandle', 'kind', 'frameFormat', 'range'], ['size', 'video', 'soloLayers'], 'media export input');
     core.exact(input.range, [], ['start', 'end'], 'range');
     const payload = {
       documentSnapshotId: pinned.documentSnapshotId,
@@ -37,6 +37,8 @@
       core.exact(input.video, [], ['fps', 'quality'], 'video');
       payload.video = { ...(has(input.video, 'fps') ? { fps: input.video.fps } : {}), ...(has(input.video, 'quality') ? { quality: input.video.quality } : {}) };
     }
+    // The Solo view (#2371): an empty set is no solo and stays off the wire.
+    if (input.soloLayers !== undefined && input.soloLayers.length) payload.soloLayers = contract.copySolo(input.soloLayers);
     contract.payload(contract.MEDIA_BEGIN, payload);
     const { start, end } = payload.range;
     const known = start !== undefined && end !== undefined;

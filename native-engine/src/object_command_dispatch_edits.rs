@@ -124,10 +124,11 @@ impl NativeObjectHistory {
         match self.prepare_layer_policy_json(payload) {
             Ok(candidate) => {
                 let before = self.content_revision();
+                let disclosure = candidate.disclosure();
                 self.commit_layer_policy(candidate)
                     .map(|revision| CompactResult::Command {
                         applied: revision != before,
-                        history_entries_added: u64::from(revision != before),
+                        history_entries_added: u64::from(revision != before && !disclosure),
                     })
                     .map_err(|code| (code, "Layer policy could not commit."))
             }
@@ -194,6 +195,15 @@ impl NativeObjectHistory {
                     })
                     .map_err(|code| (code, "Project settings could not commit."))
             }
+            Err(DispatchErrorCode::Unavailable) => Err((
+                DispatchErrorCode::Unavailable,
+                if request.operation == OP_PROJECT_SETTINGS {
+                    self.project_length_refusal(&payload)
+                } else {
+                    None
+                }
+                .unwrap_or("Native project settings are unavailable."),
+            )),
             Err(code) => Err((
                 code,
                 "Project settings payload is invalid or project is absent.",

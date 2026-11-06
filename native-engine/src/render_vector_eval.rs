@@ -349,7 +349,10 @@ pub(crate) fn duplicator_geometry(
         segments =
             motion::apply_element_motion(packet.snapshot(), record, packet.frame(), segments)?;
     }
-    segments = motion::apply_duplicator_layer_position(packet, record, layer_index, segments)?;
+    // A 3D layer's Position is part of its Pose3D: the projector replaces the 2D layer Position (baseline `is3D`).
+    if layer.three_d.value() != Some(&true) {
+        segments = motion::apply_duplicator_layer_position(packet, record, layer_index, segments)?;
+    }
     Ok((segments, record.geometry.closed))
 }
 
@@ -475,7 +478,7 @@ pub(crate) fn evaluate_record(
 mod pose;
 pub(crate) use pose::{
     common_layer_motion_target, evaluate_record_rest_with_pose, evaluate_record_with_pose,
-    has_unjoined_parent_blend,
+    has_unjoined_parent_blend, plain_empty_layer, three_d_joins_batch,
 };
 
 #[cfg(test)]

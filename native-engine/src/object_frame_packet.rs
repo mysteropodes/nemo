@@ -4,7 +4,7 @@ use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_
 // Detached geometry planning is a frame-source port; rendering never owns publication.
 pub(crate) use crate::object_document::subselect::record as subselect_record;
 pub(crate) use crate::object_document::{
-    AuthoredOrder, BitmapBrushFields, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget,
+    AuthoredOrder, BitmapBrushFields, FrameScopeKind, LayerEffect, ObjectLayer, ObjectRecord, ObjectTarget,
     Presence, PropertyHolderTarget, SolidFill, VECTOR_FAMILY,
 };
 use crate::revision::ObjectSnapshot;
@@ -37,6 +37,9 @@ mod order;
 pub(crate) mod text;
 #[path = "object_frame_video.rs"]
 pub(crate) mod video;
+// #2371: the Solo view's visibility rule the packet and its joins read.
+#[path = "object_solo_view.rs"]
+pub mod solo_view;
 pub use order::{NumericElementOrder, NumericLayerOrder, NumericOrderPlan};
 #[path = "object_property_sampling.rs"]
 mod property_sampling;
@@ -219,6 +222,8 @@ pub struct ObjectFramePacket {
     source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,
     motion_receipts: Vec<motion_receipts::MotionReceipt>,
+    /// `(layer uid, evaluated matteOn)` of the layers whose switch is expressed (see `capture_matte_on`).
+    matte_on_receipts: Vec<(String, f64)>,
     selector_receipts: Vec<text_selectors::SelectorReceipt>,
 }
 

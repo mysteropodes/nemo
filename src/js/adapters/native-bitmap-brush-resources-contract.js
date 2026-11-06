@@ -69,14 +69,14 @@
   }
 
   function finite(v) { if (typeof v !== 'number' || !Number.isFinite(v)) fail('number invalid'); }
-  // The anchor is checked here only for what pairs it: a new scene-root vector path carrying its brush group.
+  // The anchor is checked here only for what pairs it: a new vector path (the scene's or a declared component's, which the owner resolves) carrying its brush group.
   function stroke(p) {
     var behind = plain(p) && has(p, 'placement');
     exact(p, ['documentSnapshotId', 'lifecycleGeneration', 'record', 'companion', 'source'].concat(behind ? ['placement'] : []), 'bitmap stroke');
     if (behind && p.placement !== 'behind') fail('bitmap stroke placement invalid');
     id(p.documentSnapshotId); int(p.lifecycleGeneration, 1);
     var r = p.record, ext = plain(r) && plain(r.vectorExt) ? r.vectorExt.bitmapBrush : null;
-    if (!plain(r) || r.family !== 'editable-vector-path' || !plain(r.target) || r.target.strokeId !== '' || r.target.contextId !== 'scene-root' ||
+    if (!plain(r) || r.family !== 'editable-vector-path' || !plain(r.target) || r.target.strokeId !== '' || typeof r.target.contextId !== 'string' || !r.target.contextId || r.target.contextId.length > 128 ||
       !plain(ext) || !plain(ext.bitmapBrushSpec)) fail('bitmap stroke anchor invalid');
     opaque(ext.brushGroupId);
     var c = p.companion;

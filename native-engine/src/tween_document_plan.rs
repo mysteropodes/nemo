@@ -16,10 +16,12 @@ pub(crate) struct TweenRequest {
     pub(crate) selection: Presence<Vec<u32>>,
     pub(crate) span: Presence<TweenSpan>,
     pub(crate) frame: Presence<u32>,
+    /// #2358 B-comp-edit-rest: the context whose layer is tweened (absent is the scene root, else a declared component).
+    pub(crate) context_id: Presence<String>,
 }
 object_deserialize!(TweenRequest{command:String,layer_uid:String,#[serde(default)] options:Presence<TweenOptions>,
     #[serde(default)] starts:Presence<Vec<u32>>,#[serde(default)] selection:Presence<Vec<u32>>,
-    #[serde(default)] span:Presence<TweenSpan>,#[serde(default)] frame:Presence<u32>});
+    #[serde(default)] span:Presence<TweenSpan>,#[serde(default)] frame:Presence<u32>,#[serde(default)] context_id:Presence<String>});
 pub(crate) struct TweenPlan {
     pub(crate) document: ObjectDocument,
     pub(crate) bakes: Vec<BitmapTweenBake>,

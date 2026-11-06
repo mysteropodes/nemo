@@ -1,6 +1,6 @@
 //! Sealed project settings edits through the existing revision owner.
 use crate::commands::ObjectFillOwner;
-use crate::object_document::{object_deserialize, Presence, ProjectMetadata};
+use crate::object_document::{object_deserialize, ObjectDocument, Presence, ProjectMetadata};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
@@ -12,6 +12,8 @@ mod composition_delta;
 mod custom_brush_delta;
 #[path = "object_project_guide_edit.rs"]
 mod guide_delta;
+#[path = "object_project_length_edit.rs"]
+mod length_edit;
 #[path = "object_project_palette_edit.rs"]
 mod palette_delta;
 #[path = "object_project_perspective_edit.rs"]
@@ -66,6 +68,10 @@ enum SettingsAction {
         #[serde(rename = "outFrame")]
         out_frame: Number,
     },
+    SetTotalFrames {
+        frames: Number,
+    },
+    TrimToWorkArea {},
 }
 #[derive(Debug)]
 struct SettingsPayload {
@@ -82,6 +88,8 @@ object_deserialize!(SettingsPayload {
 pub(crate) struct PreparedProjectSettings {
     origin: ObjectSnapshot,
     metadata: ProjectMetadata,
+    /// Set only by the project-length actions, which publish the drawing and the settings as one revision.
+    document: Option<ObjectDocument>,
     changed: bool,
 }
 fn finite(value: Number) -> Result<f64, DispatchErrorCode> {
@@ -96,6 +104,14 @@ impl ObjectFillOwner {
         bytes: &[u8],
     ) -> Result<PreparedProjectSettings, DispatchErrorCode> {
         self.prepare_settings_json(bytes, false)
+    }
+    /// Why a Frames-field or Trim request was refused as `Unavailable`, when it was the one case the field cannot
+    /// apply at all (content no edit moves would sit past the new last frame). `None` for any other outcome.
+    pub(crate) fn project_length_refusal(&self, bytes: &[u8]) -> Option<&'static str> {
+        let payload: serde_json::Value = serde_json::from_slice(bytes).ok()?;
+        let origin = self.current_snapshot();
+        let project = origin.project()?;
+        length_edit::stranded_reason(origin.document(), project.project(), payload.get("action")?)
     }
     /// Private provider entry; the public settings dispatcher cannot select it.
     pub(crate) fn prepare_composition_metadata_json(
@@ -151,7 +167,18 @@ impl ObjectFillOwner {
             .ok_or(DispatchErrorCode::Unavailable)?
             .project()
             .clone();
+        let mut document = None;
         let metadata = match payload.action {
+            SettingsAction::SetTotalFrames { frames } => {
+                let edit = length_edit::set_total_frames(origin.document(), &before, frames)?;
+                document = edit.document;
+                Ok(edit.metadata)
+            }
+            SettingsAction::TrimToWorkArea {} => {
+                let edit = length_edit::trim_to_work_area(origin.document(), &before)?;
+                document = edit.document;
+                Ok(edit.metadata)
+            }
             SettingsAction::SetCompositionMetadata {
                 markers,
                 bpm,
@@ -184,7 +211,17 @@ impl ObjectFillOwner {
                 .with_work_area(Some(finite(in_frame)?), Some(finite(out_frame)?)),
         }
         .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-        let changed = metadata != before;
+        let changed = metadata != before || document.is_some();
+        if document.is_some() {
+            #[cfg(feature = "project_media_codec")]
+            {
+                let project = origin.project().ok_or(DispatchErrorCode::Unavailable)?;
+                let drawing = document.clone().ok_or(DispatchErrorCode::Unavailable)?;
+                ObjectSnapshot::check_candidate_saveable(
+                    &project.with_drawing(drawing).with_metadata(metadata.clone()),
+                )?;
+            }
+        }
         if composition && changed {
             #[cfg(all(feature = "history", feature = "project_media_codec"))]
             {
@@ -197,6 +234,7 @@ impl ObjectFillOwner {
         Ok(PreparedProjectSettings {
             origin,
             metadata,
+            document,
             changed,
         })
     }
@@ -219,8 +257,12 @@ impl ObjectFillOwner {
         if !candidate.changed {
             return Ok(current.content_revision());
         }
-        self.revisions
-            .publish_project_settings(candidate.metadata)
-            .map_err(|_| DispatchErrorCode::Unavailable)
+        match candidate.document {
+            Some(document) => self
+                .revisions
+                .publish_frame_repeat(document, Some(candidate.metadata)),
+            None => self.revisions.publish_project_settings(candidate.metadata),
+        }
+        .map_err(|_| DispatchErrorCode::Unavailable)
     }
 }

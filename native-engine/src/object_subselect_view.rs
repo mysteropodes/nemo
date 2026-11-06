@@ -70,6 +70,8 @@ pub struct SubselectReadProjection {
     items: Vec<SubselectReadItem>,
     preview: Option<Preview>,
     hit_test: bool,
+    /// Hit-test listing only: the affine the layer's Motion and parent chain apply to its records (`layerMatrix`).
+    layer_pose: Option<[f64; 6]>,
 }
 impl SubselectReadProjection {
     pub(crate) fn new(
@@ -91,7 +93,13 @@ impl SubselectReadProjection {
             items,
             preview,
             hit_test: false,
+            layer_pose: None,
         }
+    }
+    /// The layer's own pose at the frame, listed beside a hit-test listing so a pointer can be mapped into record space.
+    pub(crate) fn with_layer_pose(mut self, pose: Option<[f64; 6]>) -> Self {
+        self.layer_pose = pose;
+        self
     }
     /// A hit-test listing (every painted record, with bounds and role) instead of the editable selection.
     pub(crate) fn with_hit_test(mut self, hit_test: bool) -> Self {
@@ -241,6 +249,9 @@ impl ObjectSnapshot {
             if hit_test {
                 if let Some(result) = response.result.as_mut() {
                     result["hitTest"] = json!(true);
+                    if let Some(pose) = projection.layer_pose {
+                        result["layerMatrix"] = json!(pose);
+                    }
                 }
             }
             let size = serde_json::to_vec(&response)

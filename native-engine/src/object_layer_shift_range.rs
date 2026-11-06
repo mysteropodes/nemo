@@ -213,17 +213,28 @@ fn hard(
 }
 fn edge(
     origin: &ObjectSnapshot,
-    mut document: ObjectDocument,
+    document: ObjectDocument,
     gesture: &Gesture,
+    uid: &str,
+    which: usize,
+    value: f64,
+) -> Result<ObjectDocument, DispatchErrorCode> {
+    edge_at(origin, document, gesture.frame, uid, which, value)
+}
+/// One edge of a layer to the effective frame `value`: a linked, covered edge moves its Motion offset (the baseline's
+/// `trySetLinkedEdge`), any other edge its hard in/out point. Shared by the bar drag and the batch bar edits.
+pub(super) fn edge_at(
+    origin: &ObjectSnapshot,
+    mut document: ObjectDocument,
+    frame: u32,
     uid: &str,
     which: usize,
     value: f64,
 ) -> Result<ObjectDocument, DispatchErrorCode> {
     if let Some(link) = link(&document, uid) {
         if covered(&link, which) && source(&document, uid, &link) {
-            let base =
-                points(&document, &link.uid, gesture.frame, false)?[source_edge(&link, which)];
-            return offset(origin, document, uid, which, value - base, gesture.frame);
+            let base = points(&document, &link.uid, frame, false)?[source_edge(&link, which)];
+            return offset(origin, document, uid, which, value - base, frame);
         }
     }
     hard(&mut document, uid, which, value)?;

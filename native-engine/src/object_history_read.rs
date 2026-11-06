@@ -15,6 +15,8 @@ const DEFAULT_BEFORE: u64 = 20;
 /// Longest label kept (characters); a label is display text, never an identifier.
 const MAX_LABEL: usize = 32;
 const DEFAULT_LABEL: &str = "Edit";
+/// The label of an eraser bite's history entry.
+pub(crate) const ERASE_LABEL: &str = "Erase";
 
 /// Short display labels of history entries, keyed by the entry's `after_revision` (unique per entry,
 /// and stable when the entry moves between the undo and redo stacks). Entries committed outside the
@@ -24,6 +26,17 @@ pub(crate) struct HistoryLabels(BTreeMap<u64, String>);
 impl HistoryLabels {
     pub(crate) fn clear(&mut self) {
         self.0.clear();
+    }
+    /// An entry that grew to end at a later revision keeps its label under the new key.
+    pub(crate) fn rekey(&mut self, old: u64, new: u64) {
+        if let Some(label) = self.0.remove(&old) {
+            self.0.insert(new, label);
+        }
+    }
+    /// True when the undo entry ending at `after_revision` was left by an eraser bite (the label every `boolean.erase` entry gets): the
+    /// only kind of entry a `joinHistory` bite may continue.
+    pub(crate) fn is_erase(&self, after_revision: u64) -> bool {
+        self.0.get(&after_revision).is_some_and(|label| label == ERASE_LABEL)
     }
     fn get(&self, after_revision: u64) -> &str {
         self.0
@@ -69,11 +82,14 @@ pub(crate) fn label_for(operation: &str, payload: &Value) -> String {
             _ => "Edit Shapes",
         },
         "property.preset.apply" => "Apply Motion Preset",
+        "property.keys.paste" => "Paste Keyframes",
         "fill.set" => "Set Fill",
         "fill.brush" => "Brush Fill",
         "fill.trace" => "Trace Fill",
         "layer.visibility.set" => "Layer Visibility",
-        "layer.create" => "New Layer",
+        "layer.create" | "layer.kind.create" => "New Layer",
+        "layer.folder.reparent" => "Move Layer to Folder",
+        "layer.range.arrange" => "Arrange Layer Bars",
         "layer.delete" => "Delete Layer",
         "layer.duplicate" => "Duplicate Layer",
         "layer.rename" => "Rename Layer",
@@ -108,7 +124,7 @@ pub(crate) fn label_for(operation: &str, payload: &Value) -> String {
         "selection.delete" => "Delete",
         "selection.duplicate" => "Duplicate",
         "boolean.apply" => "Boolean",
-        "boolean.erase" => "Erase",
+        "boolean.erase" => ERASE_LABEL,
         "boolean.flatten" => "Flatten",
         "group.create" => "Group",
         "group.ungroup" => "Ungroup",
@@ -123,7 +139,7 @@ pub(crate) fn label_for(operation: &str, payload: &Value) -> String {
         "rig.edit" => "Edit Rig",
         "rig.pose" => "Rig Pose",
         "widget.create" | "widget.settings" | "widget.write" => "Edit Widget",
-        "component.convert" | "component.expose" | "component.place" | "component.instance.set" => "Component",
+        "component.convert" | "component.expose" | "component.place" | "component.instance.set" | "component.breakApart" | "component.state.edit" => "Component",
         "duplicator.config" | "duplicator.objects" | "duplicator.path" | "duplicator.set" => "Duplicator",
         "brush.bitmap.stroke" | "brush.bitmap.publish" => "Brush Stroke",
         "asset.attach" => "Attach Asset",

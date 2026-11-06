@@ -350,6 +350,7 @@
           "object_codec::decode_storage_project",
           "object_document::FrameScopeKind",
           "object_frame_packet::ObjectFrameSelector",
+          "object_frame_packet::solo_view::enter",
           "resource_leases::WorkId",
           "scheduler::OutputSpec",
           "desktop_viewport::ObjectPreviewView",
@@ -358,7 +359,11 @@
           "desktop_viewport::ObjectPresentedFrame",
           "desktop_viewport::ViewportDisplayFilter",
           "object_render_scene::GhostUnderlayRequest",
-          "object_render_scene::GhostReceipt"
+          "object_render_scene::GhostReceipt",
+          "history::legacy_project_import::convert_admitted_with",
+          "history::legacy_project_import::MediaTranscoder",
+          "history::legacy_project_import::NoTranscoder",
+          "history::legacy_project_import::looks_like_legacy_project"
         ],
         "rust.desktop.native.application.tests": [
           "application::ExportResourceResolver",
@@ -456,6 +461,7 @@
           "native_media_frame_export::with_placement_source_frame_count",
           "object_document::ObjectDocument",
           "object_frame_packet::ObjectFrameSelector",
+          "object_frame_packet::solo_view::enter",
           "object_render_scene::prepare_object_paint_plan",
           "object_render_scene::ObjectPaintPlan",
           "object_render_scene::prepare_object_composition",
@@ -495,12 +501,15 @@
           "object_render_scene::viewport_checker_quality_suffix",
           "object_render_scene::viewport_outline_quality_suffix",
           "object_render_scene::viewport_shadow_guides_quality_suffix",
+          "object_render_scene::viewport_solo_quality_suffix",
           "application::prepare_ghost_underlay",
           "application::release_ghost_caches"
         ],
         "rust.desktop.media": [
           "native_media_frame_export::NativeVideoDecoder",
-          "native_media_frame_export::NativeVideoInfo"
+          "native_media_frame_export::NativeVideoInfo",
+          "history::legacy_project_import::MediaTranscoder",
+          "history::legacy_project_import::convert_admitted_with"
         ]
       },
       "note": "The narrow native-engine host port is declared per exact desktop profile module, so bootstrap, focused tests, surface presentation and concrete resource/artifact/compositor ports cannot borrow each other's native-engine privileges. An omitted module is denied. The common nemo-mcp transport crate remains independent of native-engine and keeps the legacy shared allowlist form."

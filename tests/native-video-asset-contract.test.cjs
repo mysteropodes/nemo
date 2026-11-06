@@ -86,3 +86,20 @@ test('the advertised path bound fits the 4096-byte request with every other fiel
  assert.doesNotThrow(()=>SDK.validateRequest(at(2048)));
  assert.throws(()=>SDK.validateRequest(at(2049)));
 });
+test('#2256 contextId: a new layer may name its declared component; the receipt must echo it; a replace carries none',async()=>{
+ const inside=request({...payload(),contextId:'sym_comp'});
+ assert.doesNotThrow(()=>Contract.payload(LINK,inside.payload));assert.doesNotThrow(()=>SDK.validateRequest(inside));
+ const ok=response(inside);ok.result.target.contextId='sym_comp';
+ assert.doesNotThrow(()=>Contract.correlate(inside,ok));
+ assert.equal((await SDK.createNativeApplicationAdapter('ui',{dispatch:async()=>ok}).dispatch(inside)).result.target.contextId,'sym_comp');
+ // The scene-root receipt of a component request, another component, and a component receipt of a scene request are all uncorrelated.
+ for(const [q,context] of [[inside,'scene-root'],[inside,'sym_other'],[request(),'sym_comp']]){
+  const r=response(q);r.result.target.contextId=context;assert.throws(()=>Contract.correlate(q,r),context);
+  await assert.rejects(SDK.createNativeApplicationAdapter('ui',{dispatch:async()=>r}).dispatch(q));
+ }
+ for(const context of ['','  ','a\u0000b','c'.repeat(256),7,null]){
+  const p={...payload(),contextId:context};assert.throws(()=>Contract.payload(LINK,p),String(context));
+ }
+ assert.throws(()=>Contract.payload(LINK,{...payload({kind:'replace',placementId:'p1'}),contextId:'sym_comp'}));
+ assert.ok(Contract.paths(LINK).has('payload.contextId'));
+});

@@ -5,6 +5,7 @@
   if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeMotionPropertyKeys=api;
 }(typeof globalThis==='object'?globalThis:this,function(View,LockMenu){
   'use strict';
+  var MAX_SELECTED=4096,MAX_ADDRESSES=32; // up to 32 keys are addressed one by one; a larger selection is named as runs of frames
   function object(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
   function exact(v,required,optional){return object(v)&&required.every(function(k){return Object.prototype.hasOwnProperty.call(v,k);})&&Object.keys(v).every(function(k){return required.includes(k)||(optional||[]).includes(k);});}
   function vector(v,n){return Array.isArray(v)&&v.length===n&&Array.from(v).every(Number.isFinite);}
@@ -12,9 +13,10 @@
   function freeze(v){if(object(v)||Array.isArray(v)){Object.values(v).forEach(freeze);Object.freeze(v);}return v;}
   function targetKey(t){return JSON.stringify([t.contextId,t.layerUid,Object.prototype.hasOwnProperty.call(t,'strokeId'),t.strokeId]);}
   function authoredKey(v,dimension){
-    if(!exact(v,['frame','v'],['hold','curvePoints','hIn','hOut','lockTo'])||!Number.isFinite(v.frame)||!vector(v.v,dimension))return false;
+    if(!exact(v,['frame','v'],['hold','curvePoints','hIn','hOut','lockTo','color'])||!Number.isFinite(v.frame)||!vector(v.v,dimension))return false;
     if('lockTo'in v&&v.lockTo!==null&&!['in','out','layer'].includes(v.lockTo))return false;
     if('hold'in v&&typeof v.hold!=='boolean')return false;
+    if('color'in v&&!(typeof v.color==='string'&&/^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v.color)))return false;
     if(['hIn','hOut'].some(function(k){return k in v&&!vector(v[k],2);}))return false;
     if('curvePoints'in v&&v.curvePoints!==null){
       if(!Array.isArray(v.curvePoints))return false;
@@ -59,14 +61,19 @@
     async function apply(action){
       var value=accepted,ticket=serial,writer=ports.editPropertyTrack;
       if(busy||!value||!current(value,ticket)||typeof writer!=='function'||!selected.size)return refuse('Native key action is unavailable or stale.');
-      var selections=value.items.filter(function(k){return selected.has(k.frame);}).map(function(k){return {target:value.target,property:value.property,frame:k.frame};});
-      if(!selections.length||selections.length>32)return refuse('Select between 1 and 32 native keys.');
+      var addresses=value.items.filter(function(k){return selected.has(k.frame);}).map(function(k){return {target:value.target,property:value.property,frame:k.frame};}),selections=addresses;
+      if(!addresses.length||addresses.length>MAX_SELECTED)return refuse('Select at least 1 native key.');
+      if(addresses.length>MAX_ADDRESSES){
+        var runs=[],open=null;
+        value.items.slice().sort(function(a,b){return a.frame-b.frame;}).forEach(function(k){if(!selected.has(k.frame)){open=null;return;}if(open)open[1]=k.frame;else{open=[k.frame,k.frame];runs.push(open);}});
+        selections=[{target:value.target,property:value.property,ranges:runs}];
+      }
       var payload=freeze({command:'object.property.track.edit',selections:selections,action:action});
       busy=true;controls();status.textContent='Waiting for native key edit…';timelineChanged('busy');
       try{
         // Queue entry suppresses presentedSession while pending. Binding guards
         // owner/frame/selection there; this predicate owns local UI lifetime.
-        var result=await writer(payload,value.token.pin,function(){return mounted()&&ticket===serial&&accepted===value&&selected.size===selections.length&&selections.every(function(k){return selected.has(k.frame);});});
+        var result=await writer(payload,value.token.pin,function(){return mounted()&&ticket===serial&&accepted===value&&selected.size===addresses.length&&addresses.every(function(k){return selected.has(k.frame);});});
         if(!receipt(result))throw Error('Malformed native key receipt.');
         if(!ownerCurrent(value,ticket)){if(ticket===serial&&!retired)return refuse('Native key view became stale; selections cleared.');return false;}
         reset(result.applied?'Native key edit accepted. Select the property again to read its keys.':'Native key edit made no change. Select the property again to read its keys.',false);
@@ -107,7 +114,7 @@
         listen(check,'change',function(){
           if(accepted!==value||!current(value,ticket)||busy||typeof ports.editPropertyTrack!=='function'){check.checked=false;return refuse('Native key selection is unavailable or stale.');}
           var proposed=Array.from(selected);if(check.checked&&!selected.has(k.frame))proposed.push(k.frame);else proposed=proposed.filter(function(frame){return frame!==k.frame;});
-          if(proposed.length>32||!acceptSelection(proposed)){check.checked=selected.has(k.frame);status.textContent='Select at most 32 current native keys across open tracks.';return;}
+          if(proposed.length>MAX_SELECTED||!acceptSelection(proposed)){check.checked=selected.has(k.frame);status.textContent='Select at most '+MAX_SELECTED+' current native keys across open tracks.';return;}
           if(check.checked)selected.add(k.frame);else selected.delete(k.frame);
           selectionEpoch++;status.textContent=selected.size+' native key(s) selected.';controls();timelineChanged('selection');
         },rowBindings);
@@ -151,7 +158,7 @@
         if(retired||busy||!value||!current(value,ticket))return null;
         function isCurrent(){return accepted===value&&selectionEpoch===epoch&&!busy&&current(value,ticket);}
         function proposedFrames(frames){
-          if(!isCurrent()||typeof ports.editPropertyTrack!=='function'||!Array.isArray(frames)||frames.length>32)return null;
+          if(!isCurrent()||typeof ports.editPropertyTrack!=='function'||!Array.isArray(frames)||frames.length>MAX_SELECTED)return null;
           var values=Array.from(frames),seen=new Set(),available=new Set(value.items.map(function(k){return k.frame;}));
           if(!values.every(function(frame){if(!Number.isFinite(frame)||!available.has(frame)||seen.has(frame))return false;seen.add(frame);return true;}))return null;
           return acceptSelection(values)&&isCurrent()?values:null;
@@ -168,7 +175,7 @@
           }catch(_){return false;}
         }
         var projection={pin:Object.assign({},value.token.pin),frame:value.frame,viewGeneration:value.token.viewGeneration,
-          target:Object.assign({},value.target),property:value.property,items:value.items.map(function(k){return {frame:k.frame,selected:selected.has(k.frame)};})};
+          target:Object.assign({},value.target),property:value.property,items:value.items.map(function(k){var item={frame:k.frame,selected:selected.has(k.frame)};if(k.hold===true)item.hold=true;if(k.lockTo)item.lockTo=k.lockTo;if(k.color)item.color=k.color;if(Array.isArray(k.v))item.v=k.v.slice();if(Array.isArray(k.curvePoints)&&k.curvePoints.length)item.curvePoints=JSON.parse(JSON.stringify(k.curvePoints));return item;})};
         Object.defineProperties(projection,{isCurrent:{value:isCurrent},selectFrames:{value:selectFrames},canSelectFrames:{value:canSelectFrames}});
         return freeze(projection);
       }catch(_){return null;}
@@ -194,9 +201,11 @@
         return freeze(value);
       }catch(_){return null;}
     }
+    // #2524: a local, port-free proof of the selection a queued batch edit was built from.
+    function selectionKey(){return retired||!accepted?null:[serial,selectionEpoch,Array.from(selected).sort(function(a,b){return a-b;})];}
     function cancel(){reset('Native key read cancelled.',false);return true;}
     controls();
-    return Object.freeze({element:element,open:open,readKeyTimeline:readKeyTimeline,captureSelectedKeys:captureSelectedKeys,clear:function(){reset('',true);},cancel:cancel,dispose:function(){if(retired)return;reset('',true);retired=true;unbind(bindings);if(element.parentNode===container)container.removeChild(element);timelineChanged('dispose');}});
+    return Object.freeze({element:element,open:open,readKeyTimeline:readKeyTimeline,selectionKey:selectionKey,captureSelectedKeys:captureSelectedKeys,clear:function(){reset('',true);},cancel:cancel,dispose:function(){if(retired)return;reset('',true);retired=true;unbind(bindings);if(element.parentNode===container)container.removeChild(element);timelineChanged('dispose');}});
   }
   return Object.freeze({create:create});
 }));

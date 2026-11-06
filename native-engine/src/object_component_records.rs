@@ -16,10 +16,11 @@
 //! drawing layers (it never recurses into an inner `symbolId`), so an instance
 //! inside a component context has no baseline meaning and is not representable.
 use crate::object_document::{
-    object_deserialize, FrameScopeKind, ObjectLayer, ObjectRecord, Presence,
+    object_deserialize, FrameScopeKind, ObjectLayer, ObjectRecord, Presence, ProjectCameraKey,
+    ProjectCameraState,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Number;
+use serde_json::{Map, Number, Value};
 use std::collections::HashSet;
 
 #[path = "object_component_instance.rs"]
@@ -34,6 +35,15 @@ pub(crate) const COMPONENT_SET_FORMAT: &str = "nemo.native-component-set";
 pub(crate) const COMPONENT_SET_FORMAT_VERSION: u32 = 1;
 /// Every exposed-property key is `'ep_' + clock.toString(36) + '_' + ...` (expose()).
 const EXPOSED_KEY_PREFIX: &str = "ep_";
+const MAX_MARKER_TEXT: usize = 256;
+
+/// One thing a placed component shows on a frame, as a break apart bakes it into the instance layer: a vector record or an
+/// image, geometry already placed. The evaluation half produces them, the plan half writes them.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Baked {
+    Vector(crate::object_document::ObjectRecord),
+    Image(crate::object_document::RasterEntry),
+}
 
 /// Components and the instance layers that place them.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -50,10 +60,12 @@ object_deserialize!(ComponentSet {
     #[serde(deserialize_with = "bounded_entries")] instances: Vec<ComponentInstance>
 });
 
-/// One `state.symbols[symbolId]`. `cameraKeys`, `markers`, `motionArcs`,
-/// `tweenOverrides` and `tweenEasing` of the baseline symbol belong to owners
-/// that do not exist natively yet; they are not fields here, so a record that
-/// carries one is refused as an unknown member instead of silently dropped.
+/// One `state.symbols[symbolId]`. `cameraKeys` (the component's own camera, composed onto its instance) and `markers` (its
+/// composition markers) are stored here, exactly as `enterSymbol` / `exitToScene` swap them, and written by
+/// `object.component.state.edit`. `motionArcs`, `tweenOverrides` and `tweenEasing` are admitted as the baseline stores a symbol
+/// that has none (an empty table): the document-wide tween store and motion arcs own that data (their keys name the layer
+/// inside the component; the legacy importer moves a symbol's tables there), so a non-empty table on the record is refused
+/// instead of being carried twice.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ComponentRecord {
@@ -68,14 +80,41 @@ pub(crate) struct ComponentRecord {
     /// Absent until the first `expose()` (`if (!sym.exposedProps) sym.exposedProps = []`).
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) exposed_props: Presence<Vec<ExposedProp>>,
+    /// `sym.cameraKeys`: missing and explicit empty stay apart (a component never opened has none).
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) camera_keys: Presence<Vec<ProjectCameraKey>>,
+    /// `sym.markers`: one per frame, as `addCompMarker` keeps them.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) markers: Presence<Vec<ComponentMarker>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) motion_arcs: Presence<Map<String, Value>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) tween_overrides: Presence<Map<String, Value>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) tween_easing: Presence<Map<String, Value>>,
 }
 object_deserialize!(ComponentRecord {
     symbol_id: String, #[serde(default)] name: Presence<String>, total_frames: u32,
     #[serde(default)] fps: Presence<Number>,
     #[serde(deserialize_with = "bounded_entries")] layers: Vec<ObjectLayer>,
     objects: Vec<ObjectRecord>,
-    #[serde(default, deserialize_with = "bounded_presence")] exposed_props: Presence<Vec<ExposedProp>>
+    #[serde(default, deserialize_with = "bounded_presence")] exposed_props: Presence<Vec<ExposedProp>>,
+    #[serde(default, deserialize_with = "bounded_presence")] camera_keys: Presence<Vec<ProjectCameraKey>>,
+    #[serde(default, deserialize_with = "bounded_presence")] markers: Presence<Vec<ComponentMarker>>,
+    #[serde(default)] motion_arcs: Presence<Map<String, Value>>,
+    #[serde(default)] tween_overrides: Presence<Map<String, Value>>,
+    #[serde(default)] tween_easing: Presence<Map<String, Value>>
 });
+
+/// `{ frame, name, color }` as `addCompMarker` pushes it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ComponentMarker {
+    pub(crate) frame: u32,
+    pub(crate) name: String,
+    pub(crate) color: String,
+}
+object_deserialize!(ComponentMarker { frame: u32, name: String, color: String });
 
 /// `{ key, label, targetStrokeId, targetField, default }` as `expose()` pushes it.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -194,6 +233,7 @@ impl ComponentRecord {
             }
             strokes.insert(target.stroke_id.as_str());
         }
+        self.validate_owned()?;
         let mut keys = HashSet::new();
         for prop in self.exposed_props.value().into_iter().flatten() {
             if prop.key.len() <= EXPOSED_KEY_PREFIX.len()
@@ -215,6 +255,33 @@ impl ComponentRecord {
         }
         Ok(())
     }
+    /// The camera, marker and legacy-table members.
+    fn validate_owned(&self) -> Result<(), ComponentRecordError> {
+        if let Some(keys) = self.camera_keys.value() {
+            if ProjectCameraState::new(Some(keys.clone()), None).is_err() {
+                return Err(invalid("component camera key is not finite"));
+            }
+        }
+        let mut frames = HashSet::new();
+        for marker in self.markers.value().into_iter().flatten() {
+            if marker.frame >= self.total_frames
+                || !frames.insert(marker.frame)
+                || marker.name.len() > MAX_MARKER_TEXT
+                || marker.color.is_empty()
+                || marker.color.len() > MAX_MARKER_TEXT
+            {
+                return Err(invalid("component marker is outside the component or malformed"));
+            }
+        }
+        for table in [&self.motion_arcs, &self.tween_overrides, &self.tween_easing] {
+            if table.value().is_some_and(|map| !map.is_empty()) {
+                return Err(ComponentRecordError::Unsupported(
+                    "component motion arcs and tween tables belong to the native tween store",
+                ));
+            }
+        }
+        Ok(())
+    }
     pub(crate) fn symbol_id(&self) -> &str {
         &self.symbol_id
     }
@@ -226,6 +293,13 @@ impl ComponentRecord {
     }
     pub(crate) fn objects(&self) -> &[ObjectRecord] {
         &self.objects
+    }
+    /// `sym.cameraKeys`; `None` for a component that never stored any (an empty list is a stored list with no key).
+    pub(crate) fn camera_keys(&self) -> Option<&[ProjectCameraKey]> {
+        self.camera_keys.value().map(Vec::as_slice)
+    }
+    pub(crate) fn markers(&self) -> &[ComponentMarker] {
+        self.markers.value().map_or(&[], Vec::as_slice)
     }
     /// Empty for both an absent and an empty authored table (use the field to tell them apart).
     pub(crate) fn exposed_props(&self) -> &[ExposedProp] {

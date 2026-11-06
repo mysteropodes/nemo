@@ -13,7 +13,7 @@
 //! refuses typed before cloning past its cell and byte bounds. Paste, cut, delete and every
 //! history effect belong to the sealed clipboard planner; nothing here is a document writer.
 use crate::object_document::{
-    FrameScopeKind, ObjectRecord, ObjectTarget, OrderElement, Presence, RasterEntry, TextEntry,
+    FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, OrderElement, Presence, RasterEntry, TextEntry,
 };
 use crate::revision::ObjectSnapshot;
 use std::collections::{HashMap, HashSet};
@@ -236,6 +236,18 @@ pub(crate) fn copy_frame_cells(
     selection: &[SelectedCell<'_>],
     limits: &PacketLimits,
 ) -> Result<FrameClipboardPacket, ClipboardPacketError> {
+    copy_frame_cells_of(snapshot, snapshot.document(), pins, selection, limits)
+}
+
+/// #2256: the same copy over `document`, which is the snapshot's own document or the projection of a declared component as
+/// the scene (`object_context_projection::through`); the pins and the identity are always the snapshot's.
+pub(crate) fn copy_frame_cells_of(
+    snapshot: &ObjectSnapshot,
+    document: &ObjectDocument,
+    pins: &PacketPins<'_>,
+    selection: &[SelectedCell<'_>],
+    limits: &PacketLimits,
+) -> Result<FrameClipboardPacket, ClipboardPacketError> {
     use ClipboardPacketError as E;
     if pins.instance_id != snapshot.instance_id() {
         return Err(E::WrongInstance);
@@ -249,7 +261,6 @@ pub(crate) fn copy_frame_cells(
     if pins.document_snapshot_id != snapshot.snapshot_id() {
         return Err(E::WrongSnapshot);
     }
-    let document = snapshot.document();
     if !matches!(document.format_version(), 1 | 2) {
         return Err(E::OrderedDocumentUnavailable);
     }

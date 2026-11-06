@@ -70,6 +70,9 @@ impl NativeObjectHistory {
     ) -> Result<PreparedProjectSettings, DispatchErrorCode> {
         self.owner.prepare_project_settings_json(bytes)
     }
+    pub(crate) fn project_length_refusal(&self, bytes: &[u8]) -> Option<&'static str> {
+        self.owner.project_length_refusal(bytes)
+    }
     pub(crate) fn commit_project_settings(
         &mut self,
         candidate: PreparedProjectSettings,
@@ -95,6 +98,10 @@ mod composition_delta_tests;
 #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_composition_public.rs"]
 mod composition_public_tests;
+
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/object_project_length.rs"]
+mod project_length_tests;
 
 #[cfg(all(test, feature = "project_media_codec"))]
 #[path = "../tests/object_palette_edit.rs"]

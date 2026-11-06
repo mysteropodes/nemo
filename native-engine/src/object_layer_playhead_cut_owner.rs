@@ -1,4 +1,5 @@
 //! Strict preparation/commit for F11 through the sole existing revision owner.
+use crate::commands::object_fill_owner::object_context_projection::{embed, project};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::SelectionOutcome;
 use crate::object_document::{object_deserialize, AssetTarget, ObjectDocument};
@@ -67,16 +68,23 @@ impl ObjectFillOwner {
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
-        if payload.context_id != "scene-root" {
-            return Err(DispatchErrorCode::Unavailable);
+        if payload.context_id.is_empty() {
+            return Err(DispatchErrorCode::InvalidRequest);
         }
         let origin = self.current_snapshot();
         let next = origin
             .content_revision()
             .checked_add(1)
             .ok_or(DispatchErrorCode::Unavailable)?;
-        let plan =
-            plan_cut(origin.document(), next, &payload.layer_uid, payload.frame).map_err(code)?;
+        // #2256: inside a declared component the cut runs on the component as the scene (`project`) and a changed plan is written
+        // back into the real document (`embed`); the scene root is the document itself.
+        let view = project(origin.document(), &payload.context_id)?;
+        let mut plan = plan_cut(&view, next, &payload.layer_uid, payload.frame).map_err(code)?;
+        plan.document = if plan.changed {
+            embed(origin.document(), &payload.context_id, &view, plan.document)?
+        } else {
+            origin.document().clone()
+        };
         if plan.changed {
             // Linked video/image/font placement is owned by the project envelope,
             // outside ObjectDocument. Drawing-only publish would retain its old
@@ -99,7 +107,9 @@ impl ObjectFillOwner {
                                 context_id,
                                 layer_uid,
                                 ..
-                            } => context_id == "scene-root" && layer_uid == &payload.layer_uid,
+                            } => {
+                                context_id == &payload.context_id && layer_uid == &payload.layer_uid
+                            }
                             AssetTarget::AudioTrack { .. } => false,
                         })
                 });

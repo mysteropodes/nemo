@@ -170,15 +170,6 @@
       "authority": "unavailable",
       "entries": {
         "timeline": [
-          "toggleFolderLayerCollapsed",
-          "addNullLayer",
-          "reparentLayersIntoFolder",
-          "removeLayerFromFolder",
-          "addEffectLayer",
-          "addGuideLayer",
-          "addJoystickLayer",
-          "addSliderLayer",
-          "addFolderLayer",
           "deleteLayer",
           "splitLayerAtPlayhead",
           "duplicateLayer",
@@ -203,9 +194,7 @@
           "setPointType",
           "booleanOp",
           "applyStrokeProfile",
-          "deleteSelStrokes",
-          "flipHorizontal",
-          "flipVertical"
+          "deleteSelStrokes"
         ]
       },
       "kinds": []
@@ -224,6 +213,7 @@
         "timeline-selection-dash-offset",
         "timeline-selection-fill-color",
         "timeline-selection-fill-enabled",
+        "timeline-selection-flip",
         "timeline-selection-miter-limit",
         "timeline-selection-opacity",
         "timeline-selection-paint-order",
@@ -243,8 +233,6 @@
         "timeline": [
           "setCanvasClip",
           "setSafetyZones",
-          "setTotalFrames",
-          "trimToWorkArea",
           "toggleLayerMotionBlur",
           "toggleMotionBlurComp",
           "setMotionBlurSettings"

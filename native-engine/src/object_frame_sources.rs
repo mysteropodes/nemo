@@ -30,7 +30,13 @@ pub(super) fn select(
     layers
         .iter()
         .map(|layer| {
-            if component && !layer.visible() {
+            if component
+                && !crate::object_frame_packet::solo_view::layer_visible(
+                    selector.context_id,
+                    layers,
+                    layer,
+                )
+            {
                 return Ok(None);
             }
             if component

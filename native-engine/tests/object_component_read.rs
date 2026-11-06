@@ -152,7 +152,7 @@ fn one_component_context_reports_its_summary_instances_and_exposure() {
                 .get("exposedProps")
                 .map_or(0, |p| p.as_array().unwrap().len())
         );
-        // A component record carries no camera keys natively.
+        // The world's components store no camera keys.
         assert_eq!(summary["hasCameraKeys"], false);
         let placed: Vec<String> = doc["componentTables"]["components"]["instances"]
             .as_array()
@@ -389,18 +389,22 @@ fn a_long_name_cuts_the_page_early_and_the_cursor_resumes_without_loss() {
 
 #[test]
 fn the_scene_reports_whether_the_stored_project_camera_has_keys() {
-    let project = |camera: Option<Value>| {
+    let project = |camera: Option<Value>, own: Option<Value>| {
         let mut meta = json!({"canvasW":320,"canvasH":180,"fps":24});
         if let Some(keys) = camera {
             meta["cameraKeys"] = keys;
         }
+        let mut drawing = world("D");
+        if let Some(keys) = own {
+            drawing["componentTables"]["components"]["components"][0]["cameraKeys"] = keys;
+        }
         json!({"format":"nemo.native-project-document","formatVersion":1,"project":meta,
-            "drawing":world("D"),"viewportReference":null,"assets":[]})
+            "drawing":drawing,"viewportReference":null,"assets":[]})
     };
-    let summary = |camera: Option<Value>| {
+    let summary = |camera: Option<Value>, own: Option<Value>| {
         let owner = crate::history::NativeObjectHistory::from_project_file(
             "camera-read",
-            &serde_json::to_vec(&project(camera)).unwrap(),
+            &serde_json::to_vec(&project(camera, own)).unwrap(),
         )
         .expect("a project around the component world");
         let snap = owner.acquire_snapshot(owner.content_revision()).unwrap();
@@ -412,9 +416,12 @@ fn the_scene_reports_whether_the_stored_project_camera_has_keys() {
         )
     };
     let keys = json!([{"frame":0,"x":160,"y":90,"w":320}]);
-    assert_eq!(summary(Some(keys)), (json!(true), json!(false)));
-    assert_eq!(summary(Some(json!([]))), (json!(false), json!(false)));
-    assert_eq!(summary(None), (json!(false), json!(false)));
+    assert_eq!(summary(Some(keys.clone()), None), (json!(true), json!(false)));
+    assert_eq!(summary(Some(json!([])), None), (json!(false), json!(false)));
+    assert_eq!(summary(None, None), (json!(false), json!(false)));
+    // A component reports its OWN stored camera (sym.cameraKeys), independent of the project camera.
+    assert_eq!(summary(None, Some(keys)), (json!(false), json!(true)));
+    assert_eq!(summary(None, Some(json!([]))), (json!(false), json!(false)));
 }
 
 /// #2256 review: a layers page carries the facts the drawing gates read (hidden, locked, parented, 3D, Motion-transformed), for a component's

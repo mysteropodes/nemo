@@ -361,11 +361,12 @@ test('#2361 bitmap stroke: the closed request, its one-entry disposition and the
   assert.equal(C.admitted(C.STROKE), true); assert.equal(C.requiresRevision(C.STROKE), true);
   assert.equal(V.requestByteLimit(C.STROKE), C.STROKE_REQUEST_BYTES);
   C.payload(C.STROKE, good());
-  const bad = [p => { p.extra = 1; }, p => { p.record.target.strokeId = 'named'; }, p => { p.record.target.contextId = 'component-1'; },
+  const bad = [p => { p.extra = 1; }, p => { p.record.target.strokeId = 'named'; }, p => { p.record.target.contextId = ''; },
     p => { delete p.record.vectorExt; }, p => { p.record.vectorExt.bitmapBrush.brushGroupId = ''; }, p => { p.companion.width = 0; },
     p => { p.companion.opacity = 2; }, p => { p.companion.x = '5'; }, p => { p.source.kind = 'bytes'; }, p => { p.source.path = ''; },
     p => { p.lifecycleGeneration = 0; }];
   for (const change of bad) { const p = good(); change(p); assert.throws(() => C.payload(C.STROKE, p), TypeError, String(change)); }
+  { const p = good(); p.record.target.contextId = 'component-1'; C.payload(C.STROKE, p); } // #2361 a declared component's cell (the owner resolves the context)
   C.payload(C.STROKE, Object.assign(good(), { placement: 'behind' }));
   assert.throws(() => C.payload(C.STROKE, Object.assign(good(), { placement: 'front' })), TypeError);
   C.result(C.STROKE, { applied: true, historyEntriesAdded: 1 }); C.result(C.STROKE, { applied: false, historyEntriesAdded: 0 });

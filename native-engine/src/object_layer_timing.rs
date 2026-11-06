@@ -22,6 +22,10 @@ mod object_frame_clipboard_repeat_timing;
 #[path = "object_labs_timing.rs"]
 #[allow(dead_code)]
 mod object_labs_timing;
+// The tail a shorter Frames value keeps for the next grow (baseline setTotalFrames never truncates).
+#[path = "object_layer_timing_tail.rs"]
+mod object_layer_timing_tail;
+pub(crate) use object_layer_timing_tail::TimingTail;
 
 #[path = "object_layer_range_evaluate.rs"]
 pub(crate) mod range;
@@ -95,6 +99,13 @@ impl LayerTiming {
         self.keys.iter().map(|key| key.frame)
     }
 
+    /// A drawing timing keyed exactly at `frames` (ascending, unique): every other frame holds the key before it.
+    pub(crate) fn from_key_frames(frames: &[u32]) -> Self {
+        Self {
+            keys: frames.iter().map(|&frame| TimingKey { frame }).collect(),
+            ..Self::blank_drawing()
+        }
+    }
     pub(crate) fn blank_drawing() -> Self {
         Self {
             format: "nemo.native-layer-timing".into(),

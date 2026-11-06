@@ -15,13 +15,15 @@
   // frames: strictly ascending source frames (at most one host job); the job publishes frame_0001.svg ... in that order.
   function build(pinned, input) {
     core.rejectRaw(input);
-    core.exact(input, ['outputHandle', 'frames'], [], 'vector export input');
+    core.exact(input, ['outputHandle', 'frames'], ['soloLayers'], 'vector export input');
     const payload = {
       documentSnapshotId: pinned.documentSnapshotId,
       contextId: 'scene-root',
       outputHandle: core.id(input.outputHandle, 'outputHandle'),
       frames: contract.copyFrames(input.frames, contract.MAX_JOB_FRAMES),
     };
+    // The Solo view (#2371): an empty set is no solo and stays off the wire.
+    if (input.soloLayers !== undefined && input.soloLayers.length) payload.soloLayers = contract.copySolo(input.soloLayers);
     contract.payload(contract.SVG_BEGIN, payload);
     return { payload, expectation: { kind: 'frames', ext: 'svg', count: payload.frames.length } };
   }

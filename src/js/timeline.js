@@ -933,183 +933,19 @@ window.SM={
   setOnionPrevOp:function(v){state.onionPrevOpacity=v;renderOS();},setOnionNextOp:function(v){state.onionNextOpacity=v;renderOS();},
   setOnionMode:function(v){state.onionMode=v;renderOS();},
   setWorkArea:function(inF,outF){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setWorkArea',inFrame:inF,outFrame:outF}):Promise.resolve({status:'unavailable'});},
-  setTotalFrames:function(v){v=Math.max(1,Math.min(999,v));saveAllLayerFrames();for(var i=0;i<state.layers.length;i++){while(state.layers[i].frames.length<v)state.layers[i].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}state.totalFrames=v;window._totalF=v;if(state.waOut>=v)state.waOut=v-1;
-    // waIn had no clamp beside waOut's (2026-08-16): shrinking the timeline
-    // below a moved work-area start left waIn > waOut — not merely out of
-    // range but INVERTED, which draws #wa-bar as a strip starting past the
-    // end of the ruler (reproduced: 120->30 frames with waIn 50 put the whole
-    // work area at 550-880px on a 330px timeline). Clamped after waOut so the
-    // pair can never cross. Per-layer in/out and markers are deliberately NOT
-    // touched here — those are hidden by their own readers instead, so the
-    // user's ranges survive a shrink-and-grow round trip the way the frames
-    // array already does (see layerInPoint/layerOutPoint, app.js).
-    if(state.waIn>=state.waOut)state.waIn=Math.max(0,state.waOut-1);
-    window._waIn=state.waIn;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
+  setTotalFrames:function(v){var length=window.NemoNativeProjectLength;return length?length.setTotalFrames(window,v):Promise.resolve({status:'unavailable'});},
   addLayer:function(){var caller=window.NemoNativeDrawingAddController;return caller&&typeof caller.add==='function'?caller.add():Promise.resolve({status:'unavailable'});},
-  // Null layer (2026-07, Motion) — AE's "Null Object": exists purely as a
-  // parenting/pivot target for other layers (SMMotion's existing
-  // parentLayerUid/parentChainMats — a Null is just any other layer as far
-  // as that mechanism cares), never rendered itself. isNullLayer is the
-  // ONLY thing distinguishing it from a normal empty layer; engine-bridge.js's
-  // buildSceneJson short-circuits it to items:[] before any of the normal
-  // per-layer work, and it's added to the SAME "no real content" guard list
-  // as symbolId/nativeVideo/montageId in saveActiveLayerFrame/
-  // saveAllLayerFrames/getEffectiveStrokes (app.js) so nothing ever tries
-  // to read/write strokes on it.
-  // 2026-08, feedback #59 — a Null created with layers pre-selected now
-  // auto-centers on their combined world bounds and auto-parents them to
-  // it (both AE conveniences; previously a Null always dropped at canvas
-  // center with zero relationship to the selection). createUserLayer always
-  // PUSHES (state.layers.push), so it's appended at the end — the indices
-  // captured in preSel before creation stay valid after, no re-indexing
-  // needed. nullPos/nullShape are the new persisted fields (see the
-  // exportJSON/import + saveActiveLayerFrame/saveAllLayerFrames "no real
-  // content" guard already covering isNullLayer, per CLAUDE.md §1).
-  addNullLayer:function(){
-    saveAllLayerFrames();pushUndoLayers(true);
-    var preSel=_layerSel.slice();
-    var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Null'));
-    var ld=state.layers[idx];
-    ld.isNullLayer=true;
-    ld.nullShape='cross';
-    // Same reasoning as addGuideLayer's own explicit color below: without
-    // this, createUserLayer's nextLayerColor() cycling default gets read
-    // by buildNullLayerItems' marker (it falls back to ld.color first, on
-    // purpose — so a user CAN still recolor a Null later, same as a guide),
-    // giving each new Null an arbitrary/possibly-reused hue instead of a
-    // consistent, recognizable default.
-    ld.color='#ff2d78';
-    var validSel=preSel.filter(function(li){return li!==idx&&state.layers[li];});
-    var center=null;
-    if(window.SMMotion&&validSel.length){
-      var u=SMMotion.layerWorldBoundsUnion(validSel,state.currentFrame);
-      if(u)center=[u.cx,u.cy];
-    }
-    ld.nullPos=center||[state.canvasW/2,state.canvasH/2];
-    if(window.SMMotion&&validSel.length){
-      var nullUid=SMMotion.ensureLayerUid(ld);
-      validSel.forEach(function(li){SMMotion.setLayerParent(li,nullUid);});
-    }
-    activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();
-  },
-  // Pure disclosure toggle (2026-08) — never a mode change, unlike
-  // entering a Component (enterComponentLayer/enterSymbol, CLAUDE.md §8):
-  // a folder's children stay flat, real, directly editable rows in the
-  // SAME list at all times, this only flips whether they're shown.
-  // Re-renders both panels since Motion's own renderLayerListMotion and
-  // Animation 2D's renderLayerList both read the SAME computeLayerRenderOrder.
-  toggleFolderLayerCollapsed:function(li){
-    var ld=state.layers[li];if(!ld||!ld.isFolderLayer)return;
-    ld.folderCollapsed=!ld.folderCollapsed;
-    renderLayerList();renderTimeline();
-  },
-  // Drag-and-drop / menu reparenting entry point (2026-08) — the ONE place
-  // that turns "these layer indices" + "this folder index" into actual
-  // parentLayerUid assignments, so the drag handler (finishLayerReorder,
-  // above) and a future menu action can't drift. Delegates entirely to
-  // SMMotion.setLayerParent — same keep-transform-compensation, same cycle
-  // guard, same uid-based mechanism any other parenting target already
-  // uses; a Folder is just another valid parent, per Cyril's own framing
-  // ("agiront comme un null de control parentage").
-  reparentLayersIntoFolder:function(idxs,folderIdx){
-    var fld=state.layers[folderIdx];
-    if(!fld||!fld.isFolderLayer||!window.SMMotion)return;
-    var folderUid=SMMotion.ensureLayerUid(fld);
-    saveAllLayerFrames();pushUndoLayers(true);
-    var moved=0;
-    idxs.forEach(function(idx){
-      if(idx===folderIdx)return;
-      var ld=state.layers[idx];
-      if(!ld||ld.isFolderLayer)return; // no nested folders in v1 (see engine.rs is_folder_layer)
-      SMMotion.setLayerParent(idx,folderUid);
-      moved++;
-    });
-    if(moved&&fld.folderCollapsed){fld.folderCollapsed=false;} // reveal what was just dropped in
-    loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
-    if(moved){var _fn=fld.name||SM.t('layerKindFolder');showToast(moved>1?SM.t('toastLayersMovedToFolder').replace('{n}',moved).replace('{folder}',_fn):SM.t('toastLayerMovedToFolder').replace('{folder}',_fn));}
-  },
-  // Explicit un-parent (2026-08) — context-menu counterpart to dragging a
-  // layer out via the plain reorder gesture (finishLayerReorder above),
-  // for when the layer isn't easy to drag (long list, small target) or the
-  // user just wants a guaranteed one-click action.
-  removeLayerFromFolder:function(idx){
-    var ld=state.layers[idx];if(!ld||!window.SMMotion)return;
-    if(folderLayerParentIdx(idx)<0)return; // parented to something other than a folder (or not parented) — leave it alone
-    saveAllLayerFrames();pushUndoLayers(true);
-    SMMotion.setLayerParent(idx,null);
-    loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
-    showToast(SM.t('hsLayerRemovedFromFolder'));
-  },
-  // Effect (adjustment) layer (2026-07, Motion) — AE's "Adjustment Layer":
-  // no painted content of its own (frames/strokes ignored on purpose,
-  // same as a Null layer), but its effectType/effectP1/effectP2 apply to
-  // EVERYTHING BELOW IT in the stack via engine.rs's composite_scene
-  // (color_adjust.wgsl / reused blur.wgsl) — see that function's
-  // is_effect_layer branch and engine-bridge.js's buildSceneJson for the
-  // full JS<->Rust wire contract. Defaults to a mild blur so placing one
-  // has an immediately visible (if subtle) effect rather than looking
-  // like a no-op.
-  addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effects=[];activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
-  // Guide layer (2026-08, AE feature audit 8.6) — a real layer object
-  // (rotatable/parentable/keyable Transform, colored) instead of a classic
-  // ruler-drag guide: no content of its own (same "no real content" guard
-  // list as Null/Effect above), the line itself is engine-bridge.js's
-  // buildGuideLayerItems, an editor-only overlay derived from the layer's
-  // OWN Position/Rotation Transform (guidePos is the anchor Position
-  // offsets from; Rotation sets the angle) — zero new keyframe machinery.
-  // Defaults to horizontal through canvas center.
-  addGuideLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Guide'));state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=[state.canvasW/2,state.canvasH/2];state.layers[idx].guideOrientation='horizontal';state.layers[idx].color='#00baff';activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
-  // Rig control widgets (2026-08-30, rig-widget.js) — an on-canvas
-  // joystick or slider whose axes ARE ordinary expression controls on the
-  // same layer, so the value is keyable/graphable/readable from any other
-  // layer's expression with no new machinery. The layer itself is created
-  // inside rig-widget.js (it has to create the controls in the same breath
-  // — the widget points AT them and is meaningless without them); these two
-  // are just the menu entry points, thin on purpose so there is exactly one
-  // creation path.
-  addJoystickLayer:function(){if(window.SMRigWidget)SMRigWidget.addWidgetLayer('joystick');},
-  addSliderLayer:function(){if(window.SMRigWidget)SMRigWidget.addWidgetLayer('slider');},
-  // Folder layer (2026-08, "grouper les layer dans des dossiers qui
-  // agiront comme un null de control parentage") — structurally a Null
-  // (isNullLayer:true too, same pivot/no-content/parenting-target
-  // machinery, same nullPos on-canvas marker, added FIRST so a folder is
-  // never mistaken for "just" a null anywhere that checks isNullLayer
-  // alone) PLUS isFolderLayer:true, which is what actually changes
-  // behavior: engine-bridge.js's buildSceneJson gives it a distinct wire
-  // shape (folderChildIndices + its own effects stack scoped to JUST that
-  // subtree, engine.rs's is_folder_layer branch — see that function's own
-  // doc comment for why this is deliberately NOT the same mechanism as
-  // isEffectLayer's "everything below in z-order"), and the layer-list
-  // renderers (motion.js/timeline.js) give it a disclosure triangle +
-  // indented children instead of the plain marker row a bare Null gets.
-  // Explicitly NOT a precomp/Component — children stay flat, ordinary,
-  // directly editable layers in the SAME list at all times; open/close is
-  // a pure visibility toggle (ld.folderCollapsed), never a mode change
-  // (contrast enterComponentLayer/enterSymbol, CLAUDE.md §8).
-  // Same auto-center-on-selection + auto-parent convenience addNullLayer
-  // already has (feedback #59) — dropping a folder around an existing
-  // selection is the overwhelmingly common way this gets used.
-  addFolderLayer:function(){
-    saveAllLayerFrames();pushUndoLayers(true);
-    var preSel=_layerSel.slice();
-    var idx=createUserLayer(nextLayerName().replace(/^Layer/,SM.t('layerKindFolder')));
-    var ld=state.layers[idx];
-    ld.isNullLayer=true;ld.isFolderLayer=true;ld.folderCollapsed=false;
-    ld.nullShape='cross';ld.effects=[];
-    ld.color='#ffb020';
-    var validSel=preSel.filter(function(li){return li!==idx&&state.layers[li];});
-    var center=null;
-    if(window.SMMotion&&validSel.length){
-      var u=SMMotion.layerWorldBoundsUnion(validSel,state.currentFrame);
-      if(u)center=[u.cx,u.cy];
-    }
-    ld.nullPos=center||[state.canvasW/2,state.canvasH/2];
-    if(window.SMMotion&&validSel.length){
-      var folderUid=SMMotion.ensureLayerUid(ld);
-      validSel.forEach(function(li){SMMotion.setLayerParent(li,folderUid);});
-    }
-    activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();
-  },
+  // Layer kinds and folder membership (#2371 D36): Null, Folder, Effect, Guide, Joystick and Slider layers and the move of layers
+  // into and out of a Folder are native project writes only (adapters/native-layer-kinds-ui.js); there is no Paper writer here.
+  toggleFolderLayerCollapsed:function(li){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.toggleFolder(window,li):Promise.resolve({status:'unavailable'});},
+  addNullLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.add(window,'null'):Promise.resolve({status:'unavailable'});},
+  addFolderLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.add(window,'folder'):Promise.resolve({status:'unavailable'});},
+  addEffectLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.add(window,'effect'):Promise.resolve({status:'unavailable'});},
+  addGuideLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.add(window,'guide'):Promise.resolve({status:'unavailable'});},
+  addJoystickLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.addWidget(window,'joystick'):Promise.resolve({status:'unavailable'});},
+  addSliderLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.addWidget(window,'slider'):Promise.resolve({status:'unavailable'});},
+  reparentLayersIntoFolder:function(idxs,folderIdx){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.moveIntoFolder(window,idxs,folderIdx):Promise.resolve({status:'unavailable'});},
+  removeLayerFromFolder:function(idx){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.leaveFolder(window,idx):Promise.resolve({status:'unavailable'});},
   deleteLayer:function(){
     // The camera row isn't in state.layers (synthetic pseudo-layer, see
     // camera.js) — the generic layer-panel trash button silently did
@@ -1165,45 +1001,7 @@ window.SM={
   // work area and re-bases frame 0 on its start — layers, keyframes, markers
   // and the camera all shift together, or the trim would silently desync the
   // very things that were timed against it.
-  trimToWorkArea:function(){
-    // 2026-07-30 fix: the only structural layer op with no activeSymbolId/
-    // activeMontageViewId guard (~10 siblings in app.js all refuse with this
-    // same toast — convertLayerToComponent, mergeLayersIntoOne, splitLayer-
-    // IntoElements, etc.). Shrinking totalFrames here writes straight
-    // through to state.layers/state.markers/state.cameraKeys, which correctly
-    // alias the entered symbol's own data while inside one (see enterSymbol) —
-    // but sym.totalFrames is SHARED by every other instance/placement of
-    // that same symbol elsewhere in the project (other layers, other
-    // StoryBoard montages), so trimming it from inside one editing session
-    // silently reshapes all of them with no warning. Inside a montage view
-    // it's actively pointless instead: state.layers there is a throwaway
-    // synthetic per-segment array with no write-back on exit (unlike a
-    // symbol's), so the toast would claim success and every bit of it
-    // reverts the moment you leave.
-    if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
-    if(state.activeMontageViewId){showToast(SM.t('toastCloseMontageFirst'));return;}
-    var inF=state.waIn||0,outF=(state.waOut!=null?state.waOut:state.totalFrames-1);
-    if(outF<=inF){showToast(SM.t('hsWorkAreaTooShort'));return;}
-    if(inF===0&&outF===state.totalFrames-1){showToast(SM.t('toastWorkAreaAlreadyCoversAll'));return;}
-    saveAllLayerFrames();pushUndoLayers(true);
-    var n=outF-inF+1;
-    state.layers.forEach(function(ld,li){
-      ld.frames=ld.frames.slice(inF,outF+1);
-      while(ld.frames.length<n)ld.frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
-      if(ld.inPoint!=null)ld.inPoint=Math.max(0,ld.inPoint-inF);
-      if(ld.outPoint!=null)ld.outPoint=Math.max(0,Math.min(n-1,ld.outPoint-inF));
-      if(ld.markers)ld.markers=ld.markers.map(function(m){return{frame:m.frame-inF,name:m.name,color:m.color};}).filter(function(m){return m.frame>=0&&m.frame<n;});
-      if(window.SMMotion&&SMMotion.shiftLayerMotionKeys)SMMotion.shiftLayerMotionKeys(li,-inF);
-    });
-    if(state.markers)state.markers=state.markers.map(function(m){return{frame:m.frame-inF,name:m.name,color:m.color};}).filter(function(m){return m.frame>=0&&m.frame<n;});
-    if(state.cameraKeys)state.cameraKeys=state.cameraKeys.map(function(k){var c2=JSON.parse(JSON.stringify(k));c2.frame=k.frame-inF;return c2;}).filter(function(k){return k.frame>=0&&k.frame<n;});
-    state.totalFrames=n;window._totalF=n;
-    state.waIn=0;state.waOut=n-1;window._waIn=0;window._waOut=n-1;
-    state.currentFrame=Math.max(0,Math.min(n-1,state.currentFrame-inF));
-    loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
-    if(window.updateWaBar)updateWaBar();
-    showToast(SM.t('toastCompReducedToWorkArea')+n+' frames)');
-  },
+  trimToWorkArea:function(){var length=window.NemoNativeProjectLength;return length?length.trimToWorkArea(window):Promise.resolve({status:'unavailable'});},
   setLayerKeyLock:function(li,mode){
     var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
     pushUndo();
@@ -2146,6 +1944,7 @@ window.SM={
     updateUI();showToast(SM.t('toastExposureExtendedPlus')+n);
   },
   flipHorizontal:function(){
+    if(nativeFlip('h'))return;if(!n20AllowLegacyWrite('timeline-selection-flip'))return false;// #2372 A-flip-selection: a native project mirrors the selection as ONE batch
     if(state.tool!=='select'||!selectedPaths.length){showToast(SM.t('toastSelectStrokes'));return;}
     pushUndo();var bounds=null;selectedPaths.forEach(function(p){if(!bounds)bounds=p.bounds.clone();else bounds=bounds.unite(p.bounds);});
     var cx=bounds.center.x;
@@ -2157,6 +1956,7 @@ window.SM={
     saveActiveLayerFrameOrPromote();updateUI();showToast('Flip horizontal');
   },
   flipVertical:function(){
+    if(nativeFlip('v'))return;if(!n20AllowLegacyWrite('timeline-selection-flip'))return false;
     if(state.tool!=='select'||!selectedPaths.length){showToast(SM.t('toastSelectStrokes'));return;}
     pushUndo();var bounds=null;selectedPaths.forEach(function(p){if(!bounds)bounds=p.bounds.clone();else bounds=bounds.unite(p.bounds);});
     var cy=bounds.center.y;
@@ -5859,7 +5659,7 @@ function computeLayerRenderOrder(){
 // when they're already CONSECUTIVE in layer order (computeLayerRenderOrder
 // derives a folder's membership purely from adjacency, so a non-contiguous
 // selection would render wrong: reorder first, like Animate requires too).
-function groupSelectionIntoFolder(){
+function groupSelectionIntoFolder(){if(window.NemoNativeLayerRowUi&&window.NemoNativeLayerRowUi.group(window))return;
   if(_layerSel.length<2){showToast(SM.t('toastSelectAtLeast2LayersCap'));return;}
   var sorted=_layerSel.slice().sort(function(a,b){return a-b;});
   for(var k=1;k<sorted.length;k++)if(sorted[k]!==sorted[k-1]+1){showToast(SM.t('toastLayersMustBeConsecutive'));return;}
@@ -6427,6 +6227,7 @@ function routeColorToMotion(p,prop,hex){
 }
 // #2372 SEL-STYLE: on a native object project the right panel restyles the Select selection through ONE native batch (adapters/native-selection-style.js),
 // never through the legacy Paper writers the n20 gates below refuse. True when the edit was handed to it (the caller then only updates the tool defaults).
+function nativeFlip(axis){var T=window.NemoNativeSelectionTransform;if(!T||!T.native(window))return false;T.flip(window,axis);return true;}
 function nativeSelStyle(style){
   var A=window.NemoNativeSelectionStyle;
   if(!A||!A.handles(window))return false;
@@ -9589,10 +9390,10 @@ function onKeyDown(event){
   // never what anyone wants here.
   // Focus and clipboard arbitration lives in application/keyboard-arbiter.js (U05, #2370); this runs its decision.
   var inField=NemoKeyboardArbiter.inField(event.target);
-  var arb=NemoKeyboardArbiter.decide(event,function(){return {
-    motionKeySelection:state.appMode==='motion'&&!!(window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()),
+  var arb=NemoKeyboardArbiter.decide(event,function(){var NK=window.NemoNativeMotionKeyEdit&&NemoNativeMotionKeyEdit.current(document);return {
+    motionKeySelection:state.appMode==='motion'&&(NK?NK.hasSelection():!!(window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection())),
     shapeSelection:selectedPaths.length>0,
-    motionKeyClipboard:state.appMode==='motion'&&!!(window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard()),
+    motionKeyClipboard:state.appMode==='motion'&&(NK?NemoNativeMotionKeyEdit.hasClip():!!(window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard())),
     canvasClipboard:!!(_canvasClip&&_canvasClip.snaps.length)||!!(window.NemoNativeSelectionClipboard&&NemoNativeSelectionClipboard.native(window)&&NemoNativeSelectionClipboard.hasClip(window)),frameClipboard:!!(_sel.clipboard&&_sel.clipboard.length),
     lastClipKind:window._lastClipKind,svgImport:!!window.SMSvgImport};});
   if(arb){
@@ -9604,7 +9405,7 @@ function onKeyDown(event){
       case'save':window.SMProject.save();return;
       case'saveAs':window.SMProject.saveAs();return;
       case'convertToComponent':window.SM.convertActiveLayerToComponent();return;
-      case'copyKeys':SMMotion.copySelectedKeys();return;
+      case'copyKeys':var nk=window.NemoNativeMotionKeyEdit&&NemoNativeMotionKeyEdit.current(document);if(nk){nk.run({kind:'copy'}).catch(function(){});return;}SMMotion.copySelectedKeys();return;
       case'copyShapes':copySelection();return;
       case'copyFrames':window.SM.copyFrames();return;
       case'cutShapes':cutSelection();return;
@@ -9615,7 +9416,7 @@ function onKeyDown(event){
         if(window._svgPasteFallback)clearTimeout(window._svgPasteFallback);
         window._svgPasteFallback=setTimeout(function(){window._svgPasteFallback=null;window.SM.pasteFrames();},80);
         return;
-      case'pasteKeys':SMMotion.pasteKeys();return;
+      case'pasteKeys':var nk2=window.NemoNativeMotionKeyEdit&&NemoNativeMotionKeyEdit.current(document);if(nk2){nk2.run({kind:'paste'}).catch(function(){});return;}SMMotion.pasteKeys();return;
       case'pasteShapes':pasteSelection();return;
       case'pasteFrames':window.SM.pasteFrames();return;
       default:return;
@@ -10727,7 +10528,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
     // #207), not the (irrelevant once keyed) static field.
     var keyedAtOpen=!!(ld.blendKeys&&ld.blendKeys.length);
     origMode=keyedAtOpen?((window.SMMotion&&SMMotion.layerBlendModeAt)?SMMotion.layerBlendModeAt(state.activeLayerIdx,state.currentFrame):(ld.blendMode||'normal')):(ld.blendMode||'normal');
-    var natOpen=nativeCompositing();if(natOpen)origMode=natOpen.blendOf(state.activeLayerIdx);
+    var natOpen=nativeCompositing();if(natOpen)origMode=natOpen.blendOf(state.activeLayerIdx,state.currentFrame);
     pop.innerHTML='';
     Object.keys(BLEND_MODE_LABELS).forEach(function(v){
       var it=document.createElement('div');
@@ -10739,7 +10540,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
         var nat=nativeCompositing();
         if(nat){ // #2372: one native edit, no ld write, no pushUndo
           var from=origMode;origMode=null;close(false);
-          nat.setBlend(state.activeLayerIdx,v).then(function(){setLabel(v);nativeCompositingRefresh();},function(){setLabel(from||'normal');nativeCompositingRefused();});
+          nat.setBlend(state.activeLayerIdx,v,state.currentFrame).then(function(){setLabel(v);nativeCompositingRefresh();},function(){setLabel(from||'normal');nativeCompositingRefused();});
           return;
         }
         var ld2=currentLd();if(!ld2){close(false);return;}

@@ -7,7 +7,7 @@
 //! every identity must meet before any snapshot is read. The bounds are these
 //! operations' own; over the staged dispatcher the 4096-byte envelope is the
 //! effective limit.
-use crate::object_document::object_deserialize;
+use crate::object_document::{object_deserialize, Presence};
 use crate::object_document::object_group_kernels::object_clipboard_plan::ClipPayload;
 use crate::object_document::object_group_kernels::object_clipboard_remap::RemapError;
 use crate::object_document::object_group_kernels::object_selection_edit_frames::{
@@ -40,6 +40,49 @@ object_deserialize!(SelectionPayload {
     mode: String,
     stroke_ids: Vec<String>
 });
+
+/// Shapes of another layer a multi-layer duplicate copies into the destination layer.
+#[derive(Debug)]
+pub(super) struct OtherLayerPayload {
+    pub(super) layer_uid: String,
+    pub(super) stroke_ids: Vec<String>,
+}
+object_deserialize!(OtherLayerPayload {
+    layer_uid: String,
+    stroke_ids: Vec<String>
+});
+
+/// Most layers besides the destination one multi-layer duplicate may copy from.
+pub(super) const MAX_OTHER_LAYERS: usize = 32;
+
+/// duplicate: the shapes of one layer cell by stable identity, and optionally where the copies land
+/// (`offset`, the world distance of an Alt-drag; absent is the baseline 12 px nudge on both axes) and the shapes
+/// of OTHER layers the copy also takes (`others`): a selection that spans layers is cloned into the destination layer
+/// (baseline `duplicateSelection`: every selected path is materialised into the ACTIVE layer), all in one transaction.
+#[derive(Debug)]
+pub(super) struct DuplicatePayload {
+    pub(super) command: String,
+    pub(super) context_id: String,
+    pub(super) layer_uid: String,
+    pub(super) frame: u32,
+    pub(super) mode: String,
+    pub(super) stroke_ids: Vec<String>,
+    pub(super) offset: Presence<[f64; 2]>,
+    pub(super) others: Presence<Vec<OtherLayerPayload>>,
+}
+object_deserialize!(DuplicatePayload {
+    command: String,
+    context_id: String,
+    layer_uid: String,
+    frame: u32,
+    mode: String,
+    stroke_ids: Vec<String>,
+    #[serde(default)] offset: Presence<[f64; 2]>,
+    #[serde(default)] others: Presence<Vec<OtherLayerPayload>>
+});
+
+/// Largest distance (world px, per axis) a duplicate may be dragged: far beyond any canvas, small enough to stay exact.
+pub(super) const MAX_DUPLICATE_OFFSET: f64 = 1.0e6;
 
 #[derive(Debug)]
 pub(super) struct PastePayload {

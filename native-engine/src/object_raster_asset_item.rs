@@ -289,17 +289,42 @@ impl RasterItem {
     pub(crate) fn selection_companion_clone(
         &self,
         group: &str,
-        offset: f64,
+        offset: [f64; 2],
     ) -> Result<Self, RasterItemError> {
-        if !offset.is_finite() {
+        if !offset.iter().all(|v| v.is_finite()) {
             return Err(RasterItemError::NonFinite);
         }
         let mut next = self.clone();
         next.brush_group_id = Presence::Present(group.to_string());
-        if offset != 0.0 {
+        if offset != [0.0, 0.0] {
             let (x, y) = self.center();
-            next.x = Number::from_f64(x + offset).ok_or(RasterItemError::NonFinite)?;
-            next.y = Number::from_f64(y + offset).ok_or(RasterItemError::NonFinite)?;
+            next.x = Number::from_f64(x + offset[0]).ok_or(RasterItemError::NonFinite)?;
+            next.y = Number::from_f64(y + offset[1]).ok_or(RasterItemError::NonFinite)?;
+        }
+        next.validate()?;
+        Ok(next)
+    }
+
+    /// The same bitmap as a plain image (a component's break apart): optionally at a new centre and size (rotation and the
+    /// brush tags go, as `applyMatrixToStrokeData` builds its new dict), at `opacity` (kept as authored when unchanged).
+    pub(crate) fn baked(
+        &self,
+        rect: Option<((f64, f64), (f64, f64))>,
+        opacity: f64,
+    ) -> Result<Self, RasterItemError> {
+        let mut next = self.clone();
+        if let Some(((x, y), (width, height))) = rect {
+            next.x = number_of(x)?;
+            next.y = number_of(y)?;
+            next.width = number_of(width)?;
+            next.height = number_of(height)?;
+            next.rotation = Presence::Missing;
+        }
+        if !opacity.is_finite() {
+            return Err(RasterItemError::NonFinite);
+        }
+        if opacity != self.opacity() {
+            next.opacity = Presence::Present(number_of(opacity)?);
         }
         next.validate()?;
         Ok(next)

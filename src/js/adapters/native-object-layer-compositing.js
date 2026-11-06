@@ -3,7 +3,7 @@
  * (command.document.object.layer.compositing.edit): a blend or matte pick is one write, and an effect add / remove /
  * reorder / toggle sends the layer's COMPLETE resulting stack, computed at execution time from the pinned layer row so a
  * queued call never edits a stale stack. The adapter holds no document state, reads current values from the pinned
- * project info (blendMode, matteMode, matteSourceLayerUid, mattesMore, effects) and has no fallback writer: an absent
+ * project info (blendMode, blendKeys, matteMode, matteSourceLayerUid, mattesMore, effects) and has no fallback writer: an absent
  * project, route or declaration is a typed unavailability. Hover previews are the caller's own UI state and never call this. */
 (function (root, factory) {
   const commonjs = typeof module === 'object' && module.exports;
@@ -23,6 +23,7 @@
   const fault = (code, message, extra) => Command.fault(code, message, extra);
   const copy = (v) => JSON.parse(JSON.stringify(v));
   const text = (v) => typeof v === 'string' && v.length > 0;
+  const framesOk = (f) => Array.isArray(f) && f.length > 0 && f.length <= 64 && f.every((v, i) => Number.isInteger(v) && v >= 0 && (i === 0 || f[i - 1] < v));
 
   function create(session) {
     const commands = Command.create(session, 'compositing', Contract, LIMIT);
@@ -31,6 +32,12 @@
     const uidOf = (index) => { const row = rowAt(index); return row && text(row.layerUid) ? row.layerUid : null; };
     const gone = () => fault('not_found', 'The layer is not in the native project', { reason: 'layer_missing' });
     const rowByUid = (pin, uid) => rows(pin).find((row) => row.layerUid === uid) || null;
+    const keysOf = (row) => (row && Array.isArray(row.blendKeys) ? row.blendKeys : []);
+    function blendAt(index, frame) {
+      const row = rowAt(index), keys = keysOf(row);
+      if (keys.length && Number.isFinite(frame)) return (keys.filter((k) => k.frame <= frame).pop() || keys[0]).mode;
+      return row && text(row.blendMode) ? row.blendMode : 'normal';
+    }
 
     // One native edit of one layer; `members` is computed from the pinned row when the request is built.
     function edit(index, kind, members, finish) {
@@ -62,7 +69,11 @@
     return Object.freeze({
       layerUid: uidOf,
       // Current values as the pickers show them: an absent member is Normal / no matte.
-      blendOf(index) { const row = rowAt(index); return row && text(row.blendMode) ? row.blendMode : 'normal'; },
+      // With a frame, the mode HELD at that frame when the layer has blend keys (baseline layerBlendModeAt: the last key at or
+      // before the frame, the first key's mode before it); without one, or without keys, the stored blend.
+      blendOf: blendAt,
+      // The hold-only blend keys in frame order, as fresh {frame, mode} copies (the Blend stopwatch is on exactly when any exist).
+      blendKeysOf(index) { return keysOf(rowAt(index)).map((k) => ({ frame: k.frame, mode: k.mode })); },
       matteOf(index) { const row = rowAt(index); return row && text(row.matteMode) ? row.matteMode : 'none'; },
       sourceOf(index) { const row = rowAt(index); return row && text(row.matteSourceLayerUid) ? row.matteSourceLayerUid : null; },
       // The additional mattes in stored order, as fresh {uid, mode} copies, index-aligned with the stored list (empty when none).
@@ -70,9 +81,35 @@
       layerCount() { return rows(session.info()).length; },
       stackOf(index) { return stackOfRow(rowAt(index)); },
       stackAvailable(index) { return stackOfRow(rowAt(index)) !== null; },
-      setBlend(index, mode) {
+      // A layer with blend keys SNAPS the pick at `frame` (one key, the baseline dropdown); without keys the stored blend changes.
+      setBlend(index, mode, frame) {
         if (!BLEND.includes(mode)) return Promise.reject(fault('invalid_request', 'Unknown blend mode', { reason: 'local_validation' }));
-        return edit(index, 'blend', { mode });
+        return keysOf(rowAt(index)).length && Number.isInteger(frame) ? edit(index, 'blendKeySet', { index: frame, mode }) : edit(index, 'blend', { mode });
+      },
+      setBlendKey(index, frame, mode) {
+        if (!BLEND.includes(mode) || !Number.isInteger(frame) || frame < 0) return Promise.reject(fault('invalid_request', 'Invalid blend key', { reason: 'local_validation' }));
+        return edit(index, 'blendKeySet', { index: frame, mode });
+      },
+      removeBlendKey(index, frame) { return edit(index, 'blendKeyRemove', { index: frame }); },
+      // The key grid's group gestures, each ONE native edit of the layer (one revision, one history entry): the keys at `frames`
+      // (strictly increasing) removed, or moved by `by` frames with their modes (baseline Delete / drag / Alt+Arrow over a selection).
+      removeBlendKeys(index, frames) {
+        if (!framesOk(frames)) return Promise.reject(fault('invalid_request', 'Invalid blend keys', { reason: 'local_validation' }));
+        return edit(index, 'blendKeysRemove', { frames: frames.slice() });
+      },
+      moveBlendKeys(index, frames, by) {
+        if (!framesOk(frames) || !Number.isInteger(by) || by === 0) return Promise.reject(fault('invalid_request', 'Invalid blend key move', { reason: 'local_validation' }));
+        return edit(index, 'blendKeysMove', { frames: frames.slice(), by });
+      },
+      // The Blend stopwatch at `frame` (baseline renderBlendRow): off -> a key with the mode showing; on with a key here -> that
+      // key goes (the only one collapses back to the static blend, keeping its mode, in the same write); on without one -> a
+      // key holding the mode in force at the frame.
+      toggleBlendStopwatch(index, frame) {
+        if (!Number.isInteger(frame) || frame < 0) return Promise.reject(fault('invalid_request', 'Invalid frame', { reason: 'local_validation' }));
+        const keys = keysOf(rowAt(index)), here = keys.find((k) => k.frame === frame);
+        if (!keys.length) return edit(index, 'blendKeySet', { index: frame, mode: blendAt(index) });
+        if (!here) return edit(index, 'blendKeySet', { index: frame, mode: blendAt(index, frame) });
+        return keys.length === 1 ? edit(index, 'blendKeysClear', { mode: here.mode }) : edit(index, 'blendKeyRemove', { index: frame });
       },
       // None removes the matte (and its additional mattes with it); any other pick sets the mode and, like the baseline
       // menu, freezes the adjacent layer as the source when none is stored yet, in the same write.

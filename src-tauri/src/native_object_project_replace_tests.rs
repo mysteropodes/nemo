@@ -77,6 +77,7 @@ impl Fixture {
                 request_id,
                 fingerprint,
                 prepared,
+                ..
             } => (generation, request_id, fingerprint, prepared),
             _ => panic!("expected one execution"),
         }

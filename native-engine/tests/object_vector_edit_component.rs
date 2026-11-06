@@ -237,8 +237,8 @@ fn component_reads_refuse_an_undeclared_context_a_foreign_layer_and_a_frame_past
 }
 
 /// #2256: Select's hit-test listing of the ENTERED component, as the viewport presents it: the component's own layer and records, named by the
-/// component context, with the geometry read of the same record; the editable (Subselect) listing stays scene-root.
-fn component_view(owner: &NativeObjectHistory, context: &str, layer: &str, hit: bool) -> Result<Value, &'static str> {
+/// component context, with the geometry read of the same record; the editable (Direct Select) listing reads the same way (`subselect`).
+pub(super) fn component_view(owner: &NativeObjectHistory, context: &str, layer: &str, hit: bool) -> Result<Value, &'static str> {
     use crate::object_render_scene::prepare_object_viewport_composition;
     let s = owner.acquire_snapshot(owner.content_revision()).unwrap();
     let expected = ObjectFrameSelector {
@@ -280,12 +280,7 @@ fn select_lists_the_entered_components_records_and_reads_their_geometry() {
     assert_eq!(response["ok"], true, "{response}");
     assert_eq!(response["result"]["subselect"]["stableTarget"]["contextId"], CTX);
     assert_eq!(response["result"]["subselect"]["total"].as_u64().unwrap() as usize, items[0]["count"].as_u64().unwrap() as usize);
-    // The editable read of a component record stays refused; the scene root is listed as before.
-    let mut editable = request.clone();
-    editable["payload"]["subselect"] = json!({"cursor":0,"limit":16});
-    let refused = serde_json::to_value(s.dispatch(serde_json::from_value(editable).unwrap()).unwrap()).unwrap();
-    assert_eq!(refused["ok"], false, "{refused}");
-    assert!(component_view(&owner, CTX, "inner", false).is_err(), "the editable listing is scene-root only");
+    // The scene root is listed as before (the editable read of a component record: see `subselect`).
     let scene = component_view(&owner, "scene-root", "L1", true).unwrap();
     assert_eq!(scene["contextId"], "scene-root");
 }
@@ -391,3 +386,75 @@ fn a_locked_or_path_effect_component_layer_refuses_every_vector_write_like_the_s
     }
     }
 }
+
+/// #2361 Fill Brush inside an entered component (draw-bridge.js Fill Brush @1065e9d8 runs on the symbol layer enterSymbol swaps in):
+/// the shape lands in THAT component, one revision, one undo entry, and the scene root is untouched.
+#[test]
+fn a_fill_brush_in_a_component_places_in_that_component_as_one_entry_and_one_undo() {
+    let mut owner = owner_of(&doc());
+    let (before, bytes_before) = (state(&owner), bytes(&owner));
+    let s = |x: f64, y: f64| json!({"point":[x,y],"handleIn":[0,0],"handleOut":[0,0]});
+    let p = json!({"command":"object.fill.brush","layerUid":"inner","contextId":CTX,"frame":0,
+        "outline":[s(0.0, 0.0), s(40.0, 0.0), s(40.0, 30.0), s(0.0, 30.0)],"color":"#0000ffff","opacity":0.75,
+        "placement":"above","mask":false,"copies":[],"stamps":[]});
+    let candidate = owner.prepare_fill_brush_json(p.to_string().as_bytes()).unwrap();
+    owner.commit_boolean_edit(candidate).unwrap();
+    let after = state(&owner);
+    assert_eq!(owner.history_depths(), (1, 0), "one history entry");
+    assert_eq!(ids(&after).len(), 2, "the shape joined the component");
+    assert_eq!(component(&after)[1]["vectorExt"], json!({"isFillShape": true}));
+    assert_eq!(scene_part(&after), scene_part(&before), "the scene root is untouched");
+    undo(&mut owner);
+    assert_eq!(bytes(&owner), bytes_before, "one Undo restores the bytes");
+    // A component layer the context does not declare is refused with nothing prepared.
+    let mut stray = p.clone();
+    stray["layerUid"] = json!("L1");
+    assert!(owner.prepare_fill_brush_json(stray.to_string().as_bytes()).is_err());
+}
+
+/// #2256 Paint bucket (Fill tool, `fill.trace`) inside an entered component: it traces the component's own walls, places the fill in that
+/// component, keys a held component cell first, and is one revision and one undo entry; the scene root is untouched.
+#[test]
+fn a_paint_bucket_fill_in_a_component_traces_its_walls_and_keys_a_held_cell() {
+    let wall = |frame: u32| {
+        let mut w = crec(frame, "wall");
+        w["geometry"]["closed"] = json!(true);
+        w["geometry"]["segments"] = json!([[0.0, 0.0], [40.0, 0.0], [40.0, 40.0], [0.0, 40.0]]
+            .map(|p| json!({"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"point":{"x":p[0],"y":p[1]}})));
+        w
+    };
+    let mut d = doc();
+    d["componentTables"]["components"]["components"][0]["objects"] = json!([wall(0)]);
+    d["compositionOrder"]["contexts"][1]["scopes"] = json!([scope(0, &[("inner", "wall")])]);
+    let mut owner = owner_of(&d);
+    let (before, bytes_before) = (state(&owner), bytes(&owner));
+    let trace = |frame: u32| json!({"command":"object.fill.trace","layerUid":"inner","contextId":CTX,"frame":frame,
+        "point":[20,20],"color":"#336699ff","opacity":1,"remove":false});
+    let candidate = owner.prepare_fill_trace_json(trace(0).to_string().as_bytes()).unwrap();
+    owner.commit_boolean_edit(candidate).unwrap();
+    let after = state(&owner);
+    assert_eq!(owner.history_depths(), (1, 0), "one history entry");
+    let filled = component(&after).iter().find(|r| r["vectorExt"]["fillTrace"].is_object()).expect("the fill joined the component");
+    assert_eq!(filled["vectorExt"]["fillTrace"]["walls"], json!(["wall"]));
+    assert_eq!(filled["target"]["contextId"], CTX);
+    assert_eq!(scene_part(&after), scene_part(&before), "the scene root is untouched");
+    undo(&mut owner);
+    assert_eq!(bytes(&owner), bytes_before, "one Undo restores the bytes");
+    // Held cell 3 of the 8-frame component: keyed with a copy of the key's wall first, then filled -- in the same entry.
+    let candidate = owner.prepare_fill_trace_json(trace(3).to_string().as_bytes()).unwrap();
+    owner.commit_boolean_edit(candidate).unwrap();
+    let held = state(&owner);
+    let at_frame = |n: u64| component(&held).iter().filter(|r| r["target"]["frameScope"]["frame"] == n).count();
+    assert_eq!((at_frame(0), at_frame(3)), (1, 2), "the key keeps its wall; the keyed cell holds the wall copy and the fill");
+    assert_eq!(owner.history_depths(), (1, 0), "key and fill are one entry");
+    undo(&mut owner);
+    assert_eq!(bytes(&owner), bytes_before);
+    // Past the component's 8 frames and an undeclared layer are refused with nothing prepared.
+    assert!(owner.prepare_fill_trace_json(trace(8).to_string().as_bytes()).is_err());
+    let mut stray = trace(0);
+    stray["layerUid"] = json!("L1");
+    assert!(owner.prepare_fill_trace_json(stray.to_string().as_bytes()).is_err());
+}
+
+#[path = "object_subselect_component.rs"]
+mod subselect;

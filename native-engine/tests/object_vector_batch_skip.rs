@@ -10,8 +10,9 @@ fn anchor_record(id: &str) -> Value {
     r["vectorExt"] = json!({"brushTexture":{"brushGroupId":"g","brushTexturePreset":"charcoal-pencil","preTextureOpacity":1,"strokeSeed":1}});
     r
 }
+/// A green stroke and a half opacity: on a texture anchor with no fill the opacity would un-hide its outline, so the engine cannot do it.
 fn green(id: &str) -> Value {
-    restyle(id, json!({"stroke":"#00ff00"}))
+    restyle(id, json!({"stroke":"#00ff00","opacity":0.5}))
 }
 fn skipping(ops: Vec<Value>) -> Value {
     let mut p = batch(ops);

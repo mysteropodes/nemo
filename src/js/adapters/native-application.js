@@ -152,7 +152,7 @@
     if (payload.command !== 'object.project.settings.edit') throw new TypeError('invalid project settings command');
     const action = payload.action;
     if (!plain(action)) throw new TypeError('project settings action must be an object');
-    const fields = {setCanvasSize:['width','height'],setFps:['fps'],setCanvasBackground:['color'],setWorkArea:['inFrame','outFrame']};
+    const fields = {setCanvasSize:['width','height'],setFps:['fps'],setCanvasBackground:['color'],setWorkArea:['inFrame','outFrame'],setTotalFrames:['frames'],trimToWorkArea:[]};
     if (!has(fields, action.kind)) throw new TypeError('unsupported project settings action');
     exact(action, ['kind', ...fields[action.kind]], [], 'project settings action');
     if (action.kind === 'setCanvasSize') {
@@ -177,14 +177,14 @@
     } else if (operation === 'command.document.object.project.settings.edit') {
       projectSettingsPayload(payload);
     } else if (operation === 'command.document.object.layer.create') {
-      exact(payload, ['command', 'name'], [], 'object layer create');
+      exact(payload, ['command', 'name'], ['contextId'], 'object layer create'); if (has(payload, 'contextId')) objectUid(payload.contextId); // #2256: the entered component
       if (payload.command !== 'object.layer.create' || typeof payload.name !== 'string') throw new TypeError('invalid object layer create');
     } else if (['command.document.object.layer.visibility.set', 'command.document.object.layer.policy.edit'].includes(operation)) {
       const policy = operation === 'command.document.object.layer.policy.edit';
-      exact(payload, policy ? ['command', 'layerUid', 'flag', 'value'] : ['command', 'layerUid', 'visible'], [], 'object layer command');
-      // D37: the keyLock flag carries the layer key-lock mode (null clears); locked and shy stay booleans.
+      exact(payload, policy ? ['command', 'layerUid', 'flag', 'value'] : ['command', 'layerUid', 'visible'], ['contextId'], 'object layer command'); if (has(payload, 'contextId')) objectUid(payload.contextId); // #2256
+      // D37: the keyLock flag carries the layer key-lock mode (null clears); locked, shy and threeD stay booleans.
       const keyLock = policy && payload.flag === 'keyLock' && (payload.value === null || ['in', 'out', 'layer'].includes(payload.value));
-      if (payload.command !== (policy ? 'object.layer.policy.edit' : 'object.layer.visibility.set') || !keyLock && typeof payload[policy ? 'value' : 'visible'] !== 'boolean' || policy && !keyLock && !['locked', 'shy'].includes(payload.flag)) throw new TypeError('invalid object layer command');
+      if (payload.command !== (policy ? 'object.layer.policy.edit' : 'object.layer.visibility.set') || !keyLock && typeof payload[policy ? 'value' : 'visible'] !== 'boolean' || policy && !keyLock && !['locked', 'shy', 'threeD'].includes(payload.flag)) throw new TypeError('invalid object layer command');
       objectUid(payload.layerUid);
     } else if (objectHistoryOperations.includes(operation)) { exact(payload, ['command'], ['steps'], 'object history command'); if (payload.command !== operation.slice('command.document.'.length) || has(payload, 'steps') && !(Number.isSafeInteger(payload.steps) && payload.steps >= 1)) throw new TypeError('invalid object history command'); } else if (operation === 'query.document.serialize' || operation === 'query.document.evaluate') {
       const evaluate = operation === 'query.document.evaluate';
@@ -346,7 +346,7 @@
       objectUid(value.layerUid);
     } else if (['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit'].includes(operation)) {
       exact(value, ['applied', 'historyEntriesAdded'], [], 'visibility result');
-      if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) throw new TypeError('invalid visibility disposition');
+      if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0) && !(operation === 'command.document.object.layer.policy.edit' && value.applied && value.historyEntriesAdded === 0)) throw new TypeError('invalid visibility disposition'); // #2520: the 3D switch saves a revision with no undo entry
     } else if (objectHistoryOperations.includes(operation)) { exact(value, ['applied', 'historyEntriesAdded'], [], 'object history result'); if (value.applied !== true || value.historyEntriesAdded !== 0) throw new TypeError('invalid object history disposition'); } else if (operation === 'query.diagnostics.recent') {
       exact(value, ['records', 'truncated'], [], 'diagnostics result');
       if (!Array.isArray(value.records) || value.records.length > 32 || typeof value.truncated !== 'boolean') throw new TypeError('invalid diagnostics bounds');
@@ -479,6 +479,7 @@
                 response.contentRevision !== outbound.expectedRevision + 1) throw new TypeError(objectHistoryOperations.includes(outbound.operation) ? 'object history receipt revision mismatch' : 'creation receipt revision mismatch');
             if (response.ok && ['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation].includes(outbound.operation) &&
                 response.contentRevision !== outbound.expectedRevision + (response.result.applied ? 1 : 0)) throw new TypeError('visibility receipt revision mismatch');
+            if (response.ok && outbound.operation === 'command.document.object.layer.policy.edit' && response.result.applied && response.result.historyEntriesAdded === 0 && outbound.payload.flag !== 'threeD') throw new TypeError('invalid visibility disposition');
           }
           if (['query.diagnostics.recent', 'query.reproduction.report'].includes(outbound.operation) &&
               (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId)) throw new TypeError('diagnostics response identity mismatch');

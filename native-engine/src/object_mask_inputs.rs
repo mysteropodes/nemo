@@ -93,7 +93,7 @@ fn invalid(source_object_index: usize, reason: &'static str) -> ObjectSceneError
 }
 fn ordinary_layer(packet: &ObjectFramePacket, index: usize) -> bool {
     packet.source_layers().get(index).is_some_and(|layer| {
-        layer.visible()
+        crate::object_frame_packet::solo_view::layer_visible(packet.context_id(), packet.source_layers(), layer)
             && !layer.is_folder_layer()
             && !layer.is_effect_layer()
             && layer.widget.value().is_none()
@@ -341,6 +341,7 @@ pub(crate) fn compile_mask(
     packet: &ObjectFramePacket,
     source: ObjectFrameRecord<'_>,
     pose: Option<&PosedStroke>,
+    projected: Option<&crate::evaluation::object_vector_kernels::render_vector_eval::EvaluatedVector>,
 ) -> Result<CompiledContour, &'static str> {
     if !packet.owns_record(source) || !source.record().is_mask() {
         return Err("mask record is not an owned selected Path");
@@ -349,8 +350,10 @@ pub(crate) fn compile_mask(
     if !is_vector_record(source.record()) {
         return Err("mask geometry has no admitted native path representation");
     }
-    let evaluated =
-        evaluate_record_with_pose(packet, source, pose).map_err(|error| error.message())?;
+    let evaluated = match projected {
+        Some(projected) => projected.clone(),
+        None => evaluate_record_with_pose(packet, source, pose).map_err(|error| error.message())?,
+    };
     let segments = evaluated
         .segments
         .iter()
