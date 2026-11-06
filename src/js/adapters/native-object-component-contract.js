@@ -37,6 +37,11 @@
     if (typeof value !== 'string' || !value.length || bytes(value) > MAX_ID || value.includes('\u0000')) fail(`${label} is not a bounded identity`);
     return value;
   }
+  const STATE_KINDS = ['setCameraKey', 'removeCameraKey', 'setCameraEase', 'clearCamera', 'addMarker', 'updateMarker', 'removeMarker', 'clearMarkers'];
+  const MAX_LABEL = 256;
+  const numbers = (value, count, at) => {
+    if (!Array.isArray(value) || value.length !== count || !value.every((n) => typeof n === 'number' && Number.isFinite(n))) fail(`${at} must be ${count} finite numbers`);
+  };
   const KINDS = {
     // Any string: a name or label the owner stores verbatim (the 4096-byte envelope bounds it).
     text: (value, at) => { if (typeof value !== 'string') fail(`${at} must be a string`); },
@@ -70,6 +75,12 @@
     frame: (value, at) => { if (!Number.isSafeInteger(value) || value < 0 || value > MAX_FRAME) fail(`${at} must be a native u32 frame`); },
     placedAt: (value, at) => { if (!Number.isSafeInteger(value) || value < -MAX_PLACED - 1 || value > MAX_PLACED) fail(`${at} must be a native i32 offset`); },
     speed: (value, at) => { if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) fail(`${at} must be a finite number above zero`); },
+    // C-comp-owned-state: the closed members of the component camera / marker edit.
+    stateKind: (value, at) => { if (!STATE_KINDS.includes(value)) fail(`${at} is not a component state edit kind`); },
+    pair: (value, at) => numbers(value, 2, at),
+    quad: (value, at) => { numbers(value, 4, at); if (!(value[0] >= 0 && value[0] <= 1 && value[2] >= 0 && value[2] <= 1)) fail(`${at} x values must lie in 0..1`); },
+    label: (value, at) => { if (typeof value !== 'string' || bytes(value) > MAX_LABEL || value.includes('\u0000')) fail(`${at} must be a string of at most 256 bytes`); },
+    colour: (value, at) => { KINDS.label(value, at); if (!value.length) fail(`${at} must not be empty`); },
     // The Motion canvas effector handle: the inline effector at a native u32 index takes a finite world anchor.
     effectorPos: (value, at) => {
       exact(value, ['index', 'x', 'y'], [], at);
@@ -103,6 +114,10 @@
       ['placedAt', 'placedAt', true], ['speed', 'speed', true], ['atFrame', 'frame', true]]],
     // D-comp-break-apart: the inverse of convert (the baseline convertComponentToLayer), one instance layer baked back into an ordinary layer.
     'component.breakApart': ['object.component.breakApart', 'command', [['contextId', 'text'], ['layerUid', 'id']]],
+    // C-comp-owned-state: the camera keys and markers a declared component owns, one closed edit per request (contextId = the component).
+    'component.state.edit': ['object.component.state.edit', 'command', [['contextId', 'id'], ['kind', 'stateKind'], ['frame', 'frame', true], ['x', 'number', true],
+      ['y', 'number', true], ['w', 'speed', true], ['rot', 'number', true], ['hOut', 'pair', true], ['hIn', 'pair', true], ['ease', 'quad', true],
+      ['name', 'label', true], ['color', 'colour', true], ['newFrame', 'frame', true]]],
   };
   const OPERATIONS = Object.freeze(Object.keys(SPEC).map((suffix) => PREFIX + suffix));
   const spec = (operation) => (typeof operation === 'string' && operation.startsWith(PREFIX) && has(SPEC, operation.slice(PREFIX.length)) ? SPEC[operation.slice(PREFIX.length)] : null);

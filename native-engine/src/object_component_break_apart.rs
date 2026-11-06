@@ -10,21 +10,23 @@
 //! one candidate document, so one request is one revision and one history entry.
 //!
 //! What a flat layer cannot hold yet is refused whole, typed, before anything changes (stable code `component-break-apart`):
-//! images and text inside the component, Motion on its inner layers (opacity tracks are applied at paint time, not baked),
-//! inner groups and rigs, and stroke ids that collide once the inner layers share one layer.
+//! text blocks inside the component, brush images and image meshes, Motion on the inner layers other than the layer opacity
+//! (the one the viewport applies; it is folded into the baked opacity), and stroke ids that collide once the inner layers
+//! share one layer. Inner groups and rigs are not content of the baked frames: the baseline flattens the strokes only, and so
+//! does this (the component keeps its own groups and rig for every other instance).
 use crate::commands::object_fill_owner::component_owner::object_component_convert_support::{
     layer_index, require_v2, with_tables, SetupError, SetupPlan,
 };
 use crate::commands::{insert_order_element, OrderEditError};
-use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
+use crate::object_document::object_component_record_kernels::object_component_records::{Baked, SCENE_CONTEXT};
 use crate::object_document::{
-    FrameScope, FrameScopeKind, LayerTiming, ObjectDocument, ObjectRecord, Presence,
+    FrameScope, FrameScopeKind, ItemRecords, LayerTiming, ObjectDocument, ObjectTarget, Presence,
 };
 use std::collections::HashSet;
 
-/// The content of the instance on one key frame of the scene: `(frame, records)`, the records in inner stack order, geometry
+/// The content of the instance on one key frame of the scene: `(frame, items)`, the items in inner paint order, geometry
 /// already placed (component camera, then `symMatrix`), their targets still naming the component source.
-pub(crate) type BakedFrame = (u32, Vec<ObjectRecord>);
+pub(crate) type BakedFrame = (u32, Vec<Baked>);
 
 fn order_error(_: OrderEditError) -> SetupError {
     SetupError::BreakApartUnavailable(
@@ -34,44 +36,49 @@ fn order_error(_: OrderEditError) -> SetupError {
 
 /// What the component holds that the bake would drop.
 fn unbakeable(document: &ObjectDocument, symbol_id: &str) -> Option<&'static str> {
-    let component = document.component_set()?.component(symbol_id)?;
-    if document.item_records().is_some_and(|items| {
-        items
-            .targets()
-            .any(|target| target.context_id() == symbol_id)
-    }) {
-        return Some("component-break-apart: images and text inside the component cannot be baked into the layer yet.");
-    }
-    if document
-        .property_holders()
-        .is_some_and(|holders| holders.iter().any(|h| h.target().context_id() == symbol_id))
-    {
-        return Some(
-            "component-break-apart: Motion on the inner layers cannot be baked into the layer yet.",
-        );
-    }
-    if component
-        .layers()
+    let items = document.item_records()?;
+    if items
+        .text_entries()
         .iter()
-        .any(|layer| layer.groups.value().is_some() || layer.rig.value().is_some())
+        .any(|entry| entry.target.context_id() == symbol_id)
     {
-        return Some(
-            "component-break-apart: inner groups and rigs cannot be baked into the layer yet.",
-        );
+        return Some("component-break-apart: text blocks inside the component cannot be baked into the layer yet.");
+    }
+    if items.raster_entries().iter().any(|entry| {
+        entry.target.context_id() == symbol_id
+            && (entry.item.is_bitmap_brush() == Some(true)
+                || entry.item.brush_group_id().is_some()
+                || entry.item.is_brush_texture_copy() == Some(true)
+                || entry.item.mesh_id().is_some())
+    }) {
+        return Some("component-break-apart: brush images and image meshes inside the component cannot be baked into the layer yet.");
     }
     None
 }
 
-/// The inner records of `baked`, retargeted onto the host layer at `frame`.
-fn retarget(record: &ObjectRecord, layer_uid: &str, frame: u32) -> ObjectRecord {
-    let mut moved = record.clone();
-    moved.target.context_id = SCENE_CONTEXT.to_string();
-    moved.target.layer_uid = layer_uid.to_string();
-    moved.target.frame_scope = FrameScope {
-        kind: FrameScopeKind::Authored,
-        frame,
+/// The baked item on the host layer at `frame`.
+fn retarget(item: &Baked, layer_uid: &str, frame: u32) -> Baked {
+    let place = |target: &mut ObjectTarget| {
+        target.context_id = SCENE_CONTEXT.to_string();
+        target.layer_uid = layer_uid.to_string();
+        target.frame_scope = FrameScope {
+            kind: FrameScopeKind::Authored,
+            frame,
+        };
     };
+    let mut moved = item.clone();
+    match &mut moved {
+        Baked::Vector(record) => place(&mut record.target),
+        Baked::Image(entry) => place(&mut entry.target),
+    }
     moved
+}
+
+fn target_of(item: &Baked) -> &ObjectTarget {
+    match item {
+        Baked::Vector(record) => &record.target,
+        Baked::Image(entry) => &entry.target,
+    }
 }
 
 /// The refusals that need no evaluation: the layer is an instance of a component whose content a flat layer can hold.
@@ -102,22 +109,33 @@ pub(crate) fn plan_break_apart(
     let (index, symbol_id) = precheck(document, layer_uid)?;
     let mut candidate = document.clone();
     let mut keys = Vec::with_capacity(baked.len());
-    for (frame, records) in baked {
+    let (mut rasters, texts) = document
+        .item_records()
+        .map(|items| (items.raster_entries().to_vec(), items.text_entries().to_vec()))
+        .unwrap_or_default();
+    let images_before = rasters.len();
+    for (frame, items) in baked {
         let mut seen = HashSet::new();
-        for record in records {
-            if !seen.insert(record.target.stroke_id.clone()) {
+        for item in items {
+            if !seen.insert(target_of(item).stroke_id.clone()) {
                 return Err(SetupError::BreakApartUnavailable(
                     "component-break-apart: two inner layers share a stroke id, which one layer cannot hold.",
                 ));
             }
-            let moved = retarget(record, layer_uid, *frame);
-            let target = moved.target.clone();
-            candidate.objects.push(moved);
+            let moved = retarget(item, layer_uid, *frame);
+            let target = target_of(&moved).clone();
+            match moved {
+                Baked::Vector(record) => candidate.objects.push(record),
+                Baked::Image(entry) => rasters.push(entry),
+            }
             if let Presence::Present(plan) = &mut candidate.composition_order {
                 insert_order_element(plan, &target).map_err(order_error)?;
             }
         }
         keys.push(*frame);
+    }
+    if rasters.len() != images_before {
+        candidate.items = ItemRecords::normalized(rasters, texts);
     }
     let layer = &mut candidate.layers[index];
     layer.timing = Presence::Present(LayerTiming::from_key_frames(&keys));

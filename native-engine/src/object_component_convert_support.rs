@@ -119,6 +119,10 @@ pub(crate) enum SetupError {
     /// The instance shows something a flat layer cannot hold yet (items, inner Motion, groups, a rig, a record that does not
     /// bake); the text names it. Stable code `component-break-apart`.
     BreakApartUnavailable(&'static str),
+    /// A component camera or marker request outside its closed shape (a frame past the component, a non-finite value, a missing member).
+    StateEditInvalid(&'static str),
+    /// The key or marker the request names is not stored.
+    StateTargetMissing(&'static str),
     /// A component playback setting outside its closed set (a mode label, a non-positive speed, a frame outside the document).
     PlaybackInvalid,
     IdUnavailable,

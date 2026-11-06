@@ -28,20 +28,16 @@ fn folder_table(doc: &Map<String, Value>) -> Result<Map<String, Value>, LegacyIm
     Ok(out)
 }
 
-/// `state.motionArcs`: keys are `layerUid:from-to-index`; the oldest `from-to-index` form belongs to the one layer that has
-/// drawn keyframes at both ends (an ambiguous entry is dropped, as the baseline does).
-fn motion_arcs(
-    doc: &Map<String, Value>,
-    scene: &[Value],
+/// `state.motionArcs` / `sym.motionArcs`: keys are `layerUid:from-to-index`; the oldest `from-to-index` form belongs to the one
+/// layer of `layers` that has drawn keyframes at both ends (an ambiguous entry is dropped, as the baseline does). Returns the
+/// arcs that name an existing layer, under their `layerUid:` key.
+pub(crate) fn normalize_arcs(
+    value: &Value,
+    path: &str,
+    layers: &[Value],
     ctx: &mut Ctx,
-) -> Result<Option<Value>, LegacyImportError> {
-    let Some(value) = doc
-        .get("motionArcs")
-        .filter(|v| !super::classify::is_default(v))
-    else {
-        return Ok(None);
-    };
-    let uids: HashSet<&str> = scene
+) -> Result<Map<String, Value>, LegacyImportError> {
+    let uids: HashSet<&str> = layers
         .iter()
         .filter_map(|l| l["layerUid"].as_str())
         .collect();
@@ -52,7 +48,7 @@ fn motion_arcs(
         })
     };
     let mut out = Map::new();
-    for (key, arc) in super::object(value, "motionArcs")? {
+    for (key, arc) in super::object(value, path)? {
         let parts: Vec<&str> = key.split('-').collect();
         let old = parts.len() == 3
             && parts
@@ -63,7 +59,7 @@ fn motion_arcs(
                 parts[0].parse::<usize>().unwrap_or(0),
                 parts[1].parse::<usize>().unwrap_or(0),
             );
-            let owners: Vec<&Value> = scene
+            let owners: Vec<&Value> = layers
                 .iter()
                 .filter(|l| drawn(l, a) && drawn(l, b))
                 .collect();
@@ -93,11 +89,31 @@ fn motion_arcs(
                 out.insert(name, record);
             }
             None => ctx.warn(
-                format!("motionArcs.{key}"),
+                format!("{path}.{key}"),
                 "dangling_motion_arc",
                 "the motion arc names no single existing layer, so it is not carried over",
             ),
         }
+    }
+    Ok(out)
+}
+
+/// `state.motionArcs` of the scene, plus the arcs of every component (their layer uids are unique in the document).
+fn motion_arcs(
+    doc: &Map<String, Value>,
+    scene: &[Value],
+    component_arcs: Map<String, Value>,
+    ctx: &mut Ctx,
+) -> Result<Option<Value>, LegacyImportError> {
+    let mut out = match doc
+        .get("motionArcs")
+        .filter(|v| !super::classify::is_default(v))
+    {
+        Some(value) => normalize_arcs(value, "motionArcs", scene, ctx)?,
+        None => Map::new(),
+    };
+    for (key, arc) in component_arcs {
+        out.entry(key).or_insert(arc);
     }
     Ok((!out.is_empty()).then_some(Value::Object(out)))
 }
@@ -158,10 +174,33 @@ pub(super) fn drawing(
     if !dups.is_empty() {
         tables.insert("duplicators".into(), dups.to_json());
     }
-    let uids: HashSet<String> = scene
+    let mut uids: HashSet<String> = scene
         .iter()
         .filter_map(|l| l["layerUid"].as_str().map(str::to_owned))
         .collect();
+    // A component's own tween tables name the layers inside it; the layer uids are unique in the document, so one store holds them.
+    let mut merged: Map<String, Value> = doc.clone();
+    let mut component_arcs = Map::new();
+    if let Some(parts) = parts.as_mut() {
+        uids.extend(std::mem::take(&mut parts.layer_uids));
+        for (member, extra) in [
+            ("tweenOverrides", std::mem::take(&mut parts.tween_overrides)),
+            ("tweenEasing", std::mem::take(&mut parts.tween_easing)),
+        ] {
+            if extra.is_empty() {
+                continue;
+            }
+            let mut table = match merged.remove(member) {
+                Some(Value::Object(scene_table)) => scene_table,
+                _ => Map::new(),
+            };
+            for (key, value) in extra {
+                table.entry(key).or_insert(value);
+            }
+            merged.insert(member.into(), Value::Object(table));
+        }
+        component_arcs = std::mem::take(&mut parts.motion_arcs);
+    }
     let keys: HashMap<String, Vec<u32>> = std::mem::take(&mut set.keys);
     let mut drawn = keys.clone();
     let mut sampled = std::mem::take(&mut set.sampled);
@@ -172,7 +211,7 @@ pub(super) fn drawing(
     let manual = std::mem::take(&mut set.manual);
     let tween_store = tweens::convert(
         &tweens::Input {
-            doc,
+            doc: &merged,
             uids: &uids,
             keys: &keys,
             drawn: &drawn,
@@ -181,7 +220,7 @@ pub(super) fn drawing(
         },
         ctx,
     )?;
-    let arcs = motion_arcs(doc, scene, ctx)?;
+    let arcs = motion_arcs(doc, scene, component_arcs, ctx)?;
     let context = layers::order_context(&mut set);
     let mut drawing = json!({"format": "nemo.native-object-document", "formatVersion": 2, "totalFrames": total,
         "layers": set.records, "objects": set.objects,

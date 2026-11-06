@@ -16,6 +16,9 @@ use crate::object_snapshot::{ObjectSnapshot, ReadAdmission, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use serde_json::{json, Value};
 
+#[cfg(feature = "evaluation")]
+#[path = "object_component_read_state.rs"]
+mod state;
 #[cfg(test)]
 #[path = "../tests/object_component_read.rs"]
 mod tests;
@@ -53,6 +56,9 @@ enum Selector<'a> {
         cursor: u64,
         limit: u64,
     },
+    /// C-comp-owned-state: pages of a component's stored markers / camera keys (`sym.markers`, `sym.cameraKeys`).
+    Markers { id: &'a str, cursor: u64, limit: u64 },
+    CameraKeys { id: &'a str, cursor: u64, limit: u64 },
     /// #2256 Q4: the stored duplicator descriptor of one scene layer, as the inspector panel shows it.
     Duplicator {
         layer_uid: &'a str,
@@ -101,14 +107,15 @@ fn selector(payload: &Value) -> Option<Selector<'_>> {
                 id: context_id(&object["contextId"])?,
             })
         }
-        kind @ ("layers" | "instances") => {
+        kind @ ("layers" | "instances" | "markers" | "cameraKeys") => {
             let object = fields(selector, &["kind", "contextId", "cursor", "limit"])?;
             let (cursor, limit) = page_args(object)?;
             let id = context_id(&object["contextId"])?;
-            Some(if kind == "layers" {
-                Selector::Layers { id, cursor, limit }
-            } else {
-                Selector::Instances { id, cursor, limit }
+            Some(match kind {
+                "layers" => Selector::Layers { id, cursor, limit },
+                "markers" => Selector::Markers { id, cursor, limit },
+                "cameraKeys" => Selector::CameraKeys { id, cursor, limit },
+                _ => Selector::Instances { id, cursor, limit },
             })
         }
         "duplicator" => {
@@ -348,6 +355,14 @@ impl ObjectSnapshot {
                     head["contextId"] = json!(context.id());
                     (head, context.layers().len(), cursor, limit, items)
                 }
+                Selector::Markers { id, cursor, limit } => {
+                    let (head, items) = self.component_state_page(&source, id, "markers")?;
+                    (head, items.len(), cursor, limit, items)
+                }
+                Selector::CameraKeys { id, cursor, limit } => {
+                    let (head, items) = self.component_state_page(&source, id, "cameraKeys")?;
+                    (head, items.len(), cursor, limit, items)
+                }
                 Selector::Instances { id, cursor, limit } => {
                     let context = source
                         .context(id)
@@ -369,6 +384,8 @@ impl ObjectSnapshot {
         let count_key = match page["kind"].as_str() {
             Some("contexts") => "contextCount",
             Some("layers") => "layerCount",
+            Some("markers") => "markerCount",
+            Some("cameraKeys") => "keyCount",
             _ => "instanceCount",
         };
         page[count_key] = json!(count);
