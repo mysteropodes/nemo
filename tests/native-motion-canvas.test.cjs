@@ -167,7 +167,8 @@ test('Escape, a frame change and a replaced owner commit nothing', async () => {
 });
 test('a locked layer, several selected layers, another mode and a component context take no gesture', async () => {
   for (const [name, opts, prep] of [['locked', { layer: { locked: true } }], ['anim2d', { appMode: 'anim2d' }],
-    ['several', {}, (h) => { h.sandbox._layerSel = [0, 1]; }], ['component', {}, (h) => { h.sandbox.state.activeSymbolId = 'c1'; }]]) {
+    ['several', {}, (h) => { h.sandbox._layerSel = [0, 1]; }], ['component', {}, (h) => { h.sandbox.state.activeSymbolId = 'c1'; }],
+    ['a targeted element (the shape box replaces the layer gizmo)', {}, (h) => { h.sandbox.NemoNativeMotionElement = { isolated: () => true }; }]]) {
     const h = harness(opts); if (prep) prep(h);
     await h.ready();
     const { d } = await h.drag([200, 150], [260, 170]);

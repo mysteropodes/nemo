@@ -43,6 +43,8 @@
     function targetOf(proof) {
       const st = win.state, sel = win._layerSel, held = heldNow();
       if (!motion() || (st.activeSymbolId && !held) || (Array.isArray(sel) && sel.length > 1)) return null;
+      const E = win.NemoNativeMotionElement; // a shape targeted inside its entered group (double-click) has its own box (the select overlay), not the layer's gizmo
+      if (E && E.isolated(win)) return null;
       const layers = held ? held.rows : proof.info.layers, layer = layers && layers[st.activeLayerIdx];
       return layer && layer.visible !== false && typeof layer.layerUid === 'string' ? layer : null;
     }

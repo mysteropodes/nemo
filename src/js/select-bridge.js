@@ -491,7 +491,7 @@
       probe: function (e) {
         var c = window.NemoNativeOpacityCutover, prepared = c.prepared();
         var ld = state.layers[state.activeLayerIdx], layer = userLayers[state.activeLayerIdx];
-        if (window.NemoSelectCanvasIntent.objectProject(window)) return Object.freeze(state.tool === 'select' && state.appMode !== 'motion' && ld ? { mode: 'pick', x: e.clientX, y: e.clientY } : { mode: 'unavailable' }); // #2362: no Paper items
+        if (window.NemoSelectCanvasIntent.objectProject(window)) return Object.freeze(state.tool === 'select' && ld ? { mode: 'pick', x: e.clientX, y: e.clientY } : { mode: 'unavailable' }); // #2362: no Paper items
         if (!prepared || !ld || !layer || prepared.layerUid !== ld.layerUid) return Object.freeze({ mode: 'unavailable' });
         var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY), pt = new Point(w[0], w[1]);
         if (state.appMode === 'motion') {
