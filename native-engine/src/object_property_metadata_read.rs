@@ -173,7 +173,7 @@ fn descriptor(
 // Borrow the same document's declared component tables. Legacy order-only
 // contexts keep their historical root storage view; a known component NEVER
 // borrows root layers when its own local identity is absent.
-pub(crate) fn metadata_context_parts<'a>(
+fn metadata_context_parts<'a>(
     document: &'a ObjectDocument,
     context: &str,
 ) -> (&'a [ObjectLayer], &'a [ObjectRecord]) {
@@ -365,7 +365,10 @@ impl ObjectSnapshot {
                     keys.extend(DUPLICATOR_ROWS);
                 }
                 if let Some(stroke) = target.stroke_id() {
-                    keys.extend(crate::object_snapshot::property_shape_rows::shape_rows(self.document(), target.context_id(), target.layer_uid(), stroke));
+                    let kind = metadata_context_parts(self.document(), target.context_id()).1.iter()
+                        .find(|r| r.target.context_id == target.context_id() && r.target.layer_uid == target.layer_uid() && r.target.stroke_id == stroke && r.target.frame_scope.kind == FrameScopeKind::Authored)
+                        .and_then(|r| r.vector_ext.value()).and_then(|e| e.param_shape.value()).map(|p| p.kind.as_str());
+                    keys.extend(crate::object_snapshot::property_shape_rows::shape_rows(kind));
                 }
                 // #2520/#2525: the other conditional layer rows of the baseline `propsFor`, in its order.
                 if target.stroke_id().is_none() {
