@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { createInput, validGrant } = require('../cs7-session.cjs');
+const { createInput, requireMcpPinned, validGrant } = require('../cs7-session.cjs');
 
 // Real helper subprocess/pipe/exit lifecycle. It deliberately has no AX or Nemo access.
 function fixture(t, mode) {
@@ -69,4 +69,20 @@ test('a grant must be a booking in the current log, not a comment in the full #1
   const helper = fs.readFileSync(path.join(__dirname, '..', 'ui32-owned-policy.swift'), 'utf8');
   assert.ok(helper.includes('grant.range(of:"^2804/[0-9]+$",options:.regularExpression)'));
   assert.ok(!helper.includes('^1062/'));
+});
+
+test('the read client must be listed in the package proof and match its hash', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-cs7-mcp-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const binary = path.join(root, 'nemo-mcp');
+  fs.writeFileSync(binary, 'client bytes');
+  const sha = require('node:crypto').createHash('sha256').update('client bytes').digest('hex');
+  const entry = hash => ({ path: 'x/Nemo.app/Contents/MacOS/nemo-mcp', sha256: hash });
+  requireMcpPinned({ artifacts: [entry(sha)] }, binary);
+  assert.throws(() => requireMcpPinned({ artifacts: [] }, binary), /does not pin/);
+  assert.throws(() => requireMcpPinned({}, binary), /does not pin/);
+  assert.throws(() => requireMcpPinned({ artifacts: [{ path: 'x/Nemo.app/Contents/MacOS/nemo-mcp', present: false }] }, binary), /does not pin/);
+  assert.throws(() => requireMcpPinned({ artifacts: [entry('0'.repeat(64))] }, binary), /differs from the package proof/);
+  fs.writeFileSync(binary, 'substituted');
+  assert.throws(() => requireMcpPinned({ artifacts: [entry(sha)] }, binary), /differs from the package proof/);
 });

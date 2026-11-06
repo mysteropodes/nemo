@@ -15,7 +15,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 
 // ---- the harness read route, stubbed: the REAL reader (cs7-read.cjs) over a stub MCP client ------------
 // `target()` returns the world that answers (null/undefined: no document); `tamper(phase, pair)` may damage a reply.
-const INSTANCE = '0a1b2c3d-0000-4000-8000-000000000001', FOREIGN = '0a1b2c3d-0000-4000-8000-0000000000ff', BUILD = '0.0.0:stub';
+const INSTANCE = '0a1b2c3d-0000-4000-8000-000000000001', FOREIGN = '0a1b2c3d-0000-4000-8000-0000000000ff', BUILD = '0.0.0:' + identity.sourceSha;
 function stubReader({ directory, target, tamper, calls = [], listeners, current }) {
   const registry = fs.mkdtempSync(path.join(directory, '.stub-registry-'));
   fs.writeFileSync(path.join(registry, INSTANCE + '.json'), JSON.stringify({ instanceId: INSTANCE, port: 43210, secret: 'x'.repeat(36), buildId: BUILD }));

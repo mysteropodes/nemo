@@ -124,8 +124,11 @@ function packageArtifacts(app) {
   const executable = fileInfo(bundleExecutable(app));
   const sidecar = fileInfo(path.join(app, 'Contents/MacOS/ffmpeg'));
   if (!sidecar.present) throw new Error('preserved package is missing its ffmpeg sidecar');
+  // The installed rows read document state through this bundled client, so the proof must pin it too.
+  const mcp = fileInfo(path.join(app, 'Contents/MacOS/nemo-mcp'));
+  if (!mcp.present) throw new Error('preserved package is missing its nemo-mcp client');
   return [{ path: path.relative(ROOT, app) }, executable,
-    fileInfo(path.join(app, 'Contents/Info.plist')), sidecar];
+    fileInfo(path.join(app, 'Contents/Info.plist')), sidecar, mcp];
 }
 
 async function runBuildJob(options = {}) {
