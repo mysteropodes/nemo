@@ -99,7 +99,7 @@ pub(crate) fn layer_inputs(
 /// The stack as the baseline `sceneEffectsOf(ld, frame)` hands it to the renderer: each `p1..p8` is the static value,
 /// or `SMMotion.evalTrack` of its key track at `frame` when that parameter is keyed (`effectParamValueAt`). `None`
 /// when a keyed parameter of an ENABLED entry cannot be sampled (never a static substitute).
-fn effect_specs(stack: &[crate::object_document::LayerEffect], frame: f64) -> Option<Vec<EffectSpec>> {
+fn effect_specs(stack: &[crate::object_frame_packet::LayerEffect], frame: f64) -> Option<Vec<EffectSpec>> {
     stack
         .iter()
         .map(|entry| {
@@ -124,7 +124,7 @@ fn effect_specs(stack: &[crate::object_document::LayerEffect], frame: f64) -> Op
 /// `matteOn` switches the matte off. Only an effective matte mode reads the property.
 fn matte_mode_at(
     packet: &ObjectFramePacket,
-    layer: &crate::object_document::ObjectLayer,
+    layer: &crate::object_frame_packet::ObjectLayer,
     index: usize,
 ) -> Result<Option<String>, SceneEffectJoinError> {
     let Some(mode) = layer.matte_mode().map(str::to_owned) else {
