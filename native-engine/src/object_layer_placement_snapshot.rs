@@ -86,7 +86,17 @@ impl ObjectSnapshot {
                         #[cfg(not(feature = "evaluation"))]
                         let value: Option<f64> = return Err(Unavailable);
                         let keys: Vec<Value> = (track.keys.iter())
-                            .map(|k| json!({"frame":k.frame,"value":k.v.first()}))
+                            .map(|k| {
+                                let mut key = json!({"frame":k.frame,"value":k.v.first()});
+                                // The key tint and hold flag, only when the key carries them.
+                                if let Some(color) = k.color.value() {
+                                    key["color"] = json!(color);
+                                }
+                                if k.hold.value() == Some(&true) {
+                                    key["hold"] = json!(true);
+                                }
+                                key
+                            })
                             .collect();
                         json!({"keyCount":track.keys.len(),
                             "keyAtFrame":track.keys.iter().any(|k| k.frame.as_f64() == Some(at)),

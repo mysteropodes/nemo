@@ -3,7 +3,7 @@
 //! Audio requires its actual persisted record and sealed source; absent owners still refuse.
 use crate::history::NativeObjectHistory;
 use crate::object_document::media_timing::object_media_link_edit::PlacementEdit;
-use crate::object_document::placement_offset::RemapIntent;
+use crate::object_document::placement_offset::{RemapIntent, RemapSelection};
 use crate::object_document::{AssetTarget, OrderCurvePoint};
 use crate::request_receipts::DispatchErrorCode;
 use crate::transaction::CompactResult;
@@ -67,6 +67,14 @@ enum EditIn {
         #[serde(rename = "curvePoints", default)]
         curve: Option<Vec<OrderCurvePoint>>,
     },
+    // The selected Time Remap keys under one property key action (shift, delete, curve preset, tint...).
+    #[serde(rename = "editTimeRemapKeys")]
+    EditTimeRemapKeys {
+        #[serde(rename = "placementId")]
+        placement_id: String,
+        selections: Vec<SelectionIn>,
+        action: serde_json::Value,
+    },
     #[serde(rename = "setInterpMode")]
     SetInterpMode {
         #[serde(rename = "placementId")]
@@ -74,6 +82,16 @@ enum EditIn {
         #[serde(rename = "interpMode")]
         interp_mode: String,
     },
+}
+
+// One selection entry: a single key (`frame`) or runs of keys (`ranges`, inclusive); the owner requires exactly one.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SelectionIn {
+    #[serde(default)]
+    frame: Option<serde_json::Number>,
+    #[serde(default)]
+    ranges: Option<Vec<[serde_json::Number; 2]>>,
 }
 
 // Same required persisted placement fields; no absent/null offset coercion.
@@ -184,6 +202,23 @@ fn parse_edit(bytes: &[u8]) -> Result<PlacementEdit, DispatchErrorCode> {
                 curve,
             },
         ),
+        EditIn::EditTimeRemapKeys {
+            placement_id,
+            selections,
+            action,
+        } => remap(
+            placement_id,
+            RemapIntent::Keys {
+                selections: selections
+                    .into_iter()
+                    .map(|s| RemapSelection {
+                        frame: s.frame,
+                        ranges: s.ranges,
+                    })
+                    .collect(),
+                action,
+            },
+        ),
         EditIn::SetInterpMode {
             placement_id,
             interp_mode,
@@ -225,3 +260,7 @@ mod tests;
 #[cfg(all(test, feature = "project_media_codec"))]
 #[path = "../tests/object_media_link_command_timing.rs"]
 mod timing_tests;
+
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/object_media_link_remap_keys.rs"]
+mod remap_keys_tests;

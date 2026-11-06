@@ -2103,6 +2103,81 @@
         {
           "type": "object",
           "additionalProperties": false,
+          "description": "One property key action over the selected keys of the placement's Time Remap track (the object.property.track.edit actions): one revision and one history entry. Every key deleted turns the remap off. Refused when the placement has no remap; subdivide is refused as unavailable.",
+          "required": [
+            "kind",
+            "placementId",
+            "selections",
+            "action"
+          ],
+          "properties": {
+            "kind": {
+              "const": "editTimeRemapKeys"
+            },
+            "placementId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+            },
+            "selections": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "One key (frame) or the keys inside inclusive runs of frames (ranges): exactly one of the two.",
+                "oneOf": [
+                  {
+                    "required": [
+                      "frame"
+                    ],
+                    "not": {
+                      "required": [
+                        "ranges"
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "ranges"
+                    ],
+                    "not": {
+                      "required": [
+                        "frame"
+                      ]
+                    }
+                  }
+                ],
+                "properties": {
+                  "frame": {
+                    "type": "number"
+                  },
+                  "ranges": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 512,
+                    "items": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "action": {
+              "$ref": "#/$defs/ObjectPropertyTrackPayload/properties/action"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
           "required": [
             "kind",
             "placementId",
@@ -14641,6 +14716,38 @@
             },
             "hasTimeLink": {
               "type": "boolean"
+            },
+            "markers": {
+              "description": "The layer's own markers in frame order, as printed while they fit the read (the baseline snap targets); absent without any.",
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "frame"
+                ],
+                "properties": {
+                  "frame": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32
+                  }
+                }
+              }
+            },
+            "effectKeys": {
+              "description": "Every frame with a key on the layer's effect stack, ascending and unique, as printed while they fit the read; absent without any.",
+              "type": "array",
+              "maxItems": 512,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
             }
           }
         }
@@ -14778,6 +14885,15 @@
                                   },
                                   "value": {
                                     "type": "number"
+                                  },
+                                  "color": {
+                                    "description": "The key tint (#rrggbb or #rrggbbaa) when the key carries one.",
+                                    "type": "string",
+                                    "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                                  },
+                                  "hold": {
+                                    "description": "True when the key holds its value to the next key; absent otherwise.",
+                                    "const": true
                                   }
                                 }
                               }

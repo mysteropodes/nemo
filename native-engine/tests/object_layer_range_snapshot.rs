@@ -47,6 +47,29 @@ fn no_timing_layer_has_exact_real_raw_and_clamped_edges_without_a_fabricated_exp
     assert_eq!(encode_storage_project(s.document()).unwrap(), before);
 }
 #[test]
+fn layer_markers_and_effect_keys_ride_the_range_read_as_the_baseline_snap_targets() {
+    let mut v = fixture::value(&fixture::document());
+    v["layers"][0].as_object_mut().unwrap().remove("timing");
+    let long = "m".repeat(40);
+    v["layers"][0]["range"] = json!({"inPoint":-2,"outPoint":9,"markers":[{"frame":4,"name":long,"color":"#fff"},{"frame":1},
+        {"frame":2,"name":"Cut"}]});
+    v["layers"][0]["effects"] = json!([
+        {"type":"blur","enabled":true,"keys":{"p1":{"keys":[{"frame":1,"v":[2]},{"frame":3,"v":[1]}]},"p2":null}},
+        {"type":"glow","enabled":false,"keys":{"p1":{"keys":[{"frame":3,"v":[1]},{"frame":5,"v":[1]}]}}}]);
+    let s = snapshot(decode_storage_project(v.to_string().as_bytes()).unwrap());
+    let range = read(&s, &selector(&s)).unwrap()["range"].clone();
+    assert_eq!(
+        range["markers"],
+        json!([{"frame":1},{"frame":2,"name":"Cut"},{"frame":4,"name":"m".repeat(32)}])
+    );
+    assert_eq!(range["effectKeys"], json!([1, 3, 5]));
+    assert_eq!(range["rawInPoint"], -2.0);
+    // A plain layer keeps the six-field range: neither list is printed when empty.
+    let plain = snapshot(fixture::document());
+    let plain = read(&plain, &selector(&plain)).unwrap();
+    assert_eq!(plain["range"].as_object().unwrap().len(), 6);
+}
+#[test]
 fn original_timing_selector_and_range_view_are_closed_separate_reads_with_same_snapshot_identity() {
     let s = snapshot(fixture::document());
     let q = selector(&s);

@@ -116,6 +116,9 @@
   /* The keyboard route. Ports: ownsNativeMotion(), hasSelection(), edit(action), acceptsTarget(event), modalOpen(), unavailable(), noSelection() (optional notice).
    * A capture listener on the document: with no key selected, or off the timeline, the press is left to its other owners. */
   const owners = new WeakMap();
+  // Other key owners (native-time-remap-keys.js): peer(event, document) is true while they hold a selection this press acts on.
+  const peers = new Set();
+  function addPeer(peer) { peers.add(peer); return () => peers.delete(peer); }
   function install(document, ports) {
     if (!document || !document.addEventListener || !ports || typeof ports.edit !== 'function' || typeof ports.hasSelection !== 'function') throw new TypeError('Native key edit ports unavailable');
     if (owners.has(document)) throw new Error('Native key shortcuts already owned');
@@ -131,6 +134,8 @@
         selected = ports.hasSelection() === true;
       } catch (_) { return; }
       if (!selected) {
+        // A peer key owner (the Time Remap keys) that holds the selection takes the press, so it is not reported as "no selection".
+        if (Array.from(peers).some((peer) => { try { return peer(event, document) === true; } catch (_) { return false; } })) return;
         // The interpolation shortcuts mean nothing else, so they say so; Delete and the arrows keep their other owners.
         if (action.kind === 'preset' && ports.noSelection) { stop(event); try { ports.noSelection(); } catch (_) { /* a notice must not break the key */ } }
         return;
@@ -153,5 +158,5 @@
   // The installed key owner of `document` while a native project owns Motion, else null (the legacy selection is then never read).
   function current(document) { const owner = owners.get(document); return owner && owner.owned() ? owner : null; }
   function hasClip() { const Clip = clipboardModule(); return !!Clip && Clip.has(); }
-  return Object.freeze({ actionForEvent, expectedFrames, canShift, rangesOf, createEditor, install, editable, current, hasClip });
+  return Object.freeze({ actionForEvent, expectedFrames, canShift, rangesOf, createEditor, install, editable, current, hasClip, addPeer });
 }));

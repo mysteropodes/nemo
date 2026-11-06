@@ -3376,6 +3376,7 @@
         "native-motion-key-lock-menu.js",
         "native-motion-key-edit.js",
         "native-motion-key-clipboard.js",
+        "native-time-remap-keys.js",
         "native-motion-key-gesture.js",
         "native-motion-key-box.js",
         "native-motion-canvas-math.js",
