@@ -159,6 +159,8 @@ pub(crate) struct Ctx<'a> {
     pub(crate) transcoder: Option<&'a dyn MediaTranscoder>,
     /// Text item entries of every context.
     pub(crate) text: Vec<Value>,
+    /// Every layer uid of the scene and of all components, so generated uids stay unique across contexts.
+    pub(crate) layer_uids: std::collections::HashSet<String>,
 }
 impl Ctx<'_> {
     pub(crate) fn warn(

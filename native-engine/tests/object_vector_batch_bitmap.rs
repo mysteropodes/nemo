@@ -493,3 +493,5 @@ fn a_move_that_changes_nothing_or_a_refused_bake_writes_nothing() {
 
 #[path = "object_vector_batch_dabs.rs"]
 mod dabs;
+#[path = "object_vector_batch_bitmap_component.rs"]
+mod component;

@@ -446,10 +446,8 @@ impl ObjectFillOwner {
                     .map_err(|error| Self::fill_plan_error(&error))?;
             }
         }
-        // A component's bitmap companions are not part of its view: re-baking one there would leave it stale.
-        if view.is_some() && !rebakes.is_empty() {
-            return Err(DispatchErrorCode::Unavailable);
-        }
+        // The companions are document items, not part of a component's view: they are re-baked against the restored full document,
+        // where the anchor and its companion are addressed by their full target (context id included).
         if view.is_some() {
             edit.document = context::restore(edit.document, origin.document(), &context)?;
         }

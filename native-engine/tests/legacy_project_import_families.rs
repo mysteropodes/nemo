@@ -159,6 +159,15 @@ fn storyboard_modules_chains_and_view_are_stored_and_version_one_montages_migrat
     assert_eq!(refused(doc).path(), "storyboard.modules[2].dataB64");
 }
 
+fn tween_layer<'a>(drawing: &'a Value, uid: &str) -> &'a Value {
+    drawing["tweens"]["layers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|l| l["layerUid"] == uid)
+        .unwrap_or_else(|| panic!("tween layer {uid}"))
+}
+
 #[test]
 fn tween_records_hold_overrides_easing_manual_mode_and_generated_frames() {
     let mut doc = animation();
@@ -172,8 +181,7 @@ fn tween_records_hold_overrides_easing_manual_mode_and_generated_frames() {
     doc["layers"][0]["frames"][10] =
         json!({"strokes": [], "isKeyframe": true, "isInterpolated": false});
     let d = drawing(&doc.to_string());
-    let store = &d["tweens"]["layers"][0];
-    assert_eq!(store["layerUid"], "ly_shapes");
+    let store = tween_layer(&d, "ly_shapes");
     assert_eq!(
         store["options"],
         json!({"resamplePoints": 40, "step": 2, "skipManual": true, "easing": []})
@@ -255,7 +263,7 @@ fn animation_project_saves_reopens_identically_and_edits_undo_and_redo() {
         3
     );
     assert_eq!(
-        d["tweens"]["layers"][0]["spans"].as_array().unwrap().len(),
+        tween_layer(d, "ly_shapes")["spans"].as_array().unwrap().len(),
         2
     );
     assert_eq!(
@@ -287,4 +295,115 @@ fn animation_project_saves_reopens_identically_and_edits_undo_and_redo() {
     owner.redo(undone).unwrap();
     let redone: Value = serde_json::from_slice(&saved(&owner)).unwrap();
     assert_eq!(redone, hidden);
+}
+
+fn component_layers(doc: &Value) -> &Vec<Value> {
+    doc["componentTables"]["components"]["components"][0]["layers"]
+        .as_array()
+        .unwrap()
+}
+
+#[test]
+fn component_layers_keep_sparse_timing_blank_keys_and_generated_frames() {
+    let mut doc = animation();
+    // Baseline `sym_a` layer `ly_in`: keys at 0 and 3 over six frames. Add a blank key at 1 and a generated frame at 5.
+    let inner = &mut doc["symbols"]["sym_a"]["layers"][0]["frames"];
+    inner[1] = json!({"strokes": [], "isKeyframe": true, "isInterpolated": false});
+    inner[5] = json!({"strokes": [], "isKeyframe": false, "isInterpolated": true, "isManualEdit": true});
+    let converted = import(&doc.to_string());
+    let d = file(&converted)["drawing"].clone();
+    let timing = &component_layers(&d)[0]["timing"];
+    assert_eq!(timing["contextId"], "scene-root");
+    assert_eq!(timing["keys"], json!([{"frame": 0}, {"frame": 1}, {"frame": 3}]));
+    assert_eq!(timing["samples"], json!([{"frame": 5, "manualEdit": true}]));
+    assert!(
+        !warnings(&converted).iter().any(|w| w.1 == "blank_keyframe_in_component"),
+        "a blank key is expressible now"
+    );
+    let objects = d["componentTables"]["components"]["components"][0]["objects"].as_array().unwrap();
+    let frames: Vec<i64> = objects.iter().map(|o| o["target"]["frameScope"]["frame"].as_i64().unwrap()).collect();
+    assert_eq!(frames, [0, 3], "the blank key authors no record");
+}
+
+#[test]
+fn an_imported_component_takes_frame_edits_with_undo_and_redo() {
+    let converted = import(ANIMATION);
+    let mut owner = NativeObjectHistory::from_project_file("legacy-comp-timing", &converted.project_file).unwrap();
+    let first = saved(&owner);
+    let key_frames = |bytes: &[u8]| -> (Value, Vec<i64>, Vec<i64>) {
+        let d: Value = serde_json::from_slice(bytes).unwrap();
+        let component = d["drawing"]["componentTables"]["components"]["components"][0].clone();
+        let keys = component["layers"][0]["timing"]["keys"].as_array().unwrap().iter().map(|k| k["frame"].as_i64().unwrap()).collect();
+        let mut records: Vec<i64> = component["objects"].as_array().unwrap().iter().map(|o| o["target"]["frameScope"]["frame"].as_i64().unwrap()).collect();
+        records.sort_unstable();
+        (component["totalFrames"].clone(), keys, records)
+    };
+    assert_eq!(key_frames(&first), (json!(6), vec![0, 3], vec![0, 3]));
+    // Insert Frame at cell 1 (ly_in is held there): the key at 3 moves to 4 and the component grows to 7 frames.
+    let insert = json!({"command": "object.frames.insert", "contextId": "sym_a", "cell": 1});
+    owner.dispatch_frame_structure("command.document.object.frames.insert", &insert).unwrap();
+    let inserted = saved(&owner);
+    assert_eq!(key_frames(&inserted), (json!(7), vec![0, 4], vec![0, 4]));
+    assert_eq!(owner.history_depths(), (1, 0));
+    // Duplicate the drawing shown on the held cell 1 into a new key: a drawing now lives on the formerly held cell.
+    let duplicate = json!({"command": "object.frames.duplicate", "contextId": "sym_a", "layerUid": "ly_in", "cell": 1});
+    owner.dispatch_frame_structure("command.document.object.frames.duplicate", &duplicate).unwrap();
+    assert_eq!(key_frames(&saved(&owner)), (json!(8), vec![0, 2, 5], vec![0, 2, 5]));
+    assert_eq!(owner.history_depths(), (2, 0));
+    let revision = owner.content_revision();
+    let revision = owner.undo(revision).unwrap();
+    let revision = owner.undo(revision).unwrap();
+    assert_eq!(saved(&owner), first, "two undos restore the imported bytes");
+    owner.redo(revision).unwrap();
+    assert_eq!(saved(&owner), inserted);
+}
+
+#[test]
+fn generated_layer_uids_are_unique_across_the_scene_and_every_component() {
+    let stroke = base_stroke();
+    let frames = json!([{"strokes": [stroke], "isKeyframe": true}]);
+    let doc = json!({"version": 13, "totalFrames": 4,
+        "layers": [{"name": "Scene", "frames": frames}],
+        "symbols": {"sym_a": {"name": "A", "totalFrames": 4, "layers": [{"name": "A1", "frames": frames}, {"name": "A2", "layerUid": "ly_legacy_1", "frames": frames}]},
+            "sym_b": {"name": "B", "totalFrames": 4, "layers": [{"name": "B1", "frames": frames}]}}});
+    let converted = import(&doc.to_string());
+    let d = file(&converted)["drawing"].clone();
+    let mut uids: Vec<String> = vec![d["layers"][0]["layerUid"].as_str().unwrap().to_owned()];
+    for component in d["componentTables"]["components"]["components"].as_array().unwrap() {
+        for layer in component["layers"].as_array().unwrap() {
+            uids.push(layer["layerUid"].as_str().unwrap().to_owned());
+        }
+    }
+    let mut sorted = uids.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(sorted.len(), 4, "no uid repeats across contexts: {uids:?}");
+    assert_eq!(uids[0], "ly_legacy_0", "the scene keeps the first generated uid");
+    assert!(uids.contains(&"ly_legacy_1".to_owned()), "an explicit uid is kept");
+    // A stroke id derived from a layer uid cannot collide either.
+    let ids: Vec<&str> = d["componentTables"]["components"]["components"].as_array().unwrap().iter()
+        .flat_map(|c| c["objects"].as_array().unwrap()).map(|o| o["target"]["strokeId"].as_str().unwrap()).collect();
+    let scene_id = d["objects"][0]["target"]["strokeId"].as_str().unwrap();
+    assert!(!ids.contains(&scene_id), "{scene_id} {ids:?}");
+}
+
+#[test]
+fn project_tween_options_travel_with_generated_frames_and_are_not_ignored() {
+    let generated = json!([{"strokes": [base_stroke()], "isKeyframe": true},
+        {"strokes": [], "isKeyframe": false, "isInterpolated": true},
+        {"strokes": [base_stroke()], "isKeyframe": true}]);
+    let mut doc = json!({"version": 13, "totalFrames": 4, "resamplePts": 33, "tweenStep": 3,
+        "layers": [{"name": "T", "layerUid": "ly_t", "frames": generated}, {"name": "U", "layerUid": "ly_u", "frames": [{"strokes": [base_stroke()], "isKeyframe": true}]}]});
+    let converted = import(&doc.to_string());
+    let d = file(&converted)["drawing"].clone();
+    let wanted = json!({"resamplePoints": 33, "step": 3, "skipManual": true, "easing": []});
+    assert_eq!(tween_layer(&d, "ly_t")["options"], wanted);
+    assert_eq!(tween_layer(&d, "ly_t")["spans"], json!([]));
+    assert!(!converted.report.ignored.iter().any(|k| k == "resamplePts" || k == "tweenStep"));
+    // Native defaults and generated frames need no record at all.
+    doc["resamplePts"] = json!(50);
+    doc["tweenStep"] = json!(1);
+    let d = file(&import(&doc.to_string()))["drawing"].clone();
+    assert_eq!(d["tweens"]["layers"].as_array().unwrap().len(), 1, "only the layer with generated frames");
+    assert_eq!(tween_layer(&d, "ly_t")["options"]["resamplePoints"], 50);
 }
