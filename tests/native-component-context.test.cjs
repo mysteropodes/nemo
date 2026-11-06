@@ -290,6 +290,10 @@ test('an entered component paints its own timeline: baseline rows, no scene pain
   assert.equal(f.host.state.activeLayerIdx, 1, 'a row click activates the component layer');
   assert.deepEqual(f.host._layerSel, [1]);
   assert.ok(f.host.document.getElementById('layer-list').children[1].className.split(' ').includes('act'));
+  // #2256: the selected cells stay painted across a repaint (a click on a cell activates its layer, which repaints the grid).
+  f.host._sel = { frames: [{ layer: 1, frame: 3 }] }; f.host.updateUI();
+  const cells = f.host.document.getElementById('frame-grid').children;
+  assert.deepEqual([cells[1].children[3].className.split(' ').includes('sel'), cells[0].children[3].className.split(' ').includes('sel'), cells[1].children[2].className.split(' ').includes('sel')], [true, false, false]);
 });
 
 test('the entered grid shows the component\'s OWN frames and range from the pinned timing reads, never the scene\'s, and drops a stale answer', async () => {
