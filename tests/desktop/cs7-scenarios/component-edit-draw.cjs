@@ -1,8 +1,8 @@
 'use strict';
 // #2256 installed row: drawing inside an entered component (PRs #2765, #2784, #2786, #2800, #2803), foreground.
 // The UI32 helper has no pointer drawing and no double-click, so a person draws. The person never reports a
-// verdict: after each gesture they attach the unedited read-only Nemo MCP replies (history depth, per-layer
-// cell runs) and this oracle computes the effect itself (revision step, history step, which cell gained
+// verdict and never attach document state: after each reply the HARNESS makes the read-only Nemo MCP reads itself
+// (history depth, per-layer cell runs; session.read, bound to the candidate) and this oracle computes the effect itself (revision step, history step, which cell gained
 // content, whether the Scene stayed unchanged). Pixels come from the helper's own owned-window capture
 // (instances) and from a PNG the person exports into the private report directory (bitmap brush); the person
 // only reports rectangles, never whether something "looks right".
@@ -104,17 +104,12 @@ function oneEdit(p, n) {
 
 // ---- the operator script ---------------------------------------------------------------------------------
 const READS = 'Evidence reply (a JSON object): {observation: one plain sentence of what you saw, productFailure: true only if the app visibly ' +
-  'misbehaved (crash, tool refused with a notice, nothing drawn), selection: {layerUid, frame}, reads: {history: {request, response}, layers: ' +
-  '[{request, response}, ...]}}. Each {request, response} is the UNEDITED request and response of a READ-ONLY public Nemo MCP call, never a ' +
-  'command.* operation: history is query.document.object.history; layers holds one query.document.object.layer.timing call with payload.view ' +
-  '"cells" and payload.contextId set to the context named below for EVERY layer of that context, all pinned (atRevision, documentSnapshotId) to ' +
-  'the revision the history read reports. Make the reads right after the gesture and before any other action. Frames in `selection` are 0-based ' +
-  '(the UI shows frame N as N+1). Do not add pass/fail fields: the oracle judges the raw reads and refuses a reply that carries a verdict.';
-const SCENE_READS = READS + ' Context: "scene-root".';
-const COMP_READS = READS + ' Context: the entered component\'s id (the same value in every call). Also attach sceneLayers: the same cells ' +
-  'reads with payload.contextId "scene-root" for every scene layer, pinned to the same revision.';
-const KINDS = ' Also attach kinds: the UNEDITED request and response of query.document.object.component.read with selector {kind: "layers", ' +
-  'contextId: "scene-root", cursor: 0, limit: 16}, pinned to the same revision (it lists each scene layer with its layerKind).';
+  'misbehaved (crash, tool refused with a notice, nothing drawn), selection: {layerUid, frame}}. Do NOT attach any MCP reads or document ' +
+  'state: the runner reads the document itself right after your reply, so after replying touch nothing in the app. Frames in `selection` are ' +
+  '0-based (the UI shows frame N as N+1). Do not add pass/fail fields: the oracle refuses a reply that carries a verdict or any read.';
+const SCENE_READS = READS + ' The runner reads context "scene-root".';
+const COMP_READS = READS + ' The runner reads the entered component\'s context (the context id you report) and "scene-root".';
+const KINDS = ' The runner also reads the layer kinds of "scene-root" itself.';
 const ui = frame => 'frame ' + (frame + 1);
 const compGesture = (id, frame, how) => ({ id, check: 'component-draw-tools', ctx: 'component', type: 'gesture', judge: 'draw', frame,
   how: 'Inside the component click the cell of its layer at ' + ui(frame) + ' so the playhead is on ' + ui(frame) + ' (that cell has no drawing yet). ' +
@@ -130,8 +125,8 @@ const PLAN = [
       'cell at frame 2 and press F7 (blank keyframe), then right-click its row (the Layer menu) and choose "Convert to component". Add a third layer, ' +
       'rename it "Plain" and leave it empty. Add a fourth layer, rename it "Bake", draw one stroke on its frame 1, click its cell at frame 2, press F7 ' +
       '(blank keyframe) and convert it to a component the same way. Stay in Animation 2D and in the Scene tab. Reply with {observation, productFailure, ' +
-      'layers: {anchor: <layerUid of Layer 1>, component: <layerUid of the first component layer>, plain: <layerUid of Plain>, bake: <layerUid of Bake>}, ' +
-      'reads, kinds}. ' + SCENE_READS + KINDS },
+      'layers: {anchor: <layerUid of Layer 1>, component: <layerUid of the first component layer>, plain: <layerUid of Plain>, bake: <layerUid of Bake>}}. ' +
+      SCENE_READS + KINDS },
   { id: 'motion-enter', type: 'mode', check: null, failCheck: 'component-motion-draw', ctx: 'scene',
     how: 'Switch to Motion mode with the mode switch at the top. Do not edit anything. ' + SCENE_READS },
   motionGesture('motion-draw', 10, true, 'Pick the Draw tool (B) and draw a stroke.'),
@@ -147,7 +142,7 @@ const PLAN = [
       'drawZone, outside}} (each {x,y,w,h}). Do not judge anything else.' },
   { id: 'component-enter', type: 'enter', check: null, failCheck: 'component-draw-tools', ctx: 'component',
     how: 'Double-click the component layer row to enter the component (the tab bar shows the component beside Scene). Do not edit. Reply also with ' +
-      'component: {context: <component id used in the reads>, layerUid: <the component\'s layer>}. ' + COMP_READS },
+      'component: {context: <the entered component\'s context id>, layerUid: <the component\'s layer>}. ' + COMP_READS },
   compGesture('comp-draw', 8, 'Pick the Draw tool (B).'),
   compGesture('comp-pen', 7, 'Pick the Pen tool (P), click three points and finish the path (Enter).'),
   compGesture('comp-line', 6, 'Pick the Line tool (L) and drag one line.'),
@@ -181,7 +176,7 @@ const PLAN = [
       '" (path relative to the report directory). Stay inside the component for the reads. ' + COMP_READS },
   { id: 'draw-reopen', type: 'reopen', check: 'component-draw-save-reopen', ctx: 'component',
     how: 'Open that same saved file through File > Open (do not edit anything), then double-click the component layer to enter it again. Reply with ' +
-      'the same savedFile and the reads. ' + COMP_READS },
+      'the same savedFile. ' + COMP_READS },
 ];
 
 // ---- the scenario ------------------------------------------------------------------------------------------
@@ -239,10 +234,15 @@ function createWorkflow({ reportDirectory }) {
       }
       const inComponent = step.ctx === 'component';
       if (inComponent && step.type !== 'enter' && !componentContext) throw malformed(ROW, step.id);
-      // Reads the oracle cannot interpret are never guessed at: the reason is kept privately, then the batch stops as operator input.
+      // The harness reads the document (never the operator). Reads the oracle cannot interpret are never guessed at:
+      // the reason is kept privately, then the batch stops.
+      const readContext = inComponent ? componentContext || ev.component?.context : 'scene-root';
+      if (inComponent && !(text(readContext) && readContext !== 'scene-root')) throw malformed(ROW, step.id);
+      const seen = await kit.readTimeline(session, { contexts: inComponent ? [readContext, 'scene-root'] : ['scene-root'], record: { dir, name: step.id } });
+      const reads = { history: seen.history, layers: seen.layers[readContext] }, sceneLayers = seen.layers['scene-root'], scenePage = seen.pages['scene-root'];
       const why = {};
-      const next = summarize(ev.reads, inComponent ? componentContext || ev.component?.context : 'scene-root', why);
-      const nextScene = inComponent ? summarize({ history: ev.reads?.history, layers: ev.sceneLayers }, 'scene-root', why) : next;
+      const next = summarize(reads, readContext, why);
+      const nextScene = inComponent ? summarize({ history: reads.history, layers: sceneLayers }, 'scene-root', why) : next;
       if (!next || !nextScene) {
         kit.privateEvidence(dir, 'mismatch-' + step.id, { schema: 'nemo.component-edit-draw-private/1', phase: step.id, reason: why.reason });
         throw malformed(ROW, step.id);
@@ -252,7 +252,7 @@ function createWorkflow({ reportDirectory }) {
         if (!plain(l) || !text(l.anchor) || !text(l.component) || !text(l.plain) || new Set([l.anchor, l.component, l.plain]).size !== 3 ||
           ![l.anchor, l.component, l.plain].every(uid => Object.hasOwn(next.rows, uid)) || next.total < 12 ||
           next.rows[l.anchor].c[0] !== true || next.rows[l.plain].c.some(Boolean)) throw malformed(ROW, step.id);
-        const k = kindsOf(ev.kinds, next, why);
+        const k = kindsOf(scenePage, next, why);
         if (!text(l.bake) || !Object.hasOwn(next.rows, l.bake) || ![l.anchor, l.component, l.plain, l.bake].every(uid => text(uid)) || new Set([l.anchor, l.component, l.plain, l.bake]).size !== 4 ||
           !k || k[l.bake] !== 'instance' || next.rows[l.bake].c[0] !== true) {
           kit.privateEvidence(dir, 'mismatch-' + step.id, { schema: 'nemo.component-edit-draw-private/1', phase: step.id, reason: why.reason || 'bake layer is not a component instance' });
@@ -303,7 +303,7 @@ function createWorkflow({ reportDirectory }) {
       }
       if (step.type === 'bake' || step.type === 'bake-undo' || step.type === 'bake-redo') {
         // Break apart bakes the instance's frames onto the layer: one edit, the layer is a drawing layer, its keys are the component's keys.
-        const k = kindsOf(ev.kinds, next, why);
+        const k = kindsOf(scenePage, next, why);
         if (!k) {
           kit.privateEvidence(dir, 'mismatch-' + step.id, { schema: 'nemo.component-edit-draw-private/1', phase: step.id, reason: why.reason });
           throw malformed(ROW, step.id);
@@ -312,7 +312,7 @@ function createWorkflow({ reportDirectory }) {
         let bad = null;
         if (step.type === 'bake') {
           const n = next.rows[bakeUid];
-          if (n.k.length === 0) throw malformed(ROW, step.id);
+          if (!n || n.k.length === 0) throw malformed(ROW, step.id);
           bad = k[bakeUid] !== 'drawing' ? 'layer-is-still-a-component-instance'
             : n.k.length !== scene.rows[bakeUid].k.length ? 'total-frames-changed'
             : !(n.k[0] === 'key' && n.c[0] === true && n.k[1] === 'key' && n.c[1] === false && n.c.slice(1).every(v => v === false)) ? 'baked-frames-differ-from-the-component'

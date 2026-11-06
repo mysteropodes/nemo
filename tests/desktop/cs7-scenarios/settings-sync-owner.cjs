@@ -6,7 +6,8 @@
 //   * the disposable shared folder on disk (the scenario writes the second profile's published state into it
 //     and reads what the app wrote), never anything the operator copies;
 //   * the helper's accessibility observation (folder path, update rows, Merge/Merged buttons, last toast);
-//   * unedited read-only Nemo MCP cell reads the operator attaches (document state before and after the merge).
+//   * read-only Nemo MCP cell reads the HARNESS makes itself (session.read, bound to the candidate) for the
+//     document state before and after the merge; the operator never attaches document state.
 // Expected behaviour and wording are the baseline's (1065e9d8 project.js publishToShared / checkSharedUpdates /
 // pullAndMerge, app.js mergeRemoteSnapshot, timeline.js sync UI). What the first installed run may expose
 // differently (toast or row not in the accessibility tree, a snapshot shape that is not layers/frames, a
@@ -42,10 +43,8 @@ const real = p => { try { return fs.realpathSync(p); } catch { return p; } };
 const snapshotsIn = d => fs.readdirSync(d).filter(n => /^\d+\.json$/.test(n)).sort();
 const json = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 
-const READS = 'Reads: attach the UNEDITED request and response of READ-ONLY public Nemo MCP calls (never command.*): reads.history is ' +
-  'query.document.object.history; reads.layers holds one query.document.object.layer.timing call with payload.view "cells" and payload.contextId ' +
-  '"scene-root" for EVERY layer, all pinned (atRevision, documentSnapshotId) to the revision the history read reports. Make them right after the ' +
-  'gesture. Do not add pass/fail fields: a reply carrying a verdict is refused.';
+const READS = 'Do NOT attach any MCP reads or document state: the runner reads the document itself right after your reply, so after ' +
+  'replying touch nothing in the app. Do not add pass/fail fields: a reply carrying a verdict or any read is refused.';
 
 // ---- the pieces of the second profile's published state ---------------------------------------
 // The second profile's state is derived from the snapshot the app itself published, so its shape is the app's
@@ -103,8 +102,9 @@ async function runSyncOwner(ctx) {
   // requires that the expected text was NOT already shown before the gesture.
   const toastsNow = async () => textsOf(await observe());
   const afterGesture = async () => { const seen = []; for (let i = 0; i < 4; i++) { seen.push(...textsOf(await observe())); if (i < 3) await sleep(400); } return seen; };
-  const document = (phase, ev) => {
-    const state = summarize(ev.reads, 'scene-root');
+  const document = async phase => {
+    const seen = await kit.readTimeline(session, { contexts: ['scene-root'], record: { dir, name: phase } });
+    const state = summarize({ history: seen.history, layers: seen.layers['scene-root'] }, 'scene-root');
     if (!state) throw malformed('settings-profile', phase);
     return state;
   };
@@ -118,10 +118,12 @@ async function runSyncOwner(ctx) {
   await ctx.closeSettings();
   const setup = await ask('sync-document-setup', 'With Settings closed, on Layer 1 draw one stroke on frame 1 (that cell is a key with content). Then click ' +
     'Layer 1\'s cell at frame 4 only and press the REAL F7 key once so frame 4 becomes a blank key (a key with no content). Do not save and do not ' +
-    'open Settings. Reply with {observation, productFailure, layer: {uid: <layerUid of that layer>}, reads}. ' + READS);
+    'open Settings. Reply with {observation, productFailure, layer: {uid: <layerUid of that layer>}}. ' + READS);
   if (setup.productFailure) { settle('document-setup', 'fail', 'drawing or the blank keyframe reported failing'); return result(); }
-  const uid = setup.layer?.uid, before = document('sync-document-setup', setup);
-  if (!text(uid) || !Object.hasOwn(before.rows, uid)) throw malformed('settings-profile', 'sync-document-setup');
+  const uid = setup.layer?.uid;
+  if (!text(uid)) throw malformed('settings-profile', 'sync-document-setup');
+  const before = await document('sync-document-setup');
+  if (!Object.hasOwn(before.rows, uid)) throw malformed('settings-profile', 'sync-document-setup');
   const row0 = before.rows[uid];
   if (before.total < 5 || row0.k[0] !== 'key' || row0.c[0] !== true || row0.k[3] !== 'key' || row0.c[3] !== false) throw malformed('settings-profile', 'sync-document-setup');
 
@@ -199,17 +201,15 @@ async function runSyncOwner(ctx) {
 
     if (parts.check === 'pass') {
       const { ev: mergeEv, before: toasts } = await gesture('sync-merge', 'Click the "Merge" button on the row of "' + SECOND.name + '" once. Reply immediately with ' +
-        '{observation, productFailure}; do the document reads in the next step, not now.');
+        '{observation, productFailure}. ' + READS);
       if (mergeEv.productFailure) { settle('merge', 'fail', 'Merge reported failing'); return result(); }
       const seen = [], nodes = [];
       for (let i = 0; i < 4; i++) { const o = await observe(); nodes.push(o); seen.push(...textsOf(o)); if (i < 3) await sleep(400); }
       const last = nodes.at(-1);
       const merged = buttonsLabelled(last, STR.merged).length === 1 && buttonsLabelled(last, STR.merge).length === 0;
       const fusion = seen.filter(t => t.includes('Fusion de ') && !toasts.includes(t));
-      const reads = await ask('sync-merge-reads', 'Do not click anything. Attach the document reads now. Reply with {observation, productFailure, layer: {uid: <the same layerUid>}, reads}. ' + READS);
-      const after = reads.productFailure ? null : document('sync-merge-reads', reads);
-      if (reads.productFailure) settle('merge', 'fail', 'the reads step reported failing');
-      else if (fusion.length && !fusion.some(t => t.includes(MERGE_TOAST))) settle('merge', 'fail', 'merge toast is not "' + MERGE_TOAST + '": ' + fusion.join(' | '));
+      const after = await document('sync-merge-reads');
+      if (fusion.length && !fusion.some(t => t.includes(MERGE_TOAST))) settle('merge', 'fail', 'merge toast is not "' + MERGE_TOAST + '": ' + fusion.join(' | '));
       else if (after.documentId !== before.documentId || after.instanceId !== before.instanceId || after.total !== before.total ||
         !same(after.rows[uid]?.k, row0.k) || !same(Object.keys(after.rows).sort(), Object.keys(before.rows).sort())) settle('merge', 'fail', 'the merge replaced the document or changed its frames');
       else if (after.rows[uid].c.some((c, i) => i !== 3 && c !== row0.c[i])) settle('merge', 'fail', 'the merge changed frames other than the blank keyframe');

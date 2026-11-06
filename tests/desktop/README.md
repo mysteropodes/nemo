@@ -65,7 +65,17 @@ The driver reads **explicit** declarations from
 `nemo.installed-parity/1`; each `rows` entry declares `id`, `issue`, `status`
 (`Ready` or `Blocked`), existing `tasks` and `surfaces`, `dependsOn`, `scenario`,
 and `checks` containing an `id` and family-acceptance `covers` kinds. Tasks with
-no matrix surfaces may declare an empty surface list. Every Ready scenario must
+no matrix surfaces may declare an empty surface list.
+
+`tasks` lists only tasks whose **every** matrix surface (the surfaces whose own `tasks` name it) is in the
+row's `surfaces`. A task the row exercises only in part goes in `partialTasks`, an object
+`{ "<task>": ["<matrix surface the row does not exercise>", ...] }` that lists exactly the missing surfaces
+(never empty, never a task also in `tasks`). The runner refuses a row that lists a partly exercised task in
+`tasks` or states a wrong missing list, before any session is created, and a node test checks every shipped
+declaration the same way. The receipt publishes the two separately: `tasks` (fully exercised) and
+`partialTasks` (`{task: surfaces no run row exercised}`), also per row under `installed.rows[]`. Read
+`partialTasks` as "part of this task was exercised; the listed surfaces were not": a pass is never acceptance
+of those. A Ready row needs at least one task in `tasks` or `partialTasks`. Every Ready scenario must
 exist as a reviewed `cs7-scenarios/<scenario>.cjs` module exporting
 `run({session,row})`. It returns every declared assertion's `pass`, `fail` or
 `unrun` status and an explicit `safeToContinue` disposition. The scenario must
@@ -90,11 +100,50 @@ An empty or malformed list, an unknown or `Blocked` id, or a missing dependency 
 **before any session is created or the app is launched**. With no `rows` key nothing changes:
 same rows, same receipt, same stdout.
 
-`installed-pass` still means every *selected* row passed. A subset run adds a `selection`
-object right after `verdict` in `installed-results.json`, each progress file and the stdout
-line: `{ "scope": "subset", "selected": [...], "omittedReady": [...] }` (`"all-ready"` when the
-list names every Ready row). Read a subset `installed-pass` as "these rows only"; the omitted
-Ready rows were not run and the receipt is not evidence about them.
+`installed-pass` is the issue #2348 outcome: every `Ready` row ran on one candidate and passed. A run
+with a `rows` list that leaves any Ready row out gets the distinct verdict **`installed-subset-pass`** when
+all its selected rows pass, and a failing or incomplete subset is `fail` or `incomplete` as usual. A subset
+run adds a `selection` object right after `verdict` in `installed-results.json`, each progress file and the
+stdout line: `{ "scope": "subset", "selected": [...], "omittedReady": [...] }` (`"all-ready"` when the
+list names every Ready row, which keeps the `installed-pass` verdict). The omitted Ready rows were not run
+and the receipt is not evidence about them.
+
+Exit status of `cs7-run.cjs`: `0` only for `installed-pass`; **`3`** for `installed-subset-pass`, with one
+line on stderr (`CS7 subset run passed (installed-subset-pass): N selected row(s) passed, M Ready row(s)
+were not run; this is not the every-Ready-row outcome (exit status 3).`); `1` for anything else (a refusal,
+a failure, an incomplete run). A script or check that wants the #2348 outcome must test for `0`, not for
+"not 1".
+
+### Document reads are made by the harness, not the operator
+
+A row may pass only on observations the harness made itself of the candidate under test. What a person or
+agent pastes in is not proof of document state, so the operator's replies carry **no** MCP reads
+(`reads`, `sceneLayers` and `kinds` in a reply make it malformed, which stops the batch). After each reply
+the scenario calls `session.read(fn)`, the only document-read route a scenario has. It can issue nothing
+but read-only `query.*` operations (a `command.*` or any other name is refused before it is sent).
+
+The route is the one any MCP client uses: the `nemo-mcp` binary bundled in the package under test
+(`Contents/MacOS/nemo-mcp`, which must match the package proof when the proof lists it) started with
+`NEMO_MCP_REGISTRY` set to the candidate's own task-scoped registry (`<tauriDataDir>/mcp`), calling
+`nemo_discover` and `nemo_command` (native v2 `query.document.object*`). The route reports no pid or
+executable hash, so a reply is bound to the candidate like this (`cs7-read.cjs`), and the batch fails closed
+(no pass) if any step differs:
+
+1. the owner identity (pid, source sha, tree, driver sha, executable sha256) is read before and after every
+   batch and must equal the identity captured at start;
+2. the registry holds exactly one record, the discovered instance is that record (instanceId, buildId whose
+   version is the candidate's app version) and its native host is available with a document;
+3. the OS listener on the record's port (`lsof`) must be exactly the candidate's pid;
+4. every ok reply carries the batch's instanceId and documentId, and the document id, revision, lifecycle
+   generation and build id are identical before and after the batch.
+
+A reply from another running Nemo (a daily-driver build, an older candidate) cannot satisfy these. Limits,
+stated plainly: the bundled `nemo-mcp` binary is checked against the package proof only if the proof lists
+it, and the route itself still has no pid or executable hash of its own (the listener check supplies the
+pid); reporting the process id and executable sha256 in the native host status (`NativeHostStatus`) would let the reader compare them directly instead of using the listener check. Each batch's status
+tuples are kept privately as `<row>/reads-<phase>.json`; a refused batch as `<row>/read-refused-<phase>.json`
+with its fixed reason. The operator must therefore **touch nothing in the app after replying**: the read
+happens right after the reply, and a change during the batch is refused.
 
 ### Rows in package-h (frame-edit-ui, settings-profile)
 
@@ -104,12 +153,12 @@ Run them in that order or separately; both capture with distinct names (`capture
 
 - `frame-edit-ui` (#2248, foreground). A person presses the real F5/F6/F7, `+`, a bound Duplicate
   keyframe key, Cmd+Z / Cmd+Shift+Z and the timeline right-click items, in the scene and inside an
-  entered component (PR #2786). After every gesture they attach the unedited **read-only** Nemo MCP
-  replies (`query.document.object.history`, one `query.document.object.layer.timing` view `cells` per
-  layer, plus the Scene layers while inside a component). The oracle computes the revision step,
+  entered component (PR #2786). After every reply the harness itself makes the **read-only** Nemo MCP
+  reads (`query.document.object.history`, one `query.document.object.layer.timing` view `cells` per
+  layer, plus the Scene layers while inside a component); the operator attaches nothing. The oracle computes the revision step,
   history depth, total frames and cell runs itself, reads the saved files from disk (hash, total
   frames) and judges the layer-row styling from the helper's own owned-window capture. A reply with a
-  verdict field, missing/unpinned/non-tiling reads, or a `command.*` call is refused as operator input.
+  verdict field or any attached read, or harness reads that are missing, unpinned or non-tiling, stops the batch.
 - `settings-profile` (#2172). `session.input` drives the Settings entries, the eight tabs, close and
   backdrop, profile name/email/role with restore, the tool buttons and the empty sync-folder
   open-cancel/check; `observe` supplies the raw accessibility facts. The helper **cannot** drive, so a
@@ -125,7 +174,7 @@ Run them in that order or separately; both capture with distinct names (`capture
   The sync oracle reads the disposable shared folder itself (what the app wrote, and the second profile
   it seeded from the app's own published snapshot), the accessibility read (folder path, update rows,
   Merge/Merged buttons, last toast text, which stays in `#toast` after it fades, so freshness is also
-  checked) and unedited MCP cell reads of the document before and after Merge. The clause is `unrun` with
+  checked) and MCP cell reads of the document, made by the harness itself, before and after Merge. The clause is `unrun` with
   its reason when a toast, the update list or the published snapshot shape is not readable, and `fail`
   when the baseline contract is contradicted (for example the merge toast says `+1 ajout(s)` but frame 4
   still has no content). #2355 (D06) migrates publish/pull/merge to native snapshots, so a first-run
@@ -152,8 +201,8 @@ add `exprGlobals` or `trackRoles`) into `<report>/legacy-source/` and asks the o
   draws one gesture per tool inside the entered component (Draw, Pen, Line, Rectangle, Ellipse, Fill Brush, Bitmap
   Brush, each on its own empty cell), draws with Draw, Pen and a rectangle in Motion mode on "Plain", uses
   Cmd+Z / Cmd+Shift+Z, leaves the component, exports a PNG, breaks the "Bake" component apart, saves and reopens.
-  After each gesture they attach the unedited read-only MCP replies (history, per-layer cells, and for Break apart
-  the scene layers page of `component.read`). The oracle computes the revision step, the history step, which cell
+  After each reply the harness makes the read-only MCP reads itself (history, per-layer cells, and for Break apart
+  the scene layers page of `component.read`); the operator attaches none. The oracle computes the revision step, the history step, which cell
   gained content or its own key, that the Scene stayed unchanged and that Break apart made a drawing layer holding
   the component's keys. The instance pixels are measured from the helper capture taken before entering and after
   leaving (rectangles are the only thing the person reports); the exported PNG is measured the same way. An
@@ -187,6 +236,6 @@ Dependent rows remain blocked, and every unrun clause remains in the receipt.
 Cleanup runs even after partial startup, input timeout or evidence-write failure.
 Results retain the family result fields in an explicit
 `nemo.installed-family-result/1` extension with `format: nemo.parity-family-result/1`.
-`installed-pass` requires all rows, unchanged candidate identity, zero operator
-failures and complete cleanup. These receipts stay in the private report folder;
+`installed-pass` requires all Ready rows, unchanged candidate identity, zero operator
+failures and complete cleanup (a passing subset is `installed-subset-pass`, exit status 3). These receipts stay in the private report folder;
 they are never inserted into the headless `results/` census as `source-pass`.

@@ -21,7 +21,7 @@ function setup(t, faults = {}) {
 const statuses = result => Object.fromEntries(result.checks.map(c => [c.id, c.status]));
 const PASSING = { 'settings-entries-tabs': 'pass', 'profile-persist-restore': 'pass', 'profile-role-guard': 'pass',
   'profile-color-alpha': 'pass', 'shortcuts-reset': 'pass', 'sync-empty-folder': 'pass', 'sync-owner-paths': 'pass' };
-const SYNC_PHASES = ['sync-document-setup', 'sync-publish-no-folder', 'sync-choose-folder', 'sync-publish', 'sync-check', 'sync-merge', 'sync-merge-reads',
+const SYNC_PHASES = ['sync-document-setup', 'sync-publish-no-folder', 'sync-choose-folder', 'sync-publish', 'sync-check', 'sync-merge',
   'sync-publish-unwritable'];
 
 test('every clause passes on a faithful stub, sync-owner-paths included, and the sync parts are all recorded as passes', async t => {
