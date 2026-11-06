@@ -296,7 +296,7 @@ pub(super) fn restyle(
     check_target(document, target)?;
     check_layer(document, target)?;
     // The Select pivot is stored on vector records only (#2372): an image or a text block keeps the pivot for the session.
-    if style.detail.pivot().is_some() {
+    if style.pivot.is_some() {
         return Err(DispatchErrorCode::Unavailable);
     }
     let mut landing = target.clone();

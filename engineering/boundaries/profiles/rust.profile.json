@@ -297,6 +297,8 @@
         "object_vector_batch_style_gradient.rs",
         "object_vector_batch_order.rs",
         "object_vector_batch_style_dabs.rs",
+        "object_vector_batch_style_pivot.rs",
+        "object_vector_batch_delete.rs",
         "object_vector_batch_rebake.rs",
         "object_vector_trim.rs",
         "object_vector_axis_clip.rs",

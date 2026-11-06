@@ -38,6 +38,8 @@ mod gradient;
 mod order_step;
 #[path = "object_vector_batch_rebake.rs"]
 pub(super) mod rebake;
+#[path = "object_vector_batch_delete.rs"]
+mod delete;
 
 /// One batch is a bounded gesture, never a document rewrite; the encoded request stays under the vector budget.
 pub(crate) const MAX_BATCH_OPS: usize = 64;
@@ -160,14 +162,7 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
     // panel: the baseline skipped a texture anchor the edit would unhide) restyles what it can; each skipped step stays in the receipt
     // as a no-op naming its target, and a batch where every step is skipped is still refused.
     let mut skipped = 0u32;
-    // The stored dabs of the texture anchors this batch deletes: they go with their anchor, wherever the request names them.
-    let gone_with_anchor: Vec<ObjectTarget> = ops
-        .iter()
-        .filter(|op| op.op == "delete")
-        .filter_map(|op| op.stable_target.value())
-        .filter_map(|target| base.objects.iter().find(|r| &r.target == target))
-        .flat_map(|anchor| style::dabs::copies(base, anchor))
-        .collect();
+    let taken = delete::dabs_taken(base, &ops); // the stored dabs of the texture anchors this batch deletes go with their anchor
     for (requested, mut op) in ops.into_iter().enumerate() {
         starts.push(out.len());
         if op.op == "copy" {
@@ -245,30 +240,12 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
             }
             continue;
         }
-        // A `delete` (#2372 Select Delete, baseline `SM.deleteSelStrokes`): a texture anchor takes its stored dabs with it in the same revision
-        // (they follow their anchor and are never deleted alone), and a dab a selected anchor already takes is not deleted twice.
-        if op.op == "delete" && op.matrix.missing() {
-            if let Presence::Present(target) = &op.stable_target {
-                if gone_with_anchor.contains(target) {
-                    out.push(step("noop", Presence::Missing, Presence::Present(target.clone())));
-                    companion.push(false);
-                    swaps.push(None);
-                    continue;
-                }
-                let stored = base.objects.iter().find(|r| &r.target == target).map(|anchor| style::dabs::copies(base, anchor)).unwrap_or_default();
-                out.push(op);
-                companion.push(false);
-                swaps.push(None);
-                for gone in stored {
-                    companion.push(true);
-                    swaps.push(None);
-                    out.push(step("delete", Presence::Missing, Presence::Present(gone)));
-                }
-                if out.len() > MAX_EXPANDED_OPS {
-                    return Err(InvalidRequest);
-                }
-                continue;
+        match delete::expand(base, &taken, op) { // #2372 Select Delete: a texture anchor takes its stored dabs with it
+            Ok(steps) => {
+                (companion.extend((0..steps.len()).map(|at| at > 0)), swaps.extend(steps.iter().map(|_| None)), out.extend(steps));
+                if out.len() > MAX_EXPANDED_OPS { return Err(InvalidRequest); } else { continue; }
             }
+            Err(back) => op = back,
         }
         let Some(matrix) = op.matrix.value().copied() else {
             out.push(op);
@@ -497,14 +474,7 @@ pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &st
                 replace_in(&document, record)?
             }
             ("delete", Presence::Missing, Presence::Present(target)) if op.placement.missing() => {
-                // A bitmap brush anchor takes its baked companion image with it (baseline `stripAnyBrushTexture`).
-                let group = document.objects.iter().find(|r| r.target == target).and_then(|r| r.vector_ext.value()).and_then(|e| e.bitmap_brush.value()).map(|b| b.brush_group_id.clone());
-                if let Some(group) = group {
-                    let drop = rebake::Rebake::Drop(target.clone(), group);
-                    if !rebakes.contains(&drop) {
-                        rebakes.push(drop);
-                    }
-                }
+                delete::note_companion(&document, &target, &mut rebakes); // a bitmap brush anchor takes its baked companion image with it
                 delete_in(&document, target)?
             }
             _ => return Err(InvalidRequest),

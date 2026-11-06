@@ -32,6 +32,8 @@ use serde_json::Number;
 
 #[path = "object_vector_batch_style_dabs.rs"]
 pub(super) mod dabs;
+#[path = "object_vector_batch_style_pivot.rs"]
+pub(super) mod pivot;
 
 /// The wire members of a restyle step; each absent member leaves that style alone.
 #[derive(Debug, Default)]
@@ -86,6 +88,7 @@ pub(super) struct Checked {
     pub(super) width: Option<f64>,
     pub(super) opacity: Option<f64>,
     pub(super) detail: Detail,
+    pub(super) pivot: Option<pivot::Pivot>,
 }
 
 /// A number the way a hand-edited record spells it: an exact integer stays an integer.
@@ -134,6 +137,7 @@ impl Style {
             width: number(&self.width)?,
             opacity: number(&self.opacity)?,
             detail: Detail::of(self)?,
+            pivot: pivot::checked(self)?,
         };
         let sound = checked.width.is_none_or(|w| w > 0.0 && w <= 10_000.0)
             && checked.opacity.is_none_or(|o| (0.0..=1.0).contains(&o));
@@ -146,7 +150,9 @@ impl Style {
             || (checked.detail.stroke_enabled == Some(true) && checked.stroke.is_none())
             || (checked.detail.exclusive() && (own || checked.detail.has_plain()))
             || checked.detail.both_exclusive();
-        if !sound || switches || !(own || checked.detail.has_plain() || checked.detail.exclusive()) {
+        // The pivot (#2372) is an edit of its own: it combines with no other member.
+        let alone = checked.pivot.is_some() && (own || checked.detail.has_plain() || checked.detail.exclusive());
+        if !sound || switches || alone || !(own || checked.pivot.is_some() || checked.detail.has_plain() || checked.detail.exclusive()) {
             return Err(InvalidRequest);
         }
         Ok(checked)
@@ -238,8 +244,8 @@ pub(super) fn restyle(
     if !is_vector_record(existing) {
         return Err(InvalidRequest);
     }
-    if let Some(pivot) = style.detail.pivot() {
-        return detail::pivot(existing, pivot);
+    if let Some(edit) = &style.pivot {
+        return pivot::apply(existing, edit);
     }
     if let Some(feather) = style.detail.mask_feather() {
         return detail::feather(source, existing, feather);
