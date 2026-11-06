@@ -37,6 +37,14 @@ pub(crate) const COMPONENT_SET_FORMAT_VERSION: u32 = 1;
 const EXPOSED_KEY_PREFIX: &str = "ep_";
 const MAX_MARKER_TEXT: usize = 256;
 
+/// One thing a placed component shows on a frame, as a break apart bakes it into the instance layer: a vector record or an
+/// image, geometry already placed. The evaluation half produces them, the plan half writes them.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Baked {
+    Vector(crate::object_document::ObjectRecord),
+    Image(crate::object_document::RasterEntry),
+}
+
 /// Components and the instance layers that place them.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -53,10 +61,11 @@ object_deserialize!(ComponentSet {
 });
 
 /// One `state.symbols[symbolId]`. `cameraKeys` (the component's own camera, composed onto its instance) and `markers` (its
-/// composition markers) are stored here, exactly as `enterSymbol` / `exitToScene` swap them. `motionArcs`, `tweenOverrides`
-/// and `tweenEasing` are admitted as the baseline stores a symbol that has none (an empty table): the native tween store is
-/// keyed by context and owns that data for an entered component, so a non-empty legacy table is refused instead of being
-/// carried unread.
+/// composition markers) are stored here, exactly as `enterSymbol` / `exitToScene` swap them, and written by
+/// `object.component.state.edit`. `motionArcs`, `tweenOverrides` and `tweenEasing` are admitted as the baseline stores a symbol
+/// that has none (an empty table): the document-wide tween store and motion arcs own that data (their keys name the layer
+/// inside the component; the legacy importer moves a symbol's tables there), so a non-empty table on the record is refused
+/// instead of being carried twice.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ComponentRecord {

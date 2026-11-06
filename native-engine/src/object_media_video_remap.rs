@@ -2,30 +2,35 @@
 //! shared curve kernel (an evaluation module; the record stays in the document).
 use crate::object_document::placement_offset::VideoTiming;
 use crate::animation_curve::{evaluate_curve, CurveSample};
-use crate::object_document::OrderKey;
+use crate::object_document::{OrderKey, OrderTrack};
 
 impl VideoTiming {
     /// `SMMotion.timeRemapValue(ld, frame)`: `None` without a track or keys
     /// (the sampler's `null`), otherwise the eased value at `at`.
     pub(crate) fn remap_value(&self, at: f64) -> Option<f64> {
-        let keys = self.time_remap.as_ref()?.keys.as_slice();
-        let (first, last) = (keys.first()?, keys.last()?);
-        if at <= frame(first)? {
-            return value(first);
-        }
-        if at >= frame(last)? {
-            return value(last);
-        }
-        let right = keys.partition_point(|key| frame(key).is_some_and(|f| f <= at));
-        let (a, b) = (keys.get(right.checked_sub(1)?)?, keys.get(right)?);
-        if a.hold.value().copied().unwrap_or(false) {
-            return value(a);
-        }
-        let (start, end) = (frame(a)?, frame(b)?);
-        let eased = evaluate_curve(&curve(a)?, (at - start) / (end - start));
-        let result = value(a)? + (value(b)? - value(a)?) * eased;
-        result.is_finite().then_some(result)
+        sample_remap_track(self.time_remap.as_ref()?, at)
     }
+}
+
+/// `SMMotion.timeRemapValue` over one stored Time Remap track: a video placement's and a component instance's share it.
+pub(crate) fn sample_remap_track(track: &OrderTrack, at: f64) -> Option<f64> {
+    let keys = track.keys.as_slice();
+    let (first, last) = (keys.first()?, keys.last()?);
+    if at <= frame(first)? {
+        return value(first);
+    }
+    if at >= frame(last)? {
+        return value(last);
+    }
+    let right = keys.partition_point(|key| frame(key).is_some_and(|f| f <= at));
+    let (a, b) = (keys.get(right.checked_sub(1)?)?, keys.get(right)?);
+    if a.hold.value().copied().unwrap_or(false) {
+        return value(a);
+    }
+    let (start, end) = (frame(a)?, frame(b)?);
+    let eased = evaluate_curve(&curve(a)?, (at - start) / (end - start));
+    let result = value(a)? + (value(b)? - value(a)?) * eased;
+    result.is_finite().then_some(result)
 }
 
 fn frame(key: &OrderKey) -> Option<f64> {

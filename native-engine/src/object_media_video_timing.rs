@@ -170,6 +170,9 @@ pub(crate) enum RemapRefusal {
 #[cfg(feature = "evaluation")]
 #[path = "object_media_video_remap.rs"]
 mod remap;
+/// The Time Remap sampler over a stored track (a component instance reads the same one).
+#[cfg(feature = "evaluation")]
+pub(crate) use remap::sample_remap_track;
 
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_media_video_timing.rs"]

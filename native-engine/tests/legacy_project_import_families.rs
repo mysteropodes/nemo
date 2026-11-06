@@ -70,13 +70,10 @@ fn components_keep_symbols_instances_picks_exposed_props_and_time_remap() {
 
 #[test]
 fn component_content_without_a_native_owner_refuses() {
-    for (member, value) in [
-        ("tweenOverrides", json!({"a:0-1": []})),
-    ] {
-        let mut doc = animation();
-        doc["symbols"]["sym_a"][member] = value;
-        assert_eq!(refused(doc).path(), format!("symbols.sym_a.{member}"));
-    }
+    // A component's tween tables are carried now; a span that names no layer is dropped with a warning, not refused.
+    let mut doc = animation();
+    doc["symbols"]["sym_a"]["tweenOverrides"] = json!({"a:0-1": [{"aId": "x", "bId": "y"}]});
+    assert!(warnings(&import(&doc.to_string())).contains(&("tweenOverrides.a:0-1".to_owned(), "dangling_tween_span")));
     let mut doc = animation();
     doc["layers"][0]["timeRemap"] = json!({"keys": [{"frame": 0, "v": [1]}]});
     assert_eq!(refused(doc).path(), "layers[0].timeRemap");
@@ -425,4 +422,38 @@ fn a_component_keeps_its_own_camera_keys_and_markers() {
     let d = drawing(&quiet.to_string());
     let component = &d["componentTables"]["components"]["components"][0];
     assert!(component.get("cameraKeys").is_none() && component.get("markers").is_none());
+}
+
+#[test]
+fn a_component_carries_its_own_tween_tables_and_motion_arcs_into_the_document_store() {
+    // `sym.tweenOverrides`, `sym.tweenEasing` and `sym.motionArcs` key their spans by the layers INSIDE the component (`ly_in`, keyed
+    // at 0 and 3); layer uids are unique in a document, so the one store holds them next to the scene's.
+    let mut doc = animation();
+    let symbol = &mut doc["symbols"]["sym_a"];
+    symbol["tweenOverrides"] = json!({"ly_in:0-3": [{"aId": "sa", "bId": "sb"}], "ly_nowhere:0-3": [{"aId": "x", "bId": "y"}]});
+    symbol["tweenEasing"] = json!({"ly_in:0-3": {"points": [{"x": 0, "y": 0}, {"x": 0.25, "y": 0.1}, {"x": 0.75, "y": 0.9}, {"x": 1, "y": 1}]}});
+    symbol["motionArcs"] = json!({"ly_in:0-3-0": {"out": [5, 6], "junk": 1}, "0-3-1": {"cx": 4}});
+    let converted = import(&doc.to_string());
+    let wire = file(&converted);
+    let layers = wire["drawing"]["tweens"]["layers"].as_array().unwrap();
+    let inner = layers.iter().find(|l| l["layerUid"] == "ly_in").expect("the component layer has a tween record");
+    assert_eq!(inner["spans"][0]["from"], 0);
+    assert_eq!(inner["spans"][0]["to"], 3);
+    assert_eq!(inner["spans"][0]["overrides"], json!([{"aId": "sa", "bId": "sb"}]));
+    assert_eq!(inner["spans"][0]["easing"].as_array().unwrap().len(), 4);
+    assert_eq!(wire["drawing"]["motionArcs"]["ly_in:0-3-0"], json!({"out": [5, 6]}));
+    assert_eq!(wire["drawing"]["motionArcs"]["ly_in:0-3-1"], json!({"cx": 4}), "the oldest key form resolves inside the component");
+    assert!(warnings(&converted).contains(&("tweenOverrides.ly_nowhere:0-3".to_owned(), "dangling_tween_span")));
+    // The component record itself holds no table: the store owns them.
+    let component = &wire["drawing"]["componentTables"]["components"]["components"][0];
+    assert!(component.get("tweenOverrides").is_none() && component.get("motionArcs").is_none() && component.get("tweenEasing").is_none());
+    // The result opens as a native project and saves back byte for byte.
+    let owner = NativeObjectHistory::from_project_file("legacy-comp-tweens", &converted.project_file).unwrap();
+    let saved_once = saved(&owner);
+    let reopened = NativeObjectHistory::from_project_file("legacy-comp-tweens-2", &saved_once).unwrap();
+    assert_eq!(saved(&reopened), saved_once);
+    // The scene's own records are untouched by the component's tables.
+    let plain = drawing(ANIMATION);
+    let scene_only = |d: &Value| -> Vec<Value> { d["tweens"]["layers"].as_array().unwrap().iter().filter(|l| l["layerUid"] != "ly_in").cloned().collect() };
+    assert_eq!(scene_only(&plain), scene_only(&wire["drawing"]));
 }

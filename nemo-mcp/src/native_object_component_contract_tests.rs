@@ -49,6 +49,11 @@ pub(super) fn valid() -> Vec<(&'static str, Value)> {
             "component.breakApart",
             json!({"command":"object.component.breakApart","contextId":"scene-root","layerUid":"layer-a"}),
         ),
+        (
+            "component.state.edit",
+            json!({"command":"object.component.state.edit","contextId":"component-a","kind":"setCameraKey","frame":4,
+            "x":160.5,"y":90,"w":320,"rot":-12,"hOut":[1,-2],"hIn":[0,0],"ease":[0.42,0,0.58,1]}),
+        ),
     ]
 }
 
@@ -75,7 +80,7 @@ fn without(suffix: &str, key: &str) -> Value {
 }
 
 #[test]
-fn the_nine_declared_commands_are_exactly_the_admitted_operations() {
+fn the_ten_declared_commands_are_exactly_the_admitted_operations() {
     let expected = [
         "component.convert",
         "component.expose",
@@ -86,8 +91,9 @@ fn the_nine_declared_commands_are_exactly_the_admitted_operations() {
         "duplicator.config",
         "component.instance.set",
         "component.breakApart",
+        "component.state.edit",
     ];
-    assert_eq!(SPECS.len(), 9);
+    assert_eq!(SPECS.len(), 10);
     assert_eq!(
         valid().iter().map(|(s, _)| *s).collect::<Vec<_>>(),
         expected
@@ -146,6 +152,10 @@ fn one_member_mutations_are_refused_by_shape_and_by_input_admission() {
         for key in payload.as_object().unwrap().keys() {
             let config_member = ["duplicator.config", "component.instance.set"].contains(&suffix)
                 && !["command", "layerUid"].contains(&key.as_str());
+            // `component.state.edit` names only the members its kind takes: the optional ones may be absent (a null is not a value).
+            let config_member = config_member
+                || suffix == "component.state.edit"
+                    && !["command", "contextId", "kind"].contains(&key.as_str());
             if !optional.contains(&(suffix, key.as_str())) && !config_member {
                 mutants.push(without(suffix, key));
             }

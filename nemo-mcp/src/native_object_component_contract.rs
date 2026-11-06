@@ -42,6 +42,8 @@ enum K {
     PlacedAt,
     /// A finite number above zero.
     Speed,
+    /// C-comp-owned-state: a member of `object.component.state.edit` (its kind label, a camera handle or ease, a marker label or colour).
+    State(&'static str),
 }
 const INSTANCE_MODES: [&str; 4] = ["loop", "once", "pingpong", "single"];
 const DUP_MODES: [&str; 3] = ["grid", "radial", "path"];
@@ -60,7 +62,7 @@ enum Receipt {
 }
 
 /// (operation suffix, command, receipt, "member:kind" in wire order; a trailing `?` marks an optional member).
-static SPECS: [(&str, &str, Receipt, &str); 9] = [
+static SPECS: [(&str, &str, Receipt, &str); 10] = [
     (
         "component.convert",
         "object.component.convert",
@@ -118,6 +120,14 @@ static SPECS: [(&str, &str, Receipt, &str); 9] = [
         Receipt::Command,
         "contextId:text layerUid:id",
     ),
+    // C-comp-owned-state: the camera keys and markers a declared component owns, one closed edit per request.
+    (
+        "component.state.edit",
+        "object.component.state.edit",
+        Receipt::Command,
+        "contextId:id kind:stateKind frame:frame? x:number? y:number? w:speed? rot:number? hOut:pair? hIn:pair? ease:quad? \
+         name:label? color:colour? newFrame:frame?",
+    ),
 ];
 const PREFIX: &str = "command.document.object.";
 
@@ -132,6 +142,10 @@ fn spec(operation: &str) -> Option<(&'static str, Receipt, &'static str)> {
 pub(crate) fn admitted(operation: &str) -> bool {
     spec(operation).is_some()
 }
+
+/// C-comp-owned-state: the member kinds of the component camera / marker edit.
+#[path = "native_component_state_contract.rs"]
+mod state;
 
 /// #2256: the one read of the component model, kept beside its commands but a pinned query (no expectedRevision).
 #[path = "native_component_read_contract.rs"]
@@ -172,6 +186,7 @@ fn kind(token: &str) -> Option<K> {
         "frame" => K::Frame,
         "placedAt" => K::PlacedAt,
         "speed" => K::Speed,
+        token if state::admits(token) => K::State(state::token(token)),
         _ => return None,
     })
 }
@@ -198,6 +213,7 @@ fn check(kind: K, value: &Value) -> bool {
         K::Frame => value.as_u64().is_some_and(|f| f <= u64::from(u32::MAX)),
         K::PlacedAt => value.as_i64().is_some_and(|v| i32::try_from(v).is_ok()),
         K::Speed => value.as_f64().is_some_and(|v| v.is_finite() && v > 0.0),
+        K::State(token) => state::check(token, value),
         K::DupMode => value.as_str().is_some_and(|mode| DUP_MODES.contains(&mode)),
         K::DupStagger => value.as_object().is_some_and(|map| {
             map.iter()

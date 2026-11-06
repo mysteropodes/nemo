@@ -55,6 +55,21 @@ fn instances_result() -> Value {
             "items":[{"layerUid":"ly_1"},{"layerUid":"ly_2"}]}),
     )
 }
+fn markers_result() -> Value {
+    with(
+        head("markers"),
+        json!({"contextId":"sym_a","markerCount":2,"cursor":0,"nextCursor":null,"items":[
+            {"frame":2,"name":"a","color":"#e8b64c"},{"frame":9,"name":"","color":"#fff"}]}),
+    )
+}
+fn camera_keys_result() -> Value {
+    with(
+        head("cameraKeys"),
+        json!({"contextId":"sym_a","keyCount":2,"cursor":0,"nextCursor":null,"items":[
+            {"frame":0,"x":160.0,"y":90,"w":320,"rot":null,"hOut":null,"hIn":null,"ease":null},
+            {"frame":6,"x":1,"y":2,"w":3,"rot":12,"hOut":[0,0],"hIn":[1,2],"ease":[0.42,0,0.58,1]}]}),
+    )
+}
 fn duplicator_result() -> Value {
     with(
         head("duplicator"),
@@ -86,6 +101,14 @@ fn good_cases() -> Vec<(Value, Value)> {
         (
             json!({"kind":"instances","contextId":"sym_a","cursor":1,"limit":16}),
             instances_result(),
+        ),
+        (
+            json!({"kind":"markers","contextId":"sym_a","cursor":0,"limit":16}),
+            markers_result(),
+        ),
+        (
+            json!({"kind":"cameraKeys","contextId":"sym_a","cursor":0,"limit":16}),
+            camera_keys_result(),
         ),
         (
             json!({"kind":"duplicator","layerUid":"ly_dup"}),
@@ -431,4 +454,28 @@ fn wire_result_rejects_forged_owner_revision_and_shape() {
         &elsewhere,
         &serde_json::from_value(foreign).unwrap()
     ));
+}
+
+#[test]
+fn component_state_pages_are_closed_and_refuse_the_scene() {
+    for (selector, mut body) in [
+        (json!({"kind":"markers","contextId":"sym_a","cursor":0,"limit":16}), markers_result()),
+        (json!({"kind":"cameraKeys","contextId":"sym_a","cursor":0,"limit":16}), camera_keys_result()),
+    ] {
+        let payload = payload_of(&selector);
+        assert!(result(&payload, &body));
+        let mut extra = body.clone();
+        extra["items"][0]["extra"] = json!(1);
+        assert!(!result(&payload, &extra));
+        let mut wrong_context = body.clone();
+        wrong_context["contextId"] = json!("sym_b");
+        assert!(!result(&payload, &wrong_context));
+        body["items"][0]["frame"] = json!("0");
+        assert!(!result(&payload, &body));
+        // The scene's markers and camera have their own owners.
+        let scene = json!({"kind":selector["kind"],"contextId":"scene-root","cursor":0,"limit":16});
+        let mut scene_body = if selector["kind"] == "markers" { markers_result() } else { camera_keys_result() };
+        scene_body["contextId"] = json!("scene-root");
+        assert!(!result(&payload_of(&scene), &scene_body));
+    }
 }
