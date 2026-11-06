@@ -40,6 +40,7 @@ function fixture(t) {
     fs.writeFileSync(path.join(app,'Contents/Info.plist'),'<plist><dict><key>CFBundleExecutable</key><string>actual-engine</string></dict></plist>');
     fs.writeFileSync(path.join(app,'Contents/MacOS/actual-engine'),'new isolated executable',{mode:0o700});
     fs.writeFileSync(path.join(app,'Contents/MacOS/ffmpeg'),'fixture sidecar',{mode:0o700});
+    fs.writeFileSync(path.join(app,'Contents/MacOS/nemo-mcp'),'fixture mcp client',{mode:0o700});
   `);
   const git = args => {
     const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
@@ -97,6 +98,7 @@ test('isolated build preserves selected package and reports before owner cleanup
   assert.equal(fs.readFileSync(path.join(absolute(f, app), 'Contents/MacOS/actual-engine'), 'utf8'), 'new isolated executable');
   assert.ok(result.artifacts.some(a => a.path.endsWith('actual-engine') && a.sha256));
   assert.equal(result.artifacts.some(a => /MacOS\/Nemo$/.test(a.path)), false);
+  assert.ok(result.artifacts.some(a => a.path.endsWith('Contents/MacOS/nemo-mcp') && a.sha256), 'package proof pins the bundled nemo-mcp client');
   assert.ok(fs.existsSync(path.join(absolute(f, app), 'prepared.txt')));
   const observed = JSON.parse(fs.readFileSync(path.join(f.dir, 'observed-build.json')));
   assert.ok(observed.target.includes('.runtime/tasks/'));

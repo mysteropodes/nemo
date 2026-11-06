@@ -9,7 +9,7 @@ const path = require('node:path');
 const { createReader, readRegistration, OPERATION } = require('../cs7-read.cjs');
 const { identity, INSTANCE, FOREIGN } = require('./cs7-h-stubs.cjs');
 
-const BUILD = '1.2.3:abcdef';
+const BUILD = '1.2.3:' + identity.sourceSha;
 function fixture(t, over = {}) {
   const registry = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cs7-read-')));
   t.after(() => fs.rmSync(registry, { recursive: true, force: true }));
@@ -71,6 +71,8 @@ test('a reply from a different identity is refused: another process, instance, d
     'owner identity differs (source)': { current: async () => ({ ...identity, sourceSha: 'f'.repeat(40) }) },
     'discovered instance is not the registration': { state: { instanceId: FOREIGN } },
     'discovered build is not the registration': { state: { buildId: BUILD + 'x' } },
+    'registered build is the same version of another commit': { record: { buildId: '1.2.3:' + 'f'.repeat(40) }, state: { buildId: '1.2.3:' + 'f'.repeat(40) } },
+    'registered build is the candidate head but dirty': { record: { buildId: BUILD + '-dirty' }, state: { buildId: BUILD + '-dirty' } },
     'registered build is another version': { record: { buildId: '9.9.9:abcdef' }, state: { buildId: '9.9.9:abcdef' } },
     'two applications are discovered': { instances: [{ instanceId: INSTANCE }, { instanceId: FOREIGN }] },
     'no native document': { state: { available: false } },
