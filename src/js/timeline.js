@@ -10528,7 +10528,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
     // #207), not the (irrelevant once keyed) static field.
     var keyedAtOpen=!!(ld.blendKeys&&ld.blendKeys.length);
     origMode=keyedAtOpen?((window.SMMotion&&SMMotion.layerBlendModeAt)?SMMotion.layerBlendModeAt(state.activeLayerIdx,state.currentFrame):(ld.blendMode||'normal')):(ld.blendMode||'normal');
-    var natOpen=nativeCompositing();if(natOpen)origMode=natOpen.blendOf(state.activeLayerIdx);
+    var natOpen=nativeCompositing();if(natOpen)origMode=natOpen.blendOf(state.activeLayerIdx,state.currentFrame);
     pop.innerHTML='';
     Object.keys(BLEND_MODE_LABELS).forEach(function(v){
       var it=document.createElement('div');
@@ -10540,7 +10540,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
         var nat=nativeCompositing();
         if(nat){ // #2372: one native edit, no ld write, no pushUndo
           var from=origMode;origMode=null;close(false);
-          nat.setBlend(state.activeLayerIdx,v).then(function(){setLabel(v);nativeCompositingRefresh();},function(){setLabel(from||'normal');nativeCompositingRefused();});
+          nat.setBlend(state.activeLayerIdx,v,state.currentFrame).then(function(){setLabel(v);nativeCompositingRefresh();},function(){setLabel(from||'normal');nativeCompositingRefused();});
           return;
         }
         var ld2=currentLd();if(!ld2){close(false);return;}

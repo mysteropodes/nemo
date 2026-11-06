@@ -27,7 +27,9 @@ pub(crate) fn layer_supported(
     // #2257: blend, matte and effect properties of a layer in the packet's own context are composition inputs the
     // layered compositor joins (`SceneEffectPlan`); a layer inside a component's own stack has no such join.
     let joined = context == packet.context_id();
-    if !joined && layer.blend_mode().is_some_and(|mode| mode != "normal") {
+    if !joined
+        && (layer.blend_mode().is_some_and(|mode| mode != "normal") || !layer.blend_keys().is_empty())
+    {
         return Err(unavailable(
             host,
             "component layer blend mode requires a layered consumer",

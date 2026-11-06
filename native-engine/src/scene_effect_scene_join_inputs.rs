@@ -4,7 +4,7 @@
 //! static `p1..p8` (a stack with enabled keyed parameters is refused), visibility, kind flags, parent UID and the
 //! own mask count/feather, and the enabled effect stacks of the layer's selected non-mask objects (`item_effects`,
 //! keyed by source object index: the baseline `item.effects`). Refused, never neutral: a `blend` property track
-//! or enabled expression on the layer, and an expressed `matteOn` the owner's expression port did not evaluate (`LayerCompositionPropertyUnavailable`). They need the raw
+//! or enabled expression on the layer (the layer's own hold-only `blendKeys` ARE sampled, at the frame), and an expressed `matteOn` the owner's expression port did not evaluate (`LayerCompositionPropertyUnavailable`). They need the raw
 //! layer-property consumer to evaluate them at the frame; until it is joined the plan would otherwise be built on
 //! the static value, so the join stays honest by returning a typed error.
 //! Canvas-background layers are not document layers and carry no input here.
@@ -70,7 +70,8 @@ pub(crate) fn layer_inputs(
             is_widget: layer.widget.value().is_some(),
             is_effect: layer.is_effect_layer(),
             is_folder: layer.is_folder_layer(),
-            blend_mode: layer.blend_mode().map(str::to_owned),
+            // Baseline `layerBlendModeAt`: hold-only keys when the layer has them, else the stored blend.
+            blend_mode: layer.blend_mode_at(packet.frame()).map(str::to_owned),
             matte_mode: matte_mode_at(packet, layer, index)?,
             matte_source_uid: layer.matte_source_uid().map(str::to_owned),
             mattes_more: layer
@@ -156,7 +157,7 @@ pub(crate) fn first_animated_composition_property<'a>(
 /// Composition inputs the join cannot sample: an ENABLED EXPRESSION on `matteOn` the owner's expression port did not
 /// evaluate for this packet (a keyed or static `matteOn` is sampled raw by [`matte_on`], an expressed one is the
 /// packet's evaluated receipt), and any `blend` property track, which the document cannot author today (the
-/// baseline's hold-only `blendKeys` has no native record).
+/// baseline's hold-only `blendKeys` are the layer's own record, sampled by `blend_mode_at`).
 fn unsampled_composition_property(packet: &ObjectFramePacket, uid: &str) -> Option<&'static str> {
     let document = packet.snapshot().document();
     first_animated_composition_property(

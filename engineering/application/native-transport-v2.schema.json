@@ -24732,7 +24732,10 @@
             "effects",
             "effectsFromSet",
             "effectsFromClear",
-            "folderCollapsed"
+            "folderCollapsed",
+            "blendKeySet",
+            "blendKeyRemove",
+            "blendKeysClear"
           ]
         },
         "mode": {
@@ -25248,6 +25251,162 @@
               "not": {
                 "required": [
                   "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "blendKeySet"
+            },
+            "mode": {
+              "enum": [
+                "normal",
+                "multiply",
+                "screen",
+                "overlay",
+                "darken",
+                "lighten",
+                "colorDodge",
+                "colorBurn",
+                "hardLight",
+                "softLight",
+                "difference",
+                "exclusion",
+                "hue",
+                "saturation",
+                "color",
+                "luminosity"
+              ]
+            }
+          },
+          "required": [
+            "edit",
+            "mode",
+            "index"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "blendKeyRemove"
+            }
+          },
+          "required": [
+            "edit",
+            "index"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "blendKeysClear"
+            },
+            "mode": {
+              "enum": [
+                "normal",
+                "multiply",
+                "screen",
+                "overlay",
+                "darken",
+                "lighten",
+                "colorDodge",
+                "colorBurn",
+                "hardLight",
+                "softLight",
+                "difference",
+                "exclusion",
+                "hue",
+                "saturation",
+                "color",
+                "luminosity"
+              ]
+            }
+          },
+          "required": [
+            "edit"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
                 ]
               }
             },

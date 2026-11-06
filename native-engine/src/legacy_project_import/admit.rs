@@ -83,6 +83,7 @@ pub fn convert_admitted_with(
 /// Layer members of the converted record that a slice-2 family wrote, with the baseline member a refusal names.
 const LAYER_FIELDS: &[(&str, &[&str])] = &[
     ("blendMode", &["blendMode"]),
+    ("blendKeys", &["blendKeys"]),
     (
         "matteMode",
         &["matteMode", "matteSourceLayerUid", "mattesMore"],

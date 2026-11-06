@@ -7,7 +7,7 @@
 //!
 //! Row additions (all optional except `kind`): `kind` (the `layer-kind.js` `keyOf` taxonomy, or `unknown` when the stored
 //! content contradicts itself), `folderCollapsed` (a folder layer's stored state), `folderId` (organisational membership),
-//! `componentId` (the symbol an instance layer places), `blendMode`, `matteMode`, `matteSourceLayerUid`, `mattesMore`,
+//! `componentId` (the symbol an instance layer places), `blendMode`, `blendKeys` (#2257: the hold-only blend keys; `blendKeysOversize` past 64), `matteMode`, `matteSourceLayerUid`, `mattesMore`,
 //! `isMatteSource`, `timeLinkUid` and `followPathUid` (#2372: the stored Link time source and Follow path target), `followPathAlign` (true only: the orient toggle of that path), `keyLock` (D37: the layer's standing key-lock mode `in`, `out` or `layer`; omitted when none), `threeD` (true only: the baseline 3D layer switch is on), `hasDuplicator` (true only: the layer hosts a stored duplicator) with `dupSourceMode` (`shape` or `objects`, as that duplicator stores it), `opacity` (the static value), `opacityAnimated`, `hasMotion` (true only: the layer's own Position / Anchor / Rotation / Scale is not the identity pose, so a pointer must be mapped through it), and (#2372) `effects` (the layer's stored effect stack, so the
 //! effects panel can send a complete replacement) or `effectsOversize` when the stack is past the row or document bound, and the same for the path-effect stack (`pathFx`, `pathFxOversize`). Top level: `layerFolders` (the organisational folder
 //! rows) and `layerModelUnavailable`. The colour label stays the existing `color` row member.
@@ -255,6 +255,19 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
             if let Some(blend) = layer.blend_mode() {
                 row.insert("blendMode".into(), json!(blend));
             }
+            // #2257: the hold-only blend keys, so the Blend stopwatch can tell on from off and key the playhead frame.
+            if !layer.blend_keys().is_empty() {
+                if layer.blend_keys().len() <= MAX_BLEND_KEYS_LISTED {
+                    let keys: Vec<Value> = layer
+                        .blend_keys()
+                        .iter()
+                        .map(|key| json!({"frame": key.frame, "mode": key.mode}))
+                        .collect();
+                    row.insert("blendKeys".into(), Value::Array(keys));
+                } else {
+                    row.insert("blendKeysOversize".into(), json!(true));
+                }
+            }
             if let Some(mode) = layer.matte_mode() {
                 row.insert("matteMode".into(), json!(mode));
             }
@@ -323,6 +336,9 @@ pub(crate) fn layer_members(document: &ObjectDocument) -> Vec<Map<String, Value>
         })
         .collect()
 }
+
+/// A row lists at most this many blend keys (about 40 bytes each); a layer with more names the oversize and lists none.
+const MAX_BLEND_KEYS_LISTED: usize = 64;
 
 /// Top-level members: the organisational folder rows (omitted when the document has none) and the typed gaps.
 pub(crate) fn model_members(document: &ObjectDocument) -> Map<String, Value> {

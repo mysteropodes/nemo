@@ -157,7 +157,7 @@ mod scene_effect_layer_record;
 #[allow(unused_imports)]
 pub(crate) use scene_effect_layer_record::{
     blend_write, freeze_legacy_matte_sources, remap_compositing_refs, validate_layer_compositing,
-    LayerEffect, MatteRef, BLEND_MODE_NAMES, MATTE_MODE_NAMES,
+    BlendKey, LayerEffect, MatteRef, BLEND_MODE_NAMES, MATTE_MODE_NAMES,
 };
 
 #[path = "object_layer_organization.rs"]
@@ -281,6 +281,9 @@ pub struct ObjectLayer {
     pub(crate) groups: Presence<GroupTable>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) blend_mode: Presence<Option<String>>,
+    /// Baseline `ld.blendKeys`: the hold-only keys of an animated blend mode, sorted by frame (absent: the static `blendMode`).
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) blend_keys: Presence<Vec<BlendKey>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) matte_mode: Presence<Option<String>>,
     #[serde(skip_serializing_if = "Presence::missing")]
@@ -364,7 +367,8 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] path_fx: Presence<Vec<PathFxRecord>>,
     #[serde(default)] widget: Presence<WidgetRecord>,
     #[serde(default)] groups: Presence<GroupTable>,
-    #[serde(default)] blend_mode: Presence<Option<String>>, #[serde(default)] matte_mode: Presence<Option<String>>,
+    #[serde(default)] blend_mode: Presence<Option<String>>,
+    #[serde(default)] blend_keys: Presence<Vec<BlendKey>>, #[serde(default)] matte_mode: Presence<Option<String>>,
     #[serde(default)] matte_source_layer_uid: Presence<String>, #[serde(default)] mattes_more: Presence<Vec<MatteRef>>,
     #[serde(default)] is_effect_layer: Presence<bool>, #[serde(default)] is_folder_layer: Presence<bool>,
     #[serde(default)] folder_collapsed: Presence<bool>, #[serde(default)] effects: Presence<Vec<LayerEffect>>,

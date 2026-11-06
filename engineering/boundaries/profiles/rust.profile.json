@@ -1833,6 +1833,7 @@
         "scene_effect_layer_record_edit.rs",
         "scene_effect_layer_record_edit_rows.rs",
         "scene_effect_layer_record_nullable.rs",
+        "scene_effect_layer_record_blend_keys.rs",
         "object_scene_producer_component_join.rs",
         "object_scene_producer_component_join_rows.rs",
         "object_scene_producer_component_join_support.rs",

@@ -61,6 +61,8 @@ fn structural_kinds_follow_the_baseline_order_and_a_plain_layer_is_a_drawing() {
         for absent in [
             "componentId",
             "blendMode",
+            "blendKeys",
+            "blendKeysOversize",
             "matteMode",
             "matteSourceLayerUid",
             "mattesMore",
@@ -151,6 +153,27 @@ fn blend_and_matte_facts_are_copied_and_a_source_is_marked() {
     // A stored null blend is not a named blend.
     assert!(rows[5].get("blendMode").is_none());
     assert!(rows[1].get("isMatteSource").is_none());
+}
+
+#[test]
+fn hold_only_blend_keys_are_listed_in_frame_order_and_a_long_list_names_its_oversize() {
+    let keys = |count: u32| -> Vec<Value> {
+        (0..count).map(|frame| json!({"frame": frame, "mode": "screen"})).collect()
+    };
+    let document = flat(
+        json!([{"layerUid":"plain"},
+            {"layerUid":"keyed","blendMode":"multiply","blendKeys":[{"frame":2,"mode":"hue"},{"frame":9,"mode":"normal"}]},
+            {"layerUid":"edge","blendKeys":keys(64)},
+            {"layerUid":"long","blendKeys":keys(65)}]),
+        json!({}),
+    );
+    let rows = rows(&document);
+    assert!(rows[0].get("blendKeys").is_none() && rows[0].get("blendKeysOversize").is_none());
+    assert_eq!(rows[1]["blendKeys"], json!([{"frame":2,"mode":"hue"},{"frame":9,"mode":"normal"}]));
+    assert_eq!(rows[1]["blendMode"], json!("multiply"), "the static blend is still listed beside the keys");
+    assert_eq!(rows[2]["blendKeys"].as_array().unwrap().len(), 64);
+    assert_eq!(rows[3]["blendKeysOversize"], json!(true));
+    assert!(rows[3].get("blendKeys").is_none());
 }
 
 #[test]

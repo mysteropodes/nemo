@@ -1,4 +1,4 @@
-//! #2257 an EXPRESSED `matteOn` (baseline `matteOnAt` reads `valueAtFrame`, which runs the expression): the owner-held
+//! #2257 composition properties sampled at the frame. (1) An EXPRESSED `matteOn` (baseline `matteOnAt` reads `valueAtFrame`, which runs the expression): the owner-held
 //! packet carries the expression port's value of the layer at the frame, the join reads it (`>= 50` is matted) and the
 //! layered compositor draws the matte, or the layer whole, accordingly. A packet built without the owner's port keeps
 //! the typed refusal (the raw track is never substituted). Real documents, real Metal; viewport = export.
@@ -141,4 +141,87 @@ fn a_packet_without_the_owners_expression_port_refuses_the_expressed_switch() {
     // The strict raw packet carries no evaluated value and refuses an enabled expression outright; the raw 100 is
     // never substituted for it.
     assert!(prepare_object_exposure_frame(&snapshot, &pins).is_err());
+}
+
+// ---- (2) the hold-only blend keys (baseline `layerBlendModeAt`) ------------------------------------------------------
+
+/// Red `base` (20..100) under blue `top` (60..140 x 40..100) whose blend is keyed by `keys` (`[(frame, mode)]`).
+fn keyed_blend(keys: &[(u32, &str)]) -> Value {
+    let timing = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let keys: Vec<Value> = keys.iter().map(|(frame, mode)| json!({"frame": frame, "mode": mode})).collect();
+    let elements = |layer: &str| json!({"layerUid":layer,"strokeId":"s","naturalPosition":0,"order":{}});
+    let scopes: Vec<Value> = (0..=4u32)
+        .map(|frame| json!({"frameScope":{"kind":"authored","frame":frame},"elements":[elements("base"), elements("top")]}))
+        .collect();
+    let mut objects = Vec::new();
+    for frame in 0..=4u32 {
+        objects.push(record("base", (20., 20., 100., 100.), [1., 0., 0.], frame));
+        objects.push(record("top", (60., 40., 140., 100.), [0., 0., 1.], frame));
+    }
+    json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":8,
+        "layers":[{"layerUid":"base","timing":timing},{"layerUid":"top","timing":timing,"blendKeys":keys}],
+        "objects":objects,
+        "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,
+            "documentFormatVersion":2,"migration":"explicit-plan-required","referencePolicy":"unresolved",
+            "contexts":[{"contextId":"scene-root",
+                "layers":[{"layerUid":"base","naturalPosition":0,"order":{}},{"layerUid":"top","naturalPosition":1,"order":{}}],
+                "scopes":scopes}]}})
+}
+
+/// The export-door image of the raw packet at `frame` and whether the layer stack painted it.
+fn raw_frame(doc: &Value, frame: u32) -> (bool, Vec<u8>) {
+    let history = owner(doc);
+    let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
+    let pins = selector(&snapshot, frame);
+    let packet = prepare_object_exposure_frame(&snapshot, &pins).unwrap();
+    let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+    let plan = prepare_object_paint_plan(&scene, &pins).unwrap();
+    let witness = prepare_object_composition(&plan, &pins).unwrap();
+    let effects = witness.scene_effects().unwrap().clone();
+    let output = ObjectOutputSpec::new(160, 120, "project-srgb-normal-rgba8-area").unwrap();
+    let mut gpu = gpu();
+    let (layered, result) = match select_composition_path(&effects, witness.plan()).unwrap() {
+        PathSelection::Layered(stack) => (true, gpu.compose_object_layered(&witness, output, &stack)),
+        PathSelection::Flat => (false, gpu.compose_object(&witness, output)),
+    };
+    (layered, gpu.readback_object_rgba8(&result.unwrap()).unwrap().bytes().to_vec())
+}
+
+const BLACK: [u8; 4] = [0, 0, 0, 255];
+
+#[test]
+fn a_keyed_blend_mode_holds_between_its_keys_and_the_layer_stack_draws_it() {
+    // Normal from frame 0, Multiply from frame 2: red x blue is black where they overlap, blue stays blue elsewhere.
+    let doc = keyed_blend(&[(0, "normal"), (2, "multiply")]);
+    for (frame, overlap) in [(0, BLUE), (1, BLUE), (2, BLACK), (3, BLACK), (4, BLACK)] {
+        let (layered, image) = raw_frame(&doc, frame);
+        assert_eq!(layered, frame >= 2, "frame {frame}: a blended layer selects the layer stack, Normal stays flat");
+        assert_eq!(pixel(&image, 80, 60), overlap, "frame {frame}: overlap");
+        assert_eq!(pixel(&image, 120, 60), BLUE, "frame {frame}: blue over white is blue in either mode");
+        assert_eq!(pixel(&image, 30, 30), RED, "frame {frame}: the base layer alone");
+    }
+}
+
+#[test]
+fn before_its_first_key_a_keyed_layer_holds_the_first_keys_mode() {
+    let doc = keyed_blend(&[(2, "multiply")]);
+    let (layered, image) = raw_frame(&doc, 0);
+    assert!(layered);
+    assert_eq!(pixel(&image, 80, 60), BLACK, "frame 0 is before the only key: its mode holds");
+}
+
+#[test]
+fn the_stored_blend_is_ignored_while_keys_exist_and_keys_equal_the_static_blend_they_replace() {
+    let mut keyed = keyed_blend(&[(0, "normal")]);
+    keyed["layers"][1]["blendMode"] = json!("multiply");
+    let (layered, image) = raw_frame(&keyed, 3);
+    assert!(!layered, "the key (Normal) wins over the stored Multiply");
+    assert_eq!(pixel(&image, 80, 60), BLUE);
+    let mut plain = keyed_blend(&[(0, "multiply")]);
+    let (_, with_key) = raw_frame(&plain, 3);
+    plain["layers"][1].as_object_mut().unwrap().remove("blendKeys");
+    plain["layers"][1]["blendMode"] = json!("multiply");
+    let (_, stored) = raw_frame(&plain, 3);
+    assert_eq!(with_key, stored, "one key of Multiply is the stored Multiply");
 }
