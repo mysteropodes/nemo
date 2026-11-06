@@ -263,10 +263,6 @@ mod property_track_edit_tests;
 #[cfg(test)]
 #[path = "../tests/object_property_preset_apply.rs"]
 mod property_preset_apply_tests;
-// #2524/#2377: copied Motion keys pasted at the playhead as one atomic native history entry.
-#[cfg(test)]
-#[path = "../tests/object_property_keys_paste.rs"]
-mod property_keys_paste_tests;
 
 #[cfg(feature = "project_media_codec")]
 #[path = "object_project_history.rs"]

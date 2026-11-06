@@ -72,8 +72,8 @@ function fixture() {
       }
       const r = response(q, result); if (badReply) badReply(r); return r;
     }
-    assert.ok(['command.document.object.property.track.edit', 'command.document.object.property.keys.paste'].includes(q.operation)); assert.equal(q.expectedRevision, revision);
-    if (q.operation.endsWith('keys.paste') && !refusal) { revision++; return response(q, {applied:true, historyEntriesAdded:1}); }
+    if (q.operation === 'command.document.object.property.keys.paste') { assert.equal(q.expectedRevision, revision); revision++; return response(q, {applied:true, historyEntriesAdded:1}); }
+    assert.equal(q.operation, 'command.document.object.property.track.edit'); assert.equal(q.expectedRevision, revision);
     // Like the actual Tauri UI route (external=false), a local command emits no
     // self-event/ACK wait. Only the separate external() helper creates that fence.
     if (refusal) return {apiVersion:2, requestId:q.requestId, instanceId:q.instanceId, documentId:q.documentId, contentRevision:revision, ok:false, error:{code:refusal, message:'Native track refused'}};

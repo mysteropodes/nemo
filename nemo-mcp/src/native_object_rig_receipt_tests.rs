@@ -212,3 +212,34 @@ fn the_request_gate_requires_a_revision_and_the_closed_payload() {
         );
     }
 }
+
+/// #2524 / #2377: the key paste packet is closed; the engine repeats every rule on original bytes.
+#[test]
+fn the_key_paste_packet_is_closed_and_bounded() {
+    let op = format!("{P}property.keys.paste");
+    let target = json!({"contextId":"scene-root","layerUid":"L"});
+    let ok = |frame: Value, tracks: Value| {
+        let request = envelope(
+            &op,
+            json!({"command":"object.property.keys.paste","frame":frame,"tracks":tracks}),
+        );
+        crate::native_contract::validate_request(&request.operation, &request.payload)
+    };
+    let key = json!({"dt":0,"v":[1,2],"hold":true,"curvePoints":[{"x":0,"y":0},{"x":1,"y":1,"tx":0.5}]});
+    let track = |keys: Value| json!([{"target":target,"property":"position","keys":keys}]);
+    assert!(ok(json!(12), track(json!([key, {"dt":6.5,"v":[3,4]}]))));
+    assert!(ok(json!(0), json!([{"target":{"contextId":"c","layerUid":"L","strokeId":"ink"},"property":"scale","keys":[{"dt":0,"v":[1]}]}])), "an element holder");
+    assert!(!ok(json!(-1), track(json!([key]))), "the playhead is not negative");
+    assert!(!ok(json!(0), json!([])), "at least one track");
+    assert!(!ok(json!(0), track(json!([]))), "at least one key");
+    assert!(!ok(json!(0), track(json!([{"dt":-1,"v":[1]}]))), "offsets are from the earliest key");
+    assert!(!ok(json!(0), track(json!([{"dt":0,"v":[1,2,3,4,5]}]))));
+    assert!(!ok(json!(0), track(json!([{"dt":0,"v":[1],"lockTo":"in"}]))), "a pasted key carries no lock");
+    assert!(!ok(json!(0), track(json!([{"dt":0,"v":[1],"hold":1}]))));
+    assert!(!ok(json!(0), json!([{"target":{"contextId":"c"},"property":"position","keys":[{"dt":0,"v":[1]}]}])), "a holder names its layer");
+    assert!(!ok(json!(0), json!([{"target":target,"keys":[{"dt":0,"v":[1]}]}])), "a track names its property");
+    let many: Vec<Value> = (0..129).map(|_| json!({"target":target,"property":"position","keys":[{"dt":0,"v":[1]}]})).collect();
+    assert!(!ok(json!(0), json!(many)), "at most 128 tracks");
+    let keys: Vec<Value> = (0..513).map(|i| json!({"dt":i,"v":[1]})).collect();
+    assert!(!ok(json!(0), track(json!(keys))), "at most 512 keys per track");
+}

@@ -43,3 +43,8 @@ impl NativeObjectHistory {
             .map_err(|code| (code, "Motion key paste could not commit."))
     }
 }
+
+// #2524/#2377: copied Motion keys pasted at the playhead as one atomic native history entry.
+#[cfg(test)]
+#[path = "../../tests/object_property_keys_paste.rs"]
+mod tests;
