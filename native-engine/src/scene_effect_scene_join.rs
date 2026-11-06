@@ -109,12 +109,23 @@ pub(crate) fn slot_role(layer: &JoinLayerInput) -> SlotRole {
     }
 }
 
+/// The item-level stack of an item the packet's own object table does not hold (a placed component's inner record):
+/// filed on the host layer under `key`, a number that no source object index of the packet takes.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ExtraItemEffects {
+    pub(crate) source_layer_index: usize,
+    pub(crate) key: usize,
+    pub(crate) specs: Vec<EffectSpec>,
+}
+
 /// Caller-owned evaluation parameters of the effect passes.
 #[derive(Clone, Copy)]
 pub(crate) struct JoinOptions<'a> {
     pub(crate) effect_zoom: f64,
     /// Whether a `custom:` effect type has a registered shader (`run_one_effect`).
     pub(crate) is_registered: &'a dyn Fn(&str) -> bool,
+    /// Item stacks of items outside the packet's object table, joined onto their host layers.
+    pub(crate) extra_item_effects: &'a [ExtraItemEffects],
 }
 
 impl<'a> JoinOptions<'a> {
@@ -122,6 +133,13 @@ impl<'a> JoinOptions<'a> {
         Self {
             effect_zoom,
             is_registered,
+            extra_item_effects: &[],
+        }
+    }
+    pub(crate) fn with_extra_item_effects(self, extra_item_effects: &'a [ExtraItemEffects]) -> Self {
+        Self {
+            extra_item_effects,
+            ..self
         }
     }
 }
@@ -352,7 +370,7 @@ pub(crate) enum SceneEffectJoinError {
 
 #[path = "scene_effect_scene_join_inputs.rs"]
 mod inputs;
-pub(crate) use crate::object_render_scene::scene_effect_kernels::scene_effect_scene_join::inputs::layer_inputs;
+pub(crate) use crate::object_render_scene::scene_effect_kernels::scene_effect_scene_join::inputs::{effect_specs, layer_inputs};
 
 /// The immutable join of one packet, one pinned scene and the layer records: what the viewport and the export
 /// both read, so a frame has one composition plan whichever door asks for it.
@@ -431,7 +449,16 @@ pub(crate) fn plan_scene_effects<T>(
     if let Some(field) = pin.first_mismatch(scene.pin()) {
         return Err(SceneEffectJoinError::WrongPin(field));
     }
-    let inputs = layer_inputs(packet)?;
+    let mut inputs = layer_inputs(packet)?;
+    for extra in options.extra_item_effects {
+        let input = inputs
+            .iter_mut()
+            .find(|input| input.source_layer_index == extra.source_layer_index)
+            .ok_or(SceneEffectJoinError::InvalidOrder)?;
+        if input.item_effects.iter().all(|(key, _)| *key != extra.key) {
+            input.item_effects.push((extra.key, extra.specs.clone()));
+        }
+    }
     let mut plans = plan_layers(&inputs, options);
     let position: HashMap<usize, usize> = plans
         .layers

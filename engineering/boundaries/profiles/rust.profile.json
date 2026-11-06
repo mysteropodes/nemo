@@ -1934,6 +1934,8 @@
         "scene_effect_scene_join_families_docs.rs",
         "scene_effect_scene_join_folder.rs",
         "scene_effect_scene_join_items.rs",
+        "scene_effect_scene_join_item_families.rs",
+        "scene_effect_scene_join_expressed_matte.rs",
         "scene_effect_layered_view.rs",
         "scene_effect_scene_join_stack.rs",
         "scene_effect_scene_join_support.rs",

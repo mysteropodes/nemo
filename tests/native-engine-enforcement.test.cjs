@@ -5604,6 +5604,8 @@ test('F2 scene-join family parity tests stay private test children of the compos
     'native-engine/tests/scene_effect_scene_join_families_docs.rs',
     'native-engine/tests/scene_effect_scene_join_folder.rs',
     'native-engine/tests/scene_effect_scene_join_items.rs',
+    'native-engine/tests/scene_effect_scene_join_item_families.rs',
+    'native-engine/tests/scene_effect_scene_join_expressed_matte.rs',
     'native-engine/tests/scene_effect_layered_view.rs',
   ]) {
     const owner = profile.modules.find((entry) => entry.id === 'rust.native.engine.tests');

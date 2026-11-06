@@ -137,12 +137,6 @@ pub(crate) fn compile(
             "component held source differs from resolved inner frame",
         ));
     }
-    if source.has_enabled_effects() {
-        return Err(unavailable(
-            host,
-            "component element effects are unavailable",
-        ));
-    }
     let layer_target = PropertyHolderTarget {
         context_id: symbol.to_owned(),
         layer_uid: target.layer_uid().to_owned(),
