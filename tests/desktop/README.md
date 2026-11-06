@@ -73,6 +73,39 @@ assert the original product contract from actual observations; successful input
 posting is never a passing assertion. `session.input` uses the existing closed
 UI32 semantic command protocol and fresh runtime identity checks.
 
+### Running a subset of Ready rows
+
+By default every `Ready` row is loaded, prepared and run, so the existing rows' `prepare()`
+steps (observer package, keyed fixture, private Text20 packet) are all required. An optional
+`rows` array in the private config limits the batch to the named row ids:
+
+```json
+{ "rows": ["play-resume"], "sourceSha": "...", "reportDirectory": "..." }
+```
+
+Only the listed rows are loaded, prepared and run; the other rows' scenarios are never
+`require`d. `rows` must be a non-empty list of unique ids of rows that are `Ready` in the
+declarations. A row's `dependsOn` rows must be listed too; they are never added for you.
+An empty or malformed list, an unknown or `Blocked` id, or a missing dependency refuses
+**before any session is created or the app is launched**. With no `rows` key nothing changes:
+same rows, same receipt, same stdout.
+
+`installed-pass` still means every *selected* row passed. A subset run adds a `selection`
+object right after `verdict` in `installed-results.json`, each progress file and the stdout
+line: `{ "scope": "subset", "selected": [...], "omittedReady": [...] }` (`"all-ready"` when the
+list names every Ready row). Read a subset `installed-pass` as "these rows only"; the omitted
+Ready rows were not run and the receipt is not evidence about them.
+
+### Refusals
+
+A refusal before or around launch prints one line to stderr:
+`CS7 batch refused or incomplete (<reason>); inspect its private receipt. No acceptance claimed.`
+`<reason>` is the harness check's fixed message (for example `selected installed row b depends
+on a row outside the selection: a`). Any other error (file system, JSON syntax, scenario
+code) is reduced to its class and code, such as `SyntaxError` or `Error ENOENT`, so paths and
+evidence content never reach the terminal. Failures after launch are classified in the private
+receipt as before.
+
 Missing declarations or scripts refuse **before app launch**. The existing
 matrix's issue status and headless `source-pass` do not establish readiness.
 This infrastructure does not itself declare the B3 cohort Ready or implement
