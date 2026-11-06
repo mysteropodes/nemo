@@ -129,7 +129,7 @@ fn any_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) 
 }
 
 #[cfg(feature = "evaluation")]
-fn ancestor_affine(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) -> Result<[f64; 6], &'static str> {
+pub(crate) fn ancestor_affine(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) -> Result<[f64; 6], &'static str> {
     let document = snapshot.document();
     let canvas = snapshot.project().map(|p| p.project().canvas_dimensions());
     let parent_of = |at: &str| {
@@ -171,7 +171,7 @@ fn rest_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32)
 
 /// The union of the display rectangles (rotation included) of the image and raster records a layer shows at `frame`.
 #[cfg(feature = "evaluation")]
-fn raster_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) -> Option<[f64; 4]> {
+pub(crate) fn raster_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) -> Option<[f64; 4]> {
     use crate::object_frame_packet::{
         prepare_object_exposure_frame, FrameScopeKind, ObjectFrameSelector,
     };

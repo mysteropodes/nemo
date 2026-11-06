@@ -99,8 +99,8 @@
     return true;
   }
   // #2255: the rig presentation view (bones, vertices, IK chains, binds, bound vertices and one vertex's weights of one layer).
-  const RIG_PARTS = { bones: 8, vertices: 16, chains: 8, binds: 8, bound: 64, weights: 8 };
-  const RIG_REASONS = ['expression', 'sample', 'parent', 'motion'], RIG_STATES = ['posed', 'skipped', 'unlinked', 'unavailable'];
+  const RIG_PARTS = { bones: 8, vertices: 16, chains: 8, binds: 8, bound: 64, weights: 8, posed: 24 };
+  const RIG_REASONS = ['expression', 'sample', 'parent', 'three_d', 'mixed', 'contour', 'empty', 'frame', 'pose'], RIG_STATES = ['posed', 'skipped', 'unlinked', 'unavailable'];
   const id128 = (v) => typeof v === 'string' && v.length > 0 && v.length <= 128, u32 = (v) => integer(v, 0, 4294967295);
   const orNull = (v, check) => v === null || check(v);
   const boneRef = (r) => exact(r, ['boneId', 'vi'], []) && id128(r.boneId) && u32(r.vi);
@@ -114,11 +114,21 @@
     binds: (i) => exact(i, ['index', 'strokeId', 'meshId', 'points', 'rotate', 'state'], []) && u32(i.index) && (i.strokeId === null) !== (i.meshId === null) &&
       orNull(i.strokeId, id128) && orNull(i.meshId, id128) && u32(i.points) && typeof i.rotate === 'boolean' && RIG_STATES.includes(i.state),
     bound: (i) => Array.isArray(i) && i.length === 4 && u32(i[0]) && u32(i[1]) && finite(i[2]) && finite(i[3]),
+    // [bind, vertex, x, y, inX, inY, outX, outY, closed]: the posed outline of a bind (#2255).
+    posed: (i) => Array.isArray(i) && i.length === 9 && u32(i[0]) && u32(i[1]) && i.slice(2, 8).every(finite) && (i[8] === 0 || i[8] === 1),
     weights: (i) => exact(i, ['entry', 'boneId', 'ptIndex', 'offset', 'w'], []) && u32(i.entry) && id128(i.boneId) && (i.ptIndex === null) !== (i.offset === null) &&
       orNull(i.ptIndex, u32) && orNull(i.offset, finite) && finite(i.w),
   };
+  // #2255: a held pose drag, exactly one of `segment` (moveSegment) or `ik` (dragIk).
+  function rigPreview(v) {
+    if (!object(v) || Object.keys(v).length !== 1) return false;
+    if (own(v, 'segment')) return exact(v.segment, ['boneId', 'vi', 'part', 'to'], ['breakTangent']) && id128(v.segment.boneId) && u32(v.segment.vi) &&
+      ['point', 'handleIn', 'handleOut'].includes(v.segment.part) && point(v.segment.to) && (!own(v.segment, 'breakTangent') || typeof v.segment.breakTangent === 'boolean');
+    return own(v, 'ik') && exact(v.ik, ['boneId', 'vi', 'to'], []) && id128(v.ik.boneId) && u32(v.ik.vi) && point(v.ik.to);
+  }
   function rigView(v) {
-    return exact(v, ['kind', 'contextId', 'frame', 'workId', 'viewGeneration', 'layerUid', 'part', 'bind', 'vertex', 'cursor', 'limit'], []) && v.kind === 'rig' &&
+    return exact(v, ['kind', 'contextId', 'frame', 'workId', 'viewGeneration', 'layerUid', 'part', 'bind', 'vertex', 'cursor', 'limit'], ['preview']) && v.kind === 'rig' &&
+      (!own(v, 'preview') || rigPreview(v.preview)) &&
       v.contextId === 'scene-root' && u32(v.frame) && bounded(v.workId) && integer(v.viewGeneration, 1) && id128(v.layerUid) && own(RIG_PARTS, v.part) &&
       u32(v.bind) && u32(v.vertex) && (v.part === 'weights' || (v.bind === 0 && v.vertex === 0)) && integer(v.cursor, 0, 100000) && integer(v.limit, 1, RIG_PARTS[v.part]);
   }
@@ -128,7 +138,8 @@
   }
   function rigResult(v) {
     return exact(v, ['kind', 'atRevision', 'documentSnapshotId', 'contextId', 'frame', 'workId', 'viewGeneration', 'layerUid', 'part', 'bind', 'vertex',
-      'cursor', 'total', 'nextCursor', 'unavailable', 'items'], []) && v.kind === 'rig' && integer(v.atRevision, 0) && text(v.documentSnapshotId) &&
+      'cursor', 'total', 'nextCursor', 'unavailable', 'preview', 'matrix', 'items'], []) && v.kind === 'rig' && typeof v.preview === 'boolean' &&
+      orNull(v.matrix, (m) => Array.isArray(m) && m.length === 6 && m.every(finite)) && (v.matrix === null || v.unavailable === null) && integer(v.atRevision, 0) && text(v.documentSnapshotId) &&
       v.contextId === 'scene-root' && u32(v.frame) && bounded(v.workId) && integer(v.viewGeneration, 1) && id128(v.layerUid) && own(RIG_PARTS, v.part) &&
       u32(v.bind) && u32(v.vertex) && integer(v.cursor, 0, 100000) && integer(v.total, 0, 100000) && orNull(v.nextCursor, (n) => integer(n, 0, 100000)) &&
       orNull(v.unavailable, (r) => RIG_REASONS.includes(r)) && (v.unavailable === null || v.total === 0) && Array.isArray(v.items) &&
@@ -138,7 +149,7 @@
     rigPayload(p); rigResult(v);
     const end = v.cursor + v.items.length;
     if (v.atRevision !== p.atRevision || v.documentSnapshotId !== p.documentSnapshotId || ['contextId', 'frame', 'workId', 'viewGeneration', 'layerUid', 'part',
-      'bind', 'vertex', 'cursor'].some((k) => v[k] !== p.view[k]) || v.items.length > p.view.limit || end > v.total || (end === v.total ? v.nextCursor !== null : v.nextCursor !== end))
+      'bind', 'vertex', 'cursor'].some((k) => v[k] !== p.view[k]) || v.preview !== own(p.view, 'preview') || (v.cursor > 0 && v.matrix !== null) || v.items.length > p.view.limit || end > v.total || (end === v.total ? v.nextCursor !== null : v.nextCursor !== end))
       fail('rig query result does not match its request');
     return true;
   }

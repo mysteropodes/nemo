@@ -266,24 +266,115 @@ fn a_deform_failure_after_a_successful_promotion_publishes_nothing() {
     );
 }
 
+/// The row's meshes carried by one raster each on the layer's key (frame 0): the display rect the baseline read from the live raster.
+fn meshed_doc(row: &oracle::Row) -> Value {
+    let mut doc = doc_for(row, MESHED_HELD);
+    let rasters: Vec<Value> = row
+        .meshes
+        .as_object()
+        .expect("meshes")
+        .iter()
+        .map(|(id, mesh)| {
+            let r = &mesh["rect"];
+            let (w, h) = (oracle::num(&r["width"]), oracle::num(&r["height"]));
+            let mut item = json!({"assetId":"image:source","meshId":id,"x":oracle::num(&r["x"]) + w / 2.0,
+                "y":oracle::num(&r["y"]) + h / 2.0,"width":w,"height":h});
+            if oracle::num(&r["rotation"]) != 0.0 {
+                item["rotation"] = r["rotation"].clone();
+            }
+            json!({"target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
+                "layerUid":LAYER,"strokeId":format!("raster:{id}")},"item":item})
+        })
+        .collect();
+    doc["items"] = json!({"raster": rasters});
+    doc
+}
+
 #[test]
-fn mesh_binds_make_the_commit_unavailable_and_publish_nothing() {
+fn mesh_binds_commit_the_offsets_the_baseline_saved_as_one_reversible_entry() {
     let rows: Vec<oracle::Row> = oracle::rows()
         .into_iter()
-        .filter(|r| r.has_meshes())
+        .filter(|r| r.has_meshes() && r.any_kept())
         .collect();
-    assert_eq!(rows.len(), 5);
+    assert_eq!(rows.len(), 4);
     for row in &rows {
-        // The baseline committed these (it has the store and the raster); no native provider is wired.
         assert_eq!(row.commit_ret(), &json!(true), "{}", row.name);
+        let mut owner = owner_of(&meshed_doc(row));
+        let initial = state(&owner);
+        let reply = run_ok(&mut owner, row.name, commit_payload(HELD_FRAME));
+        assert_eq!(reply["result"]["historyEntriesAdded"], 1, "{}", row.name);
+        assert_saved_like_the_baseline(row, &owner, HELD_FRAME);
+        for (id, want) in row.expect["commit"]["savedMeshOffsets"].as_object().expect("savedMeshOffsets") {
+            let got = wire(&owner)["imageMeshes"][id]["offsets"].clone();
+            let got = got.as_array().unwrap_or_else(|| panic!("{}: offsets written for {id}", row.name));
+            let want = want.as_array().unwrap();
+            assert_eq!(got.len(), want.len(), "{} {id}", row.name);
+            for (g, w) in got.iter().zip(want) {
+                for k in 0..2 {
+                    assert!(oracle::close(oracle::num(&g[k]), oracle::num(&w[k])), "{} {id}: {g} vs {w}", row.name);
+                }
+            }
+        }
+        let edited = state(&owner);
+        owner.undo(owner.content_revision()).unwrap();
+        assert_eq!(bytes(&owner), initial.0, "{}: undo restores the offsets and the segments together", row.name);
+        owner.redo(owner.content_revision()).unwrap();
+        assert_eq!(bytes(&owner), edited.0, "{}: redo reapplies", row.name);
+    }
+}
+
+/// The rig view of the current snapshot (the same request the Rig canvas sends), one page of `part`.
+fn rig_page(owner: &NativeObjectHistory, part: &str, cursor: usize) -> Value {
+    let snapshot = current(owner);
+    let limit = match part { "posed" => 24, "bound" => 64, _ => 8 };
+    let request = json!({"apiVersion":2,"requestId":"rig-read","instanceId":snapshot.instance_id(),"documentId":snapshot.document_id(),
+        "operation":"query.document.object","payload":{"atRevision":snapshot.content_revision(),"documentSnapshotId":snapshot.snapshot_id(),
+            "view":{"kind":"rig","contextId":"scene-root","frame":0,"workId":"native-work-4","viewGeneration":2,"layerUid":LAYER,"part":part,
+                "bind":0,"vertex":0,"cursor":cursor,"limit":limit}}});
+    let response = snapshot
+        .dispatch_with_rig_view(serde_json::from_value(request).unwrap(), Ok(("native-work-4", 2, "scene-root", 0)))
+        .unwrap();
+    assert!(response.ok, "{part}: {:?}", response.error);
+    response.result.unwrap()
+}
+
+#[test]
+fn a_mesh_bind_is_posed_for_the_view_at_the_world_vertices_the_baseline_offsets_give() {
+    let row = oracle::row("mesh_rotated_rect_no_rotate_mode");
+    let owner = owner_of(&meshed_doc(&row));
+    let mesh = &row.meshes["im_1"];
+    let (rect, offsets) = (&mesh["rect"], row.expect["commit"]["savedMeshOffsets"]["im_1"].as_array().unwrap());
+    let (w, h, deg) = (oracle::num(&rect["width"]), oracle::num(&rect["height"]), oracle::num(&rect["rotation"]));
+    let (cx, cy) = (oracle::num(&rect["x"]) + w / 2.0, oracle::num(&rect["y"]) + h / 2.0);
+    let (s, c) = deg.to_radians().sin_cos();
+    let world: Vec<[f64; 2]> = mesh["verts"].as_array().unwrap().iter().zip(offsets).map(|(v, o)| {
+        let (u, t) = (oracle::num(&v[0]) + oracle::num(&o[0]), oracle::num(&v[1]) + oracle::num(&o[1]));
+        let (lx, ly) = ((u - 0.5) * w, (t - 0.5) * h);
+        [cx + lx * c - ly * s, cy + lx * s + ly * c]
+    }).collect();
+    let binds = rig_page(&owner, "binds", 0);
+    assert_eq!(binds["items"][0]["state"], "posed", "the snapshot provider poses the mesh bind");
+    let bound = rig_page(&owner, "bound", 0)["items"].as_array().unwrap().clone();
+    assert_eq!(bound.len(), world.len(), "every posed mesh vertex is listed for the weight popover");
+    for (item, want) in bound.iter().zip(&world) {
+        assert!(oracle::close(oracle::num(&item[2]), want[0]) && oracle::close(oracle::num(&item[3]), want[1]), "{item} vs {want:?}");
+    }
+    let posed = rig_page(&owner, "posed", 0)["items"].as_array().unwrap().clone();
+    assert_eq!(posed.len(), mesh["outline"].as_array().unwrap().len(), "the posed outline is the mesh contour");
+    for (item, want) in posed.iter().zip(&world) {
+        assert!((oracle::num(&item[2]) - want[0]).abs() <= 0.006 && (oracle::num(&item[3]) - want[1]).abs() <= 0.006, "{item} vs {want:?}");
+        assert_eq!((item[4].clone(), item[8].clone()), (json!(0), json!(1)), "a mesh contour is a closed polygon with no handles");
+    }
+}
+
+#[test]
+fn a_mesh_bind_without_a_store_or_a_raster_rect_is_the_typed_refusal_and_publishes_nothing() {
+    let rows: Vec<oracle::Row> = oracle::rows().into_iter().filter(|r| r.has_meshes() && r.any_kept()).collect();
+    for row in &rows {
+        // No store (HELD), and a store whose mesh no raster carries (MESHED_HELD): nothing is guessed.
         for build in [HELD, MESHED_HELD] {
             let mut owner = owner_for(row, build);
-            assert_refused(
-                &mut owner,
-                row.name,
-                commit_payload(HELD_FRAME),
-                ("unavailable", "pose_unavailable"),
-            );
+            assert_refused(&mut owner, row.name, commit_payload(HELD_FRAME), ("unavailable", "pose_unavailable"));
         }
     }
 }

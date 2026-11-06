@@ -3,20 +3,24 @@
 //!
 //! The command layer may not depend on the evaluation layer (`commands` allows `read-queries`,
 //! `read-queries` allows `evaluation`), so the rig edit transaction reaches the kernels through the
-//! five functions below, exactly like `ObjectSnapshot::sample_property_raw` reaches the raw sampler:
+//! functions below, exactly like `ObjectSnapshot::sample_property_raw` reaches the raw sampler:
 //! - [`weigh_control`]: `rigWeighOnePointByControl` over every point of a bind pass
 //!   (`weighForPoints` of `rigBindStroke`, with its `radius || 200` and softness clamp);
 //! - [`weigh_offset`]: `rigWeighOnePoint`, the legacy offset model the weight popover's reset button
 //!   calls (`rig-bridge.js`);
 //! - [`auto_radius`]: the radius scan of `rigAutoAssignLayer`;
 //! - [`offset_for`]: the popover's add-bone row (`loc ? loc.offset : 0`);
-//! - [`ik_lengths`]: the two lengths `rigSetIK` stores.
+//! - [`ik_lengths`]: the two lengths `rigSetIK` stores;
+//! - [`ik_drag`]: the whole Alt-drag of a chain end (`findIKChain`, `rigSetIK`, `rigDragIKEnd` and the joint mirror).
 //!
 //! Plain numbers in, plain numbers out: the stored record types belong to the document layer and are
 //! converted by the plan module of `object_rig_edit.rs` (command layer). Every input is borrowed and never
 //! changed, every result is a new owned value, so the caller publishes it (or drops it) atomically.
 //! Without the `evaluation` feature there is no kernel: each function reports
 //! [`KernelRefusal::Unavailable`]; nothing is defaulted, guessed or approximated.
+
+use crate::object_document::object_rig_record::{RigPair, RigRecord, RigSegment};
+use crate::object_document::Presence;
 
 /// One bone vertex as the kernels read it: the anchor and its two handle vectors (zero when the
 /// record has no handle, exactly what `_boneSegsToPath` makes of a missing one).
@@ -71,6 +75,47 @@ pub(crate) enum KernelRefusal {
     Unresolved,
     /// A chain reference names no bone or no rest vertex (`rigSetIK` returns `false`).
     AnchorMissing,
+    /// The dragged vertex is not the far end of a two-bone chain (`findIKChain` returns `null`).
+    NoChain,
+}
+
+fn float(number: &serde_json::Number) -> f64 {
+    // Admitted numbers are finite; NaN marks a caller that skipped admission.
+    number.as_f64().unwrap_or(f64::NAN)
+}
+
+fn pair(value: &RigPair) -> [f64; 2] {
+    [float(&value[0]), float(&value[1])]
+}
+
+fn handle(slot: &Presence<Option<RigPair>>) -> [f64; 2] {
+    match slot.value() {
+        Some(Some(value)) => pair(value),
+        _ => [0.0, 0.0],
+    }
+}
+
+fn vertex(segment: &RigSegment) -> KernelVertex {
+    KernelVertex {
+        point: pair(&segment.point),
+        handle_in: handle(&segment.handle_in),
+        handle_out: handle(&segment.handle_out),
+    }
+}
+
+/// The rig's bones in table order, as the kernels read them.
+pub(crate) fn kernel_bones(rig: &RigRecord) -> Vec<KernelBone> {
+    rig.bones
+        .entries()
+        .iter()
+        .map(|(id, bone)| KernelBone {
+            id: id.clone(),
+            radius: bone.radius_value(),
+            closed: bone.closed,
+            live: bone.segments.iter().map(vertex).collect(),
+            rest: bone.rest_segments.iter().map(vertex).collect(),
+        })
+        .collect()
 }
 
 /// `rigWeighOnePointByControl` for every point; `radius` and `softness` are the raw bind arguments
@@ -262,6 +307,59 @@ pub(crate) fn ik_lengths(
             Err(IkError::AnchorMissing(_)) => Err(KernelRefusal::AnchorMissing),
             Err(_) => Err(KernelRefusal::Unresolved),
         }
+    }
+    #[cfg(not(feature = "evaluation"))]
+    {
+        Err(KernelRefusal::Unavailable)
+    }
+}
+
+/// The chain an Alt-drag filed and the vertex writes of its solve.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct IkDrag {
+    /// `[root, joint, end]`, as `findIKChain` names them.
+    pub(crate) refs: [KernelRef; 3],
+    /// `[l1, l2]` measured on the live pose at the start of the drag (`rigSetIK`).
+    pub(crate) lengths: [f64; 2],
+    /// The joint, the end, then the solved joint copied onto the end bone's coincident near vertex.
+    pub(crate) writes: Vec<(KernelRef, [f64; 2])>,
+}
+
+/// The Alt-drag of the anchor `end` toward `target`: the chain `findIKChain` finds (a typed `NoChain` when the vertex is
+/// not the far end of a two-bone chain), filed with `flip: false` and the lengths of the live pose as `rigSetIK` does at
+/// the start of the gesture, then ONE `rigDragIKEnd` solve and the joint mirror of the bridge. Nothing is applied here.
+#[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
+pub(crate) fn ik_drag(
+    bones: &[KernelBone],
+    end: &KernelRef,
+    target: [f64; 2],
+) -> Result<IkDrag, KernelRefusal> {
+    #[cfg(feature = "evaluation")]
+    {
+        use crate::evaluation::object_image_mesh_kernels::rig_ik_solve::{
+            drag_writes, find_ik_chain, set_ik, IkBone, IkError, IkRef,
+        };
+        let ik_bones: Vec<IkBone> = bones
+            .iter()
+            .map(|bone| IkBone {
+                id: bone.id.clone(),
+                closed: bone.closed,
+                segments: bone.live.iter().map(|v| v.point).collect(),
+                rest_segments: bone.rest.iter().map(|v| v.point).collect(),
+            })
+            .collect();
+        let spec = find_ik_chain(&ik_bones, &end.bone_id, end.vi as usize).ok_or(KernelRefusal::NoChain)?;
+        let chain = set_ik(&ik_bones, &spec.root, &spec.joint, &spec.end, false).map_err(|error| match error {
+            IkError::AnchorMissing(_) => KernelRefusal::AnchorMissing,
+            _ => KernelRefusal::Unresolved,
+        })?;
+        let writes = drag_writes(&ik_bones, &spec, &chain, target).map_err(|_| KernelRefusal::Unresolved)?;
+        let to_kernel = |r: &IkRef| KernelRef { bone_id: r.bone_id.clone(), vi: r.vi as u32 };
+        Ok(IkDrag {
+            refs: [to_kernel(&spec.root), to_kernel(&spec.joint), to_kernel(&spec.end)],
+            lengths: [chain.l1, chain.l2],
+            writes: writes.iter().map(|w| (to_kernel(&w.target), w.point)).collect(),
+        })
     }
     #[cfg(not(feature = "evaluation"))]
     {

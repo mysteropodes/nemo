@@ -3,15 +3,26 @@ use super::{exact, frame, revision};
 use serde_json::Value;
 
 /// The part a request names and the most items one page of it may carry (the engine's table, restated).
-const PARTS: [(&str, u64); 6] = [
+const PARTS: [(&str, u64); 7] = [
     ("bones", 8),
     ("vertices", 16),
     ("chains", 8),
     ("binds", 8),
     ("bound", 64),
     ("weights", 8),
+    ("posed", 24),
 ];
-const REASONS: [&str; 4] = ["expression", "sample", "parent", "motion"];
+const REASONS: [&str; 9] = [
+    "expression",
+    "sample",
+    "parent",
+    "three_d",
+    "mixed",
+    "contour",
+    "empty",
+    "frame",
+    "pose",
+];
 const STATES: [&str; 4] = ["posed", "skipped", "unlinked", "unavailable"];
 const MAX_LIST: u64 = 100_000;
 
@@ -45,7 +56,7 @@ pub(super) fn request(value: &Value) -> bool {
             "cursor",
             "limit",
         ],
-        &[],
+        &["preview"],
     ) else {
         return false;
     };
@@ -69,6 +80,7 @@ pub(super) fn request(value: &Value) -> bool {
         && revision(view.get("viewGeneration")).is_some_and(|generation| generation > 0)
         && text(&view["layerUid"])
         && (view["part"] == "weights" || (bind == 0 && vertex == 0))
+        && view.get("preview").is_none_or(preview)
         && view["cursor"]
             .as_u64()
             .is_some_and(|cursor| cursor <= MAX_LIST)
@@ -77,6 +89,24 @@ pub(super) fn request(value: &Value) -> bool {
                 .as_u64()
                 .is_some_and(|l| (1..=cap).contains(&l))
         })
+}
+/// #2255: a held pose drag, exactly one of `segment` (a `moveSegment`) or `ik` (a `dragIk`), each with finite numbers.
+fn preview(value: &Value) -> bool {
+    let Some(object) = value.as_object().filter(|o| o.len() == 1) else {
+        return false;
+    };
+    if let Some(segment) = object.get("segment") {
+        return exact(segment, &["boneId", "vi", "part", "to"], &["breakTangent"]).is_some_and(|s| {
+            text(&s["boneId"])
+                && index(&s["vi"]).is_some()
+                && s["part"].as_str().is_some_and(|p| ["point", "handleIn", "handleOut"].contains(&p))
+                && pair(&s["to"])
+                && s.get("breakTangent").is_none_or(Value::is_boolean)
+        });
+    }
+    object.get("ik").is_some_and(|ik| {
+        exact(ik, &["boneId", "vi", "to"], &[]).is_some_and(|i| text(&i["boneId"]) && index(&i["vi"]).is_some() && pair(&i["to"]))
+    })
 }
 fn number(value: &Value) -> bool {
     value.as_f64().is_some_and(f64::is_finite)
@@ -156,6 +186,14 @@ fn item(part: &str, value: &Value) -> bool {
                 && number(&v[2])
                 && number(&v[3])
         }),
+        // [bind, vertex, x, y, inX, inY, outX, outY, closed]: the posed outline of a bind.
+        "posed" => value.as_array().is_some_and(|v| {
+            v.len() == 9
+                && index(&v[0]).is_some()
+                && index(&v[1]).is_some()
+                && v[2..8].iter().all(number)
+                && matches!(v[8].as_u64(), Some(0 | 1))
+        }),
         "weights" => {
             exact(value, &["entry", "boneId", "ptIndex", "offset", "w"], &[]).is_some_and(|w| {
                 index(&w["entry"]).is_some()
@@ -188,6 +226,8 @@ pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool
             "total",
             "nextCursor",
             "unavailable",
+            "preview",
+            "matrix",
             "items",
         ],
         &[],
@@ -238,6 +278,13 @@ pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool
         }
         && (reason.is_null()
             || (reason.as_str().is_some_and(|r| REASONS.contains(&r)) && total == 0))
+        // The held pose drag the answer came from is the one the request carried; the world map rides the first page of an
+        // available layer only, and is the six numbers of an affine.
+        && answer["preview"].as_bool() == Some(view.get("preview").is_some())
+        && (answer["matrix"].is_null()
+            || (cursor == 0
+                && reason.is_null()
+                && answer["matrix"].as_array().is_some_and(|m| m.len() == 6 && m.iter().all(number))))
         && items.iter().all(|value| item(part, value))
         // The request pin is checked last: an item of an unlisted part is refused by `item` itself.
         && request(payload)

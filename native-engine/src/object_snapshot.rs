@@ -93,6 +93,11 @@ mod ghost_view;
 mod rig_presentation;
 #[path = "object_rig_view.rs"]
 mod rig_view;
+// #2255: the candidate rig of a held pose drag and the world map of a rig layer with Motion (presentation only).
+#[path = "object_rig_preview.rs"]
+mod rig_preview;
+#[path = "object_rig_placement.rs"]
+mod rig_placement;
 use serde::{Deserialize, Serialize};
 pub use timing::LayerTimingReadResponse;
 const MAX_MESSAGE_BYTES: usize = 4096;
