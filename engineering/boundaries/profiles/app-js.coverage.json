@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "8616155e7b097830609e38271eb9bf9b727f4289",
+    "candidateCommit": "e6d88dfa76af1c2befbd0bbf41c8f932970549b4",
     "sourceRootTree": "da6c5335f63eb6b83fa96db312a136ef1f1b7d9b",
     "applicationTree": {
       "path": "src/js",
       "gitTree": "c1511218b9e6ff2dce295977f4e26e0108cf6e50",
-      "lastChangedCommit": "8616155e7b097830609e38271eb9bf9b727f4289"
+      "lastChangedCommit": "e6d88dfa76af1c2befbd0bbf41c8f932970549b4"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -43,7 +43,7 @@
         "gitBlob": "d447fe12fc2a158c0a430a97620b65a885fc74bb",
         "sha256": "809c232ee67a95eda6af03b1611e993aa4f7aa510d0c45878dbb1c9ee611734f",
         "moduleCount": 307,
-        "basedOnCommit": "8616155e7b097830609e38271eb9bf9b727f4289"
+        "basedOnCommit": "e6d88dfa76af1c2befbd0bbf41c8f932970549b4"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
