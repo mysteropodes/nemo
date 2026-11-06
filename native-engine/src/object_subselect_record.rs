@@ -18,17 +18,14 @@ pub(crate) fn at_frame(
     record: &ObjectRecord,
     frame: u32,
 ) -> Result<bool, Refusal> {
-    use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
     use crate::object_document::{FrameScopeKind, RangeEvaluator};
     let target = &record.target;
     // #2256: the record's own context (the scene root or the entered component) supplies the frame count, the layer and the ranges.
-    let context = ContextSource::of_document(document)
-        .context(&target.context_id)
-        .map_err(|_| Refusal::Invalid)?;
-    if frame >= context.total_frames() || target.frame_scope.kind != FrameScopeKind::Authored {
+    let (layers, total) = context_parts(document, &target.context_id).ok_or(Refusal::Invalid)?;
+    if frame >= total || target.frame_scope.kind != FrameScopeKind::Authored {
         return Err(Refusal::Invalid);
     }
-    let (_, layer) = context.layer(&target.layer_uid).ok_or(Refusal::Unsupported)?;
+    let layer = layers.iter().find(|l| l.layer_uid() == target.layer_uid).ok_or(Refusal::Unsupported)?;
     let ranges = RangeEvaluator::for_document(document, &target.context_id, frame)
         .map_err(|_| Refusal::Unsupported)?;
     if ranges
@@ -85,12 +82,18 @@ fn point(p: [f64; 2]) -> Result<ObjectPoint, Refusal> {
 // Keep API/MCP edits and both read paths inside the same admitted consumer scope. #2256: the record's layer is resolved in the record's
 // own context, so a record of an entered component is admitted exactly like a scene record.
 pub(crate) fn admit(document: &ObjectDocument, record: &ObjectRecord) -> Result<(), Refusal> {
-    use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
-    let context = ContextSource::of_document(document)
-        .context(&record.target.context_id)
-        .map_err(|_| Refusal::Unsupported)?;
-    let (_, layer) = context.layer(&record.target.layer_uid).ok_or(Refusal::Unsupported)?;
+    let layer = context_parts(document, &record.target.context_id)
+        .and_then(|(layers, _)| layers.iter().find(|l| l.layer_uid() == record.target.layer_uid))
+        .ok_or(Refusal::Unsupported)?;
     admit_layer(document, record, layer)
+}
+/// The layers and the frame count of one context: the scene root, or a component the document declares.
+fn context_parts<'a>(document: &'a ObjectDocument, context: &str) -> Option<(&'a [crate::object_document::ObjectLayer], u32)> {
+    if context == "scene-root" {
+        return Some((document.layers(), document.total_frames()));
+    }
+    let component = document.component_set()?.component(context)?;
+    Some((component.layers(), component.total_frames()))
 }
 /// The admission of a record whose layer the CALLER resolved in the record's own context (#2256: Select's hit-test listing of an entered
 /// component reads the component's layer, not a scene layer). `admit` resolves the layer in the record's own context.
