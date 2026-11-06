@@ -391,20 +391,42 @@ fn packet_is_refused(document: &serde_json::Value, instance: &str) -> bool {
 }
 
 #[test]
-fn a_keyed_matte_on_track_is_refused_at_packet_admission_and_by_the_join_guard() {
+fn a_keyed_matte_on_track_is_sampled_at_the_frame_and_an_expressed_one_is_refused() {
     use super::inputs::first_animated_composition_property as first;
+    use super::layer_inputs;
     let mut document = base_document();
     set_layer(
         &mut document,
         "L0",
         json!({"matteMode": "alpha", "matteSourceLayerUid": "L1"}),
     );
-    // Control: no track, and the packet joins.
+    let matte_at = |document: &serde_json::Value, instance: &str| {
+        let snap = snapshot(document, instance);
+        layer_inputs(&packet(&snap, FRAME)).map(|layers| {
+            layers
+                .iter()
+                .find(|layer| layer.layer_uid == "L0")
+                .and_then(|layer| layer.matte_mode.clone())
+        })
+    };
+    // Control: no track, the matte stays.
     assert!(!packet_is_refused(&document, "guard-matte-plain"));
+    assert_eq!(matte_at(&document, "guard-matte-plain"), Ok(Some("alpha".to_owned())));
+    // The track runs 100 at frame 0 to 0 at FRAME: below 50 the matte is switched off for that frame.
     key_layer_property(&mut document, "L0", "matteOn");
-    // Today no packet exists for such a document, so no join can substitute the neutral value either.
-    assert!(packet_is_refused(&document, "guard-matte"));
-    // The join's own guard names the animated property and ignores static ones and other properties.
+    assert!(!packet_is_refused(&document, "guard-matte"), "a matteOn track is admitted");
+    assert_eq!(matte_at(&document, "guard-matte"), Ok(None), "off at the last key");
+    // An enabled expression on matteOn is never replaced by the raw track.
+    let holder = &mut document["propertyHolders"][0]["properties"][0];
+    holder["expression"] = json!({"code": "100", "enabled": true});
+    let snap = snapshot(&document, "guard-matte-expr");
+    if let Ok(packet) = crate::object_frame_packet::prepare_object_frame(&snap, &selector(&snap, FRAME)) {
+        assert!(matches!(
+            layer_inputs(&packet),
+            Err(SceneEffectJoinError::LayerCompositionPropertyUnavailable { property: "matteOn", .. })
+        ));
+    }
+    // The join's own guard names an animated blend or an expressed matteOn and ignores the rest.
     assert_eq!(first([("position", true), ("matteOn", true)]), Some("matteOn"));
     assert_eq!(first([("blend", true)]), Some("blend"));
     assert_eq!(first([("matteOn", false), ("opacity", true)]), None);
@@ -428,11 +450,11 @@ fn a_blend_track_or_blend_keys_cannot_be_authored_so_no_neutral_blend_can_stand_
 }
 
 #[test]
-fn an_enabled_item_effect_is_a_typed_input_refusal_on_its_layer() {
+fn an_enabled_item_effect_is_an_input_of_its_layer_and_a_mask_or_disabled_stack_is_not() {
     use super::layer_inputs;
     let inputs = |document: &serde_json::Value, instance: &str| {
         let snap = snapshot(document, instance);
-        layer_inputs(&packet(&snap, FRAME)).map(|layers| layers.len())
+        layer_inputs(&packet(&snap, FRAME))
     };
     let mut document = base_document();
     let uid = document["objects"][0]["target"]["layerUid"]
@@ -445,19 +467,21 @@ fn an_enabled_item_effect_is_a_typed_input_refusal_on_its_layer() {
         .iter()
         .position(|layer| layer["layerUid"] == uid.as_str())
         .unwrap();
-    assert_eq!(inputs(&document, "guard-fx-plain"), Ok(3));
+    let plain = inputs(&document, "guard-fx-plain").unwrap();
+    assert_eq!(plain.len(), 3);
+    assert!(plain.iter().all(|l| !l.item_effect_enabled && l.item_effects.is_empty()));
     document["objects"][0]["effects"] = json!([{"type": "blur", "enabled": true, "p1": 4}]);
-    assert_eq!(
-        inputs(&document, "guard-fx"),
-        Err(SceneEffectJoinError::LayerCompositionPropertyUnavailable {
-            layer: source,
-            property: "itemEffects"
-        })
-    );
+    let layers = inputs(&document, "guard-fx").unwrap();
+    let layer = layers.iter().find(|l| l.source_layer_index == source).unwrap();
+    assert!(layer.item_effect_enabled);
+    assert_eq!(layer.item_effects.len(), 1, "one planned stack per effected object");
+    assert_eq!(layer.item_effects[0].0, 0, "keyed by source object index");
+    assert_eq!(layer.item_effects[0].1[0].params[0], Some(4.0));
+    assert_eq!(layers.iter().filter(|l| l.item_effect_enabled).count(), 1);
     // A disabled stack is not an input. Mask objects carry a blur stack that the mask-feather path owns; the
     // stored-mask joins in scene_effect_scene_join_stack.rs fail if the guard counted them.
     document["objects"][0]["effects"] = json!([{"type": "blur", "enabled": false, "p1": 4}]);
-    assert_eq!(inputs(&document, "guard-fx-off"), Ok(3));
+    assert!(inputs(&document, "guard-fx-off").unwrap().iter().all(|l| !l.item_effect_enabled));
 }
 
 /// #2371 (baseline `layerIsEffectivelyVisible` feeds the scene's `visible`): a layer that is not soloed is a hidden slot, so a

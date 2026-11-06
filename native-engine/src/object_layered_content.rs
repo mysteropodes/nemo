@@ -14,7 +14,9 @@ use crate::compositor::scene_effect_gpu_blend::{GpuLayerPaint, GpuLayerStack};
 use crate::compositor::scene_effect_gpu_fx::{items_bbox_px, FxItemBounds};
 use crate::compositor::{Compositor, CompositorError};
 use crate::object_render_scene::viewport_checker::shadow::is_shadow_guide;
-use crate::object_render_scene::{layered_entries, ObjectCompositionWitness, PaintEntry};
+use crate::object_render_scene::{
+    layered_entries, ObjectCompositionWitness, ObjectPaintPlan, PaintEntry,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use vello::kurbo::{Affine, BezPath, Rect, Shape};
 use vello::peniko::{Color, Fill};
@@ -82,19 +84,42 @@ impl<'w> LayerContext<'w> {
             .map_or([1., 0., 0., 1., 0., 0.], |(matrix, _)| matrix)
     }
 
+    /// The entries of one source layer the layered frame draws (hidden shadow guides left out), in authored order.
+    pub(in crate::compositor) fn layer_entries(&self, layer: usize) -> Vec<PaintEntry<'w>> {
+        let hide_shadow = self.witness.viewport_hides_shadow_guides();
+        self.entries
+            .get(&layer)
+            .into_iter()
+            .flatten()
+            .copied()
+            .filter(|entry| !(hide_shadow && is_shadow_guide(entry)))
+            .collect()
+    }
+
+    /// Baseline `items_bbox_px` of one entry (one baseline item) under the stored camera.
+    pub(in crate::compositor) fn entry_bbox(
+        &self,
+        entry: &PaintEntry<'_>,
+        canvas: (u32, u32),
+    ) -> (f32, f32, f32, f32) {
+        items_bbox_px(&entry_bounds(self.witness, entry), self.view(), canvas)
+    }
+
+    pub(in crate::compositor) fn plan(&self) -> &ObjectPaintPlan {
+        self.witness.plan()
+    }
+
     /// Baseline `items_bbox_px` of one source layer's items under the stored camera; the full target when none resolves.
     pub(in crate::compositor) fn layer_bbox(
         &self,
         layer: Option<usize>,
         canvas: (u32, u32),
     ) -> (f32, f32, f32, f32) {
-        let hide_shadow = self.witness.viewport_hides_shadow_guides();
         let items: Vec<FxItemBounds> = layer
-            .and_then(|layer| self.entries.get(&layer))
+            .map(|layer| self.layer_entries(layer))
             .into_iter()
             .flatten()
-            .filter(|entry| !(hide_shadow && is_shadow_guide(entry)))
-            .flat_map(|entry| entry_bounds(self.witness, entry))
+            .flat_map(|entry| entry_bounds(self.witness, &entry))
             .collect();
         items_bbox_px(&items, self.view(), canvas)
     }
@@ -166,13 +191,24 @@ impl Compositor {
         ctx: &LayerContext<'_>,
         layer: usize,
         view: &wgpu::TextureView,
+        size: (u32, u32),
+    ) -> Result<(), CompositorError> {
+        self.render_entries(ctx, &ctx.layer_entries(layer), view, size)
+    }
+
+    /// Draw `entries` (any subset of one layer, in order) with the SAME `emit_entry` the flat sequence uses, wrapped
+    /// once in the stored camera, into `view` over transparent.
+    pub(in crate::compositor) fn render_entries(
+        &mut self,
+        ctx: &LayerContext<'_>,
+        entries: &[PaintEntry<'_>],
+        view: &wgpu::TextureView,
         (width, height): (u32, u32),
     ) -> Result<(), CompositorError> {
         let witness = ctx.witness;
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         self.restore_object_images(witness);
         let outline = witness.viewport_outline();
-        let hide_shadow = witness.viewport_hides_shadow_guides();
         self.scene.reset();
         let mut artwork = vello::Scene::new();
         let scene = if ctx.camera.is_some() {
@@ -181,10 +217,7 @@ impl Compositor {
             &mut self.scene
         };
         let mut drawn = Ok(());
-        for entry in ctx.entries.get(&layer).into_iter().flatten().copied() {
-            if hide_shadow && is_shadow_guide(&entry) {
-                continue;
-            }
+        for entry in entries.iter().copied() {
             drawn = emit_entry(witness, entry, scene, outline);
             if drawn.is_err() {
                 break;
@@ -288,5 +321,24 @@ fn entry_bounds(witness: &ObjectCompositionWitness, entry: &PaintEntry<'_>) -> V
             .collect(),
         #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
         PaintEntry::Raster(_) => Vec::new(),
+    }
+}
+
+/// The source object whose record owns an entry's item-level effect stack: the baseline `item.effects` of that one
+/// item. Contours, text and (unplaced) images draw their own record; a brush ink, a duplicator copy, a placed
+/// component and a video slot are not the record's own item, so they never carry its stack.
+pub(in crate::compositor) fn item_object(
+    plan: &ObjectPaintPlan,
+    entry: &PaintEntry<'_>,
+) -> Option<usize> {
+    match entry {
+        PaintEntry::Contour(command) => Some(command.source().source_object_index()),
+        PaintEntry::Text(source) => (!source.placed).then_some(source.source_index),
+        PaintEntry::Raster(index) => plan
+            .raster_sources()
+            .get(*index)
+            .filter(|source| !source.placed)
+            .map(|source| source.source_index),
+        _ => None,
     }
 }

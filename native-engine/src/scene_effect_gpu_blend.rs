@@ -13,15 +13,17 @@
 //!
 //! The flat fast path is untouched: `GpuLayerStack::from_plan` refuses a flat
 //! plan, so a scene that needs none of these features is still painted by
-//! `Compositor::compose_object` pixel for pixel. Effect stacks, element
-//! effects and mask feather are typed `Unavailable` refusals (see the stack
-//! module), never silently dropped. A folder is rendered like the baseline's
+//! `Compositor::compose_object` pixel for pixel. Effect stacks, item-level
+//! stacks (`items`) and mask feather run on the layer's boxes; a missing stack is
+//! a typed `Unavailable` refusal (see the stack module), never silently dropped. A folder is rendered like the baseline's
 //! `paint_folder_children`: its children are flattened in isolation (first
 //! child seeds a transparent accumulator, each later child blends in with its
 //! own blend mode) and that result is the folder's own paint.
 
 #[path = "scene_effect_gpu_blend_fx.rs"]
 mod fx;
+#[path = "scene_effect_gpu_blend_items.rs"]
+pub(in crate::compositor) mod items;
 #[path = "scene_effect_gpu_blend_pipes.rs"]
 mod pipes;
 #[path = "scene_effect_gpu_blend_pool.rs"]
@@ -173,6 +175,7 @@ impl Compositor {
             ctx.map_or(canvas_box, |c| c.layer_bbox(stack.inputs()[wire].source_layer, size))
         };
         let document_box = ctx.map_or(canvas_box, |c| c.document_bbox(size));
+        Self::admit_item_effects(ctx, stack, size)?;
         for step in stack.steps().iter().filter(|step| step.effects) {
             let plan = stack.inputs()[step.layer].effects.expect("admitted by the stack");
             let bbox = match (step.effect_layer, step.folder.is_some()) {
@@ -198,7 +201,8 @@ impl Compositor {
         }
         if let Some(index) = stack.background() {
             pool.ensure(self, Role::Background, reserve)?;
-            self.render_wire_layer(ctx, stack, index, pool.view(Role::Background), size)?;
+            let wire = (index, Role::Background, false);
+            self.paint_wire((&kernels, &mut pool), (ctx, stack), wire, reserve)?;
         }
         let (mut current, mut spare) = (Role::AccumA, Role::AccumB);
         for step in stack.steps() {
@@ -222,7 +226,10 @@ impl Compositor {
                     let boxes = (&layer_box as &dyn Fn(usize) -> _, time);
                     self.render_folder(&kernels, &mut pool, (ctx, stack), boxes, children, reserve)?
                 }
-                None => self.render_wire_layer(ctx, stack, step.layer, pool.view(Role::Layer), size)?,
+                None => {
+                    let wire = (step.layer, Role::Layer, step.elements);
+                    self.paint_wire((&kernels, &mut pool), (ctx, stack), wire, reserve)?
+                }
             }
             let mut source = Role::Layer;
             if !input.masks.is_empty() {
@@ -233,7 +240,8 @@ impl Compositor {
             let mut into_b = false;
             for matte in &step.mattes {
                 pool.ensure(self, Role::Aux, reserve)?;
-                self.render_wire_layer(ctx, stack, matte.source, pool.view(Role::Aux), size)?;
+                let wire = (matte.source, Role::Aux, false);
+                self.paint_wire((&kernels, &mut pool), (ctx, stack), wire, reserve)?;
                 let destination = if into_b { Role::MatteB } else { Role::MatteA };
                 pool.ensure(self, destination, reserve)?;
                 kernels.matte(
@@ -289,6 +297,9 @@ impl Compositor {
             Role::FolderA,
             Role::FolderB,
             Role::Under,
+            Role::ElemA,
+            Role::ElemB,
+            Role::Run,
         ] {
             pool.release(role);
         }
@@ -372,7 +383,8 @@ impl Compositor {
         kernels.clear(pool.view(Role::FolderA), wgpu::Color::TRANSPARENT);
         let (mut current, mut spare) = (Role::FolderA, Role::FolderB);
         for child in children {
-            self.render_wire_layer(ctx, stack, child.layer, pool.view(Role::Aux), size)?;
+            let wire = (child.layer, Role::Aux, child.elements);
+            self.paint_wire((kernels, &mut *pool), (ctx, stack), wire, reserve)?;
             // A child's own effect stack runs on its isolated paint before it folds into the folder (baseline
             // `paint_folder_children`), with its own blend.
             let graded = match stack.inputs()[child.layer].effects.filter(|_| child.effects) {

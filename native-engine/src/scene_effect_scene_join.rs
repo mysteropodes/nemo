@@ -18,10 +18,11 @@
 //! * a scene entry that no producer claimed, or that a producer reported unavailable, stays on its layer as a typed
 //!   [`EntryOutcome::Unavailable`]; nothing is dropped and no producer may publish a partial scene on top of it.
 //!
-//! Inputs no record carries yet (animated blend, the matte-on track and item-level effects) are not guessed and
-//! not neutralised: the input adapter refuses a layer that has them with a typed
-//! `SceneEffectJoinError::LayerCompositionPropertyUnavailable` until the raw layer-property consumer fills the
-//! same `JoinLayerInput` field. Canvas-background layers are not document layers and carry no input. Folder children come from `parent_layer_uid`:
+//! The input adapter samples what is stored at the packet's frame: keyed effect parameters (`p1..p8` key tracks, the
+//! baseline `effectParamValueAt`), the `matteOn` track (`matteOnAt`, below 50 the matte is off) and the enabled item
+//! stacks of the layer's own objects (`JoinLayerInput::item_effects`, one planned stack each). What it cannot sample (an
+//! expressed `matteOn`, a `blend` track) is not guessed and not neutralised: the layer is refused with a typed
+//! `SceneEffectJoinError::LayerCompositionPropertyUnavailable`. Canvas-background layers are not document layers and carry no input. Folder children come from `parent_layer_uid`:
 //! every layer whose parent is the folder. The module owns no pixel, texture or scheduler state.
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     PinField, PinnedScene, SceneOutcome, ScenePin, UnavailableCause,
@@ -56,6 +57,8 @@ pub(crate) struct JoinLayerInput {
     pub(crate) mask_count: usize,
     pub(crate) mask_feather: f64,
     pub(crate) item_effect_enabled: bool,
+    /// The enabled-effect stacks of this layer's own objects, `(source object index, specs)`, in object order.
+    pub(crate) item_effects: Vec<(usize, Vec<EffectSpec>)>,
 }
 
 impl JoinLayerInput {
@@ -78,6 +81,7 @@ impl JoinLayerInput {
             mask_count: 0,
             mask_feather: 0.,
             item_effect_enabled: false,
+            item_effects: Vec::new(),
         }
     }
 }
@@ -148,6 +152,9 @@ pub(crate) struct PlannedLayer {
     pub(crate) entries: Vec<PlannedEntry>,
     pub(crate) mask_count: usize,
     pub(crate) mask_feather: f64,
+    /// One planned stack per object that carries an enabled item-level effect (`source object index`), for a
+    /// plain layer; the baseline `paint_layer_with_element_effects` runs each on its own isolated item.
+    pub(crate) item_stacks: Vec<(usize, EffectStackPlan)>,
 }
 
 /// Slot-level result of the pure join (no pin, no scene entries).
@@ -233,7 +240,7 @@ fn plain_composition(
         matte_source_index,
         mattes_more,
         layer_effect_enabled: any_enabled(effective),
-        item_effect_enabled: layer.item_effect_enabled,
+        item_effect_enabled: layer.item_effect_enabled || !layer.item_effects.is_empty(),
         mask_count: layer.mask_count,
         ..LayerComposition::default()
     }
@@ -287,6 +294,21 @@ pub(crate) fn plan_layers(inputs: &[JoinLayerInput], options: &JoinOptions<'_>) 
             effects,
             stack,
             entries: Vec::new(),
+            item_stacks: if role == SlotRole::Plain {
+                layer
+                    .item_effects
+                    .iter()
+                    .filter(|(_, specs)| any_enabled(specs))
+                    .map(|(object, specs)| {
+                        (
+                            *object,
+                            plan_effect_stack(specs, options.effect_zoom, options.is_registered),
+                        )
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            },
             mask_count: if role == SlotRole::Plain {
                 layer.mask_count
             } else {
@@ -320,8 +342,8 @@ pub(crate) enum SceneEffectJoinError {
     EffectParametersUnavailable {
         layer: usize,
     },
-    /// A keyed/expressed `matteOn` or `blend` track, or an enabled item-level effect, needs the raw layer-property
-    /// consumer; the neutral static value is never substituted.
+    /// An expressed `matteOn` or a `blend` track needs an expression/property consumer the join does not have; the
+    /// neutral static value is never substituted.
     LayerCompositionPropertyUnavailable {
         layer: usize,
         property: &'static str,

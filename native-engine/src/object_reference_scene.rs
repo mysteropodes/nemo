@@ -167,7 +167,7 @@ pub fn prepare_object_navigated_viewport_composition(
     crate::object_render_scene::brush_paint::attach(crate::object_render_scene::text_scene::attach(
         crate::object_render_scene::raster_scene::attach(witness, prior_images)?,
     )?)?
-    .with_joined_layers()
+    .with_joined_layers(zoom)
 }
 
 impl ObjectCompositionWitness {

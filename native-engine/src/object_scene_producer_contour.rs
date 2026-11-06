@@ -172,9 +172,6 @@ fn compile(
         let prepared = batches.get(source)?.map(|p| &p.geometry);
         return crate::object_render_scene::mask_inputs::compile_mask(packet, source, pose, prepared);
     }
-    if source.record().has_enabled_effects() {
-        return Err("per-element effect evaluation awaits its native scene consumer");
-    }
     batches.check(source.source_layer_index())?;
     if is_vector_record(source.record()) {
         return compile_vector(packet, source, pose, batches);

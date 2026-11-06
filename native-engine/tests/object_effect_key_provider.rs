@@ -218,7 +218,7 @@ fn real_history_restores_complete_effect_storage_bytes_and_redo_after_one_atomic
 }
 #[cfg(feature = "test-application")]
 #[test]
-fn actual_frame_packet_to_layer_plan_and_contour_producer_refuse_unimplemented_active_effect_consumers(
+fn actual_frame_packet_samples_keyed_effect_parameters_and_the_contour_producer_accepts_item_effects(
 ) {
     use crate::object_document::FrameScopeKind;
     use crate::object_frame_packet::{prepare_object_frame, ObjectFrameSelector};
@@ -239,11 +239,16 @@ fn actual_frame_packet_to_layer_plan_and_contour_producer_refuse_unimplemented_a
         scope_kind: FrameScopeKind::Authored,
         frame: 0,
     };
-    let packet = prepare_object_frame(&snap, &selector).unwrap();
-    assert!(matches!(
-        layer_inputs(&packet),
-        Err(SceneEffectJoinError::EffectParametersUnavailable { layer: 0 })
-    ));
+    // #2257: the keyed `p1` (hold 3 at frame 1, 7 at frame 4) is sampled at the packet's frame, never the static 12;
+    // interpolated frames are pinned in scene_effect_scene_join_items.rs.
+    let sampled = |frame: u32| {
+        let selector = ObjectFrameSelector { frame, scope_kind: FrameScopeKind::Authored, ..selector };
+        let packet = prepare_object_frame(&snap, &selector).unwrap();
+        let inputs = layer_inputs(&packet).expect("a keyed parameter is sampled at the frame");
+        inputs[0].effects[0].params
+    };
+    assert_eq!(sampled(0)[0], Some(3.0), "before the first key");
+    assert_eq!(sampled(0)[7], None, "an explicit null stays unset");
     let mut v = fixture();
     v["objects"][0]["effects"][0]["enabled"] = json!(true);
     let o = ObjectFillOwner::new("element-effect-render", admit(v)).unwrap();
@@ -258,7 +263,9 @@ fn actual_frame_packet_to_layer_plan_and_contour_producer_refuse_unimplemented_a
         frame: 0,
     };
     let packet = prepare_object_frame(&snap, &selector).unwrap();
-    assert!(prepare_object_render_scene(&packet, &selector).is_err());
+    // The record is drawn; its stack is applied by the layered compositor (scene_effect_scene_join_items.rs).
+    assert!(prepare_object_render_scene(&packet, &selector).is_ok());
+    assert!(layer_inputs(&packet).unwrap()[0].item_effect_enabled);
 }
 
 #[cfg(feature = "test-application")]

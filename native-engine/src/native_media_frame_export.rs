@@ -522,3 +522,7 @@ mod retained_witness_tests;
 #[cfg(test)]
 #[path = "../tests/native_media_frame_export_timing.rs"]
 mod timing_tests;
+// #2257: the decoded video slot on the layered compositor (real Metal).
+#[cfg(test)]
+#[path = "../tests/native_media_layered_pixels.rs"]
+mod layered_pixel_tests;
