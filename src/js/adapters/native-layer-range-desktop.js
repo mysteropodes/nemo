@@ -91,7 +91,7 @@
     value.tracks.map(function(track){return [trackIdentity(track),track.items.map(function(k){return k.frame;})];})]);}
   function keyAddress(track,frame){return {target:{kind:'property',target:track.target,property:track.property},frame:frame};}
   function selectedAddresses(value){var keys=[];value.tracks.forEach(function(track){track.items.forEach(function(key){if(key.selected)keys.push(keyAddress(track,key.frame));});});return keys;}
-  function clearKeys(w){(w.keyNodes||[]).forEach(function(n){if(n.parentNode)n.parentNode.removeChild(n);});w.keyNodes=[];w.keySig=null;if(w.box)w.box.remove();}
+  function clearKeys(w){(w.keyNodes||[]).concat(w.spanNodes||[]).forEach(function(n){if(n.parentNode)n.parentNode.removeChild(n);});w.keyNodes=[];w.spanNodes=[];w.keySig=null;if(w.box)w.box.remove();}
   function keyRows(root,w,layout){
     if(layout.length&&(!w.ports||typeof w.ports.setKeyTimelineRows!=='function'||w.ports.setKeyTimelineRows(layout,w.info)!==true))throw Error('Native property label rows unavailable');
     if(!layout.length&&w.ports&&typeof w.ports.setKeyTimelineRows==='function')w.ports.setKeyTimelineRows([],w.info);
@@ -107,7 +107,7 @@
   // The key buttons depend on the key frames, selection, lanes and zoom, not on which frame is shown: a playback tick whose projection prints the same
   // signature keeps its buttons (#2371) and only swaps the live value their handlers read.
   function keySignature(root,w,fc,layout,positions){
-    return JSON.stringify([fc,layout,positions.map(function(p){return [p.index,w.rows[p.index].hidden,trackIdentity(p.track),p.key.frame,p.key.selected,p.key.color||null,p.left,p.top];})]);
+    return JSON.stringify([fc,layout,positions.map(function(p){return [p.index,w.rows[p.index].hidden,trackIdentity(p.track),p.key.frame,p.key.selected,p.key.color||null,p.key.v||null,p.left,p.top];})]);
   }
   function refreshKeys(root){
     var w=works.get(root);if(!w)return;
@@ -131,6 +131,12 @@
       var signature=keySignature(root,w,fc,layout,positions);
       if(w.keySig===signature&&w.keyNodes.every(function(n){return !!n.parentNode;})){w.keyValue=value;return;}
       resetKeys(root,w);keyRows(root,w,layout);w.keyValue=value;
+      // #2377: the duration blocks and connector bars behind the keys, tinted like the keys (baseline motion.js trackRowHtml).
+      if(root.NemoNativeMotionKeySpans){
+        var byRow=new Map();positions.forEach(function(position){var list=byRow.get(position.index)||[];if(!list.some(function(e){return e.track===position.track;}))list.push({track:position.track,top:position.top});byRow.set(position.index,list);});
+        byRow.forEach(function(entries,index){if(w.rows[index].hidden)return;
+          w.spanNodes=w.spanNodes.concat(root.NemoNativeMotionKeySpans.draw(root.document,w.rows[index],entries,fc,function(event,track,a,b){pickSpan(root,w,event,track,a,b);}));});
+      }
       positions.forEach(function(position){
         var track=position.track,key=position.key,row=w.rows[position.index];if(row.hidden)return;
         var node=root.document.createElement('button');node.type='button';node.className='motion-key layer-inout-key native-motion-property-key';
@@ -159,6 +165,16 @@
       w.keySig=signature;
       boxUpdate(root,w);
     }catch(_){clearKeys(w);try{keyRows(root,w,[]);}catch(_){}notice(root,'Native key timeline coordinates are unavailable.');}
+  }
+  // A press on a connector selects its two end keys (baseline: "le trait est une cible").
+  function pickSpan(root,w,event,track,a,b){
+    event.preventDefault();event.stopPropagation();if(event.button!==undefined&&event.button!==0)return;
+    try{
+      var live=w.keyValue;
+      if(root.state.appMode!=='motion'||!live||live.frame!==root.state.currentFrame||!live.isCurrent())throw Error('Stale native key selection');
+      if(live.selectKeys([keyAddress(track,a.frame),keyAddress(track,b.frame)])!==true)throw Error('Native key selection refused');
+      refreshKeys(root);
+    }catch(_){notice(root,'Native key selection is unavailable or stale.');}
   }
   // #2524: dragging selected keys previews a shift and commits ONE native shift on release (baseline motion.js onDragMove/onDragUp).
   function dragKeys(root,w,fc,event,node){

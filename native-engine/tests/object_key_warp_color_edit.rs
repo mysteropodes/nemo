@@ -207,3 +207,56 @@ fn colour_refusals_and_hostile_documents_are_rejected() {
     ok["propertyHolders"][0]["properties"][0]["track"]["keys"][0]["color"] = json!("#4ea9ffcc");
     assert!(decode_storage_project(ok.to_string().as_bytes()).is_ok());
 }
+
+fn values(o: &NativeObjectHistory, record: usize) -> Vec<i64> {
+    keys(o, record).as_array().unwrap().iter().map(|k| k["v"][0].as_i64().unwrap()).collect()
+}
+fn pair(property: &str, a: i64, b: i64) -> Vec<Value> {
+    vec![sel("A", property, a), sel("A", property, b)]
+}
+
+#[test]
+fn space_and_liquify_may_pile_selected_keys_onto_one_frame_keeping_the_key_the_baseline_evaluation_answers_with() {
+    // Baseline `onDragMove` let dragged keys share a frame (only a key that stays blocks) and `rawValueAtFrame` answered with the FIRST key of a
+    // pile at or before the first key of the track, and with the LAST key of a pile anywhere else. A track holds one key per frame: keep that key.
+    // Interior pile: keys 10 (v 50, hold) and 20 (v 100) meet on frame 10; the later key answers.
+    let mut o = from(&fixture());
+    assert_eq!(run(&mut o, &edit(pair("opacity", 10, 20), warp("right", -10.0))), Ok(1));
+    assert_eq!((frames(&o, 0), values(&o, 0)), (vec![0, 10, 40], vec![0, 100, 60]));
+    assert_eq!(o.history_depths(), (1, 0), "one history entry for the whole gesture");
+    // Pile on the first frame of the track: keys 0 (v 0) and 10 meet on frame 0; the first key answers.
+    let mut o = from(&fixture());
+    assert_eq!(run(&mut o, &edit(pair("opacity", 0, 10), warp("right", -10.0))), Ok(1));
+    assert_eq!((frames(&o, 0), values(&o, 0)), (vec![0, 20, 40], vec![0, 100, 60]));
+    // Pile on the last frame: keys 20 and 40 meet on frame 40; the later key answers.
+    let mut o = from(&fixture());
+    assert_eq!(run(&mut o, &edit(pair("opacity", 20, 40), warp("left", 20.0))), Ok(1));
+    assert_eq!((frames(&o, 0), values(&o, 0)), (vec![0, 10, 40], vec![0, 50, 60]));
+    // Liquify: the grabbed key at 10 moves the whole drag onto the key at 20 that barely moves.
+    let mut o = from(&fixture());
+    let liquify = edit(pair("opacity", 10, 20), json!({"kind":"warp","mode":"liquify","total":10.0,"grab":10.0}));
+    assert_eq!(run(&mut o, &liquify), Ok(1));
+    assert_eq!((frames(&o, 0), values(&o, 0)), (vec![0, 20, 40], vec![0, 100, 60]));
+    // The collapsed track survives save/reload byte for byte, and undo/redo walk it exactly.
+    let saved = bytes(&o);
+    let reopened = from(&serde_json::from_slice::<Value>(&saved).unwrap());
+    assert_eq!(bytes(&reopened), saved);
+    let after = bytes(&o);
+    assert_eq!(o.undo(1), Ok(2));
+    assert_eq!(frames(&o, 0), vec![0, 10, 20, 40]);
+    assert_eq!(o.redo(2), Ok(3));
+    assert_eq!(bytes(&o), after);
+}
+
+#[test]
+fn a_pile_is_per_row_and_a_key_that_stays_still_blocks_the_whole_gesture() {
+    // Two rows pile independently: opacity keys 10 and 20 meet on 10, rotation keys 10 and 30 meet on 10.
+    let mut o = from(&fixture());
+    let rows = vec![sel("A", "opacity", 10), sel("A", "opacity", 20), sel("A", "rotation", 10), sel("A", "rotation", 30)];
+    assert_eq!(run(&mut o, &edit(rows, warp("right", -20.0))), Ok(1));
+    assert_eq!((frames(&o, 0), values(&o, 0)), (vec![0, 10, 40], vec![0, 100, 60]));
+    assert_eq!((frames(&o, 1), values(&o, 1)), (vec![0, 10], vec![0, 10]));
+    // Landing on a key that stays (frame 20, not selected) is still refused with nothing published.
+    let mut o = from(&fixture());
+    refused(&mut o, &edit(pair("opacity", 10, 40), warp("right", -20.0)), DispatchErrorCode::Unavailable);
+}

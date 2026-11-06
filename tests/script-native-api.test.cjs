@@ -249,7 +249,6 @@ test('Layer.color, comp.setWorkArea and comp.trimToWorkArea reach the native ent
   assert.equal(a.color,null);a.color='#FF0000';assert.equal(a.color,'#ff0000');a.color='#00ff00';a.color='#00ff00';
   assert.throws(()=>{a.color='red';},/#rrggbb/);
   n.comp.setWorkArea(2,9);
-  assert.throws(()=>n.comp.setWorkArea(5,5),/outside the composition/);
   assert.ok(['Layer.color','comp.setWorkArea','comp.trimToWorkArea'].every(r=>n.help().includes(r)));
   assert.deepEqual(await run.commit(),{ok:true,applied:2,pending:0});
   assert.deepEqual(o.calls,[['color','a','#00ff00'],['workArea',{inFrame:2,outFrame:9}]]);
@@ -265,4 +264,18 @@ test('trimToWorkArea with nothing to cut and a colour already worn are not write
   assert.deepEqual(await run.commit(),{ok:true,applied:0,pending:0});assert.deepEqual(o.calls,[]);
   const p=owner(L,{color:()=>Promise.resolve({ok:true,applied:true})}),r=p.run();r.nemo.layer('B').color='#abcdef';
   assert.equal((await r.commit()).error,'write-unconfirmed');
+});
+
+test('comp.setWorkArea then comp.trimToWorkArea in one run trims to the area just set, and any pair is taken as the baseline did',async()=>{
+  const o=owner(L),run=o.run(),n=run.nemo;
+  assert.equal(o.h.info.waIn,undefined);assert.equal(o.h.info.waOut,undefined);
+  n.comp.setWorkArea(10,20);n.comp.trimToWorkArea();
+  assert.equal(JSON.stringify(o.calls),'[]');
+  assert.deepEqual(await run.commit(),{ok:true,applied:2,pending:0});
+  assert.deepEqual(o.calls,[['workArea',{inFrame:10,outFrame:20}],['trim']]);
+  // Baseline took any pair (the owner stores it as given): no throw for a short, reversed or out-of-range area.
+  const odd=o.run(),m=odd.nemo;
+  assert.doesNotThrow(()=>{m.comp.setWorkArea(7,3);m.comp.setWorkArea(-4,999);m.comp.setWorkArea(5,5);});
+  assert.deepEqual(await odd.commit(),{ok:true,applied:3,pending:0});
+  assert.deepEqual(o.calls.slice(2),[['workArea',{inFrame:7,outFrame:3}],['workArea',{inFrame:-4,outFrame:999}],['workArea',{inFrame:5,outFrame:5}]]);
 });

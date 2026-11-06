@@ -208,20 +208,20 @@ test('selected-key projection exports actual qualified fractional identities and
 
 test('the key timeline projection carries each key tint and standing lock for the grid and its menu',async()=>{
  const h=fixture({keys:[{frame:0,v:[1],color:'#e8b64c'},{frame:4,v:[2],lockTo:'out'},{frame:9,v:[3]}]});assert.equal(await h.open(),true);
- assert.deepEqual(copy(h.editor.readKeyTimeline().items),[{frame:0,selected:false,color:'#e8b64c'},{frame:4,selected:false,lockTo:'out'},{frame:9,selected:false}]);
+ assert.deepEqual(copy(h.editor.readKeyTimeline().items),[{frame:0,selected:false,color:'#e8b64c',v:[1]},{frame:4,selected:false,lockTo:'out',v:[2]},{frame:9,selected:false,v:[3]}]);
 });
 
 test('key timeline is a frozen single-property native read projection with nonserialized pure UI selectors',async()=>{
  const h=fixture();assert.equal(h.editor.readKeyTimeline(),null);await h.open();
  const projection=h.editor.readKeyTimeline(),literal=copy(projection);
  assert.deepEqual(Object.keys(literal).sort(),['frame','items','pin','property','target','viewGeneration']);
- assert.deepEqual(literal,{pin:h.context().pin,frame:10,viewGeneration:2,target,property:'opacity',items:[{frame:-0.5,selected:false},{frame:4.25,selected:false},{frame:10,selected:false,hold:true}]});
+ assert.deepEqual(literal,{pin:h.context().pin,frame:10,viewGeneration:2,target,property:'opacity',items:[{frame:-0.5,selected:false,v:[25]},{frame:4.25,selected:false,v:[50]},{frame:10,selected:false,hold:true,v:[75]}]});
  assert.equal(Object.isFrozen(projection),true);assert.equal(Object.isFrozen(projection.items),true);assert.equal(Object.isFrozen(projection.items[0]),true);
  assert.equal(projection.isCurrent(),true);assert.equal(Object.getOwnPropertyDescriptor(projection,'selectFrames').enumerable,false);
  const reads=h.reads.length;assert.equal(projection.selectFrames([4.25,-0.5]),true);assert.equal(projection.isCurrent(),false);
  assert.deepEqual(h.checks().map(n=>n.checked),[true,true,false]);assert.match(h.status(),/^2 native key/);
  assert.deepEqual(copy(h.editor.captureSelectedKeys()).keys.map(k=>k.frame),[-0.5,4.25]);
- const next=h.editor.readKeyTimeline();assert.equal(next.isCurrent(),true);assert.deepEqual(copy(next.items),[{frame:-0.5,selected:true},{frame:4.25,selected:true},{frame:10,selected:false,hold:true}]);
+ const next=h.editor.readKeyTimeline();assert.equal(next.isCurrent(),true);assert.deepEqual(copy(next.items),[{frame:-0.5,selected:true,v:[25]},{frame:4.25,selected:true,v:[50]},{frame:10,selected:false,hold:true,v:[75]}]);
  assert.equal(next.selectFrames([4.25,-0.5]),true);assert.equal(next.isCurrent(),true,'same selected set does not invalidate an unchanged projection');
  assert.equal(h.reads.length,reads);assert.equal(h.writes.length,0);
 });
@@ -328,7 +328,7 @@ test('binding editKeys sends one batch over every selected key and restores the 
  assert.deepEqual(o.h.writes[0].payload,{command:'object.property.track.edit',selections:[{target:o.layerTarget,property:'opacity',frame:0},{target:o.layerTarget,property:'opacity',frame:10}],action:{kind:'shift',delta:2}});
  assert.equal(o.checks().length,3,'the drawer is back after the refresh');
  assert.deepEqual(o.checks().map(n=>n.checked),[true,false,true],'the selection follows the keys: 2, 4, 12');
- assert.deepEqual(copy(o.binding.readKeyTimelines().tracks[0].items),[{frame:2,selected:true},{frame:4,selected:false},{frame:12,selected:true}]);
+ assert.deepEqual(copy(o.binding.readKeyTimelines().tracks[0].items),[{frame:2,selected:true,v:[1]},{frame:4,selected:false,v:[2]},{frame:12,selected:true,v:[3]}]);
  o.binding.dispose();
 });
 test('binding editKeys with no selected key writes nothing and reports it; flip needs two keys',async()=>{
