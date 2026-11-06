@@ -396,6 +396,9 @@ pub(crate) fn revision_matches(expected: Option<u64>, revision: u64, value: &Val
 #[cfg(test)]
 #[path = "native_frame_edit_contract_tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "native_frame_edit_context_tests.rs"]
+mod context_tests;
 
 #[path = "native_layer_shift_contract.rs"]
 mod layer_shift;
