@@ -320,6 +320,11 @@
       "functions": 100,
       "note": "#2106 (L06-M, L02-J): pinned cargo-llvm-cov 0.9.1 measured clean source c302f80bc836535fddaa8df87070ba6fe4aa1488, MCP tree 78994c66b94278d675320248abf36d3d11e03efc; 20 binaries, 195 tests passed, none failed. Artifact: reports/b7-coverage-rust/coverage.json SHA256 e40e555285c392e00754e41dc623b04db0f0c9549df7d63f4661b98c6600a871. Floors derived by the existing baseline builder (floorPct of the measurement). Measured 224/229 lines, 371/376 regions and 32/32 functions. Every prior file/aggregate floor, exclusion, tool and recorded provenance remains unchanged; this additive registration is not whole-crate coverage acceptance."
     },
+    "nemo-mcp/src/native_item_contract_component_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#2267: cfg(test) child of native_item_contract_tests.rs holding the component-context text and animator shape cases; like its sibling test children it holds no executable region of its own, listed explicitly rather than excluded. Every other floor, exclusion, tool and recorded provenance is unchanged."
+    },
     "nemo-mcp/src/native_item_contract_tests.rs": {
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
