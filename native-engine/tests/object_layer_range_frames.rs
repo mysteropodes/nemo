@@ -238,8 +238,16 @@ fn visibility_and_unconsumed_motion_keep_their_original_publication_guards() {
             .all(|command| command.paint()[3].as_f64() == Some(1.)));
     }
     assert_eq!(encode_storage_project(rotation.document()).unwrap(), bytes);
-    // A dormant3D-only field has no2D consumer even when its drawing is outside the range.
+    // #2520/#2525: a stored 3D key on a layer whose 3D switch is off is dormant (the baseline keeps it), so it neither
+    // refuses the frame nor changes the picture.
     value["propertyHolders"][0]["properties"][0] = json!({"property":"positionZ","static":[30]});
+    let dormant = snapshot(&value);
+    assert_eq!(
+        prepare_object_exposure_frame(&dormant, &selector(&dormant, 3)).unwrap().records().len(),
+        2
+    );
+    // A field with no consumer at all stays unavailable even when its drawing is outside the range.
+    value["propertyHolders"][0]["properties"][0] = json!({"property":"dupOffsetPosZ","static":[30]});
     let unsupported = snapshot(&value);
     let bytes = encode_storage_project(unsupported.document()).unwrap();
     assert_eq!(

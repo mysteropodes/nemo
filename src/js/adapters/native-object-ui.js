@@ -288,7 +288,7 @@
           if(row.parentNode!==list||!views.get(root)||!views.get(root).rows.includes(row))return false;
           return setLayerPolicy(root,layer.layerUid,flag,value,info,ports);
         },
-        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);},rowEdit:root.NemoNativeLayerRowUi?function(layer,i,row){return root.NemoNativeLayerRowUi.bind(root,layer,i,row);}:null,parentCell:root.NemoNativeLayerParent?function(layer,i,row){return root.NemoNativeLayerParent.cell(root,info,layer,i,row);}:null,duplicatorCell:root.NemoNativeObjectDuplicatorUi?function(layer,i,row){return root.NemoNativeObjectDuplicatorUi.cell(root,info,layer,i,row);}:null,soloCell:root.NemoNativeLayerSolo?function(layer,i,row){return root.NemoNativeLayerSolo.cell(root,info,layer,i,row);}:null,layerKind:root.SMLayerKind,blendLabels:root.BLEND_MODE_LABELS,matteLabel:typeof root.matteModeLabel==='function'?root.matteModeLabel:null});
+        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);},rowEdit:root.NemoNativeLayerRowUi?function(layer,i,row){return root.NemoNativeLayerRowUi.bind(root,layer,i,row);}:null,parentCell:root.NemoNativeLayerParent?function(layer,i,row){return root.NemoNativeLayerParent.cell(root,info,layer,i,row);}:null,threeDCell:root.NemoNativeLayerThreeD?function(layer,toggle){return root.NemoNativeLayerThreeD.cell(root.document,layer,toggle);}:null,duplicatorCell:root.NemoNativeObjectDuplicatorUi?function(layer,i,row){return root.NemoNativeObjectDuplicatorUi.cell(root,info,layer,i,row);}:null,soloCell:root.NemoNativeLayerSolo?function(layer,i,row){return root.NemoNativeLayerSolo.cell(root,info,layer,i,row);}:null,layerKind:root.SMLayerKind,blendLabels:root.BLEND_MODE_LABELS,matteLabel:typeof root.matteModeLabel==='function'?root.matteModeLabel:null});
       caption=createNativeObjectUiText(root,'div','');
       unavailable=createNativeObjectUiText(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
       unavailable.setAttribute('role','status');unavailable.className='native-object-timing-unavailable';
@@ -396,7 +396,7 @@
   function setLayerPolicy(root,uid,flag,value,expected,ports){
     function refused(){if(root.showToast)root.showToast('Native layer policy was not confirmed.');return false;}
     try{
-      if(!nativeObjectUiPortsReady(ports)||!['locked','shy'].includes(flag)||typeof value!=='boolean'||typeof ports.readTransportGeneration!=='function'||!Number.isSafeInteger(ports.readTransportGeneration())||ports.readTransportGeneration()<0||policyTasks.has(root))return Promise.resolve(false);
+      if(!nativeObjectUiPortsReady(ports)||!['locked','shy','threeD'].includes(flag)||typeof value!=='boolean'||typeof ports.readTransportGeneration!=='function'||!Number.isSafeInteger(ports.readTransportGeneration())||ports.readTransportGeneration()<0||policyTasks.has(root))return Promise.resolve(false);
       var owner=policyPort(ports),session=ports.currentSession(),info=session&&session.info(),view=views.get(root),epoch=policyEpochs.get(root)||0;
       var layer=info&&info.layers.filter(function(l){return l.layerUid===uid;});
       if(!view||!sameTimingPin(view.pin,info)||!owner||!session||!session.isActive()||!sameTimingPin(expected,info)||!confirmed(root,info,session.readPresentedObjectSession())||!layer||layer.length!==1||ports.projectionReady(info)!==true)return Promise.resolve(false);
@@ -412,7 +412,7 @@
       }).then(function(result){
         if(result!==true||policyTasks.get(root)!==ticket||(policyEpochs.get(root)||0)!==epoch||policySelection(root)!==signature||ports.currentSession()!==session||!session.isActive()||!views.get(root)||views.get(root).ports!==ports||views.get(root).list!==view.list||policyPort(ports)!==owner||ports.readTransportGeneration&&ports.readTransportGeneration()!==transport)return refused();
         var next=session.info(),target=next&&next.layers.filter(function(l){return l.layerUid===uid;});
-        if(!next||!['instanceId','documentId','lifecycleGeneration'].every(function(k){return next[k]===pin[k];})||next.contentRevision<=pin.contentRevision||next.documentSnapshotId===pin.documentSnapshotId||!target||target.length!==1||target[0][flag]!==value||ports.projectionReady(next)!==true||!confirmed(root,next,session.readPresentedObjectSession()))return refused();
+        if(!next||!['instanceId','documentId','lifecycleGeneration'].every(function(k){return next[k]===pin[k];})||next.contentRevision<=pin.contentRevision||next.documentSnapshotId===pin.documentSnapshotId||!target||target.length!==1||(target[0][flag]===true)!==value||ports.projectionReady(next)!==true||!confirmed(root,next,session.readPresentedObjectSession()))return refused();
         // Only UI-owned selection/presentation ports run after native confirmation.
         if(flag==='locked'&&value&&root.state.appMode==='drawing'&&typeof ports.clearDrawingSelection==='function')ports.clearDrawingSelection(uid,next);
         if(flag==='shy'&&value&&typeof ports.setShyMode==='function')ports.setShyMode(true,next);

@@ -77,16 +77,16 @@ function scenario(openFault){
     if(command==='nemo_native_dispatch'&&r.operation==='query.document.object.layer.timing')return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:revision,ok:false,error:{code:'unavailable',message:'Timing is outside this policy fixture'}};
     assert.equal(command,'nemo_native_dispatch');routes.push(command);assert.equal(r.expectedRevision,revision);
     assert.equal(r.documentId,info().documentId);commands.push(r);
-    assert.equal(r.operation,'command.document.object.layer.policy.edit');assert.equal(r.payload.command,'object.layer.policy.edit');assert.ok(['locked','shy','keyLock'].includes(r.payload.flag));
+    assert.equal(r.operation,'command.document.object.layer.policy.edit');assert.equal(r.payload.command,'object.layer.policy.edit');assert.ok(['locked','shy','threeD','keyLock'].includes(r.payload.flag));
     const keyLock=r.payload.flag==='keyLock',applied=keyLock?(policy.keyLock===undefined?null:policy.keyLock)!==r.payload.value:(policy[r.payload.flag]===true)!==r.payload.value;
-    if(applied){if(keyLock&&r.payload.value===null)delete policy.keyLock;else policy[r.payload.flag]=r.payload.value;revision++;}
+    if(applied){if(keyLock&&r.payload.value===null)delete policy.keyLock;else if(r.payload.flag==='threeD'&&r.payload.value===false)delete policy.threeD;else policy[r.payload.flag]=r.payload.value;revision++;}
     const response={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,
       contentRevision:revision,ok:true,result:{applied,historyEntriesAdded:applied?1:0}};
     if(replyGate){const gate=replyGate;replyGate=null;await gate.promise;}
     if(failure==='malformed-reply')response.result.historyEntriesAdded=2;
     return response;
   }
-  const root={state:{},selectedPaths:[],userLayers:[],NemoNativeObjectProjectFile:Files,
+  const root={state:{},selectedPaths:[],userLayers:[],NemoNativeObjectProjectFile:Files,NemoNativeLayerThreeD:require('../src/js/adapters/native-layer-three-d.js'),
     NemoNativeApplicationAdapter:{createNativeApplicationAdapter(...args){const client=Application.createNativeApplicationAdapter(...args);return {...client,editLayerPolicy(request){sdkCalls++;return client.editLayerPolicy(request);}};}},NemoApplicationMcpTransport:{createNativeTauriTransport:invoke=>{
       transportGeneration++;const transport=Transport.createNativeTauriTransport(invoke);
       return {...transport,subscribeRevisions:(listen,synchronize,disconnected)=>{
@@ -294,4 +294,38 @@ test('D37 the actual SDK and session write, read back and clear a layer key lock
  const same=await h.session.editLayerPolicy(payload('keyLock','in'),h.session.info());assert.equal(same.result.applied,false);assert.equal(h.session.info().layers[0].keyLock,'in');
  const clear=await h.session.editLayerPolicy(payload('keyLock',null),h.session.info());assert.equal(clear.result.applied,true);
  assert.equal(Object.hasOwn(h.session.info().layers[0],'keyLock'),false);
+});
+
+// #2520/#2525: the baseline 3D Layer switch is the third layer-policy flag; the row cell reaches the real SDK/session path and the row reports it.
+const threeDCell=h=>h.row().children.find(c=>c.dataset&&c.dataset.nativeLayerThreeD!==undefined);
+test('the 3D Layer cell shows the native threeD fact and one click is ONE policy edit through the real SDK/session',async()=>{
+  const h=await open();let cell=threeDCell(h);
+  assert.ok(cell,'every row carries the baseline 3D Layer column cell');
+  assert.deepEqual([cell.className,cell.title,cell.dataset.nativeLayerThreeD],['lico motion-col-3d off','3D Layer','false']);
+  await cell.fire('click');
+  assert.equal(h.sdkCalls,1);assert.equal(h.commands.length,1);
+  assert.deepEqual(h.commands[0].payload,{command:'object.layer.policy.edit',layerUid:'legacy layer:alpha',flag:'threeD',value:true});
+  assert.equal(h.session.info().layers[0].threeD,true);assert.equal(h.session.info().contentRevision,1);
+  cell=threeDCell(h);
+  assert.deepEqual([cell.className,cell.dataset.nativeLayerThreeD],['lico motion-col-3d','true'],'the cell is lit from the native row fact');
+  await cell.fire('click');
+  assert.equal(h.commands[1].payload.value,false);
+  assert.equal(Object.hasOwn(h.session.info().layers[0],'threeD'),false,'switching off leaves no authored false in the row');
+  assert.equal(threeDCell(h).className,'lico motion-col-3d off');
+  assert.equal(h.session.info().layers[1].threeD,undefined,'the neighbour layer is untouched');
+});
+test('an external 3D revision lights the cell without any command of this window',async()=>{
+  const h=await open();await h.external('threeD',true);h.render();
+  assert.equal(h.session.info().layers[0].threeD,true);assert.equal(threeDCell(h).dataset.nativeLayerThreeD,'true');assert.equal(h.commands.length,0);
+});
+test('the metadata contract takes a true threeD row and refuses every other value',async()=>{
+  const h=await open(),Metadata=require('../src/js/adapters/native-object-project-metadata.js'),request={requestId:'policy-read',instanceId:'instance',documentId:h.current().documentId};
+  const read=Metadata.decode({...h.current(),requestId:request.requestId,layers:[{layerUid:'a',threeD:true},{layerUid:'b'}]},request);
+  assert.deepEqual(read.layers,[{layerUid:'a',threeD:true},{layerUid:'b'}]);
+  for(const value of [false,null,0,'true',[],{}])assert.throws(()=>Metadata.decode({...h.current(),requestId:request.requestId,layers:[{layerUid:'a',threeD:value}]},request),/uncorrelated/);
+});
+test('native policy intent accepts threeD as a boolean only',async()=>{
+  const h=await open();
+  for(const value of [1,null,'in'])await assert.rejects(h.session.editLayerPolicy(payload('threeD',value),h.session.info()),/stale or invalid/);
+  assert.equal(h.sdkCalls,0);assert.equal(h.commands.length,0);
 });

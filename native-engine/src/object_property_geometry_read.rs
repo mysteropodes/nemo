@@ -14,7 +14,8 @@ use serde_json::{json, Value};
 
 impl ObjectSnapshot {
     /// The `layerBounds` result for a layer holder at `frame`; a stroke holder, a fractional or negative frame and a layer
-    /// that shows no geometry the box can follow (text, effect, rig, 3D, expression-driven document) are typed refusals.
+    /// that shows no geometry the box can follow (text, effect, rig, expression-driven document) are typed refusals. A 3D layer is answered:
+    /// its gizmo pivots about the same bounds.
     pub(crate) fn layer_bounds_read(
         &self,
         target: &PropertyHolderTarget,

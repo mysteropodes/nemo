@@ -83,7 +83,7 @@
    * key, so it is offered only where it does not hide the current frame's dot (the baseline drew it only when it had length). */
   function hit(l, p, o) {
     const px = o.client, tolBox = 9, ringTol = 7;
-    if (!l.isNull) {
+    if (!l.isNull && !o.noBox) { // a 3D layer has no box: its gizmo takes the ring and the handles' place
       const ring = px(l.pivot), rr = (l.ringRadius * o.pxPerUnit);
       if (Math.abs(Math.hypot(p.x - ring.x, p.y - ring.y) - rr) < ringTol) return { type: 'rotate' };
       let best = null, bestD = tolBox;
@@ -95,7 +95,7 @@
     if (grab) return { type: 'handle', key: grab.key, which: grab.which };
     if (dot) return { type: 'key', key: dot.key };
     if (o.alt && near(px(l.pivot), p, 9)) return { type: 'anchor' };
-    if (o.body) {
+    if (o.body && !o.noBox) {
       const q = ['nw', 'ne', 'se', 'sw'].map((k) => px(l.corners[k])); // point in the (possibly rotated) box: same side of every edge
       const side = q.map((a, i) => { const b = q[(i + 1) % 4]; return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x); });
       if (side.every((v) => v >= 0) || side.every((v) => v <= 0)) return { type: 'move' };

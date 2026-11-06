@@ -4348,11 +4348,12 @@
           "enum": [
             "locked",
             "shy",
+            "threeD",
             "keyLock"
           ]
         },
         "value": {
-          "description": "Boolean for locked and shy; null or in/out/layer for keyLock (null clears the layer key-lock mode).",
+          "description": "Boolean for locked, shy and threeD; null or in/out/layer for keyLock (null clears the layer key-lock mode).",
           "oneOf": [
             {
               "type": "boolean"
@@ -4376,7 +4377,8 @@
             "flag": {
               "enum": [
                 "locked",
-                "shy"
+                "shy",
+                "threeD"
               ]
             },
             "value": {
