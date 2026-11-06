@@ -185,7 +185,8 @@ fn a_record_with_vertex_offsets_lists_its_painted_bounds_and_the_offsets() {
     assert_ne!(before, after, "the bounds follow the moved vertex");
     // A sibling without vertex Motion is listed exactly as before.
     assert!(items.iter().filter(|i| i["role"] == "mask").all(|m| m.get("vertexOffsets").is_none()));
-=======
+}
+
 #[test]
 fn the_listing_reads_back_the_stored_select_pivot_of_a_vector_record() {
     let mut doc = masked_content();
@@ -203,5 +204,4 @@ fn the_listing_reads_back_the_stored_select_pivot_of_a_vector_record() {
     let plain = listing(&masked_content()).unwrap();
     let item = plain.iter().find(|i| i["stableTarget"]["strokeId"] == "a").unwrap();
     assert!(item.get("xformAnchorKey").is_none() && item.get("xformAnchorCustom").is_none(), "{item}");
->>>>>>> origin/codex/native-remediation
 }
