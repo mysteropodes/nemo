@@ -168,7 +168,9 @@ fn compile(
 ) -> Result<CompiledContour, &'static str> {
     if source.record().is_mask() {
         batches.check(source.source_layer_index())?;
-        return crate::object_render_scene::mask_inputs::compile_mask(packet, source, pose);
+        // A 3D layer's mask arrives projected by the common batch; any other mask is moved by its layer Position alone.
+        let prepared = batches.get(source)?.map(|p| &p.geometry);
+        return crate::object_render_scene::mask_inputs::compile_mask(packet, source, pose, prepared);
     }
     if source.record().has_enabled_effects() {
         return Err("per-element effect evaluation awaits its native scene consumer");

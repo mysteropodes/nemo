@@ -14,6 +14,9 @@ use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use std::collections::BTreeMap;
 use vello::kurbo::BezPath;
 
+#[path = "object_duplicator_scene_three_d.rs"]
+mod three_d;
+
 #[derive(Debug, Clone)]
 pub(crate) struct DuplicatorPaint {
     pub(crate) layer_index: usize,
@@ -37,9 +40,74 @@ pub(crate) struct DuplicatorScene {
     layers: BTreeMap<usize, Vec<usize>>,
 }
 
+/// One clone's authored geometry in document space: a vector record through the geometry evaluator, any other record as stored.
+fn copy_segments(
+    packet: &ObjectFramePacket,
+    record: &crate::object_frame_packet::ObjectRecord,
+    layer_index: usize,
+) -> Result<(Vec<CubicSegment>, bool), &'static str> {
+    if is_vector_record(record) {
+        let (segments, closed) = duplicator_geometry(packet, record, layer_index).map_err(|e| e.message())?;
+        return Ok((
+            segments
+                .into_iter()
+                .map(|s| CubicSegment { point: s.point, handle_in: s.handle_in, handle_out: s.handle_out })
+                .collect(),
+            closed,
+        ));
+    }
+    let number = |v: &serde_json::Number| v.as_f64().filter(|v| v.is_finite()).ok_or("nonfinite duplicator point");
+    let segments = record
+        .geometry
+        .segments
+        .iter()
+        .map(|s| {
+            Ok(CubicSegment {
+                point: [number(&s.point.x)?, number(&s.point.y)?],
+                handle_in: [number(&s.handle_in.x)?, number(&s.handle_in.y)?],
+                handle_out: [number(&s.handle_out.x)?, number(&s.handle_out.y)?],
+            })
+        })
+        .collect::<Result<Vec<_>, &'static str>>()?;
+    Ok((segments, record.geometry.closed))
+}
+
 pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, ObjectSceneError> {
     let mut result = DuplicatorScene::default();
     for layer in packet.duplicator_outputs() {
+        // #2520: a 3D host projects every clone around the union bounds of ALL its clones, each with its own `dup3D` delta.
+        let (flat, projectors) = if packet.source_layers()[layer.layer_index].three_d.value() == Some(&true) {
+            let host = packet.source_layers()[layer.layer_index].layer_uid().to_owned();
+            let at = |copy_index: usize, reason| ObjectSceneError::UnsupportedGeometry {
+                source_object_index: layer.source_indices[copy_index],
+                reason,
+            };
+            let mut flat = Vec::with_capacity(layer.output.copies.len());
+            for (copy_index, copy) in layer.output.copies.iter().enumerate() {
+                let mut record = copy.record.clone();
+                record.target.layer_uid = host.clone();
+                flat.push(copy_segments(packet, &record, layer.layer_index).map_err(|r| at(copy_index, r))?);
+            }
+            let deltas: Vec<_> = layer
+                .output
+                .copies
+                .iter()
+                .map(|copy| {
+                    copy.dup_3d.map(|d| crate::evaluation::property_projection_3d::ExtraDelta {
+                        dz: Some(d.dz),
+                        drx: Some(d.drx),
+                        dry: Some(d.dry),
+                        ..Default::default()
+                    })
+                })
+                .collect();
+            let (segments, closed): (Vec<_>, Vec<_>) = flat.iter().cloned().unzip();
+            let projectors = three_d::projectors(packet, layer.layer_index, &segments, &closed, &deltas)
+                .map_err(|r| at(0, r))?;
+            (flat, projectors)
+        } else {
+            (Vec::new(), None)
+        };
         let mut indices = Vec::with_capacity(layer.output.copies.len());
         for (copy_index, copy) in layer.output.copies.iter().enumerate() {
             let invalid = |reason| ObjectSceneError::UnsupportedGeometry {
@@ -59,9 +127,6 @@ pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, Obj
                     "per-element effect evaluation awaits its native scene consumer",
                 ));
             }
-            if copy.dup_3d.is_some() {
-                return Err(invalid("duplicator 3D awaits its native projection join"));
-            }
             let placement = layer
                 .output
                 .placements
@@ -78,10 +143,15 @@ pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, Obj
                 crate::evaluation::object_scene_style_kernels::object_scene_style_item::SceneItemStyle::solid_fill(
                     crate::object_render_scene::mask_inputs::white_solid().map_err(invalid)?)
             } else {
-                let opacity = packet
-                    .layer_opacity(layer.layer_index)
-                    .map_err(|_| invalid("duplicator host opacity is unavailable"))?
-                    * placement.placement.opacity_factor;
+                // A 3D host ignores its 2D Motion opacity (baseline `is3D`).
+                let host_opacity = if projectors.is_some() {
+                    1.0
+                } else {
+                    packet
+                        .layer_opacity(layer.layer_index)
+                        .map_err(|_| invalid("duplicator host opacity is unavailable"))?
+                };
+                let opacity = host_opacity * placement.placement.opacity_factor;
                 crate::object_frame_packet::duplicators::paint_style(
                     packet,
                     &record,
@@ -90,39 +160,13 @@ pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, Obj
                 )
                 .map_err(invalid)?
             };
-            let (segments, closed) = if is_vector_record(&record) {
-                let (segments, closed) = duplicator_geometry(packet, &record, layer.layer_index)
-                    .map_err(|e| invalid(e.message()))?;
-                (
-                    segments
-                        .into_iter()
-                        .map(|s| CubicSegment {
-                            point: s.point,
-                            handle_in: s.handle_in,
-                            handle_out: s.handle_out,
-                        })
-                        .collect(),
-                    closed,
-                )
-            } else {
-                let number = |v: &serde_json::Number| {
-                    v.as_f64()
-                        .filter(|v| v.is_finite())
-                        .ok_or_else(|| invalid("nonfinite duplicator point"))
-                };
-                let segments = record
-                    .geometry
-                    .segments
-                    .iter()
-                    .map(|s| {
-                        Ok(CubicSegment {
-                            point: [number(&s.point.x)?, number(&s.point.y)?],
-                            handle_in: [number(&s.handle_in.x)?, number(&s.handle_in.y)?],
-                            handle_out: [number(&s.handle_out.x)?, number(&s.handle_out.y)?],
-                        })
-                    })
-                    .collect::<Result<Vec<_>, ObjectSceneError>>()?;
-                (segments, record.geometry.closed)
+            let (segments, closed) = match flat.get(copy_index) {
+                Some(found) => found.clone(),
+                None => copy_segments(packet, &record, layer.layer_index).map_err(invalid)?,
+            };
+            let segments = match &projectors {
+                Some(projectors) => three_d::project(&segments, &projectors[copy_index]),
+                None => segments,
             };
             let shape =
                 VectorShape::new(&segments, closed, stroke_reach(&style)).map_err(invalid)?;

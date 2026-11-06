@@ -318,6 +318,9 @@ fn shared_motion_admission_refuses_mask_and_multiple_parent_controls_without_pub
     for kind in ["mask", "parentBlend"] {
         let mut source = three_d(false);
         if kind == "mask" {
+            // Outside 3D a mask keeps the unjoined route (under the layer's own 3D switch it is projected with the layer:
+            // `a_mask_contour_under_3d_is_projected_with_the_layer`).
+            source["layers"][0]["threeD"] = json!(false);
             source["objects"][0]["vectorExt"] = json!({"isMask":true,"maskMode":"add"});
         } else {
             source["propertyHolders"][0]["properties"]

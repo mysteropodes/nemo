@@ -151,3 +151,19 @@ pub(crate) fn apply_chain(
     }
     repaint(item)
 }
+
+/// #2520: a 3D layer's block, every glyph vertex through the layer projector (the layer stage and the parent chain are empty
+/// for a 3D layer). Contours that collapse to no ink leave the block like a zero scale.
+pub(crate) fn apply_projection(
+    item: &mut TextSceneItem,
+    projector: &crate::evaluation::property_projection_3d::Projector3D,
+) -> Result<(), TextProducerError> {
+    let (scene, kept) = item
+        .scene
+        .projected(projector, GeometryAdmission::DropCoincidentCurves)
+        .map_err(TextProducerError::Scene)?;
+    item.pulls = kept.iter().map(|&i| item.pulls[i]).collect();
+    item.units = kept.iter().map(|&i| item.units[i]).collect();
+    item.scene = scene;
+    repaint(item)
+}

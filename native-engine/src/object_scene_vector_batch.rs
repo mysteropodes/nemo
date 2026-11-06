@@ -123,11 +123,10 @@ fn prepare_layer(
         .iter()
         .any(|copies| copies.layer_index == index)
     {
-        if three_d
-            || motion.as_ref().is_some_and(|m| {
-                m.rotation != 0. || m.anchor != [0., 0.] || m.scale != [100., 100.]
-            })
-        {
+        // A 3D host's clones are projected by the duplicator scene itself (per-clone `dup3D` deltas).
+        if motion.as_ref().is_some_and(|m| {
+            m.rotation != 0. || m.anchor != [0., 0.] || m.scale != [100., 100.]
+        }) {
             return Err("duplicator layer pose awaits its actual copy batch and paint consumer");
         }
         return Ok(None);
@@ -135,9 +134,11 @@ fn prepare_layer(
     // Vectors that share a layer with Text or raster items take the pose of that union: the same chain those items use.
     let item_consumers = packet.raster_records().any(|s| s.layer_index() == index)
         || packet.text_records().any(|s| s.layer_index() == index);
+    // A mask contour of a 3D layer is projected with the layer (baseline: the mask path is a child of the layer, so it takes the
+    // same vertex projector); outside 3D a mask keeps the unjoined route.
     let record_mixed = sources.iter().any(|s| {
         (!is_vector_record(s.record()) && s.record().family != "closed-solid-fill-cubic-path")
-            || s.record().is_mask()
+            || (s.record().is_mask() && (!three_d || !is_vector_record(s.record())))
     });
     let item_chain = match chains {
         Some(chains) if item_consumers && !record_mixed && !three_d => Some(
@@ -187,9 +188,9 @@ fn prepare_layer(
     if !active && !expanded && parents.is_empty() && !common_position {
         return Ok(None);
     }
-    // A 3D layer that also holds still images pivots around the union of its drawn geometry and its images (baseline
-    // `userLayers[i].bounds`); Text and masks keep the layer unjoined.
-    let union_bounds = if three_d && item_consumers && !record_mixed && !packet.text_records().any(|s| s.layer_index() == index) {
+    // A 3D layer that also holds still images or Text pivots around the union of its drawn geometry and its items (baseline
+    // `userLayers[i].bounds`).
+    let union_bounds = if three_d && item_consumers && !record_mixed {
         chains.and_then(|c| c.layer_bounds(index))
     } else {
         None
@@ -208,7 +209,7 @@ fn prepare_layer(
     }
     let mut vectors = Vec::new();
     let mut refusals = Vec::new();
-    for source in sources.iter().copied().filter(|s| !s.record().is_mask()) {
+    for source in sources.iter().copied().filter(|s| three_d || !s.record().is_mask()) {
         let record = source.record();
         // The paint style carries the layer pose (`PaintPose`): stroke width and gradient endpoints follow the same chain
         // as the path. What stays unjoined is a gradient whose Position is an expression (the raw
@@ -217,6 +218,7 @@ fn prepare_layer(
         // A gradient under 3D keeps its raw endpoints: the baseline projects the geometry only and leaves the paint alone.
         let refusal = if record.fill_gradient().is_some()
             && !three_d
+            && !record.is_mask()
             && packet
                 .snapshot()
                 .document()

@@ -1,5 +1,5 @@
-//! #2520/#2525 post-merge: the 3D switch never leaves the document unavailable. A layer the frame path cannot place in 3D refuses the
-//! switch with no revision and no history; every accepted switch keeps every frame preparing; and the accepted switch is saved with a
+//! #2520/#2525 post-merge: the 3D switch never leaves the document unavailable. A layer the frame path cannot place in 3D (a component
+//! instance) refuses the switch with no revision and no history; every accepted switch keeps every frame preparing; and the accepted switch is saved with a
 //! revision but is no undo step (baseline `toggleLayer3D` pushed no undo snapshot), exactly like the folder fold.
 use super::*;
 use crate::object_codec::{decode_storage_project, encode_storage_project};
@@ -40,6 +40,17 @@ fn mixed() -> Value {
     elements.push(element("ly_img", "r0", 0));
     elements.push(element("ly_txt", "t0", 0));
     doc
+}
+/// A document whose only layer is a component instance: the one kind the frame path cannot place in 3D yet.
+fn with_instance() -> Value {
+    let layers = [fixture::layer("ly_inst", "Instance", &[]), fixture::layer("ly_v", "Vector", &[(0, "sv")])];
+    fixture::document(
+        &layers,
+        json!({"componentTables":{"components":{"format":"nemo.native-component-set","formatVersion":1,
+            "components":[{"symbolId":"sym_c","totalFrames":24,"layers":[{"layerUid":"ci"}],"objects":[]}],
+            "instances":[{"contextId":"scene-root","layerUid":"ly_inst","symbolId":"sym_c","symPlayMode":"once",
+                "symSpeed":1,"symPlacedAt":0,"symSingleFrame":0}]}}}),
+    )
 }
 fn owner(doc: &Value) -> NativeObjectHistory {
     NativeObjectHistory::new(
@@ -114,14 +125,11 @@ fn the_three_d_keys_of_every_kind_leave_the_frame_available_with_the_switch_on_o
 }
 
 #[test]
-fn text_is_the_one_kind_the_frame_path_cannot_place_yet_and_refuses_the_switch_with_no_revision() {
-    let mut o = owner(&mixed());
+fn a_component_instance_is_the_one_kind_the_frame_path_cannot_place_yet_and_refuses_the_switch_with_no_revision() {
+    let mut o = owner(&with_instance());
     let zero = bytes(&o);
     assert!(prepares(&o), "the fixture prepares before any switch");
-    assert_eq!(
-        set(&mut o, "ly_txt", true),
-        Err(DispatchErrorCode::Unavailable)
-    );
+    assert_eq!(set(&mut o, "ly_inst", true), Err(DispatchErrorCode::Unavailable));
     assert_eq!(
         (o.content_revision(), o.history_depths(), bytes(&o)),
         (0, (0, 0), zero),
@@ -133,7 +141,7 @@ fn text_is_the_one_kind_the_frame_path_cannot_place_yet_and_refuses_the_switch_w
 #[test]
 fn every_other_kind_takes_the_switch_and_every_frame_still_prepares() {
     let mut o = owner(&mixed());
-    let kinds = ["ly_v", "ly_empty", "ly_null", "ly_folder", "ly_fx", "ly_widget", "ly_img"];
+    let kinds = ["ly_v", "ly_empty", "ly_null", "ly_folder", "ly_fx", "ly_widget", "ly_img", "ly_txt"];
     for (i, layer) in kinds.iter().enumerate() {
         assert_eq!(set(&mut o, layer, true), Ok(i as u64 + 1), "{layer}");
         assert!(prepares(&o), "{layer}: the document prepares with the switch on");
@@ -146,20 +154,57 @@ fn every_other_kind_takes_the_switch_and_every_frame_still_prepares() {
 }
 
 #[test]
-fn a_stored_3d_flag_on_a_text_layer_can_still_be_switched_off() {
-    let mut doc = mixed();
-    doc["layers"][7]["threeD"] = json!(true);
+fn a_text_layer_takes_the_switch_with_a_saved_revision_and_no_undo_entry() {
+    let mut o = owner(&mixed());
+    assert_eq!(set(&mut o, "ly_txt", true), Ok(1));
+    assert_eq!(o.history_depths(), (0, 0));
+    assert!(prepares(&o) && !head(&o).frame_has_unjoined_3d());
+}
+
+#[test]
+fn a_stored_3d_flag_on_a_component_instance_can_still_be_switched_off() {
+    let mut doc = with_instance();
+    doc["layers"][0]["threeD"] = json!(true);
     let mut o = owner(&doc);
     assert!(
         !prepares(&o),
-        "an imported 3D text layer is the unavailable state the switch must never create"
+        "an imported 3D instance layer is the unavailable state the switch must never create"
     );
-    assert_eq!(
-        set(&mut o, "ly_txt", false),
-        Ok(1),
-        "switching off is never refused"
-    );
+    assert_eq!(set(&mut o, "ly_inst", false), Ok(1), "switching off is never refused");
     assert!(prepares(&o));
+}
+
+/// #2520: a duplicator host and a layer holding a mask contour both take the switch, and every frame still prepares (their clones and
+/// their mask are projected with the layer).
+#[test]
+fn a_duplicator_host_and_a_mask_layer_take_the_switch_and_the_frame_still_prepares() {
+    let host = fixture::document(
+        &[fixture::layer("ly_v", "Vector", &[(0, "sv")])],
+        json!({"componentTables":{"duplicators": fixture::duplicator_table(&[("ly_v", json!({"mode":"grid","rows":1,"cols":3,"spacingX":10,"timeOffset":{"enabled":true,"offsetFrames":1,"direction":"forward"}}))])}}),
+    );
+    // A duplicator needs the canvas metadata of a project.
+    let document = decode_storage_project(host.to_string().as_bytes()).unwrap();
+    let project = crate::object_document::ProjectEnvelope::no_media(
+        crate::object_document::ProjectMetadata::new(100, 100, 24.).unwrap(),
+        document,
+    );
+    let mut o = NativeObjectHistory::from_admitted_project("three-d-dup", project).unwrap();
+    assert!(prepares(&o));
+    assert_eq!(set(&mut o, "ly_v", true), Ok(1));
+    assert!(prepares(&o) && !head(&o).frame_has_unjoined_3d());
+    assert_eq!(o.history_depths(), (0, 0));
+    let mut masked = mixed();
+    let corner = |x: f64, y: f64| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
+    masked["objects"][0] = json!({"schemaVersion":1,"family":"editable-vector-path","target":target("ly_v", "sv"),
+        "geometry":{"kind":"cubic-path","closed":true,"coordinateSpace":"document-world","handleSpace":"relative",
+            "segments":[corner(0., 0.), corner(100., 0.), corner(100., 60.), corner(0., 60.)]},
+        "fill":null,
+        "vector":{"stroke":null,"hasRealStroke":false,"strokeWidth":3,"strokeCap":"round","strokeJoin":"round","opacity":1},
+        "vectorExt":{"isMask":true,"maskMode":"add","maskFeather":0}});
+    let mut o = owner(&masked);
+    assert!(prepares(&o));
+    assert_eq!(set(&mut o, "ly_v", true), Ok(1));
+    assert!(prepares(&o) && !head(&o).frame_has_unjoined_3d());
 }
 
 #[test]
