@@ -257,7 +257,7 @@ test('the project reads ask the held component context with its own frame count 
   await assert.rejects(scene.reads.readPresentedStrokes({ contextId: CTX, layerUid: 'inner', frame: 2 }, scene.pin, () => false), /Invalid presented-stroke selection/);
 });
 
-test('the subselect view contract admits the HELD component for a presented-stroke view, never free text, and the edit intent stays on the scene root', () => {
+test('the subselect view contract admits the HELD component for a presented-stroke view, never free text, and the edit intent names the held component too', () => {
   const C = require('../src/js/adapters/native-subselect-contract.js');
   const w = world();
   const view = (contextId) => ({ atRevision: 3, documentSnapshotId: 'native-object:d:3', view: { kind: 'subselect', contextId, layerUid: 'inner', frame: 0, workId: 'native-work-1', viewGeneration: 1, cursor: 0, limit: 8, hitTest: true } });
@@ -269,7 +269,11 @@ test('the subselect view contract admits the HELD component for a presented-stro
   w.held.held = CTX;
   const edit = (contextId) => ({ command: 'object.subselect.edit', stableTarget: { contextId, layerUid: 'inner', frameScope: { kind: 'authored', frame: 0 }, strokeId: 'a' }, intent: { kind: 'move', indices: [0], delta: [1, 1] } });
   C.payload(C.EDIT, edit('scene-root'));
-  assert.throws(() => C.payload(C.EDIT, edit(CTX)), /Invalid native subselect intent/, 'Subselect editing is not made context-aware');
+  C.payload(C.EDIT, edit(CTX)); // #2356: Direct Select edits the entered component's records
+  w.held.held = 'scene-root';
+  assert.throws(() => C.payload(C.EDIT, edit(CTX)), /Invalid native subselect intent/, 'a component that is not entered');
+  w.held.held = CTX;
+  assert.throws(() => C.payload(C.EDIT, edit('comp-b')), /Invalid native subselect intent/, 'never free text');
 });
 
 test('a batch delete may name a listed record\'s stable target (Select\'s Delete over several layers)', async () => {

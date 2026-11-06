@@ -3996,6 +3996,11 @@
           "minLength": 1,
           "maxLength": 255
         },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
         "options": {
           "$ref": "#/$defs/ObjectTweenOptions"
         },
@@ -4040,6 +4045,11 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 255
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
         },
         "options": {
           "$ref": "#/$defs/ObjectTweenOptions"
@@ -4251,6 +4261,11 @@
           "minLength": 1,
           "maxLength": 255
         },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
         "frame": {
           "type": "integer",
           "minimum": 0,
@@ -4277,6 +4292,11 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 255
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
         },
         "span": {
           "$ref": "#/$defs/ObjectTweenSpan"

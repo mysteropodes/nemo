@@ -67,7 +67,7 @@ use span_generate::*;
 
 #[path = "tween_document_plan.rs"]
 mod document_plan;
-pub(crate) use document_plan::{plan_tween, TweenRequest};
+pub(crate) use document_plan::{plan_tween, TweenPlan, TweenRequest};
 
 pub(crate) use crate::object_document::pressure_geometry::{add_segs, PathSampler, SegOut};
 use crate::object_document::pressure_geometry::{path_of, pressure_outline};

@@ -581,3 +581,35 @@ test('the entered grid mounts the header "Select frames" strip once and keeps it
   assert.equal(tick.caption, full.caption, 'the same caption node (the grid did not rebuild)');
   assert.match(tick.text, /Frame 5 \/ 12$/, 'the caption text the strip copies is already the new frame');
 });
+
+// #2256 E-comp-auto-split: Motion's double-click on an instance releases a single-layer component into one layer per shape (motion.js:6888).
+function splitRecorder(f, outcome) {
+  const calls = [];
+  f.host.NemoNativeComponentLayerEdit = { split: async (host, uid) => { calls.push({ uid, frame: host.state.currentFrame, presented: Context.presented(host).contextId }); return outcome || { ok: true, applied: true }; } };
+  return calls;
+}
+test('Motion: entering a component that holds one drawing layer splits it once, inside the entered context, and says how to undo', async () => {
+  const f = fixture(); f.composed.bindPolicyEntries();
+  const calls = splitRecorder(f); f.host.state.appMode = 'motion';
+  f.row(2).fire('dblclick'); await settle();
+  assert.deepEqual(calls, [{ uid: 'ic', frame: 0, presented: 'sym_b' }], 'one split request, for the lone layer, after the context is presented');
+  assert.deepEqual(f.toasts, ['toastSplitToLayersUndoHint'], 'the baseline hint (the fixture locale returns the key)');
+});
+test('Motion: a component with two layers, an Animation 2D entry, a refused split and a plain tab entry never split or toast', async () => {
+  const f = fixture(); f.composed.bindPolicyEntries();
+  const calls = splitRecorder(f, { ok: false, code: 'invalid_request' }); f.host.state.appMode = 'motion';
+  f.row(1).fire('dblclick'); await settle();
+  assert.deepEqual(calls, [], 'sym_a holds two layers: the baseline splits only a single-layer component');
+  await f.host.SM.exitToScene(); await settle();
+  f.row(2).fire('dblclick'); await settle();
+  assert.equal(calls.length, 1, 'the single-layer component asks once');
+  assert.deepEqual(f.toasts, [], 'a refusal (already one shape per layer) is the idempotent re-entry: silent');
+  await f.host.SM.exitToScene(); await settle();
+  f.host.state.appMode = 'anim2d';
+  f.row(2).fire('dblclick'); await settle();
+  assert.equal(calls.length, 1, 'Animation 2D enters without splitting');
+  await f.host.SM.exitToScene(); await settle();
+  f.host.state.appMode = 'motion';
+  f.host.SM.enterSymbol('sym_b'); await settle();
+  assert.equal(calls.length, 1, 'the tab / panel entry (enterSymbol) does not split');
+});

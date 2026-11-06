@@ -311,9 +311,25 @@
       var ctx = all.contexts[i];
       if (ctx.contextKind !== 'component') continue;
       var found = await c.listInstances(ctx.contextId);
-      if (found.ok && found.items.some(function (item) { return item.layerUid === layerUid; })) return enter(host, ctx.contextId, null, layerUid);
+      if (found.ok && found.items.some(function (item) { return item.layerUid === layerUid; })) {
+        var opened = await enter(host, ctx.contextId, null, layerUid);
+        if (opened === true) await autoSplit(host);
+        return opened;
+      }
     }
     return false;
+  }
+  // Motion's double-click on an instance (1065e9d8:src/js/motion.js:6888 enterComponentLayer) silently releases a component that holds exactly ONE
+  // drawing layer into one layer per shape, at the entered playhead, as ONE history entry (the layer.split of the held context: the owner applies
+  // the kernel's plan, a layer of fewer than two shapes is its typed refusal and the idempotent re-entry). The Animation 2D entry never splits.
+  async function autoSplit(host) {
+    var st = live(host), edit = host.NemoNativeComponentLayerEdit;
+    if (!st || !host.state || host.state.appMode !== 'motion' || st.rows.length !== 1 || st.rows[0].layerKind !== 'drawing' || !edit || typeof edit.split !== 'function') return false;
+    var done;
+    try { done = await edit.split(host, st.rows[0].layerUid); } catch (_) { return false; }
+    if (!done || done.ok !== true || done.applied !== true) return false;
+    toast(host, t(host, 'toastSplitToLayersUndoHint', 'Split into layers — right-click › « Merge selected layers » to undo it'));
+    return true;
   }
 
   function node(host, tag, text, cls) { var el = host.document.createElement(tag); el.textContent = text; if (cls) el.className = cls; return el; }

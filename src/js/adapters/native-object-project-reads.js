@@ -297,7 +297,7 @@
       return typed&&pointTypes.length===segments.length?{closed:closed,segments:segments,pointTypes:pointTypes}:{closed:closed,segments:segments};
     }
     async function readSubselect(selector,pin) {
-      if(!exact(selector,['contextId','layerUid','frame'],[])||selector.contextId!=='scene-root'||!text(selector.layerUid)||!integer(selector.frame,0,4294967295)||!pins(pin))throw fault('invalid_request','Invalid subselect selection');
+      if(!exact(selector,['contextId','layerUid','frame'],[])||!readContext(selector.contextId)||!text(selector.layerUid)||!integer(selector.frame,0,4294967295)||!pins(pin))throw fault('invalid_request','Invalid subselect selection');
       const o=origin(selector,pin);if(!o)throw fault('unavailable','Subselect needs a current native presentation');
       await settle(o);let cursor=0,total=null,items=[];
       for(;;){

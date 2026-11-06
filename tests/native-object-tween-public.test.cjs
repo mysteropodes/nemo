@@ -16,11 +16,15 @@ const defOf = (operation) => schema.$defs.Request.oneOf.find((b) => b.allOf[1].p
 const options = { resamplePoints: 50, step: 1, skipManual: true, easing: [{ x: 0, y: 0 }, { x: 0.5, y: 0.2, tx: 1, ty: 0 }, { x: 1, y: 1 }] };
 const span = { from: 0, to: 4, easing: [{ x: 0, y: 0 }, { x: 1, y: 1 }], overrides: [{ aId: 'a', bId: 'b' }, { aIds: ['c', 'd'], bId: 'e' }], manualStrokes: ['a', 'c'] };
 const valid = {
+  // #2358: every command may name the entered component (`contextId`, absent is the scene root).
   [contract.TWEEN_GENERATE]: [{ command: 'object.tween.generate', layerUid: 'L', options, selection: [1, 6] }, { command: 'object.tween.generate', layerUid: 'L' },
-    { command: 'object.tween.generate', layerUid: 'L', starts: [] }],
-  [contract.TWEEN_REGENERATE]: [{ command: 'object.tween.regenerate', layerUid: 'L', options, starts: [0, 4] }, { command: 'object.tween.regenerate', layerUid: 'L' }],
-  [contract.TWEEN_SPLIT]: [{ command: 'object.tween.split', layerUid: 'L', frame: 2, options }, { command: 'object.tween.split', layerUid: 'L', frame: 2 }],
-  [contract.TWEEN_REASSIGN]: [{ command: 'object.tween.reassign', layerUid: 'L', span, options }, { command: 'object.tween.reassign', layerUid: 'L', span }],
+    { command: 'object.tween.generate', layerUid: 'L', starts: [] }, { command: 'object.tween.generate', layerUid: 'L', contextId: 'comp-a', options, starts: [0] }],
+  [contract.TWEEN_REGENERATE]: [{ command: 'object.tween.regenerate', layerUid: 'L', options, starts: [0, 4] }, { command: 'object.tween.regenerate', layerUid: 'L' },
+    { command: 'object.tween.regenerate', layerUid: 'L', contextId: 'comp-a' }],
+  [contract.TWEEN_SPLIT]: [{ command: 'object.tween.split', layerUid: 'L', frame: 2, options }, { command: 'object.tween.split', layerUid: 'L', frame: 2 },
+    { command: 'object.tween.split', layerUid: 'L', frame: 2, contextId: 'comp-a' }],
+  [contract.TWEEN_REASSIGN]: [{ command: 'object.tween.reassign', layerUid: 'L', span, options }, { command: 'object.tween.reassign', layerUid: 'L', span },
+    { command: 'object.tween.reassign', layerUid: 'L', span, contextId: 'comp-a' }],
 };
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const withAt = (payload, pointer, value) => {
@@ -36,7 +40,7 @@ const flaws = {
     ['/options/resamplePoints', 1], ['/options/resamplePoints', 257], ['/options/step', 0], ['/options/step', 1000], ['/options/skipManual', 'yes'],
     ['/options/easing', new Array(257).fill({ x: 0, y: 0 })], ['/options/easing/0/x', -0.1], ['/options/easing/0/x', 1.1], ['/options/easing/0/z', 1],
     ['/options/easing/1/tx', '1'], ['/options/resamplePoints', undefined], ['/options/extra', true]],
-  [contract.TWEEN_REGENERATE]: [['/options/step', 0], ['/selection', '1'], ['/selection', [1]]],
+  [contract.TWEEN_REGENERATE]: [['/options/step', 0], ['/selection', '1'], ['/selection', [1]], ['/contextId', ''], ['/contextId', 5], ['/contextId', 'x'.repeat(129)]],
   [contract.TWEEN_SPLIT]: [['/frame', -1], ['/frame', undefined], ['/frame', '2'], ['/selection', [1]], ['/span', span], ['/options/step', 0]],
   [contract.TWEEN_REASSIGN]: [['/span', undefined], ['/span/from', -1], ['/span/to', 1.5], ['/span/overrides', new Array(129).fill({ aId: 'a', bId: 'b' })],
     ['/span/overrides/0/bId', ''], ['/span/overrides/0/aIds', ['a']], ['/span/overrides/1/aIds', []], ['/span/overrides/1/aId', 'a'], ['/span/overrides/0/aId', undefined],

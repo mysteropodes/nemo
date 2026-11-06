@@ -67,6 +67,19 @@ fn each_command_admits_its_documented_shapes() {
 }
 
 #[test]
+fn every_command_may_name_the_component_it_tweens_and_nothing_else_as_a_context() {
+    for suffix in TWEEN {
+        let operation = format!("{P}{suffix}");
+        let named = set(valid(suffix), "contextId", json!("comp-a"));
+        assert!(request(&operation, &named), "{suffix}: a component context");
+        assert!(envelope(&operation, named).validate().is_ok(), "{suffix}");
+        for bad in [json!(""), json!(7), json!("x".repeat(129))] {
+            assert!(!request(&operation, &set(valid(suffix), "contextId", bad.clone())), "{suffix}: {bad}");
+        }
+    }
+}
+
+#[test]
 fn a_flawed_member_is_refused_for_every_command() {
     let generate = |at: &str, bad: Value| ("tween.generate", set(valid("tween.generate"), at, bad));
     let regenerate =

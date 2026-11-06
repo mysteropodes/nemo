@@ -237,8 +237,8 @@ fn component_reads_refuse_an_undeclared_context_a_foreign_layer_and_a_frame_past
 }
 
 /// #2256: Select's hit-test listing of the ENTERED component, as the viewport presents it: the component's own layer and records, named by the
-/// component context, with the geometry read of the same record; the editable (Subselect) listing stays scene-root.
-fn component_view(owner: &NativeObjectHistory, context: &str, layer: &str, hit: bool) -> Result<Value, &'static str> {
+/// component context, with the geometry read of the same record; the editable (Direct Select) listing reads the same way (`subselect`).
+pub(super) fn component_view(owner: &NativeObjectHistory, context: &str, layer: &str, hit: bool) -> Result<Value, &'static str> {
     use crate::object_render_scene::prepare_object_viewport_composition;
     let s = owner.acquire_snapshot(owner.content_revision()).unwrap();
     let expected = ObjectFrameSelector {
@@ -280,12 +280,7 @@ fn select_lists_the_entered_components_records_and_reads_their_geometry() {
     assert_eq!(response["ok"], true, "{response}");
     assert_eq!(response["result"]["subselect"]["stableTarget"]["contextId"], CTX);
     assert_eq!(response["result"]["subselect"]["total"].as_u64().unwrap() as usize, items[0]["count"].as_u64().unwrap() as usize);
-    // The editable read of a component record stays refused; the scene root is listed as before.
-    let mut editable = request.clone();
-    editable["payload"]["subselect"] = json!({"cursor":0,"limit":16});
-    let refused = serde_json::to_value(s.dispatch(serde_json::from_value(editable).unwrap()).unwrap()).unwrap();
-    assert_eq!(refused["ok"], false, "{refused}");
-    assert!(component_view(&owner, CTX, "inner", false).is_err(), "the editable listing is scene-root only");
+    // The scene root is listed as before (the editable read of a component record: see `subselect`).
     let scene = component_view(&owner, "scene-root", "L1", true).unwrap();
     assert_eq!(scene["contextId"], "scene-root");
 }
@@ -460,3 +455,6 @@ fn a_paint_bucket_fill_in_a_component_traces_its_walls_and_keys_a_held_cell() {
     stray["layerUid"] = json!("L1");
     assert!(owner.prepare_fill_trace_json(stray.to_string().as_bytes()).is_err());
 }
+
+#[path = "object_subselect_component.rs"]
+mod subselect;
