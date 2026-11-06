@@ -94,11 +94,14 @@ test('finding 1: no rectangle comes from the operator, and the capture is hashed
   const { session, workflow, directory } = setup(t);
   const asked = [], original = session.requestEvidence, inner = session.input; let captures = 0;
   session.requestEvidence = request => { asked.push(request.phase); return original(request); };
-  session.input = (command, ...rest) => { if (command === 'capture') captures++; return inner(command, ...rest); };
+  const commands = [];
+  session.input = (command, ...rest) => { commands.push(command); if (command === 'capture' && rest[0] === 'capture-1.png') captures++; return inner(command, ...rest); };
   assert.equal(PLAN.find(s => s.id === 'layer-row-styling').how, undefined);
   const result = await workflow.run({ session, row: row() });
   assert.equal(statuses(result)['layer-row-styling'], 'pass');
   assert.ok(!asked.includes('layer-row-styling') && captures === 1);
+  // The helper's first `observe` is reserved for the Start screen: this row's first helper command is a capture.
+  assert.equal(commands[0], 'capture');
   const private_ = JSON.parse(fs.readFileSync(path.join(directory, 'frame-edit-ui/layer-row-styling.json'), 'utf8'));
   assert.equal(private_.facts.sha256, require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(directory, 'capture-1.png'))).digest('hex'));
   assert.deepEqual(private_.window, { w: 810, h: 710 });

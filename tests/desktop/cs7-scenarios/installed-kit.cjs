@@ -131,18 +131,18 @@ function toPixels(image, win, frame) {
 }
 const unionOf = rects => { const x = Math.min(...rects.map(r => r.x)), y = Math.min(...rects.map(r => r.y)),
   x2 = Math.max(...rects.map(r => r.x + r.w)), y2 = Math.max(...rects.map(r => r.y + r.h)); return { x, y, w: x2 - x, h: y2 - y }; };
-// One capture the harness takes and judges itself: observe, capture, read the PNG ONCE (its sha256 is recorded), observe again.
-// A capture whose node frames moved between the two observations is reported unstable, never judged.
+// One capture the harness takes and judges itself: capture first (the helper's first command may be this one, and its first
+// `observe` is reserved for the Start screen), read the PNG ONCE (its sha256 is recorded), then observe twice. A capture whose
+// node frames moved between the two observations is reported unstable, never judged.
 async function shot(session, reportDirectory, name) {
-  const before = await session.input('observe');
   const captured = await session.input('capture', name);
   if (!plain(captured) || captured.capture !== name) return null;
   const bytes = readInside(reportDirectory, name), image = loadPng(bytes);
-  const after = await session.input('observe');
-  if (!image || !Array.isArray(before?.nodes) || !Array.isArray(after?.nodes) || !before.nodes.every(plain) || !after.nodes.every(plain)) return null;
+  const first = await session.input('observe'), after = await session.input('observe');
+  if (!image || !Array.isArray(first?.nodes) || !Array.isArray(after?.nodes) || !first.nodes.every(plain) || !after.nodes.every(plain)) return null;
   const win = windowOf(after);
   return { name, image, sha256: sha256(bytes), bytes: bytes.length, nodes: after.nodes, window: win,
-    stable: !!win && same(windowOf(before), win) && stableFrames(before.nodes, after.nodes) };
+    stable: !!win && same(windowOf(first), win) && stableFrames(first.nodes, after.nodes) };
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 

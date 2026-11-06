@@ -210,10 +210,12 @@ test('P2813-3: the instance pixels are judged on the canvas\'s own accessibility
   assert.match(outcomeOf(ctx.directory).reason, /canvas tiles/);
   // No operator phase asks for rectangles, and both captures are hashed by the runner.
   ctx = setup(t);
-  const asked = []; const original = ctx.session.requestEvidence;
+  const asked = [], commands = []; const original = ctx.session.requestEvidence, input = ctx.session.input;
   ctx.session.requestEvidence = request => { asked.push(request.phase); return original(request); };
+  ctx.session.input = (command, ...rest) => { commands.push(command); return input(command, ...rest); };
   await ctx.workflow.run({ session: ctx.session, row: row() });
   assert.ok(!asked.includes('instance-before'));
+  assert.equal(commands[0], 'capture');   // the helper's first `observe` is reserved for the Start screen
   const shot = JSON.parse(fs.readFileSync(path.join(ctx.directory, 'component-edit-draw/instance-before.json'), 'utf8'));
   assert.equal(shot.sha256, require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(ctx.directory, 'capture-21.png'))).digest('hex'));
   assert.deepEqual(shot.canvas, { x: 100, y: 80, w: 500, h: 300 });

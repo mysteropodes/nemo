@@ -17,6 +17,8 @@ const CLAUSES = ['scene-f5-f6-f7', 'scene-menu-and-shortcuts', 'scene-undo-redo'
 const KINDS = ['key', 'interpolated', 'held', 'unexposed'];
 const OP = { history: 'query.document.object.history', timing: 'query.document.object.layer.timing' };
 const CAPTURE = 'capture-1.png';
+// The helper's first `observe` is reserved for the Start screen, so when this row runs first its first helper command is a capture.
+const PRIME = 'capture-2.png';
 // Compact, measured from the accessibility frames of the layer row (window points): at most the baseline `.lrow` height (34),
 // each visibility/lock/shy control no taller than 28 and no wider than 90, and a name long enough to prove the ellipsis (60).
 const ROW_MAX = 34, CONTROL_H = 28, CONTROL_W = 90, NAME_MIN = 60;
@@ -283,7 +285,7 @@ function createWorkflow({ reportDirectory }) {
       const ev = await session.requestEvidence({ row: ROW, phase: step.id, instruction: step.how, details });
       if (!rawOnly(ev) || !text(ev.observation) || typeof ev.productFailure !== 'boolean') throw malformed(ROW, step.id);
       kit.privateEvidence(dir, step.id, ev);
-      if (step.type === 'placement') continue;
+      if (step.type === 'placement') { await session.input('capture', PRIME); continue; }
       if (ev.productFailure) {
         // The operator may only report a failure, never a success; a reported failure is taken as stated.
         if (step.check) outcome[step.check] = 'fail';

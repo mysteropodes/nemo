@@ -21,6 +21,8 @@ const ROW = 'component-edit-draw';
 const CLAUSES = ['component-draw-tools', 'component-draw-undo-redo', 'component-instances-pixels', 'component-bitmap-export',
   'component-break-apart', 'component-motion-draw', 'component-draw-save-reopen'];
 const BEFORE = 'capture-21.png', AFTER = 'capture-22.png';
+// The helper's first `observe` is reserved for the Start screen, so when this row runs first its first helper command is a capture.
+const PRIME = 'capture-20.png';
 const BASELINE = 'exports/bitmap-baseline.png', EXPORT = 'exports/bitmap-brush.png', SAVED = 'saved/component-draw.json';
 const DIFF = 24, INK_MIN = 200, TILE_PIXELS = 10, TILES_X = 8, TILES_Y = 6, TILES_MAX = 24, EXPORT_INK_MIN = 200;
 const CANVAS = 'drawing-canvas', PLAYHEAD = 'info-frame';
@@ -263,7 +265,7 @@ function createWorkflow({ reportDirectory }) {
       const ev = await session.requestEvidence({ row: ROW, phase: step.id, instruction: step.how, details });
       if (!rawOnly(ev) || !text(ev.observation) || typeof ev.productFailure !== 'boolean') throw malformed(ROW, step.id);
       kit.privateEvidence(dir, step.id, ev);
-      if (step.type === 'placement') continue;
+      if (step.type === 'placement') { await session.input('capture', PRIME); continue; }
       if (ev.productFailure) {
         // The person may only report a failure, never a success; a reported failure is taken as stated.
         if (step.check) outcome[step.check] = 'fail';
