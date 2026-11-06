@@ -26,9 +26,10 @@ function harness(items, options = {}) {
   const paper = Paper.load(), body = el('body'), listeners = [], toasts = [], batches = [], frames = [];
   let busy = false; // the native queue has a command pending: the public presentation getter reports none (queue-pending)
   let pin = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 1, documentSnapshotId: 's1', canvasW: 200, canvasH: 200, layers: [{ layerUid: 'L', hasMotion: !!options.layerMatrix }] };
-  const reads = [], edits = [], props = { position: [100, 50] };
+  const reads = [], edits = [], batchEdits = [], props = { position: [100, 50] };
   const propSession = { readProperty: async (selector) => { reads.push(selector); return { value: props.position.slice() }; },
-    editProperty: async (payload) => { edits.push(payload); if (options.refuseEdit) return { ok: true, result: { applied: false } }; props.position = payload.action.values.slice(); pin = { ...pin, contentRevision: pin.contentRevision + 1, documentSnapshotId: 's' + (pin.contentRevision + 1) }; return { ok: true, result: { applied: true } }; } };
+    editProperty: async (payload) => { edits.push(payload); if (options.refuseEdit) return { ok: true, result: { applied: false } }; props.position = payload.action.values.slice(); pin = { ...pin, contentRevision: pin.contentRevision + 1, documentSnapshotId: 's' + (pin.contentRevision + 1) }; return { ok: true, result: { applied: true } }; },
+    editPropertyBatch: async (payload) => { batchEdits.push(payload); if (options.refuseEdit) return { ok: true, result: { applied: false } }; pin = { ...pin, contentRevision: pin.contentRevision + 1, documentSnapshotId: 's' + (pin.contentRevision + 1) }; return { ok: true, result: { applied: true } }; } };
   const store = items.map((i) => JSON.parse(JSON.stringify(i)));
   const session = { info: () => pin, isActive: () => true, blocksLegacy: () => true, readPresentedObjectSession: () => (busy ? null : { presentation: { ...pin, frame: 0 } }),
     async readPresentedStrokes(_selector, _pin, wanted, centres) {
@@ -56,7 +57,7 @@ function harness(items, options = {}) {
   const target = { setPointerCapture() {}, releasePointerCapture() {}, hasPointerCapture: () => true };
   const ev = (x, y, extra) => ({ button: 0, pointerId: 1, buttons: 1, clientX: x, clientY: y, shiftKey: false, altKey: false, currentTarget: target,
     stopImmediatePropagation() {}, preventDefault() {}, ...extra });
-  const h = { root, intent, toasts, batches, reads, edits, props, store, body, listeners, frames,
+  const h = { root, intent, toasts, batches, reads, edits, batchEdits, props, store, body, listeners, frames,
     busy: (on) => { busy = on; }, runFrames: () => { frames.splice(0).forEach((f) => f()); }, // one animation frame: callbacks queued meanwhile wait for the next
     setPin: (n) => { pin = { ...pin, ...n }; },
     press: (x, y, extra) => intent.down(ev(x, y, extra)), drag: (x, y, extra) => intent.move(ev(x, y, extra)), release: (x, y, extra) => intent.up(ev(x, y, { buttons: 0, ...extra })),
@@ -144,6 +145,27 @@ test('Alt does not copy in Motion, a second shape cannot be dragged with the fir
   await h.select(10, 190); // empty canvas
   assert.deepEqual(h.ids(), []);
   assert.equal(Element.isolated(h.root), false, 'nothing targeted: the layer gizmo returns');
+});
+
+test('several shapes of the entered layer move together as ONE batch of Position edits (one revision, one history entry)', async () => {
+  const h = harness([BIG, OTHER]);
+  await dbl(h, 40, 40);
+  await h.select(160, 160, true); // Shift adds the second shape to the targeted one
+  assert.deepEqual(h.ids().sort(), ['A', 'B']);
+  assert.equal(Element.isolated(h.root), true);
+  h.press(40, 40); h.drag(50, 45); h.drag(70, 55); await settle();
+  assert.deepEqual(h.batchEdits, [], 'no write while dragging');
+  await h.release(70, 55); await settle();
+  assert.deepEqual(h.edits, [], 'never one request per shape');
+  assert.equal(h.batchEdits.length, 1, 'one gesture, one request');
+  assert.equal(h.batchEdits[0].command, 'object.property.batch');
+  assert.deepEqual(h.batchEdits[0].edits.map((e) => [e.target.strokeId, e.property, e.action.kind, e.action.frame, e.action.values]),
+    [['A', 'position', 'setValue', 0, [130, 65]], ['B', 'position', 'setValue', 0, [130, 65]]]);
+  assert.deepEqual(h.ids().sort(), ['A', 'B'], 'both stay targeted');
+  const refused = harness([BIG, OTHER], { refuseEdit: true });
+  await dbl(refused, 40, 40); await refused.select(160, 160, true);
+  refused.press(40, 40); refused.drag(70, 55); await settle(); await refused.release(70, 55); await settle();
+  assert.equal(refused.batchEdits.length, 1);
 });
 
 test('outside Motion nothing is isolated and the double-click does nothing', async () => {

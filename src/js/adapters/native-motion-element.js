@@ -19,6 +19,7 @@
   'use strict';
   var PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   var GONE = 'The document changed during the drag — nothing was changed.';
+  var MAX_ELEMENTS = 64, TOO_MANY = 'Too many elements are selected to be moved together. Select fewer.';
   var round = function (v) { return Math.round(v * 1e6) / 1e6; };
   var flags = new WeakMap();
   function flag(win) { if (!flags.has(win)) flags.set(win, { layerUid: null, busy: false }); return flags.get(win); }
@@ -66,9 +67,9 @@
     o = o || {};
     var I = win.NemoSelectCanvasIntent, W = win.NemoNativeObjectWidgetUI, Wait = win.NemoNativePresentationWait;
     if (!inMotion(win) || !I || !W) { notice(win, 'Moving this element is not available right now.'); return 'refused'; }
-    if (sel.length !== 1) { notice(win, 'Move one element at a time in Motion.'); return 'refused'; }
-    var p = sel[0], t = p.data.nativeStableTarget, idx = p.data.nativeLayerIndex;
-    if (!Number.isInteger(idx) || !t.strokeId || !(p.data.nativeRole)) { notice(win, 'Select an element to move it.'); return 'refused'; }
+    if (!sel.length || sel.length > MAX_ELEMENTS) { notice(win, TOO_MANY); return 'refused'; }
+    var rows = sel.map(function (p) { return { t: p.data.nativeStableTarget, idx: p.data.nativeLayerIndex, role: p.data.nativeRole }; });
+    if (rows.some(function (r) { return !Number.isInteger(r.idx) || !r.t || !r.t.strokeId || !r.role; }) || rows.some(function (r) { return r.idx !== rows[0].idx || r.t.layerUid !== rows[0].t.layerUid; })) { notice(win, 'Select an element to move it.'); return 'refused'; }
     if (o.stale && o.stale()) { notice(win, GONE); return 'stale'; }
     var held = I.heldId(win), heldArg = held === 'scene-root' ? undefined : held;
     var session = W.session(win), proof = W.proofNow(win, 'readProperty', heldArg);
@@ -77,18 +78,27 @@
       proof = W.proofNow(win, 'readProperty', heldArg);
     }
     if (!proof || !proof.current(true) || (o.pin && !samePin(proof.info, o.pin))) { notice(win, GONE); return 'stale'; }
-    var target = { contextId: proof.selector.contextId, layerUid: t.layerUid, strokeId: t.strokeId }, frame = proof.selector.frame;
+    var frame = proof.selector.frame;
     try {
-      var local = await localDelta(win, idx, o.pin || proof.info, frame, [matrix[4], matrix[5]]);
-      var base = await proof.session.readProperty(selectorOf(proof.info, { kind: 'rawSample', target: target, property: 'position', frame: frame }));
-      if (!base || !Array.isArray(base.value) || base.value.length !== 2 || !base.value.every(Number.isFinite)) throw new Error('The element position could not be read.');
+      var local = await localDelta(win, rows[0].idx, o.pin || proof.info, frame, [matrix[4], matrix[5]]);
+      // Every element's own Position is read first; a gesture over several shapes is then ONE `object.property.batch` (one revision, one history
+      // entry), a single shape the plain `object.property.edit`.
+      var edits = [];
+      for (var i = 0; i < rows.length; i++) {
+        var target = { contextId: proof.selector.contextId, layerUid: rows[i].t.layerUid, strokeId: rows[i].t.strokeId };
+        var base = await proof.session.readProperty(selectorOf(proof.info, { kind: 'rawSample', target: target, property: 'position', frame: frame }));
+        if (!base || !Array.isArray(base.value) || base.value.length !== 2 || !base.value.every(Number.isFinite)) throw new Error('The element position could not be read.');
+        edits.push({ target: target, property: 'position', action: { kind: 'setValue', frame: frame, values: [round(base.value[0] + local[0]), round(base.value[1] + local[1])] } });
+      }
       if (o.cancelled && o.cancelled()) return 'cancelled';
       var pin = {}; PINS.forEach(function (k) { pin[k] = proof.info[k]; });
       if (!proof.current(true)) { notice(win, GONE); return 'stale'; }
       if (o.release) o.release();
-      var payload = { command: 'object.property.edit', target: target, property: 'position',
-        action: { kind: 'setValue', frame: frame, values: [round(base.value[0] + local[0]), round(base.value[1] + local[1])] } };
-      var response = await proof.session.editProperty(payload, pin, function () { return proof.current(); });
+      var many = edits.length > 1;
+      if (many && typeof proof.session.editPropertyBatch !== 'function') throw new Error('Native property batch is unavailable.');
+      var payload = many ? { command: 'object.property.batch', edits: edits }
+        : { command: 'object.property.edit', target: edits[0].target, property: 'position', action: edits[0].action };
+      var response = await (many ? proof.session.editPropertyBatch : proof.session.editProperty).call(proof.session, payload, pin, function () { return proof.current(); });
       if (!response || response.ok !== true || !response.result || typeof response.result.applied !== 'boolean') throw new Error('Native property edit was not confirmed.');
       if (!response.result.applied) return 'noop';
     } catch (error) {

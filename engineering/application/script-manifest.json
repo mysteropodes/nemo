@@ -167,6 +167,7 @@
     {"src":"js/adapters/native-motion-effector.js"},
     {"src":"js/adapters/native-motion-gizmo-3d.js"},
     {"src":"js/adapters/native-motion-canvas.js"},
+    {"src":"js/adapters/native-motion-multi.js"},
     {"src":"js/adapters/native-motion-property-view.js"},
     {"src":"js/adapters/native-motion-property-keys.js"},
     {"src":"js/adapters/native-motion-property-value.js"},

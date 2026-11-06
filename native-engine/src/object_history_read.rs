@@ -83,6 +83,7 @@ pub(crate) fn label_for(operation: &str, payload: &Value) -> String {
         },
         "property.preset.apply" => "Apply Motion Preset",
         "property.keys.paste" => "Paste Keyframes",
+        "property.batch" => "Edit Properties",
         "fill.set" => "Set Fill",
         "fill.brush" => "Brush Fill",
         "fill.trace" => "Trace Fill",
