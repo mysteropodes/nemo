@@ -76,7 +76,7 @@ fn curve(value: &Value) -> bool {
         })
 }
 /// `#rrggbb` or `#rrggbbaa`.
-pub(super) fn key_color(value: &str) -> bool {
+pub(crate) fn key_color(value: &str) -> bool {
     value.len() > 1
         && value.starts_with('#')
         && matches!(value.len() - 1, 6 | 8)

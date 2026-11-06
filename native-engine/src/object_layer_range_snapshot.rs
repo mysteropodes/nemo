@@ -32,6 +32,73 @@ fn range_error(error: RangeError) -> DispatchErrorCode {
         _ => DispatchErrorCode::Unavailable,
     }
 }
+/// Bytes each optional snap list may take of the 4 KiB read; a longer list is cut at the last entry that fits.
+const SNAP_LIST_BYTES: usize = 1536;
+const MAX_MARKER_NAME: usize = 32;
+/// The layer's own markers (`ld.markers`, frame order) as `{frame, name?}`, the baseline snap targets "Repère calque".
+fn marker_list(layer: &crate::object_document::ObjectLayer, total: u32) -> Vec<Value> {
+    let mut list: Vec<(i64, Option<String>)> = layer
+        .range
+        .value()
+        .and_then(|r| r.markers.value())
+        .map(|markers| {
+            markers
+                .iter()
+                .filter(|m| m.frame >= 0 && m.frame < i64::from(total))
+                .map(|m| {
+                    let name = m.name.value().filter(|n| !n.is_empty());
+                    (
+                        m.frame,
+                        name.map(|n| n.chars().take(MAX_MARKER_NAME).collect()),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    list.sort_by_key(|(frame, _)| *frame);
+    let mut bytes = 0;
+    let mut out = Vec::new();
+    for (frame, name) in list {
+        let entry = match name {
+            Some(name) => json!({"frame":frame,"name":name}),
+            None => json!({"frame":frame}),
+        };
+        bytes += entry.to_string().len() + 1;
+        if bytes > SNAP_LIST_BYTES {
+            break;
+        }
+        out.push(entry);
+    }
+    out
+}
+/// Every frame carrying a key on any parameter track of the layer's effect stack, ascending and unique.
+fn effect_key_frames(layer: &crate::object_document::ObjectLayer, total: u32) -> Vec<i64> {
+    let mut frames: Vec<i64> = layer
+        .effects
+        .value()
+        .into_iter()
+        .flatten()
+        .filter_map(|effect| effect.keys.value().and_then(Option::as_ref))
+        .flat_map(|tracks| {
+            tracks
+                .entries()
+                .iter()
+                .filter_map(|(_, track)| track.as_ref())
+        })
+        .flat_map(|track| track.keys.iter())
+        .filter_map(|key| key.frame.as_f64().filter(|f| f.fract() == 0.0))
+        .map(|f| f as i64)
+        .filter(|f| *f >= 0 && *f < i64::from(total))
+        .collect();
+    frames.sort_unstable();
+    frames.dedup();
+    let mut bytes = 0;
+    frames.retain(|f| {
+        bytes += f.to_string().len() + 1;
+        bytes <= SNAP_LIST_BYTES
+    });
+    frames
+}
 impl ObjectSnapshot {
     pub(crate) fn query_layer_range_json(&self, bytes: &[u8]) -> Result<Value, DispatchErrorCode> {
         use DispatchErrorCode::{InvalidRequest, StaleRevision, Unavailable};
@@ -91,11 +158,20 @@ impl ObjectSnapshot {
         let linked = range
             .and_then(|r| r.time_link.value())
             .is_some_and(Option::is_some);
-        let value = json!({"kind":"layerRange","instanceId":self.instance_id(),"documentId":self.document_id(),
+        let mut value = json!({"kind":"layerRange","instanceId":self.instance_id(),"documentId":self.document_id(),
             "atRevision":self.content_revision(),"documentSnapshotId":self.snapshot_id(),
             "contextId":selector.context_id,"layerUid":selector.layer_uid,"frame":selector.frame,
             "range":{"rawInPoint":raw.in_point,"rawOutPoint":raw.out_point,"inPoint":bounded.in_point,
                 "outPoint":bounded.out_point,"hasCustomRange":custom,"hasTimeLink":linked}});
+        // The snap targets of the baseline `snapMotionFrame`, only when the layer has any (a plain layer keeps the six-field range).
+        let markers = marker_list(layer, context.total_frames());
+        if !markers.is_empty() {
+            value["range"]["markers"] = Value::Array(markers);
+        }
+        let effect_keys = effect_key_frames(layer, context.total_frames());
+        if !effect_keys.is_empty() {
+            value["range"]["effectKeys"] = json!(effect_keys);
+        }
         if serde_json::to_vec(&value).map_err(|_| Unavailable)?.len() > MAX_MESSAGE_BYTES {
             return Err(Unavailable);
         }

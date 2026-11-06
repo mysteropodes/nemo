@@ -128,3 +128,43 @@ fn raw_duplicate_members_refuse_before_value_collapse_and_valid_bytes_keep_the_s
     large.payload = json!({"kind":"remove","placementId":"x".repeat(4096)});
     assert!(large.validate_input().is_err());
 }
+#[test]
+fn the_time_remap_intents_and_the_key_edit_register_closed_and_refuse_anything_else() {
+    let ok = [
+        json!({"kind":"enableTimeRemap","placementId":"p1","inFrame":0,"outFrame":10,"lastSourceFrame":19}),
+        json!({"kind":"disableTimeRemap","placementId":"p1"}),
+        json!({"kind":"removeTimeRemapKey","placementId":"p1","frame":3}),
+        json!({"kind":"setTimeRemapKey","placementId":"p1","frame":3,"value":7.5}),
+        json!({"kind":"setTimeRemapKey","placementId":"p1","frame":3,"value":7,"curvePoints":[{"x":0,"y":0},{"x":1,"y":1,"tx":0.5}]}),
+        json!({"kind":"setInterpMode","placementId":"p1","interpMode":"blend"}),
+        json!({"kind":"editTimeRemapKeys","placementId":"p1","selections":[{"frame":3},{"ranges":[[5,10],[12,12]]}],"action":{"kind":"shift","delta":-2}}),
+        json!({"kind":"editTimeRemapKeys","placementId":"p1","selections":[{"frame":0}],"action":{"kind":"color","color":null}}),
+        json!({"kind":"editTimeRemapKeys","placementId":"p1","selections":[{"frame":0}],"action":{"kind":"preset","preset":"hold"}}),
+    ];
+    for payload in ok {
+        assert!(request(&payload), "{payload}");
+        assert!(envelope(payload).validate_input().is_ok());
+    }
+    let keys = |selections: Value, action: Value| json!({"kind":"editTimeRemapKeys","placementId":"p1","selections":selections,"action":action});
+    let delete = json!({"kind":"delete"});
+    for payload in [
+        json!({"kind":"enableTimeRemap","placementId":"p1","inFrame":"0","outFrame":10,"lastSourceFrame":19}),
+        json!({"kind":"disableTimeRemap","placementId":"p1","frame":0}),
+        json!({"kind":"setTimeRemapKey","placementId":"p1","frame":3,"value":null}),
+        json!({"kind":"setTimeRemapKey","placementId":"p1","frame":3,"value":1,"curvePoints":[{"x":0}]}),
+        json!({"kind":"setInterpMode","placementId":"p1","interpMode":""}),
+        json!({"kind":"setTimeRemap","placementId":"p1","timeRemap":null}),
+        keys(json!([]), delete.clone()),
+        keys(json!([{}]), delete.clone()),
+        keys(json!([{"frame":1,"ranges":[[0,1]]}]), delete.clone()),
+        keys(json!([{"ranges":[[5,1]]}]), delete.clone()),
+        keys(json!([{"ranges":[]}]), delete.clone()),
+        keys(json!([{"frame":1,"property":"timeRemap"}]), delete.clone()),
+        keys(json!([{"frame":1}]), json!({"kind":"shift","delta":0.5})),
+        keys(json!([{"frame":1}]), json!({"kind":"color","color":"blue"})),
+        keys(json!([{"frame":1}]), json!({"kind":"bake"})),
+        json!({"kind":"editTimeRemapKeys","placementId":"p1","selections":[{"frame":1}],"action":delete,"x":1}),
+    ] {
+        assert!(!request(&payload), "{payload}");
+    }
+}

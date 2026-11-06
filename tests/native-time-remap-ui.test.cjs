@@ -147,6 +147,26 @@ test('the Time Remap row value and stopwatch set or remove the key at the playhe
   assert.equal(f.calls.length,4);assert.equal(f.effects.includes('legacy'),false);
 });
 
+test('the selected remap keys go out as ONE editTimeRemapKeys edit; deleting every key says the remap is off; bad input sends nothing',async()=>{
+  const f=fixture(video({timeRemap:remap(KEYS,10,19.6)}));f.api.bindTimeRemapEntries();
+  f.root.SM.timeRemapKeyFacts(1);await settle();
+  const keys=f.root.SM.timeRemapKeysIntent;assert.equal(typeof keys,'function');
+  assert.equal(await keys(1,[{frame:24}],{kind:'shift',delta:-2}),true);
+  assert.deepEqual(f.calls[0].payload,{kind:'editTimeRemapKeys',placementId:'p1',selections:[{frame:24}],action:{kind:'shift',delta:-2}});
+  assert.equal(await keys(1,[{ranges:[[0,24]]}],{kind:'delete'}),true);
+  assert.deepEqual(f.calls[1].payload,{kind:'editTimeRemapKeys',placementId:'p1',selections:[{ranges:[[0,24]]}],action:{kind:'delete'}});
+  assert.ok(f.effects.some(e=>Array.isArray(e)&&e[0]==='toast'&&e[1]==='toastTimeRemapDisabled'),'every key deleted: the remap is off');
+  const before=f.effects.filter(e=>Array.isArray(e)&&e[1]==='toastTimeRemapDisabled').length;
+  assert.equal(await keys(1,[{frame:0}],{kind:'delete'}),true);
+  assert.equal(f.effects.filter(e=>Array.isArray(e)&&e[1]==='toastTimeRemapDisabled').length,before,'one of two keys deleted: the remap stays on');
+  for(const bad of [[[],{kind:'delete'}],[[{frame:0}],{kind:'bake'}],[[{frame:0,ranges:[[0,1]]}],{kind:'delete'}],[[{frame:NaN}],{kind:'delete'}]]){
+    await assert.rejects(()=>keys(1,bad[0],bad[1]).then(r=>{if(r===false)throw new Error('false');return r;}),Error,JSON.stringify(bad));
+  }
+  assert.equal(f.calls.length,3);
+  f.setFacts(video());assert.equal(await keys(1,[{frame:0}],{kind:'delete'}),false,'an unremapped placement takes no key edit');
+  assert.equal(f.calls.length,3);
+});
+
 test('the row stays across a frame change and an edit; only the remapped layer re-reads, redrawing frame-only',async()=>{
   let facts=video({timeRemap:remap(KEYS,10,19.6)});
   const f=fixture(facts);f.api.bindTimeRemapEntries();
@@ -175,7 +195,7 @@ test('the key entries are optional on the legacy owner and are removed again on 
   const f=fixture(video());assert.equal('timeRemapKeyFacts' in f.legacy,false);f.api.bindTimeRemapEntries();
   assert.equal(typeof f.root.SM.timeRemapKeyIntent,'function');
   f.setBlocks(false);f.setActive(false);f.api.disposeTimeRemapEntries();
-  assert.equal('timeRemapKeyFacts' in f.root.SM,false);assert.equal('timeRemapKeyIntent' in f.root.SM,false);
+  assert.equal('timeRemapKeyFacts' in f.root.SM,false);assert.equal('timeRemapKeyIntent' in f.root.SM,false);assert.equal('timeRemapKeysIntent' in f.root.SM,false);
 });
 
 // A modelled DOM for the native inspector mount; the inspector code itself is production.

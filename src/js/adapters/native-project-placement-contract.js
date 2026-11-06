@@ -25,6 +25,28 @@
   const frames=(v,names)=>{for(const n of names)if(!finite(v[n]))fail('invalid time remap frame');};
   function curvePoints(c){if(!Array.isArray(c)||!c.every(p=>{exact(p,['x','y'],['tx','ty']);return ['x','y','tx','ty'].every(k=>!has(p,k)||finite(p[k]));}))fail('invalid time remap curve');}
   function interpMode(m){if(typeof m!=='string'||!m||bytes(m)>32||m.includes('\0'))fail('invalid interpolation mode');}
+  // The Time Remap key edit: the selected keys (one frame, or runs of frames) under one property key action (the track-edit actions).
+  const COLOR=/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+  function selection(s){
+    if(!s||typeof s!=='object'||Array.isArray(s))fail('invalid time remap key selection');
+    exact(s,[],['frame','ranges']);
+    if(has(s,'frame')===has(s,'ranges'))fail('a key selection names a frame or ranges, not both');
+    if(has(s,'frame')&&!finite(s.frame))fail('invalid selected key frame');
+    if(has(s,'ranges')&&(!Array.isArray(s.ranges)||s.ranges.length<1||s.ranges.length>512||!s.ranges.every(r=>Array.isArray(r)&&r.length===2&&finite(r[0])&&finite(r[1])&&r[0]<=r[1])))fail('invalid selected key ranges');
+  }
+  function keyAction(a){
+    if(!a||typeof a!=='object'||Array.isArray(a))fail('time remap key action must be an object');
+    const big=n=>finite(n)&&Math.abs(n)<=1000000;
+    if(a.kind==='preset'){exact(a,['kind','preset']);if(!['linear','ease','easeIn','easeOut','hold'].includes(a.preset))fail('unsupported curve preset');}
+    else if(a.kind==='influence'){exact(a,['kind','side','percent']);if(!['in','out'].includes(a.side)||!finite(a.percent))fail('invalid curve influence');}
+    else if(a.kind==='lockTo'){exact(a,['kind','mode']);if(a.mode!==null&&!['in','out','layer'].includes(a.mode))fail('invalid key lock mode');}
+    else if(a.kind==='shift'){exact(a,['kind','delta']);if(!Number.isSafeInteger(a.delta)||Math.abs(a.delta)>1000000)fail('invalid key shift');}
+    else if(['delete','flip','distribute','subdivide'].includes(a.kind))exact(a,['kind']);
+    else if(a.kind==='warp'){exact(a,['kind','mode','total'],['grab']);const liquify=a.mode==='liquify';
+      if(!['top','bottom','left','right','liquify'].includes(a.mode)||!big(a.total)||has(a,'grab')!==liquify||liquify&&!big(a.grab))fail('invalid key warp');}
+    else if(a.kind==='color'){exact(a,['kind','color']);if(a.color!==null&&!(typeof a.color==='string'&&COLOR.test(a.color)))fail('invalid key colour');}
+    else fail('unsupported time remap key action');
+  }
   function payload(op,v){
     if(op!==OP)fail('placement operation is not declared');
     if(v&&v.kind==='place'){
@@ -37,6 +59,8 @@
     else if(v&&v.kind==='removeTimeRemapKey'){exact(v,['kind','placementId','frame']);sourceId(v.placementId);frames(v,['frame']);}
     else if(v&&v.kind==='disableTimeRemap'){exact(v,['kind','placementId']);sourceId(v.placementId);}
     else if(v&&v.kind==='setTimeRemapKey'){exact(v,['kind','placementId','frame','value'],['curvePoints']);sourceId(v.placementId);frames(v,['frame','value']);if(has(v,'curvePoints'))curvePoints(v.curvePoints);}
+    else if(v&&v.kind==='editTimeRemapKeys'){exact(v,['kind','placementId','selections','action']);sourceId(v.placementId);
+      if(!Array.isArray(v.selections)||v.selections.length<1||v.selections.length>128)fail('invalid time remap key selections');v.selections.forEach(selection);keyAction(v.action);}
     else if(v&&v.kind==='setInterpMode'){exact(v,['kind','placementId','interpMode']);sourceId(v.placementId);interpMode(v.interpMode);}
     else fail('invalid placement edit');
   }

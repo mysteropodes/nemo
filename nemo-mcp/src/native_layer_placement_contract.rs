@@ -68,8 +68,16 @@ fn remap(value: &Value) -> bool {
                 || r["keys"].as_array().is_some_and(|keys| {
                     Some(keys.len() as u64) == count
                         && keys.iter().all(|k| {
-                            exact(k, &["frame", "value"], &[])
-                                .is_some_and(|k| finite(&k["frame"]) && finite(&k["value"]))
+                            exact(k, &["frame", "value"], &["color", "hold"]).is_some_and(|k| {
+                                finite(&k["frame"])
+                                    && finite(&k["value"])
+                                    && k.get("hold").is_none_or(|h| h == &Value::Bool(true))
+                                    && k.get("color").is_none_or(|c| {
+                                        c.as_str().is_some_and(
+                                            crate::native_contract::property_read::key_color,
+                                        )
+                                    })
+                            })
                         })
                 }))
     })

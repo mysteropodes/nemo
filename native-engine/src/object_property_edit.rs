@@ -21,6 +21,8 @@ mod control_edit;
 mod curves;
 #[path = "object_property_expression_edit.rs"]
 mod expression_edit;
+#[path = "object_property_key_action.rs"]
+mod key_action;
 #[path = "object_property_key_batch.rs"]
 mod key_batch;
 #[path = "object_property_pose_edit.rs"]

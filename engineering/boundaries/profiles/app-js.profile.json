@@ -3020,11 +3020,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-time-remap-ui.js"
+        "native-time-remap-ui.js",
+        "native-time-remap-keys.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-time-remap-ui.js"
+        "native-time-remap-ui.js",
+        "native-time-remap-keys.js"
       ]
     },
     {

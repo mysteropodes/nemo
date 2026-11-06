@@ -733,6 +733,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-time-remap-keys.js",
+      "moduleId": "app.native.time.remap.ui.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2747,
+          "scriptOrdinal": 396
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/export-svg-frame.js",
       "moduleId": "app.export.svgframe.adapter",
       "executionClass": "document-classic",
