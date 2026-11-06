@@ -172,6 +172,7 @@
     {"src":"js/adapters/native-motion-property-value.js"},
     {"src":"js/adapters/native-motion-property-panel.js"},
     {"src":"js/adapters/native-motion-property-binding.js"},
+    {"src":"js/adapters/native-blend-key-grid.js"},
     {"src":"js/motion.js"},
     {"comment":["<!-- Capability registration (P05). Holds no state of its own and is loaded","     before the application services that register into it. -->"]},
     {"src":"js/application/capability-registry.js"},

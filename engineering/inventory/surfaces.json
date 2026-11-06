@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "a0af8f80d6135628eea86a0afb5aeb892a3940b2",
-  "describe": "v0.7.0-alpha.4-5405-ga0af8f80d-dirty"
+  "head": "2d6273e270a8ada60d4141b1253d1316b91b815c",
+  "describe": "v0.7.0-alpha.4-5413-g2d6273e27-dirty"
  },
- "inputsDigest": "060ac4351b6223a0df7aa8ae0d658029953aabf0abf382b77704865d2bf2252f",
+ "inputsDigest": "2a71aa002c9dc50b59bcdd19574fbc3c26f1911ff48eaf6db3f303d033257768",
  "states": [
   "inventoried",
   "characterized",
@@ -236,8 +236,8 @@
   },
   "SMMotion": {
    "file": "src/js/motion.js",
-   "line": 13366,
-   "members": 29
+   "line": 13367,
+   "members": 30
   },
   "SMNativeVideo": {
    "file": "src/js/native-video-bridge.js",
@@ -2962,7 +2962,7 @@
     "functionsVisited": 163,
     "via": "variable b",
     "references": [
-     "src/js/motion.js:13218 setAppMode()",
+     "src/js/motion.js:13219 setAppMode()",
      "src/js/timeline.js:1028 toggleLayerMotionBlur()",
      "src/js/timeline.js:1049 toggleMotionBlurComp()"
     ]
@@ -3226,7 +3226,7 @@
     "via": "variable b",
     "references": [
      "src/js/motion-graph.js:457 toggle()",
-     "src/js/motion.js:13214 setAppMode()"
+     "src/js/motion.js:13215 setAppMode()"
     ]
    },
    "fixtures": [
@@ -3679,7 +3679,7 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 78,
+    "functionsVisited": 75,
     "via": "variable newBtn",
     "references": [
      "src/js/adapters/native-palette-ui.js:244 render()",
@@ -4870,7 +4870,7 @@
     "references": [
      "src/js/adapters/native-component-layer-edit.js:164 shy()",
      "src/js/adapters/native-object-ui.js:373 setShyMode()",
-     "src/js/motion.js:13216 setAppMode()",
+     "src/js/motion.js:13217 setAppMode()",
      "src/js/timeline.js:1069 toggleLayerShy()"
     ]
    },
@@ -8369,7 +8369,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 25,
+    "functionsVisited": 38,
     "via": "chain",
     "references": [
      "src/js/images.js:249 importImages()"
@@ -12359,7 +12359,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 27,
+    "functionsVisited": 34,
     "via": "variable trig",
     "references": [
      "src/js/adapters/native-object-ui.js:175 unavailableInspector()",
@@ -17445,7 +17445,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 25,
+    "functionsVisited": 38,
     "via": "chain",
     "references": [
      "src/js/images.js:625 importVideo()",
@@ -17931,7 +17931,7 @@
    "capability": "2D Animation",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13252 initModeSwitch()"
+    "src/js/motion.js:13253 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -17980,7 +17980,7 @@
    "capability": "Motion — property keyframes (position/rotation/scale/opacity)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13252 initModeSwitch()"
+    "src/js/motion.js:13253 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -18029,7 +18029,7 @@
    "capability": "StoryBoard — in development, not yet available in this build",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13252 initModeSwitch()"
+    "src/js/motion.js:13253 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -22672,7 +22672,7 @@
    "source": "src/js/adapters/native-layer-range-menu.js:118",
    "meta": {
     "i18n": null,
-    "functionsVisited": 43
+    "functionsVisited": 40
    },
    "fixtures": []
   },
@@ -22788,7 +22788,7 @@
    "source": "src/js/adapters/native-layer-range-menu.js:106",
    "meta": {
     "i18n": null,
-    "functionsVisited": 9
+    "functionsVisited": 23
    },
    "fixtures": []
   },
@@ -22879,7 +22879,7 @@
    "source": "src/js/adapters/native-palette-ui.js:219",
    "meta": {
     "i18n": null,
-    "functionsVisited": 58
+    "functionsVisited": 69
    },
    "fixtures": [
     "static-props",
@@ -27648,7 +27648,7 @@
    "source": "src/js/motion.js:10968",
    "meta": {
     "i18n": "ctxAddKeyHere",
-    "functionsVisited": 533
+    "functionsVisited": 532
    },
    "fixtures": [
     "static-props",
@@ -27729,7 +27729,7 @@
    "source": "src/js/motion.js:10965",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 294
+    "functionsVisited": 293
    },
    "fixtures": [
     "static-props",
@@ -28005,7 +28005,7 @@
    "source": "src/js/motion.js:11021",
    "meta": {
     "i18n": "ctxInvertSelection",
-    "functionsVisited": 122
+    "functionsVisited": 121
    },
    "fixtures": [
     "static-props",
@@ -28241,7 +28241,7 @@
    "source": "src/js/motion.js:11003",
    "meta": {
     "i18n": "ctxSubdivideMidpoint",
-    "functionsVisited": 547
+    "functionsVisited": 546
    },
    "fixtures": [
     "static-props",

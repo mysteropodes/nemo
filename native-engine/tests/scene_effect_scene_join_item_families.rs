@@ -101,6 +101,40 @@ fn duplicated(fx: Option<Value>) -> NativeObjectHistory {
     )
 }
 
+/// Host `D` (an Object-mode duplicator whose pool layer `P` draws nothing, so the clone output is genuinely empty)
+/// holding the effected source rectangle `src`; `P` is a second, empty layer.
+fn emptied(fx: Option<Value>) -> NativeObjectHistory {
+    let mut record = rect_record("scene-root", "D", "src", (10., 20., 30., 40.), [1., 0., 0.]);
+    if let Some(fx) = fx {
+        record["effects"] = fx;
+    }
+    let tables = json!({"duplicators":{"format":"nemo.native-duplicator-set","formatVersion":1,
+        "duplicators":[{"contextId":"scene-root","layerUid":"D",
+            "duplicator":{"mode":"grid","rows":1,"cols":3,"spacingX":40,
+                "sourceMode":"objects","sourceLayerUids":["P"]}}],"effectorLayers":[]}});
+    let mut doc = drawing("D", vec![record], &["src"], tables);
+    doc["layers"] = json!([{"layerUid":"D","timing":timing()},{"layerUid":"P","timing":timing()}]);
+    doc["compositionOrder"]["contexts"][0]["layers"] = json!([
+        {"layerUid":"D","naturalPosition":0,"order":{}},
+        {"layerUid":"P","naturalPosition":1,"order":{}}]);
+    owner_of("dup-empty", doc, (160, 60))
+}
+
+#[test]
+fn an_effected_source_of_a_host_whose_clone_output_is_empty_draws_nothing_instead_of_refusing() {
+    let (flat_layered, control) = frame_of(&emptied(None), (160, 60));
+    assert!(!flat_layered);
+    assert_eq!(count(&control, RED), 0, "the baseline draws nothing: the copies replace the source and are empty");
+    let witness = witness_of(&emptied(Some(invert())));
+    assert!(
+        witness.plan().is_duplicator_host(0),
+        "the host paints copies, not originals"
+    );
+    let (_, graded) = frame_of(&emptied(Some(invert())), (160, 60));
+    assert_eq!(graded, control, "no copy, no grade: identical to the plain control");
+    assert_eq!(count(&graded, CYAN), 0);
+}
+
 /// A host layer `host` placing component `comp-a`: a red inner rectangle (`fx` on it) and a green one overlapping it.
 fn placed(fx: Option<Value>) -> NativeObjectHistory {
     let mut red = rect_record("comp-a", "inner", "red", (8., 8., 40., 36.), [1., 0., 0.]);

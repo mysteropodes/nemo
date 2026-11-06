@@ -23,6 +23,7 @@
   const fault = (code, message, extra) => Command.fault(code, message, extra);
   const copy = (v) => JSON.parse(JSON.stringify(v));
   const text = (v) => typeof v === 'string' && v.length > 0;
+  const framesOk = (f) => Array.isArray(f) && f.length > 0 && f.length <= 64 && f.every((v, i) => Number.isInteger(v) && v >= 0 && (i === 0 || f[i - 1] < v));
 
   function create(session) {
     const commands = Command.create(session, 'compositing', Contract, LIMIT);
@@ -90,6 +91,16 @@
         return edit(index, 'blendKeySet', { index: frame, mode });
       },
       removeBlendKey(index, frame) { return edit(index, 'blendKeyRemove', { index: frame }); },
+      // The key grid's group gestures, each ONE native edit of the layer (one revision, one history entry): the keys at `frames`
+      // (strictly increasing) removed, or moved by `by` frames with their modes (baseline Delete / drag / Alt+Arrow over a selection).
+      removeBlendKeys(index, frames) {
+        if (!framesOk(frames)) return Promise.reject(fault('invalid_request', 'Invalid blend keys', { reason: 'local_validation' }));
+        return edit(index, 'blendKeysRemove', { frames: frames.slice() });
+      },
+      moveBlendKeys(index, frames, by) {
+        if (!framesOk(frames) || !Number.isInteger(by) || by === 0) return Promise.reject(fault('invalid_request', 'Invalid blend key move', { reason: 'local_validation' }));
+        return edit(index, 'blendKeysMove', { frames: frames.slice(), by });
+      },
       // The Blend stopwatch at `frame` (baseline renderBlendRow): off -> a key with the mode showing; on with a key here -> that
       // key goes (the only one collapses back to the static blend, keeping its mode, in the same write); on without one -> a
       // key holding the mode in force at the frame.

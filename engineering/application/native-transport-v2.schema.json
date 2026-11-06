@@ -24755,7 +24755,9 @@
             "folderCollapsed",
             "blendKeySet",
             "blendKeyRemove",
-            "blendKeysClear"
+            "blendKeysClear",
+            "blendKeysRemove",
+            "blendKeysMove"
           ]
         },
         "mode": {
@@ -24800,6 +24802,24 @@
           "maxItems": 32,
           "items": {
             "$ref": "#/$defs/ObjectLayerCompositingEffect"
+          }
+        },
+        "frames": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        },
+        "by": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647,
+          "not": {
+            "const": 0
           }
         }
       },
@@ -24862,6 +24882,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -24904,6 +24938,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -24943,6 +24991,20 @@
               "not": {
                 "required": [
                   "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
                 ]
               }
             }
@@ -24992,6 +25054,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -25034,6 +25110,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -25067,6 +25157,20 @@
               "not": {
                 "required": [
                   "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
                 ]
               }
             }
@@ -25110,6 +25214,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -25151,6 +25269,20 @@
                   "collapsed"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -25190,6 +25322,20 @@
               "not": {
                 "required": [
                   "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
                 ]
               }
             }
@@ -25239,6 +25385,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -25278,6 +25438,20 @@
               "not": {
                 "required": [
                   "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
                 ]
               }
             }
@@ -25335,6 +25509,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -25376,6 +25564,20 @@
                   "effects"
                 ]
               }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
             }
           ]
         },
@@ -25409,6 +25611,124 @@
             "edit"
           ],
           "allOf": [
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "frames"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "blendKeysRemove"
+            }
+          },
+          "required": [
+            "edit",
+            "frames"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "index"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "collapsed"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "effects"
+                ]
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "by"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "edit": {
+              "const": "blendKeysMove"
+            }
+          },
+          "required": [
+            "edit",
+            "frames",
+            "by"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "mode"
+                ]
+              }
+            },
             {
               "not": {
                 "required": [

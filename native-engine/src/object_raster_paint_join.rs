@@ -54,6 +54,10 @@ impl ObjectPaintPlan {
     pub(crate) fn has_components(&self) -> bool {
         !self.scene.components.paints.is_empty()
     }
+    /// Whether the plan paints the copies of this source layer instead of its original records.
+    pub(crate) fn is_duplicator_host(&self, source_layer_index: usize) -> bool {
+        self.scene.duplicators.is_host(source_layer_index)
+    }
     /// Every duplicator copy paint, in scene order (the entries' `PaintIndex::Duplicator` index).
     pub(crate) fn duplicator_paints(
         &self,
