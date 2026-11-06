@@ -280,3 +280,40 @@ fn the_conditional_layer_rows_appear_with_their_prerequisite_in_the_baseline_ord
     with_matte.retain(|r| *r != "timeLinkInOffset");
     assert_eq!(listed(&value, "L0"), strings(&with_matte));
 }
+fn gizmo_bounds(value: &Value, layer: &str) -> Result<Value, crate::request_receipts::DispatchErrorCode> {
+    let o = NativeObjectHistory::new("gizmo-bounds", decode_storage_project(value.to_string().as_bytes()).unwrap()).unwrap();
+    let pin = head(&o);
+    let selector = json!({"instanceId":pin.instance_id(),"documentId":pin.document_id(),"atRevision":pin.content_revision(),
+        "documentSnapshotId":pin.snapshot_id(),"view":{"kind":"layerBounds","target":{"contextId":"scene-root","layerUid":layer},"frame":0}});
+    pin.query_property_read_json(selector.to_string().as_bytes()).map(|r| r["bounds"].clone())
+}
+#[test]
+fn an_effect_layer_is_boxed_at_the_origin_and_adds_nothing_to_a_null_centre() {
+    let mut value = fixture();
+    let effect = json!({"layerUid":"FX","name":"fx","visible":true,"locked":false,"color":"#5fa875","isEffectLayer":true,"effects":[],
+        "timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]}});
+    value["layers"].as_array_mut().unwrap().push(effect);
+    value["compositionOrder"]["contexts"][0]["layers"].as_array_mut().unwrap().push(json!({"layerUid":"FX","naturalPosition":2,"order":{}}));
+    assert_eq!(gizmo_bounds(&value, "FX").unwrap(), json!([0.0, 0.0, 0.0, 0.0]), "the baseline boxes an empty layer at the origin");
+    assert_eq!(gizmo_bounds(&value, "A").unwrap(), json!([20.0, 30.0, 120.0, 90.0]), "a vector layer is unchanged");
+    let o = NativeObjectHistory::new("fx-union", decode_storage_project(value.to_string().as_bytes()).unwrap()).unwrap();
+    let union = crate::object_snapshot::object_parent_pivot_read::layers_world_union(&head(&o), "scene-root", &["A", "FX"], 0);
+    assert_eq!(union, Some([20.0, 30.0, 120.0, 90.0]), "the effect layer's zero bounds do not pull the centre to the origin");
+}
+#[test]
+fn an_expression_driven_document_still_boxes_its_layers_on_their_rest_geometry() {
+    use crate::object_frame_packet::{prepare_object_exposure_frame, FrameScopeKind, ObjectFrameSelector};
+    let mut value = fixture();
+    value["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"A"},"properties":[
+        {"property":"position","expression":{"code":"[1, 2]","enabled":true}}]}]);
+    let o = NativeObjectHistory::new("expr-bounds", decode_storage_project(value.to_string().as_bytes()).unwrap()).unwrap();
+    let pin = head(&o);
+    let selector = ObjectFrameSelector { instance_id: pin.instance_id(), document_id: pin.document_id(), content_revision: pin.content_revision(),
+        document_snapshot_id: pin.snapshot_id(), context_id: "scene-root", scope_kind: FrameScopeKind::Authored, frame: 0 };
+    assert!(prepare_object_exposure_frame(&pin, &selector).is_err(), "premise: the strict packet needs the expression owner");
+    let p = crate::object_snapshot::object_parent_pivot_read::layer_gizmo_bounds(&pin, "scene-root", "A", 0);
+    let q = crate::object_snapshot::object_parent_pivot_read::layer_ancestor_affine(&pin, "scene-root", "A", 0);
+    assert!(p.is_ok() && q.is_ok(), "{p:?} {q:?}");
+    assert_eq!(gizmo_bounds(&value, "A").unwrap(), json!([20.0, 30.0, 120.0, 90.0]));
+    assert_eq!(gizmo_bounds(&value, "B").unwrap(), json!([0.0, 0.0, 10.0, 10.0]));
+}
