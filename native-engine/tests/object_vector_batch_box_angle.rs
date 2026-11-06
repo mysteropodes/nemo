@@ -144,8 +144,13 @@ fn a_pivot_with_another_style_member_or_a_malformed_value_is_refused_and_writes_
         ("a string coordinate", json!({"xformAnchorCustom":[1, "2"]})),
         ("beyond the bound", json!({"xformAnchorCustom":[1.0e9, 0]})),
     ] {
-        let r = send(&mut owner, label, batch(vec![pivot("s-a", style)]));
-        assert_eq!(r["ok"], false, "{label}: {r}");
+        // A malformed member is refused at admission (an error) or answered by a typed refusal; either way nothing is written.
+        let q = request(&owner, label, batch(vec![pivot("s-a", style)]));
+        let refused = match owner.try_dispatch_object_command(&serde_json::from_value(q).unwrap()) {
+            Err(_) | Ok(None) => true,
+            Ok(Some(reply)) => serde_json::to_value(reply).unwrap()["ok"] == false,
+        };
+        assert!(refused, "{label}");
     }
     assert_eq!((state(&owner), owner.history_depths()), (before, (0, 0)));
 }

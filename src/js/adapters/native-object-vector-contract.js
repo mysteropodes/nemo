@@ -172,9 +172,7 @@
       if (hasStroke) fail(`${label}.pressure: a pressure stroke is painted through its fill and has no real stroke`);
     }
     if (has(value, 'paramShape')) shapeBody(value.paramShape, `${label}.paramShape`, false);
-    if (has(value, 'boxAngle')) num(value.boxAngle, `${label}.boxAngle`);
-    if (has(value, 'xformAnchorKey')) oneOf(value.xformAnchorKey, ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'], `${label}.xformAnchorKey`);
-    if (has(value, 'xformAnchorCustom')) pair(value.xformAnchorCustom, `${label}.xformAnchorCustom`);
+    if (has(value, 'boxAngle')) num(value.boxAngle, `${label}.boxAngle`); if (has(value, 'xformAnchorKey')) oneOf(value.xformAnchorKey, ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'], `${label}.xformAnchorKey`); if (has(value, 'xformAnchorCustom')) pair(value.xformAnchorCustom, `${label}.xformAnchorCustom`);
     if (has(value, 'linkedFillId') && (typeof value.linkedFillId !== 'string' || !value.linkedFillId.length || bytes(value.linkedFillId) > 128 || /[\u0000-\u001f\u007f-\u009f]/.test(value.linkedFillId))) fail(`${label}.linkedFillId must be a bounded identity`);
     if (has(value, 'isLinkedFillCompanion') && typeof value.isLinkedFillCompanion !== 'boolean') fail(`${label}.isLinkedFillCompanion must be a boolean`);
     if (value.isLinkedFillCompanion === true && (!has(value, 'linkedFillId') || has(value, 'pressure'))) fail(`${label} has an invalid linked-fill companion`);

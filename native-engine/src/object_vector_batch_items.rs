@@ -108,10 +108,6 @@ pub(super) fn transform(
     }
     check_target(document, target)?;
     check_layer(document, target)?;
-    // The Select pivot is stored on vector records only (#2372): an image or a text block keeps the pivot for the session.
-    if style.detail.pivot().is_some() {
-        return Err(DispatchErrorCode::Unavailable);
-    }
     let mut landing = target.clone();
     landing.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
     if let Some(entry) = raster {
@@ -299,6 +295,10 @@ pub(super) fn restyle(
     }
     check_target(document, target)?;
     check_layer(document, target)?;
+    // The Select pivot is stored on vector records only (#2372): an image or a text block keeps the pivot for the session.
+    if style.detail.pivot().is_some() {
+        return Err(DispatchErrorCode::Unavailable);
+    }
     let mut landing = target.clone();
     landing.frame_scope.frame = frame.unwrap_or(target.frame_scope.frame);
     if let Some(entry) = raster {
