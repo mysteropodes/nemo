@@ -1,0 +1,189 @@
+{
+  "schema": "nemo.installed-parity/1",
+  "contract": "https://github.com/mysteropodes/nemo/issues/2348#issuecomment-6415465173",
+  "rows": [
+    {
+      "id": "frame-edit-ui",
+      "issue": 2248,
+      "status": "Ready",
+      "tasks": [
+        "F09",
+        "F10",
+        "F11",
+        "F12",
+        "F13"
+      ],
+      "surfaces": [
+        "menu:timeline.js:top:ctxinsertframe",
+        "menu:timeline.js:top:ctxinsertkeyframe",
+        "menu:timeline.js:top:ctxinsertblankkeyframe",
+        "menu:timeline.js:top:ctxclearkeyframe",
+        "menu:timeline.js:top:ctxremoveframes",
+        "shortcut:cmdInsertFrame",
+        "shortcut:cmdInsertKey",
+        "shortcut:cmdInsertBlankKey",
+        "shortcut:cmdExtendExposure",
+        "shortcut:cmdDuplicateKey"
+      ],
+      "dependsOn": [],
+      "scenario": "frame-edit-ui",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/2248#issuecomment-6522968234",
+      "checks": [
+        {
+          "id": "scene-f5-f6-f7",
+          "clause": "Real F5, F6 and F7 on a selected timeline cell each apply once: F5 inserts one held frame, F6 promotes a held cell to a key with its content, F7 makes a blank key, each as exactly one revision and one history entry.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "scene-menu-and-shortcuts",
+          "clause": "The right-click Insert a frame, Insert a keyframe, Insert a blank keyframe, Clear the keyframe and Delete the frames items, and the Extend exposure and Duplicate keyframe shortcuts, each apply once with the baseline timeline effect and one history entry.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "scene-undo-redo",
+          "clause": "One Cmd+Z undoes exactly the last frame edit and one Cmd+Shift+Z redoes it, read back from history depth and the cell runs.",
+          "covers": [
+            "undo-redo",
+            "oracle"
+          ]
+        },
+        {
+          "id": "scene-save-reopen",
+          "clause": "After Save and reopening the saved file the edited timeline and total frames read back unchanged, the file bytes are untouched by opening, and the reopened history is fresh.",
+          "covers": [
+            "save-reopen",
+            "oracle"
+          ]
+        },
+        {
+          "id": "component-edits",
+          "clause": "Inside an entered component F5, F6, F7, Extend exposure, Duplicate keyframe, Clear the keyframe and Delete the frames edit the component timeline with one revision and one history entry each, and the Scene timeline stays unchanged.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "component-undo-redo",
+          "clause": "One Cmd+Z and one Cmd+Shift+Z inside the component undo and redo exactly one component edit, with the Scene timeline unchanged.",
+          "covers": [
+            "undo-redo",
+            "oracle"
+          ]
+        },
+        {
+          "id": "component-save-reopen",
+          "clause": "After Save and reopening, the entered component and the Scene timeline read back as saved, with the file untouched by opening.",
+          "covers": [
+            "save-reopen",
+            "oracle"
+          ]
+        },
+        {
+          "id": "layer-row-styling",
+          "clause": "Native timeline layer rows render as compact dark rows with single-line names and compact visibility, lock and shy controls that keep their accessible names.",
+          "covers": [
+            "pixels"
+          ]
+        }
+      ],
+      "taskEvidence": "Surfaces are limited to the timeline context-menu items and shortcuts this scenario presses. The Convert to keyframes, clipboard and Duplicate the selection menu items, dom:#tl-total and the Labs tasks are not exercised. Move, Repeat and clipboard inside a component are later work (9fc4d1dcf) and are not part of this row.",
+      "runtimePrerequisites": "Foreground operator with the real keyboard and mouse on an owned Nemo window placed at the top of display 2 (2880,-270, 1620x1420); a public Nemo MCP read route for read-only query.* calls; a disposable report directory for the saved files. The UI32 helper cannot send F5/F6/F7, right-click or free drags.",
+      "evidence": "Component frame and key edits: https://github.com/mysteropodes/nemo/pull/2786 merged at e5a7b33f50223fa7551613fe35a720f2f5c24327. Desktop frame-edit routing: https://github.com/mysteropodes/nemo/pull/2337 merged at 4c38ae23a69dbbc5e9d073464ee756bd77e0f79d. MCP half recorded at https://github.com/mysteropodes/nemo/issues/2248#issuecomment-6522968234 (integration 4d99db9d, 7/7). No installed run has happened for this row."
+    },
+    {
+      "id": "settings-profile",
+      "issue": 2172,
+      "status": "Ready",
+      "tasks": [
+        "U02"
+      ],
+      "surfaces": [
+        "dom:#btn-settings",
+        "dom:#project-tabs-settings",
+        "dom:#settings-close",
+        "dom:#profile-name",
+        "dom:#profile-email",
+        "dom:#profile-role",
+        "dom:#profile-color",
+        "dom:#profile-color-well",
+        "dom:#sync-folder-path",
+        "dom:#sync-choose-folder",
+        "dom:settings-tabs>button[data-tab=general]",
+        "dom:settings-tabs>button[data-tab=figma]",
+        "dom:settings-tabs>button[data-tab=about]",
+        "dom:settings-modal>div[data-pane=general]",
+        "dom:settings-modal>div[data-pane=figma]",
+        "dom:settings-modal>div[data-pane=about]"
+      ],
+      "dependsOn": [],
+      "scenario": "settings-profile",
+      "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/2172#issuecomment-6252374438",
+      "checks": [
+        {
+          "id": "settings-entries-tabs",
+          "clause": "Both ordinary Settings entries (app menu and the project-tabs gear) open the modal, all eight tabs switch their pane, and the close button and the backdrop dismiss it.",
+          "covers": [
+            "positive"
+          ]
+        },
+        {
+          "id": "profile-persist-restore",
+          "clause": "Profile name and email written in the dialog persist across close and the other entry route, an empty name falls back to the default name, and the baseline profile is restored.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "profile-role-guard",
+          "clause": "Profile role changes are read back with their hint, and the Producer role keeps drawing tools from becoming active; the baseline role is restored.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "profile-color-alpha",
+          "clause": "The profile colour swatch shows a chosen opaque colour, the same colour at half alpha, and the original colour after restoration.",
+          "covers": [
+            "pixels"
+          ]
+        },
+        {
+          "id": "shortcuts-reset",
+          "clause": "A rebound shortcut shows in the Shortcuts tab and Reset all returns the tab to its recoverable defaults.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "sync-empty-folder",
+          "clause": "With no shared folder configured, cancelling the folder picker keeps it empty and the update check on the empty folder completes without a stale result.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        },
+        {
+          "id": "sync-owner-paths",
+          "clause": "The real sync-owner publish, check, merge and failure paths against a configured shared folder.",
+          "covers": [
+            "positive",
+            "oracle"
+          ]
+        }
+      ],
+      "taskEvidence": "Original criteria: the 2026-10-18 disposition in acceptanceReference; remaining rows reconciled at https://github.com/mysteropodes/nemo/issues/2172#issuecomment-6403867536. Surfaces are limited to what the scenario opens, types into or presses. The Figma token and URL fields, the settings-modal links, #np-w and #np-h are not exercised. sync-owner-paths is declared so the receipt names it, and the scenario always returns it unrun: it needs a configured shared folder and a second profile, which the UI32 helper cannot reach.",
+      "runtimePrerequisites": "The UI32 helper and a clean Start screen at launch; a foreground operator for File > New, the colour picker and the Shortcuts rebind/Reset all; the owned window placed at the top of display 2 (2880,-270, 1620x1420); no shared sync folder configured (the helper refuses a non-empty path). Profile name, email and role are restored by the helper, but the app keeps the profile in local storage of the disposable run.",
+      "evidence": "Settings and profile presentation: https://github.com/mysteropodes/nemo/pull/2178 merged at 4cf1c2ecf64c8bfe3908e2c1b20f2d52eca02214. No installed run has happened for this row."
+    }
+  ]
+}
