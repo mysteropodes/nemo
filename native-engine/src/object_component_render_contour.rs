@@ -24,7 +24,10 @@ pub(crate) fn layer_supported(
     layer: &ObjectLayer,
     host: usize,
 ) -> Result<(), ObjectSceneError> {
-    if layer.blend_mode().is_some_and(|mode| mode != "normal") {
+    // #2257: blend, matte and effect properties of a layer in the packet's own context are composition inputs the
+    // layered compositor joins (`SceneEffectPlan`); a layer inside a component's own stack has no such join.
+    let joined = context == packet.context_id();
+    if !joined && layer.blend_mode().is_some_and(|mode| mode != "normal") {
         return Err(unavailable(
             host,
             "component layer blend mode requires a layered consumer",
@@ -32,14 +35,15 @@ pub(crate) fn layer_supported(
     }
     if layer.parent_layer_uid.value().is_some_and(Option::is_some)
         || layer.rig().is_some()
-        || layer.is_effect_layer()
         || layer.is_folder_layer()
-        || layer
-            .effects()
-            .is_some_and(|effects| effects.iter().any(|effect| effect.enabled))
-        || layer.effects_from().is_some()
-        || layer.matte_on()
-        || !layer.mattes_more().is_empty()
+        || (!joined
+            && (layer.is_effect_layer()
+                || layer
+                    .effects()
+                    .is_some_and(|effects| effects.iter().any(|effect| effect.enabled))
+                || layer.effects_from().is_some()
+                || layer.matte_on()
+                || !layer.mattes_more().is_empty()))
     {
         return Err(unavailable(
             host,

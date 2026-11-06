@@ -24,6 +24,9 @@ const BLUE:&str="89504e470d0a1a0a0000000d4948445200000002000000010806000000f4227
 const RED:&str="89504e470d0a1a0a0000000d4948445200000002000000010806000000f4227f8a0000000e49444154789c63f8cfc0f01f040110f803fd4e95c16f0000000049454e44ae426082";
 const ALPHA:&str="89504e470d0a1a0a0000000d494844520000000200000002080600000072b60d240000001a49444154789c63105432feef129ad6c050de319361d5ee33ff01378a07ad4ff3864d0000000049454e44ae426082";
 fn source() -> Vec<u8> {
+    source_with(json!({"layerUid":"L0"}))
+}
+fn source_with(layer: Value) -> Vec<u8> {
     let cases: Value = serde_json::from_str(include_str!(
         "../../engineering/application/examples/native-object-v1/cases.json"
     ))
@@ -41,7 +44,7 @@ fn source() -> Vec<u8> {
     }
     serde_json::to_vec(&json!({"format":"nemo.native-project-document","formatVersion":1,
         "project":{"canvasW":64,"canvasH":64,"fps":24},"viewportReference":null,"assets":[],
-        "drawing":{"format":"nemo.native-object-document","formatVersion":2,"totalFrames":2,"layers":[{"layerUid":"L0"}],"objects":records,
+        "drawing":{"format":"nemo.native-object-document","formatVersion":2,"totalFrames":2,"layers":[layer],"objects":records,
             "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
                 "contexts":[{"contextId":"scene-root","layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],"scopes":scopes}],
                 "migration":"explicit-plan-required","referencePolicy":"unresolved"}}})).unwrap()
@@ -285,6 +288,34 @@ fn cpu_reference_reuses_charged_allocation_across_frames_settings_undo_and_check
     );
     drop(retained_blob);
     assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn gpu_reference_image_sits_beneath_a_layered_frame_exactly_as_beneath_the_flat_one() {
+    // #2257: a Multiply layer selects the layer stack; the reference image is the content beneath the artwork, so no
+    // blend sees it, and every pixel of the flat frame above is the same here.
+    use crate::object_render_scene::scene_effect_kernels::scene_effect_order::CompositionPlan;
+    let mut gpu = Compositor::new().expect("reference viewport requires real Metal");
+    let mut owner = NativeObjectHistory::from_project_file(
+        "reference-layered",
+        &source_with(json!({"layerUid":"L0","blendMode":"multiply"})),
+    )
+    .unwrap();
+    attach(&mut owner, BLUE);
+    let witness = viewport(&owner, 0, None);
+    assert!(matches!(
+        witness.scene_effects().unwrap().plan(),
+        CompositionPlan::Layered { .. }
+    ));
+    assert!(witness.has_viewport_reference());
+    let pixels = rgba(&mut gpu, &owner, &witness);
+    pixel(&pixels, 8, 32, [128, 128, 255, 255]);
+    pixel(&pixels, 8, 8, [255; 4]);
+    pixel(&pixels, 32, 32, [255, 0, 0, 255]);
+    // The export never draws the viewport reference, layered or not.
+    let s = snapshot(&owner);
+    let export = prepare_object_composition(&plan(&s, 0), &pins(&s, 0)).unwrap();
+    assert!(!export.has_viewport_reference());
 }
 
 #[test]

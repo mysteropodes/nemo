@@ -335,44 +335,44 @@ fn contour_multiply_overlay_really_multiplies_and_both_doors_agree() {
 }
 
 #[test]
-fn a_family_alone_in_a_multiply_layer_is_refused_typed_before_any_door() {
-    // The scene boundary refuses the blend context; no compositor sees a partial scene.
-    for name in ["brush", "text", "mesh"] {
-        if name == "text" && !cfg!(feature = "font_asset_admission") {
-            continue;
-        }
-        let refusal = scene_refusal(&family(name), Some("multiply"), None);
-        assert!(
-            refusal.contains("UnsupportedGeometry")
-                && refusal.contains("native parent group, rig or effect context unavailable"),
-            "{name}: {refusal}"
-        );
-    }
-    let refusal = scene_refusal(&family("component"), Some("multiply"), None);
-    assert!(
-        refusal.contains("UnsupportedComponent")
-            && refusal.contains("component layer blend mode requires a layered consumer"),
-        "component: {refusal}"
-    );
-}
-
-#[test]
-fn a_family_beside_a_multiply_layer_is_refused_by_both_doors_never_dropped() {
+fn a_family_alone_in_a_multiply_layer_draws_as_the_flat_normal_image_through_both_doors() {
+    // #2257: Multiply over an empty backdrop is the source itself, so the layered image of a family item is the flat one.
     let mut gpu = gpu();
-    for (name, refusal) in [
-        ("brush", "native raster layered effects are unavailable"),
-        ("text", "native Text layered effects are unavailable"),
-        ("mesh", "native raster layered effects are unavailable"),
-        (
-            "component",
-            "native component layered effects are unavailable",
-        ),
-    ] {
+    for name in ["brush", "text", "mesh", "component"] {
         if name == "text" && !cfg!(feature = "font_asset_admission") {
             continue;
         }
         let family = family(name);
-        // Control: the same two layers with Normal overlay are flat, draw the family item and agree on every door.
+        let flat = run_case(&mut gpu, &family, None, None);
+        let layered = run_case(&mut gpu, &family, Some("multiply"), None);
+        assert!(!flat.layered, "{name}: the Normal control stays flat");
+        assert!(layered.layered, "{name}: Multiply selects the layered stack");
+        assert_one_image(&flat, name);
+        assert_one_image(&layered, name);
+        assert!(
+            non_blank(pixels(&flat.viewport)) > 100,
+            "{name}: the control really draws the family item"
+        );
+        let (count, worst) = pixels(&layered.viewport)
+            .iter()
+            .zip(pixels(&flat.viewport))
+            .fold((0usize, 0u8), |(n, w), (a, b)| {
+                (n + usize::from(a != b), w.max(a.abs_diff(*b)))
+            });
+        // The blend pass round-trips straight alpha through premultiplied RGBA8: at most one level on an antialiased edge.
+        assert!(worst <= 1, "{name}: layered Multiply vs flat Normal ({count} channels differ)");
+    }
+}
+
+#[test]
+fn a_family_beside_a_multiply_layer_is_drawn_and_both_doors_agree() {
+    let mut gpu = gpu();
+    for name in ["brush", "text", "mesh", "component"] {
+        if name == "text" && !cfg!(feature = "font_asset_admission") {
+            continue;
+        }
+        let family = family(name);
+        // Control: the same two layers with a Normal overlay are flat, draw the family item and agree on every door.
         let control = run_case(&mut gpu, &family, None, Some("normal"));
         assert!(!control.layered, "{name}");
         assert_one_image(&control, name);
@@ -382,24 +382,21 @@ fn a_family_beside_a_multiply_layer_is_refused_by_both_doors_never_dropped() {
             pixels(&solo.viewport),
             "{name}: the overlay contour is part of the control"
         );
-        // Layered: the family item cannot be drawn, so BOTH doors name that, with the same text.
+        // Layered: the family item is drawn on its own layer and the overlay multiplies over it; both doors hold one image.
         let layered = run_case(&mut gpu, &family, None, Some("multiply"));
         assert!(
             layered.layered,
             "{name}: the Multiply overlay selects the layered stack"
         );
-        assert_eq!(
-            layered.viewport,
-            Door::Refused(refusal.into()),
-            "{name} viewport"
-        );
-        assert_eq!(
-            layered.export, layered.viewport,
-            "{name}: the export door refuses identically"
+        assert_one_image(&layered, name);
+        assert_ne!(
+            pixels(&layered.viewport),
+            pixels(&control.viewport),
+            "{name}: the overlay really multiplies instead of covering"
         );
         assert!(
-            layered.png.is_none(),
-            "{name}: nothing is encoded from a refused frame"
+            non_blank(pixels(&layered.viewport)) >= non_blank(pixels(&solo.viewport)),
+            "{name}: the family item is never dropped from a layered frame"
         );
     }
 }
@@ -432,17 +429,12 @@ fn a_family_entry_no_producer_drew_is_incomplete_on_the_flat_and_the_layered_pat
 #[cfg(not(feature = "font_asset_admission"))]
 #[test]
 fn text_without_a_font_parser_never_reaches_a_door() {
-    // Normal: the missing parser is the typed refusal. Multiply: the blend context is refused first, still typed.
-    for (blend, reason) in [
-        (None, "native font parser is unavailable"),
-        (
-            Some("multiply"),
-            "native parent group, rig or effect context unavailable",
-        ),
-    ] {
+    // The missing parser is the typed refusal, with or without a blend mode: #2257 joins the blend, it does not hide it.
+    for blend in [None, Some("multiply")] {
         let refusal = scene_refusal(&family("text"), blend, None);
         assert!(
-            refusal.contains("UnsupportedGeometry") && refusal.contains(reason),
+            refusal.contains("UnsupportedGeometry")
+                && refusal.contains("native font parser is unavailable"),
             "{refusal}"
         );
     }

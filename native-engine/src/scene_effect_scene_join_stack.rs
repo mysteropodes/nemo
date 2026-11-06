@@ -8,8 +8,9 @@
 //! * a `Layered` plan becomes a `GpuLayerStack` (L08-G) whose per-wire-layer fills are the paint plan's commands
 //!   grouped by SOURCE layer and placed at that layer's paint-order wire index, validated as a whole, and checked to
 //!   cover the plan exactly once (`covers_plan`), so a layer can neither lose nor duplicate a command.
-//! Every layered feature G cannot render yet (layer and element effect stacks, effect-layer grading, folder passes,
-//! mask feather) comes back as the typed `GpuBlendError::Unavailable` it already is; nothing is dropped.
+//! Every layered feature G cannot render yet (element effect stacks, custom shaders) comes back as the typed
+//! `GpuBlendError::Unavailable` it already is; nothing is dropped. Layer, folder and effect-layer stacks are the
+//! join's planned `EffectStackPlan`s, admitted against each layer's box when the stack is composed.
 //! No texture, device or scheduler state is touched: the compositor entries run the returned stack.
 use crate::compositor::scene_effect_gpu_blend::{
     layer_runs_from_plan, GpuBlendError, GpuFill, GpuLayerInput, GpuLayerPaint, GpuLayerStack,
@@ -92,7 +93,7 @@ pub(crate) fn folds_only(join: &SceneEffectPlan) -> bool {
 
 /// Select the compositor path for `plan`, the paint plan of the packet `join` was built from.
 pub(crate) fn select_composition_path<'a>(
-    join: &SceneEffectPlan,
+    join: &'a SceneEffectPlan,
     plan: &'a ObjectPaintPlan,
 ) -> Result<PathSelection<'a>, PathSelectionError> {
     if !join.is_for_packet(plan.packet()) || !plan.mask_inputs().is_for_packet(plan.packet()) {
@@ -123,6 +124,10 @@ pub(crate) fn select_composition_path<'a>(
     let mut inputs: Vec<GpuLayerInput<'a>> = (0..join.layers().len())
         .map(|_| GpuLayerInput::default())
         .collect();
+    for (slot, layer) in join.layers().iter().enumerate() {
+        inputs[slot].source_layer = Some(layer.source_layer_index);
+        inputs[slot].effects = layer.stack.as_ref();
+    }
     for run in runs {
         let slot = join.wire_index_of_source(run.source_layer_index).ok_or(
             PathSelectionError::UnknownLayer {
@@ -173,3 +178,6 @@ mod tests;
 #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/scene_effect_scene_join_families.rs"]
 mod families_tests;
+#[cfg(all(test, feature = "history", feature = "project_media_codec"))]
+#[path = "../tests/scene_effect_layered_view.rs"]
+mod layered_view_tests;

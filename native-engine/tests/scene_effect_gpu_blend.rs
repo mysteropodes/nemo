@@ -131,7 +131,7 @@ fn isolated_paint(
     };
     let mut target = gpu.make_object_target(8, 8).unwrap();
     target
-        .render(|view| gpu.render_paints(&[&paint], view, (8, 8)))
+        .render(|view| gpu.render_paints(&[&paint], None, view, (8, 8)))
         .unwrap();
     let bytes = gpu.readback_texture(target.texture(), 8, 8).unwrap();
     let raw: &[u8] = &bytes;

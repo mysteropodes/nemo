@@ -212,18 +212,20 @@ fn gpu_an_export_paints_the_soloed_layers_and_a_viewport_solo_leaks_nothing_into
 }
 
 /// The packet and plan built with the Solo view open: a layer the set shows is part of the frame whatever its eye says.
-fn solo_plan(s: &ObjectSnapshot, uids: &[&str]) -> crate::object_render_scene::ObjectPaintPlan {
-    let _view = crate::object_frame_packet::solo_view::enter("scene-root", &set(uids));
+fn solo_plan(s: &ObjectSnapshot) -> crate::object_render_scene::ObjectPaintPlan {
     plan(s)
 }
+/// Production holds the Solo view from the packet's preparation through the layer join of the witness.
 fn solo_viewport(s: &ObjectSnapshot, uids: &[&str]) -> ObjectCompositionWitness {
-    prepare_object_viewport_composition(&solo_plan(s, uids), &pins(s), None)
+    let _view = crate::object_frame_packet::solo_view::enter("scene-root", &set(uids));
+    prepare_object_viewport_composition(&solo_plan(s), &pins(s), None)
         .unwrap()
         .with_viewport_solo(&set(uids))
         .unwrap()
 }
 fn solo_export(s: &ObjectSnapshot, uids: &[&str]) -> ObjectCompositionWitness {
-    prepare_object_composition(&solo_plan(s, uids), &pins(s))
+    let _view = crate::object_frame_packet::solo_view::enter("scene-root", &set(uids));
+    prepare_object_composition(&solo_plan(s), &pins(s))
         .unwrap()
         .with_export_solo(&set(uids))
         .unwrap()

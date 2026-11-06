@@ -261,7 +261,12 @@ fn missing_override_or_nonconsumed_motion_refuses_before_any_partial_scene_is_pu
                 d["componentTables"]["components"]["components"][0]["layers"][0]["blendMode"] =
                     json!("multiply")
             }
-            5 => d["layers"][2]["blendMode"] = json!("screen"),
+            // #2257: a blend mode on the HOST layer is a composition input the layered compositor joins; see
+            // `a_blend_mode_on_the_host_layer_is_joined_not_refused`. Kind 5 is kept as an inner-stack effect.
+            5 => {
+                d["componentTables"]["components"]["components"][0]["layers"][0]["effects"] =
+                    json!([{"type": "blur", "enabled": true, "p1": 4}])
+            }
             _ => {
                 d["objects"].as_array_mut().unwrap().push(record(
                     "scene-root",
@@ -295,6 +300,22 @@ fn missing_override_or_nonconsumed_motion_refuses_before_any_partial_scene_is_pu
         assert_eq!(image(&s), before);
         assert_eq!(o.history_depths(), (0, 0));
     }
+}
+#[test]
+fn a_blend_mode_on_the_host_layer_is_joined_not_refused() {
+    let mut d = drawing();
+    d["layers"][2]["blendMode"] = json!("screen");
+    let o = owner(&d);
+    let s = o.acquire_snapshot(0).unwrap();
+    let expected = pins(&s, 0);
+    let packet = prepare_object_exposure_frame(&s, &expected).unwrap();
+    let scene = prepare_object_render_scene(&packet, &expected).unwrap();
+    let plan = prepare_object_paint_plan(&scene, &expected).unwrap();
+    let witness = crate::object_render_scene::prepare_object_composition(&plan, &expected).unwrap();
+    assert!(matches!(
+        witness.scene_effects().unwrap().plan(),
+        crate::object_render_scene::scene_effect_kernels::scene_effect_order::CompositionPlan::Layered { .. }
+    ));
 }
 #[test]
 fn bad_scene_and_paint_pins_do_not_replace_the_retained_component_plan() {

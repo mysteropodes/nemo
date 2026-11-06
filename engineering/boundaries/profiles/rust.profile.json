@@ -842,7 +842,9 @@
         "scene_effect_gpu_fx_bounds.rs",
         "scene_effect_gpu_fx_frame.rs",
         "scene_effect_scene_join_stack.rs",
-        "object_raster_compositor.rs"
+        "object_raster_compositor.rs",
+        "object_layered_content.rs",
+        "scene_effect_gpu_blend_fx.rs"
       ],
       "publicApi": [
         "compositor.rs"
@@ -1925,6 +1927,7 @@
         "scene_effect_scene_join_families.rs",
         "scene_effect_scene_join_families_docs.rs",
         "scene_effect_scene_join_folder.rs",
+        "scene_effect_layered_view.rs",
         "scene_effect_scene_join_stack.rs",
         "scene_effect_scene_join_support.rs",
         "object_parametric_edit.rs",

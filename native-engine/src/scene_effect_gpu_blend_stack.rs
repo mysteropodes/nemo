@@ -11,13 +11,14 @@ use crate::object_render_scene::object_scene_style_emit::{prepare_item, Prepared
 use crate::object_render_scene::scene_effect_kernels::scene_effect_order::{
     CompositionPlan, LayerStep, MatteStep, PaintSource,
 };
+use crate::object_render_scene::scene_effect_kernels::scene_effect_params::EffectStackPlan;
 use crate::object_render_scene::{ObjectPaintCommand, ObjectPaintPlan};
 use std::collections::BTreeMap;
 use vello::kurbo::BezPath;
 
-/// Baseline `if feather > 0.01` threshold of `composite_scene`: a feather above
-/// it needs the shared blur pass, which belongs to the effect-pass leaf.
-const FEATHER_PASS_THRESHOLD: f32 = 0.01;
+/// Baseline `if feather > 0.01` threshold of `composite_scene`: a feather above it blurs the combined mask
+/// silhouette with the shared Gaussian pass before it multiplies into the layer.
+pub(crate) const FEATHER_PASS_THRESHOLD: f32 = 0.01;
 
 /// One closed contour with straight (non-premultiplied) RGBA in `0..=1`.
 #[derive(Clone, Debug)]
@@ -82,18 +83,23 @@ pub(crate) struct GpuMask<'a> {
 /// Everything the executor needs from one wire layer, indexed like the plan.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct GpuLayerInput<'a> {
+    /// The document layer this wire slot paints (an index into the packet's source layers). The layered compositor
+    /// draws every non-contour family of that layer, which no fill list can carry, from the witness' paint entries.
+    pub(crate) source_layer: Option<usize>,
     pub(crate) paint: GpuLayerPaint<'a>,
     pub(crate) masks: Vec<GpuMask<'a>>,
     pub(crate) mask_feather: f32,
+    /// The planned effect stack of this layer (`None` when no entry is enabled): its own stack for an ordinary or
+    /// folder layer, the "into" stack of an effect layer. Admission against the layer's box happens at compose time.
+    pub(crate) effects: Option<&'a EffectStackPlan>,
 }
 
-/// Baseline features this leaf does not render.
+/// Baseline features the layered path does not render.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum GpuUnavailable {
     ElementEffects { layer: usize },
     LayerEffects { layer: usize },
     EffectLayerStack { layer: usize },
-    MaskFeather { layer: usize },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -157,6 +163,8 @@ pub(crate) struct GpuFolderChild {
     pub(crate) layer: usize,
     pub(crate) blend: u32,
     pub(crate) seeds: bool,
+    /// The child's own effect stack runs on its isolated paint before it folds into the folder.
+    pub(crate) effects: bool,
 }
 
 /// One planned paint step: the layer, its resolved mattes, its blend index. A folder step carries its children:
@@ -167,6 +175,10 @@ pub(crate) struct GpuStep {
     pub(crate) mattes: Vec<MatteStep>,
     pub(crate) blend: u32,
     pub(crate) folder: Option<Vec<GpuFolderChild>>,
+    /// The layer's effect stack runs on its masked, matted result before the blend.
+    pub(crate) effects: bool,
+    /// An adjustment layer: no paint of its own, its stack grades the accumulator below it.
+    pub(crate) effect_layer: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -218,18 +230,34 @@ impl<'a> GpuLayerStack<'a> {
                     applies_stack,
                 } => {
                     // A disabled stack copies the backdrop through unchanged
-                    // (identical pixels); an enabled one needs the effect pass.
+                    // (identical pixels); an enabled one grades the accumulator.
                     if *applies_stack {
-                        return Err(GpuBlendError::Unavailable(
-                            GpuUnavailable::EffectLayerStack { layer: *index },
-                        ));
+                        let has_stack = inputs.get(*index).is_some_and(|input| input.effects.is_some());
+                        if !has_stack {
+                            return Err(GpuBlendError::Unavailable(
+                                GpuUnavailable::EffectLayerStack { layer: *index },
+                            ));
+                        }
+                        steps.push(GpuStep {
+                            layer: *index,
+                            mattes: Vec::new(),
+                            blend: 0,
+                            folder: None,
+                            effects: true,
+                            effect_layer: true,
+                        });
                     }
                 }
                 LayerStep::Paint(paint) => {
                     let layer = paint.index;
                     let mut folder = None;
+                    let has_effects = |index: usize| {
+                        inputs.get(index).is_some_and(|input| input.effects.is_some())
+                    };
                     let unavailable = match &paint.source {
-                        PaintSource::Plain | PaintSource::Folder(_) if paint.layer_effects => {
+                        PaintSource::Plain | PaintSource::Folder(_)
+                            if paint.layer_effects && !has_effects(layer) =>
+                        {
                             Some(GpuUnavailable::LayerEffects { layer })
                         }
                         PaintSource::Plain => None,
@@ -247,7 +275,7 @@ impl<'a> GpuLayerStack<'a> {
                                 }
                                 refused = refused.or(if child.item_effects {
                                     Some(GpuUnavailable::ElementEffects { layer: child.index })
-                                } else if child.layer_effects {
+                                } else if child.layer_effects && !has_effects(child.index) {
                                     Some(GpuUnavailable::LayerEffects { layer: child.index })
                                 } else {
                                     None
@@ -256,6 +284,7 @@ impl<'a> GpuLayerStack<'a> {
                                     layer: child.index,
                                     blend: child.blend,
                                     seeds: child.seeds_accumulator,
+                                    effects: child.layer_effects,
                                 });
                             }
                             folder = Some(flattened);
@@ -275,10 +304,9 @@ impl<'a> GpuLayerStack<'a> {
                             supplied: input.masks.len(),
                         });
                     }
-                    if !input.masks.is_empty() && input.mask_feather > FEATHER_PASS_THRESHOLD {
-                        return Err(GpuBlendError::Unavailable(GpuUnavailable::MaskFeather {
-                            layer,
-                        }));
+                    // NaN keeps the baseline `feather > 0.01` meaning (no blur); an infinite radius is no radius.
+                    if input.mask_feather.is_infinite() {
+                        return Err(GpuBlendError::InvalidPaint { layer });
                     }
                     if let Some(matte) = paint.mattes.iter().find(|m| m.source >= inputs.len()) {
                         return Err(GpuBlendError::IndexOutOfRange {
@@ -290,6 +318,8 @@ impl<'a> GpuLayerStack<'a> {
                         mattes: paint.mattes.clone(),
                         blend: paint.blend,
                         folder,
+                        effects: paint.layer_effects,
+                        effect_layer: false,
                     });
                 }
             }

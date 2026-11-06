@@ -53,13 +53,14 @@ fn retained_witness(
 }
 
 #[test]
-fn actual_flat_entry_refuses_retained_masks_even_when_witness_has_no_joined_effect_plan() {
+fn actual_flat_entry_refuses_retained_masks_even_though_the_witness_joins_a_layered_plan() {
     let (owner, snapshot, witness) = retained_witness(true);
     let before = encode_storage_project(snapshot.document()).unwrap();
-    assert!(
-        witness.scene_effects().is_none(),
-        "exercise the actual production fallback gap"
-    );
+    // #2257: the production witness now carries its joined plan, which selects the layered path for masks.
+    assert!(matches!(
+        witness.scene_effects().unwrap().plan(),
+        crate::object_render_scene::scene_effect_kernels::scene_effect_order::CompositionPlan::Layered { .. }
+    ));
     assert_eq!(
         witness.plan().mask_inputs().layer(1).unwrap().masks().len(),
         3
@@ -85,7 +86,10 @@ fn actual_flat_entry_refuses_retained_masks_even_when_witness_has_no_joined_effe
 fn actual_zero_mask_witness_keeps_the_existing_flat_admission() {
     let (owner, snapshot, witness) = retained_witness(false);
     let before = encode_storage_project(snapshot.document()).unwrap();
-    assert!(witness.scene_effects().is_none());
+    assert!(matches!(
+        witness.scene_effects().unwrap().plan(),
+        crate::object_render_scene::scene_effect_kernels::scene_effect_order::CompositionPlan::Flat { .. }
+    ));
     assert!(witness.plan().mask_inputs().layers().is_empty());
     assert_eq!(witness.plan().commands().len(), 5);
     assert!(check_flat_masks(&witness).is_ok());
