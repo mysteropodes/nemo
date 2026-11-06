@@ -166,3 +166,67 @@ fn the_gizmo_bounds_read_answers_a_3d_layer_and_still_refuses_nothing_it_answere
     set(&mut o, "A", json!(true)).unwrap();
     assert_eq!(bounds(&o).unwrap(), flat, "the 3D gizmo pivots about the same rest bounds the 2D box did");
 }
+#[cfg(feature = "evaluation")]
+#[test]
+fn a_3d_layer_with_no_geometry_at_the_playhead_is_boxed_at_the_origin_and_a_flat_empty_layer_stays_refused() {
+    use crate::request_receipts::DispatchErrorCode::Unavailable;
+    let mut value = fixture();
+    let blank = |uid: &str| json!({"layerUid":uid,"name":uid,"visible":true,"locked":false,"color":"#5fa875",
+        "timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]}});
+    value["layers"].as_array_mut().unwrap().push(blank("C"));
+    value["compositionOrder"]["contexts"][0]["layers"].as_array_mut().unwrap().push(json!({"layerUid":"C","naturalPosition":2,"order":{}}));
+    let mut o = NativeObjectHistory::new("three-d-empty", decode_storage_project(value.to_string().as_bytes()).unwrap()).unwrap();
+    let bounds = |o: &NativeObjectHistory| {
+        let pin = head(o);
+        let selector = json!({"instanceId":pin.instance_id(),"documentId":pin.document_id(),"atRevision":pin.content_revision(),
+            "documentSnapshotId":pin.snapshot_id(),"view":{"kind":"layerBounds","target":{"contextId":"scene-root","layerUid":"C"},"frame":0}});
+        pin.query_property_read_json(selector.to_string().as_bytes()).map(|r| (r["bounds"].clone(), r["parentAffine"].clone()))
+    };
+    assert_eq!(bounds(&o), Err(Unavailable), "a flat layer with nothing to box is still a typed refusal");
+    set(&mut o, "C", json!(true)).unwrap();
+    assert_eq!(bounds(&o).unwrap(), (json!([0.0, 0.0, 0.0, 0.0]), json!([1.0, 0.0, 0.0, 1.0, 0.0, 0.0])));
+    set(&mut o, "C", json!(false)).unwrap();
+    assert_eq!(bounds(&o), Err(Unavailable));
+}
+#[test]
+fn a_duplicator_host_lists_its_eight_per_copy_offsets_after_the_transform_rows_and_they_edit_and_read_back() {
+    let document = decode_storage_project(crate::object_frame_packet::duplicator_sources::tests::duplicated_document(1).to_string().as_bytes()).unwrap();
+    let mut o = NativeObjectHistory::new("dup-rows", document).unwrap();
+    let dup = ["dupOffsetPos", "dupOffsetRot", "dupOffsetScale", "dupOffsetOpacity", "dupOffsetHue", "dupOffsetPosZ", "dupOffsetRotX", "dupOffsetRotY"];
+    let base = ["position", "anchor", "rotation", "scale", "opacity", "order"];
+    let host = names(&o, "L0");
+    assert_eq!(host, base.iter().chain(dup.iter()).map(|s| (*s).to_owned()).collect::<Vec<_>>());
+    let mut items = vec![];
+    let mut offset = 0;
+    loop {
+        let page = properties(&o, "L0", offset);
+        items.extend(page["items"].as_array().unwrap().clone());
+        match page["nextOffset"].as_u64() {
+            Some(next) => offset = next,
+            None => break,
+        }
+    }
+    let z = items.iter().find(|i| i["property"] == "dupOffsetPosZ").unwrap();
+    assert_eq!((z["dimension"].clone(), z["unit"].clone(), z["defaultValue"].clone()), (json!(1), json!("px"), json!([0])));
+    // The 3D switch adds its own three rows in front; the duplicator rows follow, and a layer without a duplicator lists none.
+    set(&mut o, "L0", json!(true)).unwrap();
+    let three = names(&o, "L0");
+    assert_eq!(&three[..9], ["position", "positionZ", "anchor", "rotation", "rotationX", "rotationY", "scale", "opacity", "order"]);
+    assert_eq!(&three[9..], dup);
+    let others: Vec<String> = head(&o).document().layers().iter().map(|l| l.layer_uid().to_owned()).filter(|u| u != "L0").collect();
+    for uid in others {
+        assert!(names(&o, &uid).iter().all(|n| !n.starts_with("dupOffset")), "{uid}");
+    }
+    // The three 3D offsets edit and read back like the others, as one revision each.
+    let before = o.content_revision();
+    assert_eq!(edit(&mut o, "L0", "dupOffsetPosZ", json!([-40])), before + 1);
+    assert_eq!(edit(&mut o, "L0", "dupOffsetRotX", json!([12])), before + 2);
+    assert_eq!(edit(&mut o, "L0", "dupOffsetRotY", json!([-7.5])), before + 3);
+    let holders = wire(&o)["propertyHolders"].clone();
+    let value = |property: &str| holders.as_array().unwrap().iter().flat_map(|h| h["properties"].as_array().unwrap().iter())
+        .find(|p| p["property"] == property).unwrap()["static"].clone();
+    assert_eq!((value("dupOffsetPosZ"), value("dupOffsetRotX"), value("dupOffsetRotY")), (json!([-40]), json!([12]), json!([-7.5])));
+    assert_eq!(o.undo(before + 3), Ok(before + 4));
+    assert_eq!(wire(&o)["propertyHolders"].as_array().unwrap().iter().flat_map(|h| h["properties"].as_array().unwrap().iter())
+        .find(|p| p["property"] == "dupOffsetRotY").map(|p| p["static"].clone()), None);
+}
