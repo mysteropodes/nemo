@@ -18,6 +18,11 @@ impl ObjectSnapshot {
                 // #2520: a plain layer with nothing on it yet has nothing to place; its switch must not make the frame unavailable.
                 && !crate::evaluation::object_vector_kernels::render_vector_eval::plain_empty_layer(self.document(), layer.layer_uid()))
     }
+    /// #2520: whether the 3D switch may go ON for `layer_uid` of `document` without leaving the frame unavailable: the layer joins the common
+    /// batch with its switch on (or has nothing on it yet), and no layer is parented to it.
+    pub(crate) fn three_d_switch_joins(document: &crate::object_document::ObjectDocument, layer_uid: &str) -> bool {
+        crate::evaluation::object_vector_kernels::render_vector_eval::three_d_joins_batch(document, layer_uid)
+    }
     /// Camera pose independent of the viewport's session-only cameraView switch.
     /// Export and camera-locked preview select this same stored-camera provider.
     pub(crate) fn sampled_camera_matrix(

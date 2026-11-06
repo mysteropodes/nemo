@@ -117,9 +117,7 @@ impl ObjectFillOwner {
         };
         // #2520: switching a layer to 3D is refused, with no revision, where the frame path cannot place it in 3D; otherwise
         // the one click would leave every frame of the document unavailable.
-        if three_d == Some(true)
-            && !crate::evaluation::object_vector_kernels::render_vector_eval::three_d_joins_batch(&document, &payload.layer_uid)
-        {
+        if three_d == Some(true) && !ObjectSnapshot::three_d_switch_joins(&document, &payload.layer_uid) {
             return Err(DispatchErrorCode::Unavailable);
         }
         ObjectSnapshot::validate_drawing(&document)

@@ -41,11 +41,11 @@ async function fixture(options={}){
 test('actual ordinary property timeline publishes read and shared inspector selections without writer or legacy authority',async()=>{
  const h=await fixture();assert.equal(h.ordinary.readKeyTimeline(),null);await h.open();
  const projection=h.ordinary.readKeyTimeline();assert.ok(projection);assert.strictEqual(h.latest.property,'opacity');assert.deepEqual(copy(projection.target),h.target);
- assert.deepEqual(copy(projection.items),[{frame:-0.5,selected:false},{frame:4.25,selected:false},{frame:12,selected:false}]);
+ assert.deepEqual(copy(projection.items),[{frame:-0.5,selected:false,v:[1]},{frame:4.25,selected:false,v:[2]},{frame:12,selected:false,v:[3]}]);
  const before=h.notifications;assert.equal(projection.selectFrames([4.25]),true);assert.ok(h.notifications>before);assert.equal(projection.isCurrent(),false);
  assert.deepEqual(h.checks().map(n=>n.checked),[false,true,false]);assert.deepEqual(copy(h.ordinary.captureSelectedKeys()).keys,[{target:{kind:'property',target:h.target,property:'opacity'},frame:4.25}]);
  const current=h.ordinary.readKeyTimeline();h.checks()[0].checked=true;await h.checks()[0].fire('change');
- assert.equal(current.isCurrent(),false);assert.deepEqual(copy(h.latest.items),[{frame:-0.5,selected:true},{frame:4.25,selected:true},{frame:12,selected:false}]);
+ assert.equal(current.isCurrent(),false);assert.deepEqual(copy(h.latest.items),[{frame:-0.5,selected:true,v:[1]},{frame:4.25,selected:true,v:[2]},{frame:12,selected:false,v:[3]}]);
  assert.equal(h.writes.length,0);h.retire();assert.equal(h.ordinary.readKeyTimeline(),null);assert.ok(h.events.includes('dispose'));
 });
 
