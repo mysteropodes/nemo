@@ -16,6 +16,9 @@ use crate::object_snapshot::{ObjectSnapshot, ReadAdmission, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use serde_json::{json, Value};
 
+#[cfg(feature = "evaluation")]
+#[path = "object_component_read_state.rs"]
+mod state;
 #[cfg(test)]
 #[path = "../tests/object_component_read.rs"]
 mod tests;
@@ -53,18 +56,9 @@ enum Selector<'a> {
         cursor: u64,
         limit: u64,
     },
-    /// C-comp-owned-state: a page of the markers a component stores (`sym.markers`), in stored order.
-    Markers {
-        id: &'a str,
-        cursor: u64,
-        limit: u64,
-    },
-    /// C-comp-owned-state: a page of the camera keys a component stores (`sym.cameraKeys`), in stored order.
-    CameraKeys {
-        id: &'a str,
-        cursor: u64,
-        limit: u64,
-    },
+    /// C-comp-owned-state: pages of a component's stored markers / camera keys (`sym.markers`, `sym.cameraKeys`).
+    Markers { id: &'a str, cursor: u64, limit: u64 },
+    CameraKeys { id: &'a str, cursor: u64, limit: u64 },
     /// #2256 Q4: the stored duplicator descriptor of one scene layer, as the inspector panel shows it.
     Duplicator {
         layer_uid: &'a str,
@@ -362,37 +356,11 @@ impl ObjectSnapshot {
                     (head, context.layers().len(), cursor, limit, items)
                 }
                 Selector::Markers { id, cursor, limit } => {
-                    let context = source
-                        .context(id)
-                        .map_err(|_| DispatchErrorCode::NotFound)?;
-                    // The scene's markers belong to the composition owner.
-                    let component = context.component().ok_or(DispatchErrorCode::InvalidRequest)?;
-                    let items: Vec<Value> = component
-                        .markers()
-                        .iter()
-                        .map(|m| json!({"frame":m.frame,"name":m.name,"color":m.color}))
-                        .collect();
-                    let mut head = self.component_head("markers");
-                    head["contextId"] = json!(context.id());
+                    let (head, items) = self.component_state_page(&source, id, "markers")?;
                     (head, items.len(), cursor, limit, items)
                 }
                 Selector::CameraKeys { id, cursor, limit } => {
-                    let context = source
-                        .context(id)
-                        .map_err(|_| DispatchErrorCode::NotFound)?;
-                    // The scene's camera is read through `query.document.object.project.camera.read`.
-                    let component = context.component().ok_or(DispatchErrorCode::InvalidRequest)?;
-                    let items: Vec<Value> = component
-                        .camera_keys()
-                        .unwrap_or(&[])
-                        .iter()
-                        .map(|k| {
-                            json!({"frame":shown(Some(k.frame), 0),"x":k.x,"y":k.y,"w":k.w,"rot":k.rot.value(),
-                                "hOut":k.h_out.value(),"hIn":k.h_in.value(),"ease":k.ease.value()})
-                        })
-                        .collect();
-                    let mut head = self.component_head("cameraKeys");
-                    head["contextId"] = json!(context.id());
+                    let (head, items) = self.component_state_page(&source, id, "cameraKeys")?;
                     (head, items.len(), cursor, limit, items)
                 }
                 Selector::Instances { id, cursor, limit } => {

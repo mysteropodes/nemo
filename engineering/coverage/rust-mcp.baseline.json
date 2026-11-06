@@ -256,6 +256,12 @@
       "reason": "no executable regions in the coverage report",
       "note": "#2256: cfg(test) child of native_component_read_contract.rs; hand-added with its parent, no other entry changed."
     },
+    "nemo-mcp/src/native_component_state_contract.rs": {
+      "lines": 85,
+      "regions": 80,
+      "functions": 100,
+      "note": "C-comp-owned-state: member kinds of component.state.edit; hand-added with the new file, no other entry changed. Every kind is exercised by the contract tests (accept and refuse); floors sit below the unreached defensive arms, to be raised by the next measured run."
+    },
     "nemo-mcp/src/native_workspace_context_contract.rs": {
       "lines": 99.29,
       "regions": 97.94,
