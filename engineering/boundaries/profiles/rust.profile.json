@@ -993,6 +993,7 @@
         "reference_image_resources.rs",
         "object_property_read.rs",
         "object_property_geometry_read.rs",
+        "object_property_conditional_rows.rs",
         "object_project_wire_admission.rs",
         "object_raster_asset_prepare.rs",
         "object_property_metadata_read.rs",
