@@ -3,8 +3,10 @@ use crate::native_contract::{exact, object};
 use serde_json::Value;
 pub(crate) const OP: &str = "command.document.object.layer.policy.edit";
 pub(super) fn request(value: &Value) -> bool {
-    exact(value, &["command", "layerUid", "flag", "value"], &[]).is_some_and(|p| {
+    exact(value, &["command", "layerUid", "flag", "value"], &["contextId"]).is_some_and(|p| {
         p.get("command").and_then(Value::as_str) == Some("object.layer.policy.edit")
+            // #2256: the declared component the flag is set inside; absent is the scene root.
+            && p.get("contextId").is_none_or(|id| id.as_str().is_some_and(|id| !id.is_empty()))
             && p.get("layerUid")
                 .and_then(Value::as_str)
                 .is_some_and(|uid| !uid.is_empty())

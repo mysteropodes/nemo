@@ -20,6 +20,7 @@
 use crate::commands::object_fill_owner::object_frame_edit_document::{
     retime_key_with_active, FrameEditError, RetimeOutcome,
 };
+use crate::commands::object_fill_owner::object_context_projection::{context_of, through};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{object_deserialize, ObjectDocument, Presence, RetimePair};
 use crate::object_snapshot::ObjectSnapshot;
@@ -36,13 +37,16 @@ struct RetimePayload {
     active_layer_uid: Presence<String>,
     from: u32,
     to: u32,
+    /// #2256: the declared component the drag works inside; absent is the scene root.
+    context_id: Presence<String>,
 }
 object_deserialize!(RetimePayload {
     command: String,
     layer_uid: String,
     #[serde(default)] active_layer_uid: Presence<String>,
     from: u32,
-    to: u32
+    to: u32,
+    #[serde(default)] context_id: Presence<String>
 });
 
 fn refusal(error: FrameEditError) -> DispatchErrorCode {
@@ -129,13 +133,21 @@ impl ObjectFillOwner {
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
+        let context = context_of(&payload.context_id)?.to_owned();
         let origin = self.current_snapshot();
-        let (document, applied_to, pairs) = match plan(origin.document(), &payload)? {
-            RetimeOutcome::Changed(done) => {
-                (Some(done.document), Some(done.applied_to), done.pairs)
+        // Inside a component the unchanged kernel runs on the component as the scene (`through`); the moved frame and the pairs are
+        // read off the same outcome.
+        let (mut applied_to, mut pairs) = (None, Vec::new());
+        let document = through(origin.document(), &context, |view| {
+            match plan(view, &payload)? {
+                RetimeOutcome::Changed(done) => {
+                    applied_to = Some(done.applied_to);
+                    pairs = done.pairs;
+                    Ok(Some(done.document))
+                }
+                RetimeOutcome::NoChange => Ok(None),
             }
-            RetimeOutcome::NoChange => (None, None, Vec::new()),
-        };
+        })?;
         Ok(PreparedExposureRetime {
             origin,
             document,

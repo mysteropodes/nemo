@@ -5230,6 +5230,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-component-layer-edit.js",
+      "moduleId": "app.native.component.context.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2775,
+          "scriptOrdinal": 421
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-component-context.js",
       "moduleId": "app.native.component.context.adapter",
       "executionClass": "document-classic",

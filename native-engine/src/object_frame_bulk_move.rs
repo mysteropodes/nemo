@@ -1,6 +1,7 @@
 //! Original moveFrames and content-only shiftLayerFrames through the existing native owner.
 //! Whole-cell timing/content/order is preserved; clipboard normalization is never used. Move's
 //! checkpoint eligibility differs from byte change. Shift's caller still owns atomic Motion/range/history.
+use crate::commands::object_fill_owner::object_context_projection::{context_of, through};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
     object_deserialize, plan_move_frames, plan_shift_frames, BulkCell, BulkMoveLayer, BulkMovePlan,
@@ -35,10 +36,13 @@ struct Payload {
     selection: Presence<Vec<BulkFrameCell>>,
     frame: Presence<u32>,
     delta: Presence<i64>,
+    /// #2256: the declared component the move works inside; absent is the scene root (Move only).
+    context_id: Presence<String>,
 }
 object_deserialize!(Payload { command: String, layer_uid: String,
     #[serde(default)] selection: Presence<Vec<BulkFrameCell>>,
-    #[serde(default)] frame: Presence<u32>, #[serde(default)] delta: Presence<i64> });
+    #[serde(default)] frame: Presence<u32>, #[serde(default)] delta: Presence<i64>,
+    #[serde(default)] context_id: Presence<String> });
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BulkFramePair {
     pub(crate) layer_uid: String,
@@ -400,15 +404,24 @@ impl ObjectFillOwner {
         if payload.layer_uid.is_empty() {
             return Err(invalid());
         }
+        let context = context_of(&payload.context_id)?.to_owned();
+        // The shift is the layer-bar's atomic gesture (Motion, ranges and history belong to its caller): it has no component route.
+        if payload.command != MOVE && context != CONTEXT {
+            return Err(DispatchErrorCode::Unavailable);
+        }
         let origin = self.current_snapshot();
-        let (command, plan, next) = prepare(origin.document(), &payload)?;
-        let changed = next != *origin.document();
-        let uids: Vec<_> = origin
-            .document()
-            .layers
-            .iter()
-            .map(|l| l.layer_uid.clone())
-            .collect();
+        // Inside a component the unchanged kernel runs on the component as the scene (`through`); the layer slots of the plan are the
+        // component's own, so they are named with the view's uids.
+        let mut taken = None;
+        let document = through(origin.document(), &context, |view| {
+            let (command, plan, next) = prepare(view, &payload)?;
+            let changed = next != *view;
+            let uids: Vec<_> = view.layers.iter().map(|l| l.layer_uid.clone()).collect();
+            let publish = changed || plan.checkpoint_required;
+            taken = Some((command, plan, changed, uids));
+            Ok(if publish { Some(next) } else { None })
+        })?;
+        let (command, plan, changed, uids) = taken.ok_or(DispatchErrorCode::Internal)?;
         let selection = plan.selection.map(|cells| {
             cells
                 .into_iter()
@@ -431,11 +444,7 @@ impl ObjectFillOwner {
             .collect();
         Ok(PreparedBulkFrameEdit {
             origin,
-            document: if changed || plan.checkpoint_required {
-                Some(next)
-            } else {
-                None
-            },
+            document,
             command,
             document_changed: changed,
             checkpoint_required: plan.checkpoint_required,

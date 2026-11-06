@@ -2993,7 +2993,8 @@
       "files": [
         "native-component-grid.js",
         "native-component-context.js",
-        "native-component-frame-edit.js"
+        "native-component-frame-edit.js",
+        "native-component-layer-edit.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [

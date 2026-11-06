@@ -5,6 +5,7 @@
 //! correlated response against the operation-specific full-message budget BEFORE commit.
 //! Copy/Cut/Paste alone use the F12 transport budget; Duplicate retains4096.
 //! Records plus complete order arrays retain the existing4MiB copied-data bound.
+use crate::commands::object_fill_owner::object_context_projection::context_of;
 use crate::commands::object_fill_owner::object_frame_clipboard_packet::FrameClipboardPacket;
 use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
     CellItems, CellRef, FrameClipboardOperation, PasteCell, PasteRequest,
@@ -53,6 +54,8 @@ struct ClipboardPayload {
     frame: Presence<u32>,
     cells: Presence<Vec<WireCell>>,
     selection: Presence<Vec<WireRef>>,
+    /// #2256: the declared component the clipboard action works inside; absent is the scene root.
+    context_id: Presence<String>,
 }
 object_deserialize!(ClipboardPayload {
     command: String,
@@ -61,7 +64,8 @@ object_deserialize!(ClipboardPayload {
     #[serde(default)] layer_uid: Presence<String>,
     #[serde(default)] frame: Presence<u32>,
     #[serde(default)] cells: Presence<Vec<WireCell>>,
-    #[serde(default)] selection: Presence<Vec<WireRef>>
+    #[serde(default)] selection: Presence<Vec<WireRef>>,
+    #[serde(default)] context_id: Presence<String>
 });
 
 fn require<T>(field: Presence<T>) -> Result<T, DispatchErrorCode> {
@@ -114,23 +118,38 @@ impl crate::commands::ObjectFillOwner {
                 })
             })
             .collect::<Result<Vec<CellRef>, DispatchErrorCode>>()?;
+        let context = context_of(&payload.context_id)?;
         if selection.is_empty() {
+            // An undeclared component still refuses: the context is checked even when there is nothing to copy.
+            crate::commands::object_fill_owner::object_context_projection::project(
+                self.current_snapshot().document(),
+                context,
+            )?;
             Ok(None)
         } else {
-            self.copy_frame_clipboard(&selection).map(Some)
+            self.copy_frame_clipboard_in(&selection, context).map(Some)
         }
     }
 }
 
 /// Parse one clipboard command payload into its typed operation.
+#[allow(dead_code)]
 pub(crate) fn parse_clipboard_payload(
     bytes: &[u8],
 ) -> Result<FrameClipboardOperation, DispatchErrorCode> {
+    parse_clipboard_payload_in(bytes).map(|(operation, _)| operation)
+}
+
+/// The typed operation and the context it works inside (the scene root when the payload names none).
+pub(crate) fn parse_clipboard_payload_in(
+    bytes: &[u8],
+) -> Result<(FrameClipboardOperation, String), DispatchErrorCode> {
     if bytes.len() > budget::MESSAGE_BYTES {
         return Err(DispatchErrorCode::InvalidRequest);
     }
     let payload: ClipboardPayload =
         serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+    let context = context_of(&payload.context_id)?.to_owned();
     if !matches!(
         payload.command.as_str(),
         "object.frames.clipboard.cut" | "object.frames.clipboard.paste"
@@ -138,6 +157,10 @@ pub(crate) fn parse_clipboard_payload(
     {
         return Err(DispatchErrorCode::InvalidRequest);
     }
+    operation_of(payload).map(|operation| (operation, context))
+}
+
+fn operation_of(payload: ClipboardPayload) -> Result<FrameClipboardOperation, DispatchErrorCode> {
     match payload.command.as_str() {
         "object.frames.clipboard.cut" => {
             forbid(&payload.instance_id)?;

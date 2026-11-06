@@ -80,6 +80,8 @@
       var name = node(host, 'span', 'lnm', layer.name); name.title = layer.name + ' — ' + layer.layerKind;
       row.appendChild(ico); row.appendChild(name);
       row.addEventListener('click', function () { if (ports.current()) ports.select(i); });
+      // The eye, the padlock and the row menu: layer-level edits of the component (native-component-layer-edit.js), one native request each.
+      if (host.NemoNativeComponentLayerEdit) host.NemoNativeComponentLayerEdit.decorate(host, row, layer, i);
       return row;
     });
     var frows = st.rows.map(function (layer, i) {

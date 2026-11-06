@@ -188,6 +188,7 @@ fn drop_content(
             selection: Presence::Missing,
             frame: Presence::Missing,
             delta: Presence::Present(dx),
+            context_id: Presence::Missing,
         };
         let (_, plan, next) = prepare_content(&document, &payload)?;
         document = next;

@@ -177,11 +177,11 @@
     } else if (operation === 'command.document.object.project.settings.edit') {
       projectSettingsPayload(payload);
     } else if (operation === 'command.document.object.layer.create') {
-      exact(payload, ['command', 'name'], [], 'object layer create');
+      exact(payload, ['command', 'name'], ['contextId'], 'object layer create'); if (has(payload, 'contextId')) objectUid(payload.contextId); // #2256: the entered component
       if (payload.command !== 'object.layer.create' || typeof payload.name !== 'string') throw new TypeError('invalid object layer create');
     } else if (['command.document.object.layer.visibility.set', 'command.document.object.layer.policy.edit'].includes(operation)) {
       const policy = operation === 'command.document.object.layer.policy.edit';
-      exact(payload, policy ? ['command', 'layerUid', 'flag', 'value'] : ['command', 'layerUid', 'visible'], [], 'object layer command');
+      exact(payload, policy ? ['command', 'layerUid', 'flag', 'value'] : ['command', 'layerUid', 'visible'], ['contextId'], 'object layer command'); if (has(payload, 'contextId')) objectUid(payload.contextId); // #2256
       // D37: the keyLock flag carries the layer key-lock mode (null clears); locked, shy and threeD stay booleans.
       const keyLock = policy && payload.flag === 'keyLock' && (payload.value === null || ['in', 'out', 'layer'].includes(payload.value));
       if (payload.command !== (policy ? 'object.layer.policy.edit' : 'object.layer.visibility.set') || !keyLock && typeof payload[policy ? 'value' : 'visible'] !== 'boolean' || policy && !keyLock && !['locked', 'shy', 'threeD'].includes(payload.flag)) throw new TypeError('invalid object layer command');

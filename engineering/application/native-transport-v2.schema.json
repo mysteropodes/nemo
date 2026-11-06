@@ -2258,6 +2258,10 @@
         "name"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.create"
         },
@@ -4343,6 +4347,10 @@
         "visible"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.visibility.set"
         },
@@ -4364,6 +4372,10 @@
         "value"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.policy.edit"
         },
@@ -4853,6 +4865,10 @@
         "selection"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.delete"
         },
@@ -4869,6 +4885,10 @@
         "layerUid"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.duplicate"
         },
@@ -4907,6 +4927,10 @@
         "selection"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.reorder"
         },
@@ -5700,6 +5724,10 @@
         "to"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.key.move"
         },
@@ -5727,6 +5755,10 @@
         "selection"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.clipboard.duplicate"
         },
@@ -5756,6 +5788,10 @@
         "times"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.repeat"
         },
@@ -13500,6 +13536,10 @@
         "selection"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.clipboard.copy"
         },
@@ -13523,6 +13563,10 @@
         "selection"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.clipboard.cut"
         },
@@ -13550,6 +13594,10 @@
         "cells"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.clipboard.paste"
         },
@@ -13756,6 +13804,10 @@
         "frame"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.move"
         },

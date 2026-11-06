@@ -53,8 +53,56 @@ fn a_component_context_id_is_an_optional_opaque_name_on_the_nine_timing_edits() 
             "{operation} refuses a non-string id"
         );
     }
-    // Operations that have no component route yet stay closed to the field.
-    let mut mv = json!({"command":"object.layer.key.move","layerUid":"layer-a","from":2,"to":4});
-    mv["contextId"] = json!("sym_a");
-    assert!(!request(KEY_MOVE, &mv));
+}
+
+fn moves(operation: &str) -> Value {
+    match operation {
+        KEY_MOVE => json!({"command":"object.layer.key.move","layerUid":"layer-a","from":2,"to":4}),
+        MOVE => {
+            json!({"command":"object.frames.move","selection":[{"layerUid":"layer-a","frame":2}],"layerUid":"layer-b","frame":3})
+        }
+        REPEAT => {
+            json!({"command":"object.frames.repeat","fromLayerUid":"layer-a","toLayerUid":"layer-b","fromFrame":1,"toFrame":3,"times":2})
+        }
+        CLIPBOARD_COPY => {
+            json!({"command":"object.frames.clipboard.copy","selection":[{"layerUid":"layer-a","frame":2}]})
+        }
+        CLIPBOARD_CUT => {
+            json!({"command":"object.frames.clipboard.cut","selection":[{"layerUid":"layer-a","frame":2}]})
+        }
+        CLIPBOARD_PASTE => json!({"command":"object.frames.clipboard.paste","instanceId":"i","documentId":"d","layerUid":"layer-a","frame":1,
+            "cells":[{"relLayer":0,"relFrame":0,"keyframe":true,"records":[]}]}),
+        SELECTION_DUPLICATE => {
+            json!({"command":"object.frames.clipboard.duplicate","layerUid":"layer-a","selection":[{"layerUid":"layer-a","frame":2}]})
+        }
+        _ => unreachable!(),
+    }
+}
+
+#[test]
+fn a_component_context_id_is_an_optional_opaque_name_on_move_repeat_and_the_clipboard() {
+    // #2256 part 2: key move, whole-cell Move, Repeat, Copy, Cut, Paste and Duplicate Selection work inside a declared component.
+    for operation in [
+        KEY_MOVE,
+        MOVE,
+        REPEAT,
+        CLIPBOARD_COPY,
+        CLIPBOARD_CUT,
+        CLIPBOARD_PASTE,
+        SELECTION_DUPLICATE,
+    ] {
+        let mut payload = moves(operation);
+        assert!(request(operation, &payload), "{operation}");
+        payload["contextId"] = json!("sym_a");
+        assert!(request(operation, &payload), "{operation} accepts a component id");
+        payload["contextId"] = json!("");
+        assert!(!request(operation, &payload), "{operation} refuses an empty id");
+        payload["contextId"] = json!(7);
+        assert!(!request(operation, &payload), "{operation} refuses a non-string id");
+    }
+    // Key move keeps its own optional captured Arc layer next to the context.
+    let mut both = moves(KEY_MOVE);
+    both["activeLayerUid"] = json!("layer-b");
+    both["contextId"] = json!("sym_a");
+    assert!(request(KEY_MOVE, &both));
 }

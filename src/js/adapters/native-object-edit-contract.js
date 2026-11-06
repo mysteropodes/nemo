@@ -121,10 +121,11 @@
   const SPEC = {
     // atFrame: the cell Direct Select edits, when it differs from the stored key (held frames, #2356); optional on the wire.
     'subselect.edit': ['object.subselect.edit', 'command', [['stableTarget','subselectTarget'],['intent','subselectIntent']], [['atFrame', 'frame']]],
-    'layer.delete': ['object.layer.delete', 'command', [['selection', 'selection']]],
-    'layer.duplicate': ['object.layer.duplicate', 'created', [['layerUid', 'layerUid']]],
+    // contextId (optional on these three, #2256): the declared component whose layers the edit works on; absent is the scene root.
+    'layer.delete': ['object.layer.delete', 'command', [['selection', 'selection']], [['contextId', 'contextId']]],
+    'layer.duplicate': ['object.layer.duplicate', 'created', [['layerUid', 'layerUid']], [['contextId', 'contextId']]],
     'layer.rename': ['object.layer.rename', 'command', [['layerUid', 'layerUid'], ['name', 'name']]],
-    'layer.reorder': ['object.layer.reorder', 'command', [['layerUids', 'layerUids'], ['gap', 'gap'], ['selection', 'selection']]],
+    'layer.reorder': ['object.layer.reorder', 'command', [['layerUids', 'layerUids'], ['gap', 'gap'], ['selection', 'selection']], [['contextId', 'contextId']]],
     'group.create': ['object.group.create', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['groupId', 'groupId'], ['name', 'groupName'], ['strokeIds', 'strokeIds1']]],
     'group.ungroup': ['object.group.ungroup', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['strokeIds', 'strokeIds1']]],
     'group.combine': ['object.group.combine', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['groupId', 'groupId'], ['mode', 'combineMode'], ['strokeIds', 'strokeIds1']]],
