@@ -71,7 +71,8 @@ function page(e, options = {}) {
   }));
   vm.runInContext('var _motionKeySel = []; var _keyAnchor = null;', context);
   vm.runInContext(slice('  function isKeySelected(holder, prop, key) {', '  function isMotionPropSelected'), context);
-  vm.runInContext(slice('  function nativeBlendGrid() {', '  var PROP_LABEL ='), context);
+  vm.runInContext(slice('  function trackFor(holder, prop) {', '  var PROP_LABEL ='), context);
+  vm.runInContext(slice('  function nativeBlendGrid() {', '  function renderDiscreteKeyGridRow('), context);
   vm.runInContext('function setKeySel(sel) { _motionKeySel = sel || []; }', context);
   win.SMMotion = { keySelection: () => vm.runInContext('_motionKeySel', context), setKeySelection: (sel) => { logs.selections.push(sel.length); vm.runInContext('setKeySel', context)(sel); } };
   return { win, context, listeners, logs, layers, selected: () => vm.runInContext('_motionKeySel', context) };

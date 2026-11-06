@@ -450,8 +450,6 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // code that can meet prop === 'timeRemap' (everything inside a propsFor
   // loop, every _motionKeySel consumer) MUST resolve through this — reading
   // holder.motion[prop] directly is only safe in PROPS-only loops.
-  // #2257: on a native project the Blend keys live in the engine; the grid adapter hands out stable key objects and commits gestures.
-  function nativeBlendGrid() { var c = window.nativeCompositing && nativeCompositing(), g = window.NemoNativeBlendKeyGrid; return c && g ? g.desktop(window, c) : null; }
   function trackFor(holder, prop) {
     if (!holder) return null;
     if (prop === 'timeRemap') return holder.timeRemap || null;
@@ -10432,6 +10430,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // — none of that cares what prop string it's given, so extending
   // trackFor (below) to resolve 'blendKeys'/'parentKeys' is the one piece
   // that makes all of it work for these rows too, unmodified.
+  // #2257: on a native project the Blend keys live in the engine; the grid adapter hands out stable key objects and commits gestures.
+  function nativeBlendGrid() { var c = window.nativeCompositing && nativeCompositing(), g = window.NemoNativeBlendKeyGrid; return c && g ? g.desktop(window, c) : null; }
   function renderDiscreteKeyGridRow(grid, holder, prop, label, keys, removeAt) {
     // 'motion-group-row' is kept because the key-selection machinery finds
     // this row by that class (applyMarqueeSelection and the Shift-range
