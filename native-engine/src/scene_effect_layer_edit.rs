@@ -181,6 +181,41 @@ fn apply(layer: &mut ObjectLayer, edit: &Edit) -> Result<(), DispatchErrorCode> 
                 Presence::Present(keys)
             };
         }
+        Edit::BlendKeysRemove(frames) => {
+            let mut keys = layer.blend_keys().to_vec();
+            for frame in frames {
+                let at = keys
+                    .binary_search_by_key(frame, |key| key.frame)
+                    .map_err(|_| DispatchErrorCode::NotFound)?;
+                keys.remove(at);
+            }
+            layer.blend_keys = if keys.is_empty() {
+                Presence::Missing
+            } else {
+                Presence::Present(keys)
+            };
+        }
+        Edit::BlendKeysMove { frames, by } => {
+            let mut keys = layer.blend_keys().to_vec();
+            let mut moving = Vec::with_capacity(frames.len());
+            for frame in frames {
+                let at = keys
+                    .binary_search_by_key(frame, |key| key.frame)
+                    .map_err(|_| DispatchErrorCode::NotFound)?;
+                moving.push(keys.remove(at));
+            }
+            // The group lands whole or not at all: a target is a frame (never below 0) no staying key holds.
+            for key in &mut moving {
+                key.frame = u32::try_from(i64::from(key.frame) + i64::from(*by))
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+                if keys.iter().any(|stay| stay.frame == key.frame) {
+                    return Err(DispatchErrorCode::InvalidRequest);
+                }
+            }
+            keys.extend(moving);
+            keys.sort_by_key(|key| key.frame);
+            layer.blend_keys = Presence::Present(keys);
+        }
         Edit::BlendKeysClear(mode) => {
             layer.blend_keys = Presence::Missing;
             if let Some(mode) = mode {
@@ -223,6 +258,15 @@ impl ObjectFillOwner {
         check_references(&document, &payload.layer_uid, &edit)?;
         if matches!(&edit, Edit::BlendKeySet { frame, .. } if *frame >= document.total_frames) {
             return Err(DispatchErrorCode::InvalidRequest);
+        }
+        if let Edit::BlendKeysMove { frames, by } = &edit {
+            // Every target stays inside the project (the order is increasing, so the ends are the extremes).
+            let (first, last) = (frames.first().copied(), frames.last().copied());
+            let land = |frame: Option<u32>| frame.map(|f| i64::from(f) + i64::from(*by));
+            let inside = |at: Option<i64>| at.is_some_and(|at| at >= 0 && at < i64::from(document.total_frames));
+            if !inside(land(first)) || !inside(land(last)) {
+                return Err(DispatchErrorCode::InvalidRequest);
+            }
         }
         apply(&mut document.layers[index], &edit)?;
         let changed = document.layers[index] != origin.document().layers[index];

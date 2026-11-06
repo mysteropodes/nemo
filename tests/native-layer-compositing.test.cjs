@@ -476,3 +476,31 @@ test('the Motion Blend row on a native project shows the engine keys and the sto
   assert.deepEqual(plain(h.sent.map((r) => r.payload)), [{ command: COMPOSITING, layerUid: 'K-two', edit: 'blendKeySet', index: 7, mode: 'multiply' }]);
   assert.deepEqual(refreshed, ['ok']);
 });
+
+// #2257: the key grid's group gestures are two more edits of the same operation, each ONE native command for any number of keys.
+test('the contract admits the group edits of the key grid and refuses malformed ones locally', () => {
+  const ok = (extra) => { try { Contract.payload(OP, Object.assign({ command: COMPOSITING, layerUid: 'L' }, extra)); return true; } catch (_) { return false; } };
+  assert.equal(ok({ edit: 'blendKeysRemove', frames: [3, 4] }), true);
+  assert.equal(ok({ edit: 'blendKeysMove', frames: [3, 4], by: -2 }), true);
+  assert.equal(ok({ edit: 'blendKeysRemove' }), false, 'the keys are required');
+  assert.equal(ok({ edit: 'blendKeysRemove', frames: [] }), false);
+  assert.equal(ok({ edit: 'blendKeysRemove', frames: [1], by: 1 }), false);
+  assert.equal(ok({ edit: 'blendKeysMove', frames: [1] }), false, 'a move needs its distance');
+  assert.equal(ok({ edit: 'blendKeysMove', by: 1 }), false, 'a move needs its keys');
+  assert.equal(ok({ edit: 'blendKeysMove', frames: [-1], by: 1 }), false);
+  assert.equal(ok({ edit: 'blendKeysMove', frames: [1], by: 1.5 }), false);
+});
+
+test('moving or removing several blend keys is one native command; bad input never reaches the owner', async () => {
+  const h = harness({ layers: KEYED });
+  await h.adapter.moveBlendKeys(0, [4, 10], 2);
+  assert.deepEqual(plain(h.sent[0].payload), { command: COMPOSITING, layerUid: 'K-two', edit: 'blendKeysMove', frames: [4, 10], by: 2 });
+  await h.adapter.removeBlendKeys(0, [4, 10]);
+  assert.deepEqual(plain(h.sent[1].payload), { command: COMPOSITING, layerUid: 'K-two', edit: 'blendKeysRemove', frames: [4, 10] });
+  await assert.rejects(h.adapter.moveBlendKeys(0, [4], 0), (error) => error.code === 'invalid_request', 'a zero move is no edit');
+  await assert.rejects(h.adapter.moveBlendKeys(0, [10, 4], 1), (error) => error.code === 'invalid_request', 'frames strictly increasing');
+  await assert.rejects(h.adapter.removeBlendKeys(0, []), (error) => error.code === 'invalid_request');
+  await assert.rejects(h.adapter.removeBlendKeys(0, [1, 1]), (error) => error.code === 'invalid_request');
+  await assert.rejects(h.adapter.moveBlendKeys(9, [1], 1), (error) => error.code === 'not_found');
+  assert.equal(h.sent.length, 2);
+});

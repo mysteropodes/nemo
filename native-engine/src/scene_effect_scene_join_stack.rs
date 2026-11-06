@@ -136,13 +136,18 @@ pub(crate) fn select_composition_path<'a>(
             .collect();
     }
     // Every item stack is drawn by exactly the entry that owns its record; a stack no entry claims (a record
-    // nothing draws, a video slot) is refused typed, never dropped.
+    // nothing draws, a video slot) is refused typed, never dropped. The one exception is a duplicator host: it paints
+    // its copies in place of its original records, so the stack of an original no copy claims (the output is empty)
+    // has nothing to grade and stays unused, as the baseline draws nothing for that layer. The layer stack looks a
+    // stack up only by the record an entry draws, so the unclaimed one is never run.
     if join.layers().iter().any(|layer| !layer.item_stacks.is_empty()) {
         let claimed: std::collections::BTreeSet<usize> = layered_entries(plan)
             .filter_map(|(_, entry)| claimed_object(plan, &entry))
             .collect();
         for (slot, layer) in join.layers().iter().enumerate() {
-            if layer.item_stacks.iter().any(|(object, _)| !claimed.contains(object)) {
+            if !plan.is_duplicator_host(layer.source_layer_index)
+                && layer.item_stacks.iter().any(|(object, _)| !claimed.contains(object))
+            {
                 return Err(PathSelectionError::Stack(GpuBlendError::Unavailable(
                     GpuUnavailable::ElementEffects { layer: slot },
                 )));

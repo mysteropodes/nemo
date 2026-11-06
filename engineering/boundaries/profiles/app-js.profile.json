@@ -3615,11 +3615,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-layer-compositing.js"
+        "native-object-layer-compositing.js",
+        "native-blend-key-grid.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-layer-compositing.js"
+        "native-object-layer-compositing.js",
+        "native-blend-key-grid.js"
       ]
     },
     {
