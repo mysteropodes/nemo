@@ -67,7 +67,7 @@
     if(!Command||!Stroke||!Contract||!VectorContract||!Stage||!tauri||!tauri.fs||!tauri.path||!root.crypto||typeof root.crypto.randomUUID!=='function')
       return Promise.resolve(unavailable('bitmap_stage_unavailable'));
     if(root.state.maskMode)return Promise.resolve(unavailable('bitmap_mask_unavailable'));
-    var map=Stroke.toRecord(dict,{layerUid:t.layerUid,frame:t.frame,strokeId:''});
+    var map=Stroke.toRecord(dict,{layerUid:t.layerUid,frame:t.frame,strokeId:'',contextId:t.context});
     if(!map.ok)return Promise.resolve(Object.freeze({status:map.code==='unavailable'?'unavailable':'unmapped',code:map.code,reason:map.reason}));
     var made=bake(root,t,dict),record=anchor(map.record,dict,made),b=made.baked;
     // The record rules the owner's codec repeats (bitmapBrush aside, which the stroke command owns), checked before any file.

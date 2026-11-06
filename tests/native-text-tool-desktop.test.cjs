@@ -29,8 +29,8 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
  const baseInfo=f.session.info;f.session.info=()=>({...baseInfo(),canvasW:320,canvasH:180,totalFrames:8,layers:[{layerUid:'L0',locked:false}]});root.state.cameraView=options.cameraView?.mode==='stored-camera';
  const pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
  let running=0,presentation=null,presentationKey=null,lastLease=null;
- function shown(){const pin=f.session.info(),key=JSON.stringify([pinKeys.map(k=>pin[k]),root.state.currentFrame,root.state.cameraView,options.cameraView]);
-  if(key!==presentationKey){presentationKey=key;presentation={...pin,owner:'native',status:'presented',contextId:'scene-root',frame:root.state.currentFrame,workId:'work-'+pin.contentRevision,viewGeneration:1,...(options.cameraView?{view:options.cameraView}:{})};}
+ function shown(){const pin=f.session.info(),key=JSON.stringify([pinKeys.map(k=>pin[k]),root.state.currentFrame,root.state.cameraView,options.cameraView,options.contextId]);
+  if(key!==presentationKey){presentationKey=key;presentation={...pin,owner:'native',status:'presented',contextId:options.contextId||'scene-root',frame:root.state.currentFrame,workId:'work-'+pin.contentRevision,viewGeneration:1,...(options.cameraView?{view:options.cameraView}:{})};}
   return {...pin,presentation};}
  f.session.readPresentedObjectSession=why=>{if(running){if(why)why('queue-pending');return null;}return shown();};
  const runResource=f.session.runResourceCommand;
@@ -45,6 +45,7 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
    if(options.actionReader==='missing')delete lease.readPresentedObjectSession;lastLease=lease;
    try{return await action(lease);}finally{live=false;}
   }).finally(()=>{running--;});};
+ f.session.runComponentCommand=f.session.runResourceCommand; // #2267: the entered component's route is the same queue, presented in that context
  root.NemoNativeObjectProject={desktop:()=>f.session};
  // Controlled immutable native Perspective projection; never read legacy Perspective fields.
  let perspectiveMode='disabled',perspectiveOwner=f.session;const perspectiveListeners=new Set();
@@ -58,7 +59,7 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
   perspectiveProofs.set(value,typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0);return value;
  },readForCommand(value){
   const owner=perspectiveOwner,info=owner.info(),ticket=typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0;
-  return (perspectiveMode==='disabled'||perspectiveMode==='publication-wait')&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
+  return (perspectiveMode==='disabled'||perspectiveMode==='publication-wait'||perspectiveMode==='enabled')&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
  },onRead(listener){perspectiveListeners.add(listener);return ()=>perspectiveListeners.delete(listener);}});
 
  const logs={legacy:0,zoom:0,selected:0};let intent;zoom.addEventListener('pointerdown',()=>logs.zoom++);canvas.addEventListener('pointerdown',()=>logs.legacy++);
@@ -402,8 +403,8 @@ test('actual Text inspector mounts late animator capability once and retires its
  f.binding.retire();assert.equal(retires,1);
 });
 
-test('actual native Text admission refuses unavailable, stale and enabled Perspective projections',async()=>{
- for(const mode of ['unavailable','stale','enabled']){
+test('actual native Text admission refuses unavailable and stale Perspective projections; an enabled guide does not gate Text (baseline)',async()=>{
+ for(const mode of ['unavailable','stale']){
   const f=await fixture();f.perspectiveMode(mode);
   Object.defineProperty(f.root.state,'perspectiveEnabled',{get(){throw new Error('legacy Perspective read');},set(){throw new Error('legacy Perspective write');}});
   await f.click();assert.equal(f.binding.core.snapshot().draft,null,mode);assert.equal(f.owner.log.executed.length,0,mode);assert.equal(f.logs.legacy,0,mode);
@@ -669,4 +670,41 @@ test('#2267 a hit that is not text (or a locked/hidden layer the pick skips) pla
  f.root.NemoSelectCanvasIntent.pick=async()=>({data:{nativeRole:'stroke',nativeLayerIndex:1,nativeLayerUid:'L1'}});
  await f.click();await f.turn();assert.equal(acts,0);assert.equal(f.get('text-input').value,'');f.input('text-input','New');f.apply();await f.turn();
  assert.equal(f.owner.log.received[0].payload.command,'object.text.create');assert.equal(f.owner.log.received[0].payload.layerUid||'L0','L0');
+});
+
+test('#2267 Motion mode places text like Animation 2D, with the Perspective guide on', async () => {
+  const f = await fixture();
+  f.root.state.appMode = 'motion'; f.perspectiveMode('enabled');
+  await f.click(100, 110);
+  assert.equal(f.get('text-popover').style.display, 'block');
+  f.input('text-input', 'In Motion'); f.apply(); await f.turn();
+  assert.equal(f.owner.log.executed.length, 1);
+  assert.equal(f.owner.log.received[0].payload.block.text, 'In Motion');
+  assert.equal(f.owner.log.received[0].payload.keyframe, 'copy', 'a new block keys a held cell with a copy first');
+});
+test('#2267 inside an entered component the Text tool places text in THAT component, on its own layer and frame range', async () => {
+  const options = {};
+  const f = await fixture(false, Desktop, options);
+  options.contextId = 'comp-a'; f.root.state.activeSymbolId = 'comp-a';
+  f.root.NemoNativeComponentContext = { contextId: () => 'comp-a', layerRows: () => [{ layerUid: 'inner', locked: false, visible: true }], frameBound: () => 6, selectLayer: () => true };
+  await f.click(100, 110);
+  assert.equal(f.get('text-popover').style.display, 'block');
+  f.input('text-input', 'Inside'); f.apply(); await f.turn();
+  assert.equal(f.owner.log.executed.length, 1);
+  const q = f.owner.log.received[0].payload;
+  assert.equal(q.command, 'object.text.create');
+  assert.deepEqual(q.target, { contextId: 'comp-a', frameScope: { kind: 'authored', frame: 0 }, layerUid: 'inner', strokeId: '' });
+  // The playhead past the component's own frame count draws nothing.
+  const g = await fixture(false, Desktop, options);
+  g.root.state.activeSymbolId = 'comp-a'; g.root.state.currentFrame = 6;
+  g.root.NemoNativeComponentContext = { contextId: () => 'comp-a', layerRows: () => [{ layerUid: 'inner', locked: false }], frameBound: () => 6, selectLayer: () => true };
+  await g.click(100, 110);
+  assert.equal(g.binding.core.snapshot().draft, null);
+  assert.equal(g.owner.log.executed.length, 0);
+  // A locked component layer is refused the same way a locked scene layer is.
+  const h = await fixture(false, Desktop, options);
+  h.root.state.activeSymbolId = 'comp-a';
+  h.root.NemoNativeComponentContext = { contextId: () => 'comp-a', layerRows: () => [{ layerUid: 'inner', locked: true }], frameBound: () => 6, selectLayer: () => true };
+  await h.click(100, 110);
+  assert.equal(h.binding.core.snapshot().draft, null);
 });

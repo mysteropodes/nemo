@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "a4719c9805eeae21598df8fe181ddb849233e944",
-  "describe": "v0.7.0-alpha.4-5306-ga4719c980-dirty"
+  "head": "c263ad83ac33bbca847c1dffbab82bcc56ee671f",
+  "describe": "v0.7.0-alpha.4-5309-gc263ad83a-dirty"
  },
- "inputsDigest": "df03b600162b6d134ce9177b1e9fc7760fc638f20c956274da88c02ce37b5e58",
+ "inputsDigest": "34a6ad728b0f394d44effd380271e66f682f4a36f39dc5f06483c86865ae2b2d",
  "states": [
   "inventoried",
   "characterized",
@@ -1876,7 +1876,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 205,
+    "functionsVisited": 206,
     "via": "chain",
     "references": []
    },
@@ -13399,8 +13399,8 @@
     "functionsVisited": 72,
     "via": "helper el()",
     "references": [
-     "src/js/adapters/native-text-animator-desktop.js:43 draw()",
-     "src/js/adapters/native-text-animator-desktop.js:60 render()"
+     "src/js/adapters/native-text-animator-desktop.js:54 draw()",
+     "src/js/adapters/native-text-animator-desktop.js:71 render()"
     ]
    },
    "fixtures": [
@@ -33184,7 +33184,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:522",
    "meta": {
-    "functionsVisited": 13
+    "functionsVisited": 15
    },
    "fixtures": [
     "media",
@@ -33503,7 +33503,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 406
+    "functionsVisited": 408
    },
    "fixtures": [
     "media",

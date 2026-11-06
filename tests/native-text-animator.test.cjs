@@ -18,19 +18,21 @@ class Element{
 function fixture(){
  let evaluatedAvailable=true,revision=0,selected='a',serial=0,records=[{id:'ta-1',selector:{},props:{position:[20,0]}}];const commands=[];
  function pin(){return {instanceId:'instance',documentId:'document',lifecycleGeneration:1,contentRevision:revision,documentSnapshotId:'snapshot-'+revision,totalFrames:8,layers:[{layerUid:'L0',locked:false}]};}
- const session={info:pin,isActive:()=>true,blocksLegacy:()=>true,projectionReady:true,requestId:p=>p+'-'+(++serial),runResourceCommand:fn=>fn({reconcile:async()=>{},dispatch:async q=>{
+ const routes=[];
+ let go;const session={info:pin,isActive:()=>true,blocksLegacy:()=>true,projectionReady:true,requestId:p=>p+'-'+(++serial),runComponentCommand:fn=>{routes.push('component');return go(fn);},runResourceCommand:fn=>{routes.push('scene');return go(fn);}};
+ go=fn=>fn({reconcile:async()=>{},dispatch:async q=>{
   let result,contentRevision=revision;
   if(q.operation==='query.document.object.text'){
    const text=JSON.stringify({animators:records,selectors:records.map(()=>evaluatedAvailable?{available:true,value:selector}:{available:false,reason:"native selector expression unavailable"}),hasText:true}),v=q.payload.view,part=Buffer.from(text).subarray(v.offset,v.offset+v.limit).toString();
-   const end=v.offset+Buffer.byteLength(part);result={instanceId:'instance',documentId:'document',atRevision:revision,documentSnapshotId:'snapshot-'+revision,kind:'animators',layerUid:v.layerUid,frame:v.frame,textBytes:Buffer.byteLength(text),offset:v.offset,text:part,nextOffset:end===Buffer.byteLength(text)?null:end};
+   const end=v.offset+Buffer.byteLength(part);result={instanceId:'instance',documentId:'document',atRevision:revision,documentSnapshotId:'snapshot-'+revision,kind:'animators',layerUid:v.layerUid,...(v.contextId?{contextId:v.contextId}:{}),frame:v.frame,textBytes:Buffer.byteLength(text),offset:v.offset,text:part,nextOffset:end===Buffer.byteLength(text)?null:end};
   }else{Item.payload(q.operation,q.payload);commands.push(copy(q.payload));revision++;contentRevision=revision;result={applied:true,historyEntriesAdded:1,operation:q.payload.command.slice(7),strokeId:q.payload.animator?q.payload.animator.id:q.payload.animatorId};}
   return {apiVersion:2,requestId:q.requestId,instanceId:'instance',documentId:'document',contentRevision,ok:true,result};
- }})};
+ }});
  const context=()=>({pin:pin(),layerUid:'L0',frame:0,selectionKey:selected});
  const doc={body:new Element('body'),createElement:t=>new Element(t),getElementById:id=>find(doc.body,n=>n.id===id)};
  ['p-textanim-sec','p-textanim-add-row','p-textanim-empty','p-textanim-list','p-textanim-add'].forEach(id=>{const n=doc.createElement('div');n.id=id;doc.body.appendChild(n);});
  const root={document:doc,state:{appMode:'motion',currentFrame:0,activeLayerIdx:0,playing:false},NemoNativeObjectProject:{desktop:()=>session},NemoNativeTextAnimator:Model,NemoNativeTextRead:Read,NemoNativeObjectItemCommand:Command};
- return {session,context,commands,root,doc,advance(){revision++;},select(){selected='b';},setRecords(v){records=v;},unavailable(){evaluatedAvailable=false;},input(label){return find(doc.body,n=>n.attributes['aria-label']===label);}};
+ return {session,routes,context,commands,root,doc,advance(){revision++;},select(){selected='b';},setRecords(v){records=v;},unavailable(){evaluatedAvailable=false;},input(label){return find(doc.body,n=>n.attributes['aria-label']===label);}};
 }
 function find(n,p){if(p(n))return n;for(const c of n.children){const x=find(c,p);if(x)return x;}return null;}
 test('native animator caller sends one detached sealed intent and rejects stale origins',async()=>{
@@ -69,3 +71,25 @@ test('native inspector owns a fresh visible animator mount and revokes retired m
 });
 
 test("animator application refuses absent I/O ports without deriving adapter fallbacks",()=>{const f=fixture();assert.throws(()=>Model.create(f.session,f.context),e=>e.code==='unavailable');assert.equal(f.commands.length,0);});
+
+test('inside an entered component the animator reads and writes name the component and ride the component route (#2267)',async()=>{
+ const f=fixture(),read=[];
+ f.root.state.activeSymbolId='comp-a';f.root.state.totalFrames=8;
+ f.root.NemoNativeComponentContext={contextId:()=> 'comp-a',layerRows:()=>[{layerUid:'inner',locked:false}],frameBound:()=>8};
+ const inner=()=>({pin:f.session.info(),contextId:'comp-a',layerUid:'inner',frame:0,selectionKey:'k'});
+ const m=Model.create(f.session,inner,{reader:Read.create(f.session),command:Command.create(Object.freeze({info:f.session.info,isActive:f.session.isActive,requestId:f.session.requestId,runResourceCommand:f.session.runComponentCommand}),'item'),samePin:Read.samePin});
+ const loaded=await m.load();assert.equal(loaded.context.contextId,'comp-a');
+ await m.edit('ta-1',{kind:'setEnabled',enabled:false},loaded.context);
+ assert.deepEqual(f.routes,['component','component']);assert.equal(f.commands[0].contextId,'comp-a');assert.equal(f.commands[0].layerUid,'inner');
+ // The scene keeps the legacy shape: no contextId member.
+ const g=fixture(),sm=make(g),sl=await sm.load();await sm.edit('ta-1',{kind:'setEnabled',enabled:false},sl.context);assert.equal('contextId' in g.commands[0],false);
+});
+test('the ordinary animator controls are no longer gated off inside a component; they ask the component rows and frame bound',async()=>{
+ const f=fixture();f.root.state.activeSymbolId='comp-a';
+ f.root.NemoNativeComponentContext={contextId:()=> 'comp-a',layerRows:()=>[{layerUid:'inner',locked:false}],frameBound:()=>8};
+ Desktop.render(f.root);await turn();
+ const input=f.input('position X');assert.ok(input,'the controls render for the component layer');input.value='25';input.fire('change');await turn();
+ assert.equal(f.commands.length,1);assert.equal(f.commands[0].contextId,'comp-a');assert.equal(f.commands[0].layerUid,'inner');assert.deepEqual(f.routes.slice(-1),['component']);
+ // A scene presentation while a component is held is not a component's: no controls.
+ const g=fixture();g.root.state.activeSymbolId='comp-a';Desktop.render(g.root);await turn();assert.equal(g.input('position X'),null);
+});

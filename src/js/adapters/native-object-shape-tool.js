@@ -3,9 +3,9 @@
 (function(root,factory){var node=typeof module==='object'&&module.exports;
   var api=factory(node?require('./native-object-draw-paint.js'):root.NemoNativeDrawPaint,node?require('./native-object-draw-symmetry.js'):root.NemoNativeDrawSymmetry,
     node?require('./native-object-draw-bitmap.js'):root.NemoNativeDrawBitmap,
-    node?require('./native-object-draw-resize.js'):root.NemoNativeDrawResize,node?require('./native-layer-motion-pose.js'):root.NemoNativeLayerMotionPose||{needs:function(l){return !!l&&l.hasMotion===true;},read:function(){return Promise.reject(new Error('Motion'));},localize:function(t,e){return {t:t,end:e};},message:'The layer\u2019s Motion transform could not be read \u2014 nothing was drawn.'});
+    node?require('./native-object-draw-resize.js'):root.NemoNativeDrawResize,node?require('./native-layer-motion-pose.js'):root.NemoNativeLayerMotionPose||{needs:function(l){return !!l&&l.hasMotion===true;},read:function(){return Promise.reject(new Error('Motion'));},localize:function(t,e){return {t:t,end:e};},message:'The layer\u2019s Motion transform could not be read \u2014 nothing was drawn.'},node?require('./native-object-perspective-snap.js'):root.NemoNativePerspectiveSnap||{line:function(p,s,e){return e;},pull:function(p,s,w){return w;}},node?require('./native-object-pen-continue.js'):root.NemoNativePenContinue||{begin:function(){return null;},commit:function(){return Promise.resolve({status:'unavailable'});}});
   if(node)module.exports=api;else root.NemoNativeObjectShapeTool=api;
-}(typeof globalThis==='object'?globalThis:this,function(Paint,Symmetry,Bitmap,Resize,Pose){
+}(typeof globalThis==='object'?globalThis:this,function(Paint,Symmetry,Bitmap,Resize,Pose,Snap,Cont){
   'use strict';
   var tools=['line','rect','ellipse'],shapeTools=tools.concat(['star','speechbubble']); var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});} function fail(message){throw new Error(message);}
@@ -42,7 +42,7 @@
     function style(tool,proof){
       var s=root.state,current=session(),ownerInfo=current&&current.info(),port=root.NemoNativePerspectiveController;
       var perspective=port&&(proof?typeof port.readForCommand==='function'&&port.readForCommand(proof):port.read());
-      if(!(s.appMode==='anim2d'||s.appMode==='motion')||s.playing||s.spaceDown||s.isPanning||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled)fail('This drawing mode is unavailable in native shape tools.');
+      if(!(s.appMode==='anim2d'||s.appMode==='motion')||s.playing||s.spaceDown||s.isPanning||!perspective||!same(perspective.info,ownerInfo))fail('This drawing mode is unavailable in native shape tools.');
       if(ports.freehand)return ports.style();
       if(ports.pen)return Paint.shadowStyle(root,s,penStyle(s));
       // Shadow mode inks the shape in the swatch whatever Stroke/Fill say (applyShadowBrushTag).
@@ -107,7 +107,7 @@
     }
     function clear(){if(overlay){overlay.remove();overlay=null;}} function release(t){try{var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.releasePointerCapture)el.releasePointerCapture(t.pointer);}catch(_){} }
     function cancel(){if(gate)gate.cancel();if(sizer)sizer.cancel();if(drag){var t=drag;drag=null;t.cancelled=true;clear();release(t);}return {status:'cancelled'};}
-    function endpoint(t,e){var end=point(e,t);return !ports.freehand&&e.shiftKey?ports.constrain(t.tool,t.start,end):end;}
+    function endpoint(t,e){var end=point(e,t);if(!ports.freehand&&t.tool==='line')end=Snap.line(t.perspective,t.start,end);return !ports.freehand&&e.shiftKey?ports.constrain(t.tool,t.start,end):end;}
     function dictionary(t,end,final){
       if(ports.pen){
         var anchors=t.anchors.concat(end&&!t.handleDrag?[{point:end}]:[]);
@@ -154,7 +154,7 @@
         if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});
         return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
       });};};
-      var guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:wrap('runResourceCommand'),runComponentCommand:typeof s.runComponentCommand==='function'?wrap('runComponentCommand'):undefined};
+      var guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:wrap('runResourceCommand'),runComponentCommand:typeof s.runComponentCommand==='function'?wrap('runComponentCommand'):undefined};if(ports.pen&&t.cont&&t.cont.ready)return Cont.commit(root,root.NemoNativeObjectVector.create(guarded,function(){return t.context;}),t,dict); // B-pen-continue: the press began on an open path's endpoint
       // draw-bridge.js Fill Brush: one native command places the shape (fillBrushMode) and merges same-colour fills.
       // Labs multi-frame draw stamps the path the merge hands back on the other selected frames, in the same commit.
       var fbStamps=dict.isFillShape&&root.SMLabs&&typeof root.SMLabs.multiframeTargets==='function'?root.SMLabs.multiframeTargets(t.frame):[];
@@ -164,8 +164,8 @@
         .then(function(r){if(r&&r.applied&&fbStamps.length&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(fbStamps.length);
           return {status:r&&r.applied?'applied':'noop'};},root.NemoNativeObjectVector.statusOf);
       // draw-bridge.js Bitmap Brush: the anchor, its baked companion and the PNG in one native command.
-      if(t.style&&t.style.bitmap){if(t.context!=='scene-root'){t.refusal='Bitmap brushes are not available inside a component.';return Promise.resolve({status:'unavailable',reason:'bitmap_component_unavailable'});} // the bitmap stroke command is scene-root only
-        return Bitmap.commit(root,guarded,t,dict,root.NemoNativeObjectVector.statusOf);}
+      if(t.style&&t.style.bitmap){var bitmapRoute=t.context==='scene-root'?guarded:guarded.runComponentCommand?Object.assign({},guarded,{runResourceCommand:guarded.runComponentCommand}):null;if(!bitmapRoute){t.refusal='Bitmap brushes are not available inside a component.';return Promise.resolve({status:'unavailable',reason:'bitmap_component_unavailable'});}
+        return Bitmap.commit(root,bitmapRoute,t,dict,root.NemoNativeObjectVector.statusOf);} // an entered component: the stroke rides the component route (the resource route is scene-only)
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
       // G23 (symmetry-bridge.js onStrokeCommitted @1065e9d8): the stroke and its copies, each linked fill below its ribbon,
       // in one createMany (behind keeps the order at the bottom).
@@ -230,7 +230,7 @@
             if(uncertain){var owner=session(),pin=owner&&owner.info();
               if(owner===uncertain.session&&pin&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===uncertain.pin[k];})){notice('Reopen the native project before drawing again; the previous result is unconfirmed.');return true;}
               uncertain=null;}
-            drag=capture(e);drag.pointerType=e.pointerType||'mouse';drag.anchors=[{point:drag.start,client:client}];drag.handleDrag=true;drag.last={time:now,client:client};
+            drag=capture(e);drag.pointerType=e.pointerType||'mouse';drag.anchors=[{point:drag.start,client:client}];drag.handleDrag=true;drag.last={time:now,client:client};Cont.begin(root,drag,Mapping);
             grab(e);preview(drag,drag.start);return true;
           }
           var t=drag;if(!current(t,true)){cancel();return true;}
@@ -272,7 +272,7 @@
             var events=kind==='move'&&typeof e.getCoalescedEvents==='function'?e.getCoalescedEvents():null;
             (events&&events.length?events:[e]).forEach(function(sample){
               if(sample.pointerId!==undefined&&sample.pointerId!==t.pointer)fail('Brush sample belongs to another pointer.');
-              ports.sample(t.samples,point(sample,t),sample,kind,t);});
+              ports.sample(t.samples,Snap.pull(t.perspective,t.start,point(sample,t)),sample,kind,t);});
           }
           if(kind==='move'){preview(t,end);return true;}
           if(kind==='up'){drag=null;clear();submit(t,end);release(t);return true;}

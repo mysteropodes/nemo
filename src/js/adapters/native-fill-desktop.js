@@ -80,10 +80,14 @@
       W.await(root,{read,notice:'The canvas is still busy - click again.',holds:()=>state.tool==='fill'&&!state.playing&&current(root)===owner&&state.currentFrame===frame&&state.activeLayerIdx===layer})
         .then(r=>{if(r.ready||r.status==='refused')handlePointerDown(root,event,ports,true);});
       return true;}
+    // #2256 fill.trace: inside an entered component the context, its layer rows and its frame count are the component's (the ones the workspace controller holds) and the write rides the component route.
+    const comp=root.NemoNativeComponentContext,held=comp&&typeof comp.contextId==='function'?comp.contextId(root):'scene-root',rows=held!=='scene-root'&&comp.layerRows(root)||(info&&info.layers);
     const rect=info&&Mapping.bounds(root,info);
-    if(!shown||!shown.presentation||!rect||!PIN.every(key=>shown[key]===info[key])||shown.presentation.frame!==state.currentFrame||!Mapping.matchesView(root,shown.presentation)){toast('Native fill coordinates are unavailable');return true;}
+    if(!shown||!shown.presentation||!rect||!PIN.every(key=>shown[key]===info[key])||shown.presentation.frame!==state.currentFrame||(shown.presentation.contextId||'scene-root')!==held||(held!=='scene-root'&&!(state.currentFrame<comp.frameBound(root,info)))||!Mapping.matchesView(root,shown.presentation)){toast('Native fill coordinates are unavailable');return true;}
     const captured=shown.presentation;let actionReady=null;
-    const guarded={info:owner.info,isActive:owner.isActive,requestId:owner.requestId,runResourceCommand:action=>owner.runResourceCommand(ctx=>{
+    const route=held==='scene-root'?owner.runResourceCommand:owner.runComponentCommand;
+    if(typeof route!=='function'){toast('Native fill coordinates are unavailable');return true;}
+    const guarded={info:owner.info,isActive:owner.isActive,requestId:owner.requestId,runResourceCommand:action=>route.call(owner,ctx=>{
       const exact=()=>{const p=ctx.readPresentedObjectSession&&ctx.readPresentedObjectSession();return p&&p.presentation===captured&&(captured.view?captured.view.mode:'canvas')===(state.cameraView===true?'stored-camera':'canvas')&&state.currentFrame===captured.frame&&JSON.stringify(Mapping.bounds(root,owner.info()))===JSON.stringify(rect);};
       if(!exact())throw command.fault('stale_owner','Fill presentation changed');
       actionReady=exact;try{return action({reconcile:ctx.reconcile,dispatch:q=>{if(!exact())throw command.fault('stale_owner','Fill presentation changed');return ctx.dispatch(q);}});}finally{actionReady=null;}
@@ -91,8 +95,8 @@
     const editor=create({current:()=>current(root)===owner?guarded:current(root),ready:(session,info)=>session===guarded&&current(root)===owner&&(actionReady?actionReady():Mapping.matchesView(root,captured))
       &&root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true,
       target:(info)=>{
-        const row=info.layers&&info.layers[state.activeLayerIdx];
-        return row&&!row.locked?{layerUid:row.layerUid,contextId:'scene-root',frame:state.currentFrame}:null;
+        const row=rows&&rows[state.activeLayerIdx];
+        return row&&!row.locked?{layerUid:row.layerUid,contextId:held,frame:state.currentFrame}:null;
       }});
     try{
       const mapped=Mapping.point(event,{bounds:rect,canvasW:info.canvasW,canvasH:info.canvasH,presentation:captured});

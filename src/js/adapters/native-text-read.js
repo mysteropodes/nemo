@@ -10,12 +10,14 @@
   function samePin(a,b){return a&&b&&['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].every(function(k){return a[k]===b[k];});}
   function freeze(v){if(v&&typeof v==='object'){Object.keys(v).forEach(function(k){freeze(v[k]);});Object.freeze(v);}return v;}
   function create(session){
-    function run(expected,action){
-      var pin;try{pin=clone(expected||pinOf(session));if(!samePin(pin,pinOf(session)))throw fault('stale_revision','Native text view is stale');
-        if(typeof session.runResourceCommand!=='function')throw fault('unavailable','Native text resource route unavailable');
+    // #2267: the scene root rides the resource route; an entered component's text rides the component route (the presented context must be that component).
+    function route(contextId){var scene=!contextId||contextId==='scene-root',f=scene?session.runResourceCommand:session.runComponentCommand;return typeof f==='function'?f.bind(session):null;}
+    function run(expected,action,contextId){
+      var pin,go=route(contextId);try{pin=clone(expected||pinOf(session));if(!samePin(pin,pinOf(session)))throw fault('stale_revision','Native text view is stale');
+        if(!go)throw fault('unavailable','Native text resource route unavailable');
       }catch(error){return Promise.reject(error);}
       function guard(){if(!samePin(pin,pinOf(session)))throw fault('stale_revision','Native text owner or snapshot changed');}
-      return Promise.resolve().then(function(){return session.runResourceCommand(async function(ctx){guard();
+      return Promise.resolve().then(function(){return go(async function(ctx){guard();
         async function read(view){guard();var request={apiVersion:2,requestId:session.requestId('text-read'),instanceId:pin.instanceId,documentId:pin.documentId,
           operation:Contract.OP,payload:{atRevision:pin.contentRevision,documentSnapshotId:pin.documentSnapshotId,view:view}};
           Contract.payload(Contract.OP,request.payload);var response=await ctx.dispatch(request);guard();
@@ -28,17 +30,17 @@
       });});
     }
     return Object.freeze({
-      readAnimators:function(layerUid,frame,expected){return run(expected,async function(read,pin){
+      readAnimators:function(layerUid,frame,expected,contextId){var named=contextId&&contextId!=='scene-root';return run(expected,async function(read,pin){
         var offset=0,parts=[],total=null;
-        do{var chunk=await read({kind:'animators',layerUid:layerUid,frame:frame,offset:offset,limit:1024});
+        do{var chunk=await read(named?{kind:'animators',layerUid:layerUid,contextId:contextId,frame:frame,offset:offset,limit:1024}:{kind:'animators',layerUid:layerUid,frame:frame,offset:offset,limit:1024});
           if(total!==null&&total!==chunk.textBytes)throw fault('uncorrelated','Animator length changed inside a snapshot');
           total=chunk.textBytes;parts.push(chunk.text);offset=chunk.nextOffset;
         }while(offset!==null);
         var text=parts.join('');if(new TextEncoder().encode(text).length!==total)throw fault('uncorrelated','Animator data incomplete');
         var records=JSON.parse(text);if(!records||!Array.isArray(records.animators)||!Array.isArray(records.selectors)||records.animators.length>256||records.animators.length!==records.selectors.length||typeof records.hasText!=='boolean')throw fault('uncorrelated','Animator records invalid');
         return freeze({pin:clone(pin),layerUid:layerUid,frame:frame,animators:records.animators,selectors:records.selectors,hasText:records.hasText});
-      });},
-      listPage:function(scope,offset,limit,expected){var view=clone({kind:'targets',scope:scope,offset:offset,limit:limit});return run(expected,function(read){return read(view);});},
+      },contextId);},
+      listPage:function(scope,offset,limit,expected){var view=clone({kind:'targets',scope:scope,offset:offset,limit:limit});return run(expected,function(read){return read(view);},scope.contextId);},
       readBlock:function(target,expected){target=clone(target);return run(expected,async function(read,pin){
         var meta=await read({kind:'inspect',target:target}),offset=0,parts=[];
         do{var chunk=await read({kind:'text',target:target,offset:offset,limit:1024});
@@ -47,7 +49,7 @@
         }while(offset!==null);
         var text=parts.join('');if(new TextEncoder().encode(text).length!==meta.textBytes)throw fault('uncorrelated','Native text is incomplete');
         return freeze({pin:clone(pin),target:clone(target),block:Object.assign({},meta.block,{text:text})});
-      });},
+      },target.contextId);},
     });
   }
   return Object.freeze({create:create,samePin:samePin});
