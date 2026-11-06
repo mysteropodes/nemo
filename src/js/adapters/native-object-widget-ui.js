@@ -37,12 +37,13 @@
     return !!W && !!s && W.busy((f) => s.readPresentedObjectSession(f));
   }
   // The proof that the widgets are read from the presentation the user is looking at, at the playhead.
-  function proofNow(win, method) {
+  // `held` (optional): the entered component's context id, for the Motion canvas gizmo of a component layer; every other caller proves the scene root.
+  function proofNow(win, method, held) {
     const s = session(win);
     if (!s || !s.isActive() || typeof s[method || 'readWidgets'] !== 'function' || !win.state || win.state.playing) return null;
     try {
       const info = s.info(), shown = s.readPresentedObjectSession(), p = shown && shown.presentation;
-      if (!info || !p || shown.available !== true || p.owner !== 'native' || p.status !== 'presented' || p.contextId !== 'scene-root' ||
+      if (!info || !p || shown.available !== true || p.owner !== 'native' || p.status !== 'presented' || p.contextId !== (held || 'scene-root') ||
         p.frame !== win.state.currentFrame || !samePin(p, info) || !samePin(shown, info)) return null;
       const ticket = s.readSubscriptionGeneration();
       // #2372: the native queue hides the presentation while any command is pending (a hover read, the repaint of the last write): that is
@@ -54,7 +55,7 @@
             live.readSubscriptionGeneration() === ticket && (now ? now.presentation === p : !strict && why[0] === 'queue-pending');
         } catch (_) { return false; }
       };
-      return { session: s, info, presentation: p, selector: { contextId: 'scene-root', frame: p.frame }, current };
+      return { session: s, info, presentation: p, selector: { contextId: held || 'scene-root', frame: p.frame }, current };
     } catch (_) { return null; }
   }
   function mappingFor(win, entry) {

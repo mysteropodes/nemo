@@ -27,7 +27,7 @@ fn layer(uid: &str, parent: Option<&str>, null: bool) -> Value {
     }
     layer
 }
-fn pin() -> ObjectSnapshot {
+fn source() -> Value {
     let element = |uid: &str| json!({"layerUid":uid,"strokeId":format!("s{uid}"),"naturalPosition":0,"order":{}});
     let order: Vec<Value> = ["A", "B", "N", "C"]
         .iter()
@@ -43,11 +43,10 @@ fn pin() -> ObjectSnapshot {
             "migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[{"contextId":"scene-root",
                 "layers":order,
                 "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":[element("A"), element("B"), element("C")]}]}]}});
-    ObjectSnapshot::new(
-        "layer-bounds",
-        decode_storage_project(source.to_string().as_bytes()).unwrap(),
-    )
-    .unwrap()
+    source
+}
+fn pin() -> ObjectSnapshot {
+    ObjectSnapshot::new("layer-bounds", decode_storage_project(source().to_string().as_bytes()).unwrap()).unwrap()
 }
 fn read(pin: &ObjectSnapshot, target: Value, frame: Value) -> Result<Value, DispatchErrorCode> {
     let selector = json!({"instanceId":pin.instance_id(),"documentId":pin.document_id(),"atRevision":pin.content_revision(),
@@ -149,4 +148,62 @@ fn a_stale_snapshot_is_a_stale_revision() {
             .unwrap_err(),
         DispatchErrorCode::StaleRevision
     );
+}
+
+// #2256 B-comp-edit-rest: the same document with ALL its layers moved into the declared component `comp` placed by a scene layer `host`. Its Motion
+// holders stay behind: the component paints render a component layer's Opacity only, and the box is read BEFORE the layer's own Motion.
+const COMP: &str = "comp";
+fn component_pin() -> ObjectSnapshot {
+    fn retag(value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                if let Some(Value::Object(target)) = map.get_mut("target") {
+                    target.insert("contextId".into(), json!(COMP));
+                }
+                map.values_mut().for_each(retag);
+            }
+            Value::Array(rows) => rows.iter_mut().for_each(retag),
+            _ => {}
+        }
+    }
+    let d = source();
+    let (mut objects, mut order) = (d["objects"].clone(), d["compositionOrder"]["contexts"][0].clone());
+    retag(&mut objects);
+    // The storage format admits no parenting inside a component yet: every component layer is a root.
+    let mut layers = d["layers"].clone();
+    layers.as_array_mut().unwrap().iter_mut().for_each(|l| l["parentLayerUid"] = Value::Null);
+    order["contextId"] = json!(COMP);
+    let out = json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":8,"layers":[layer("host", None, false)],"objects":[],
+        "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,"migration":"explicit-plan-required",
+            "referencePolicy":"unresolved","contexts":[{"contextId":"scene-root","layers":[{"layerUid":"host","naturalPosition":0,"order":{}}],"scopes":[]},order]},
+        "componentTables":{"components":{"format":"nemo.native-component-set","formatVersion":1,
+            "components":[{"symbolId":COMP,"totalFrames":8,"layers":layers,"objects":objects}],
+            "instances":[{"contextId":"scene-root","layerUid":"host","symbolId":COMP,"symPlayMode":"loop"}]}}});
+    ObjectSnapshot::new("layer-bounds-component", decode_storage_project(out.to_string().as_bytes()).unwrap()).unwrap()
+}
+fn component_target(uid: &str) -> Value {
+    json!({"contextId":COMP,"layerUid":uid})
+}
+
+#[test]
+fn a_component_layer_answers_the_same_bounds_and_identity_ancestor_map_as_the_scene_layer() {
+    let (scene, inside) = (pin(), component_pin());
+    for uid in ["A", "B", "C", "N"] {
+        let expected = read(&scene, layer_target(uid), json!(0)).unwrap();
+        let got = read(&inside, component_target(uid), json!(0)).unwrap();
+        assert_eq!(got["bounds"], expected["bounds"], "{uid}: bounds, before the layer's own Motion");
+        assert_eq!(got["parentLayerUid"], Value::Null, "{uid}: a component layer is a root");
+        close(affine(&got), [1., 0., 0., 1., 0., 0.]);
+        assert_eq!(got["target"], component_target(uid), "{uid}: the answer names the component context");
+        assert_eq!(got["frame"], json!(0));
+    }
+}
+
+#[test]
+fn a_component_read_never_answers_for_another_context_or_an_unknown_layer() {
+    let inside = component_pin();
+    assert_eq!(read(&inside, component_target("nope"), json!(0)), Err(DispatchErrorCode::NotFound));
+    assert_eq!(read(&inside, json!({"contextId":"comp-gone","layerUid":"A"}), json!(0)), Err(DispatchErrorCode::NotFound));
+    assert_eq!(read(&inside, layer_target("A"), json!(0)), Err(DispatchErrorCode::NotFound), "the scene root has no layer A here");
+    assert_eq!(read(&inside, json!({"contextId":COMP,"layerUid":"A","strokeId":"sA"}), json!(0)), Err(DispatchErrorCode::InvalidRequest));
 }
