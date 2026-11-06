@@ -209,8 +209,9 @@ fn strict_raw_payload_refusals_and_inclusive4096_limit_leave_owner_untouched() {
             DispatchErrorCode::NotFound,
         ),
         (
+            // #2256: a component the document does not declare is unknown (a declared one is the scene of the cut).
             r#"{"command":"object.layer.cut","contextId":"symbol-context","layerUid":"a","frame":10}"#,
-            DispatchErrorCode::Unavailable,
+            DispatchErrorCode::NotFound,
         ),
         (
             r#"{"command":"object.layer.cut","contextId":"scene-root","layerUid":"","frame":10}"#,

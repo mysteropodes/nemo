@@ -4,7 +4,7 @@
 //! locked `ly_in_lock` key 0; scene of 6 frames). Expected values are hand-computed, never read back from the code under test; each
 //! edit is undone to the original bytes, redone, and saved and reopened, and the scene and the placement table stay byte-identical.
 use super::context_history::{
-    bytes, component, frames_of, keys, open, open_as, outside, run, value, scope_frames,
+    bytes, component, frames_of, keys, open, open_as, outside, run, scope_frames, value,
 };
 use crate::history::object_history::NativeObjectHistory;
 use crate::object_codec::decode_storage_project;
@@ -60,7 +60,11 @@ fn cycle(mut o: NativeObjectHistory, operation: &str, payload: Value) -> (Value,
         "the scene and the placement table are untouched"
     );
     let revision = o.undo(1).unwrap();
-    assert_eq!(bytes(&o), before_bytes, "one Undo restores the complete bytes");
+    assert_eq!(
+        bytes(&o),
+        before_bytes,
+        "one Undo restores the complete bytes"
+    );
     o.redo(revision).unwrap();
     assert_eq!(value(&o), after, "Redo reproduces the edit");
     let reopened = decode_storage_project(&bytes(&o)).unwrap();
@@ -95,16 +99,31 @@ fn key_move_retimes_the_component_key_and_its_drawing() {
     assert_eq!(keys(&after, "ly_in_a"), vec![0, 3]);
     assert_eq!(frames_of(&after, "ly_in_a"), vec![0, 3]);
     assert_eq!(component(&after)["totalFrames"], 4);
-    assert_eq!(after["totalFrames"], 6, "the scene length is not the component's");
+    assert_eq!(
+        after["totalFrames"], 6,
+        "the scene length is not the component's"
+    );
 }
 
 #[test]
 fn key_move_refusals_are_typed_and_publish_nothing() {
     // A locked component layer refuses; a scene layer is not a component layer; the target is judged against the component (4).
-    refused(KEY_MOVE, json!({"command":"object.layer.key.move","contextId":"sym_a","layerUid":"ly_in_lock","from":0,"to":1}));
-    refused(KEY_MOVE, json!({"command":"object.layer.key.move","contextId":"sym_a","layerUid":"ly_scene","from":0,"to":1}));
-    refused(KEY_MOVE, json!({"command":"object.layer.key.move","contextId":"sym_a","layerUid":"ly_in_a","from":2,"to":5}));
-    refused(KEY_MOVE, json!({"command":"object.layer.key.move","contextId":"sym_missing","layerUid":"ly_in_a","from":2,"to":3}));
+    refused(
+        KEY_MOVE,
+        json!({"command":"object.layer.key.move","contextId":"sym_a","layerUid":"ly_in_lock","from":0,"to":1}),
+    );
+    refused(
+        KEY_MOVE,
+        json!({"command":"object.layer.key.move","contextId":"sym_a","layerUid":"ly_scene","from":0,"to":1}),
+    );
+    refused(
+        KEY_MOVE,
+        json!({"command":"object.layer.key.move","contextId":"sym_a","layerUid":"ly_in_a","from":2,"to":5}),
+    );
+    refused(
+        KEY_MOVE,
+        json!({"command":"object.layer.key.move","contextId":"sym_missing","layerUid":"ly_in_a","from":2,"to":3}),
+    );
 }
 
 #[test]
@@ -128,8 +147,14 @@ fn whole_cell_move_carries_the_cell_to_another_component_layer() {
 
 #[test]
 fn whole_cell_move_refuses_a_scene_layer_and_a_locked_destination_row() {
-    refused(MOVE, json!({"command":"object.frames.move","contextId":"sym_a","selection":[{"layerUid":"ly_scene","frame":0}],"layerUid":"ly_in_b","frame":3}));
-    refused(MOVE, json!({"command":"object.frames.move","contextId":"sym_a","selection":[{"layerUid":"ly_in_a","frame":2}],"layerUid":"ly_scene","frame":3}));
+    refused(
+        MOVE,
+        json!({"command":"object.frames.move","contextId":"sym_a","selection":[{"layerUid":"ly_scene","frame":0}],"layerUid":"ly_in_b","frame":3}),
+    );
+    refused(
+        MOVE,
+        json!({"command":"object.frames.move","contextId":"sym_a","selection":[{"layerUid":"ly_in_a","frame":2}],"layerUid":"ly_scene","frame":3}),
+    );
 }
 
 #[test]
@@ -161,7 +186,11 @@ fn duplicate_selection_pastes_the_copy_after_the_selection_inside_the_component(
     );
     assert_eq!(keys(&after, "ly_in_a"), vec![0, 1, 2]);
     assert_eq!(frames_of(&after, "ly_in_a"), vec![0, 1, 2]);
-    assert_eq!(component(&after)["totalFrames"], 4, "a selection duplicate never grows the timeline");
+    assert_eq!(
+        component(&after)["totalFrames"],
+        4,
+        "a selection duplicate never grows the timeline"
+    );
 }
 
 #[test]
@@ -193,7 +222,11 @@ fn cut_blanks_the_unlocked_cell_and_returns_the_packet_then_paste_lands_it_elsew
     let after = value(&o);
     assert_eq!(keys(&after, "ly_in_b"), vec![0, 2]);
     assert_eq!(frames_of(&after, "ly_in_b"), vec![0, 2]);
-    assert_eq!(outside(&after), outside(&value(&open())), "the scene is untouched by both edits");
+    assert_eq!(
+        outside(&after),
+        outside(&value(&open())),
+        "the scene is untouched by both edits"
+    );
     // Two edits, two entries; undo twice restores the original bytes.
     assert_eq!(o.history_depths(), (2, 0));
     let current = o.content_revision();
@@ -213,15 +246,34 @@ fn copy_reads_the_component_cells_and_changes_nothing() {
     );
     assert_eq!(reply["ok"], true, "{reply}");
     assert_eq!(reply["result"]["applied"], false);
-    let cells = reply["result"]["clipboard"]["cells"].as_array().unwrap().clone();
+    let cells = reply["result"]["clipboard"]["cells"]
+        .as_array()
+        .unwrap()
+        .clone();
     assert_eq!(cells.len(), 2, "{reply}");
     assert_eq!(
-        cells.iter().map(|c| (c["relLayer"].clone(), c["relFrame"].clone(), c["keyframe"].clone())).collect::<Vec<_>>(),
-        vec![(json!(0), json!(0), json!(true)), (json!(1), json!(0), json!(true))]
+        cells
+            .iter()
+            .map(|c| (
+                c["relLayer"].clone(),
+                c["relFrame"].clone(),
+                c["keyframe"].clone()
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            (json!(0), json!(0), json!(true)),
+            (json!(1), json!(0), json!(true))
+        ]
     );
-    assert_eq!((bytes(&o), o.content_revision(), o.history_depths()), before);
+    assert_eq!(
+        (bytes(&o), o.content_revision(), o.history_depths()),
+        before
+    );
     // A scene layer is not a layer of the component.
-    refused(COPY, json!({"command":"object.frames.clipboard.copy","contextId":"sym_a","selection":[{"layerUid":"ly_scene","frame":0}]}));
+    refused(
+        COPY,
+        json!({"command":"object.frames.clipboard.copy","contextId":"sym_a","selection":[{"layerUid":"ly_scene","frame":0}]}),
+    );
 }
 
 #[test]
@@ -237,7 +289,10 @@ fn a_scene_clipboard_pastes_into_the_component_by_relative_cell() {
     assert_eq!(copied["ok"], true, "{copied}");
     let packet = copied["result"]["clipboard"].clone();
     let (instance, document) = ids(&o);
-    assert_eq!((packet["instanceId"].clone(), packet["documentId"].clone()), (json!(instance), json!(document)));
+    assert_eq!(
+        (packet["instanceId"].clone(), packet["documentId"].clone()),
+        (json!(instance), json!(document))
+    );
     let pasted = step(
         &mut o,
         "paste",
@@ -287,7 +342,10 @@ fn policy_and_visibility_change_the_component_layer_only() {
     );
     assert_eq!(reply["result"]["applied"], false, "{reply}");
     assert_eq!((o.content_revision(), o.history_depths()), (0, (0, 0)));
-    refused(POLICY, json!({"command":"object.layer.policy.edit","contextId":"sym_a","layerUid":"ly_scene","flag":"locked","value":true}));
+    refused(
+        POLICY,
+        json!({"command":"object.layer.policy.edit","contextId":"sym_a","layerUid":"ly_scene","flag":"locked","value":true}),
+    );
 }
 
 #[test]
@@ -298,9 +356,19 @@ fn create_adds_a_blank_layer_on_top_of_the_component_stack() {
         json!({"command":"object.layer.create","contextId":"sym_a","name":"Fresh"}),
     );
     assert_eq!(reply["result"]["layerUid"], "native-layer:1:0", "{reply}");
-    assert_eq!(layer_uids(&after), vec!["ly_in_a", "ly_in_b", "ly_in_lock", "native-layer:1:0"]);
-    assert_eq!(layer_field(&after, "native-layer:1:0", "name"), json!("Fresh"));
-    assert_eq!(after["layers"].as_array().unwrap().len(), 2, "the scene stack is untouched");
+    assert_eq!(
+        layer_uids(&after),
+        vec!["ly_in_a", "ly_in_b", "ly_in_lock", "native-layer:1:0"]
+    );
+    assert_eq!(
+        layer_field(&after, "native-layer:1:0", "name"),
+        json!("Fresh")
+    );
+    assert_eq!(
+        after["layers"].as_array().unwrap().len(),
+        2,
+        "the scene stack is untouched"
+    );
 }
 
 #[test]
@@ -316,8 +384,15 @@ fn create_in_a_component_with_an_authored_order_plan_extends_that_plan_only() {
         .iter()
         .map(|l| l["layerUid"].as_str().unwrap().to_owned())
         .collect();
-    assert_eq!(inner, vec!["ly_in_a", "ly_in_b", "ly_in_lock", "native-layer:1:0"]);
-    assert_eq!(scope_frames(&after), vec![0, 2], "the existing scopes are kept");
+    assert_eq!(
+        inner,
+        vec!["ly_in_a", "ly_in_b", "ly_in_lock", "native-layer:1:0"]
+    );
+    assert_eq!(
+        scope_frames(&after),
+        vec![0, 2],
+        "the existing scopes are kept"
+    );
 }
 
 #[test]
@@ -328,7 +403,11 @@ fn delete_duplicate_and_reorder_work_on_component_layers() {
         json!({"command":"object.layer.delete","contextId":"sym_a","selection":selection("ly_in_b")}),
     );
     assert_eq!(layer_uids(&deleted), vec!["ly_in_a", "ly_in_lock"]);
-    assert_eq!(frames_of(&deleted, "ly_in_b"), Vec::<u64>::new(), "its drawing goes with it");
+    assert_eq!(
+        frames_of(&deleted, "ly_in_b"),
+        Vec::<u64>::new(),
+        "its drawing goes with it"
+    );
 
     let (reply, duplicated) = cycle(
         open(),
@@ -347,7 +426,10 @@ fn delete_duplicate_and_reorder_work_on_component_layers() {
         REORDER,
         json!({"command":"object.layer.reorder","contextId":"sym_a","layerUids":["ly_in_lock"],"gap":0,"selection":selection("ly_in_lock")}),
     );
-    assert_eq!(layer_uids(&reordered), vec!["ly_in_lock", "ly_in_a", "ly_in_b"]);
+    assert_eq!(
+        layer_uids(&reordered),
+        vec!["ly_in_lock", "ly_in_a", "ly_in_b"]
+    );
 }
 
 #[test]
@@ -355,19 +437,41 @@ fn lifecycle_refusals_are_typed() {
     // A component keeps at least one layer: deleting them one by one refuses the last, with the document, revision and history alone.
     let mut o = open();
     for (id, uid) in [("d1", "ly_in_a"), ("d2", "ly_in_b")] {
-        let reply = step(&mut o, id, DELETE, json!({"command":"object.layer.delete","contextId":"sym_a","selection":selection(uid)}));
+        let reply = step(
+            &mut o,
+            id,
+            DELETE,
+            json!({"command":"object.layer.delete","contextId":"sym_a","selection":selection(uid)}),
+        );
         assert_eq!(reply["ok"], true, "{reply}");
     }
     let before = (bytes(&o), o.content_revision(), o.history_depths());
-    let last = step(&mut o, "d3", DELETE, json!({"command":"object.layer.delete","contextId":"sym_a","selection":selection("ly_in_lock")}));
+    let last = step(
+        &mut o,
+        "d3",
+        DELETE,
+        json!({"command":"object.layer.delete","contextId":"sym_a","selection":selection("ly_in_lock")}),
+    );
     assert_eq!(last["ok"], false, "{last}");
     assert_eq!(last["error"]["code"], "invalid_request", "{last}");
-    assert_eq!((bytes(&o), o.content_revision(), o.history_depths()), before);
+    assert_eq!(
+        (bytes(&o), o.content_revision(), o.history_depths()),
+        before
+    );
     assert_eq!(layer_uids(&value(&o)), vec!["ly_in_lock"]);
     // A scene layer is not a component layer, an undeclared component is unknown.
-    refused(DUPLICATE, json!({"command":"object.layer.duplicate","contextId":"sym_a","layerUid":"ly_scene"}));
-    refused(CREATE, json!({"command":"object.layer.create","contextId":"sym_missing","name":"x"}));
-    refused(REORDER, json!({"command":"object.layer.reorder","contextId":"sym_a","layerUids":["ly_scene"],"gap":0,"selection":selection("ly_in_a")}));
+    refused(
+        DUPLICATE,
+        json!({"command":"object.layer.duplicate","contextId":"sym_a","layerUid":"ly_scene"}),
+    );
+    refused(
+        CREATE,
+        json!({"command":"object.layer.create","contextId":"sym_missing","name":"x"}),
+    );
+    refused(
+        REORDER,
+        json!({"command":"object.layer.reorder","contextId":"sym_a","layerUids":["ly_scene"],"gap":0,"selection":selection("ly_in_a")}),
+    );
 }
 
 #[test]
@@ -379,13 +483,26 @@ fn the_playhead_cut_splits_a_component_layer_at_the_frame() {
         json!({"command":"object.layer.cut","contextId":"sym_a","layerUid":"ly_in_a","frame":2}),
     );
     let layers = layer_uids(&after);
-    assert_eq!(layers[1], "native-layer:1:0", "the new layer sits above its source");
+    assert_eq!(
+        layers[1], "native-layer:1:0",
+        "the new layer sits above its source"
+    );
     // Baseline splitLayerAtPlayhead: the full authored content is cloned and the ranges are hard-cut at the frame, against the
     // component's own length (4), not the scene's (6).
-    assert_eq!(layer_field(&after, "ly_in_a", "range"), json!({"outPoint":1}));
-    assert_eq!(layer_field(&after, "native-layer:1:0", "range"), json!({"inPoint":2,"outPoint":3}));
+    assert_eq!(
+        layer_field(&after, "ly_in_a", "range"),
+        json!({"outPoint":1})
+    );
+    assert_eq!(
+        layer_field(&after, "native-layer:1:0", "range"),
+        json!({"inPoint":2,"outPoint":3})
+    );
     assert_eq!(keys(&after, "native-layer:1:0"), vec![0, 2]);
     assert_eq!(frames_of(&after, "native-layer:1:0"), vec![0, 2]);
     assert_eq!(layers.len(), 4, "{layers:?}");
-    assert_eq!(after["layers"].as_array().unwrap().len(), 2, "the scene stack is untouched");
+    assert_eq!(
+        after["layers"].as_array().unwrap().len(),
+        2,
+        "the scene stack is untouched"
+    );
 }
