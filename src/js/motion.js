@@ -804,8 +804,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     if (isPropFiltered(kind)) return false;
     if (!_hideUnanimated) return true;
     var nbk = kind === 'blend' && window.nativeCompositing && nativeCompositing(); // #2257: native keys live in the engine
-    var keys = kind === 'parent' ? ld.parentKeys : nbk ? nbk.blendKeysOf(state.layers.indexOf(ld)) : ld.blendKeys;
-    return !!(keys && keys.length);
+    var keys = kind === 'parent' ? ld.parentKeys : nbk ? nbk.blendKeysOf(state.layers.indexOf(ld)) : ld.blendKeys; return !!(keys && keys.length);
   }
   function handleRevealAnimatedShortcut() {
     if (state.appMode !== 'motion') return false;

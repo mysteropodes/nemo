@@ -79,36 +79,6 @@
           "historyEntriesAdded": 1
         }
       }
-    },
-    {
-      "label": "#2257 key the Multiply blend of a layer at frame 12 (hold-only blend keys); installed/UI acceptance remains pending",
-      "request": {
-        "apiVersion": 2,
-        "requestId": "compositing-2",
-        "instanceId": "instance-A",
-        "documentId": "document-A",
-        "expectedRevision": 7,
-        "operation": "command.document.object.layer.compositing.edit",
-        "payload": {
-          "command": "object.layer.compositing.edit",
-          "layerUid": "layer-1",
-          "edit": "blendKeySet",
-          "index": 12,
-          "mode": "multiply"
-        }
-      },
-      "response": {
-        "apiVersion": 2,
-        "requestId": "compositing-2",
-        "instanceId": "instance-A",
-        "documentId": "document-A",
-        "contentRevision": 8,
-        "ok": true,
-        "result": {
-          "applied": true,
-          "historyEntriesAdded": 1
-        }
-      }
     }
   ]
 }

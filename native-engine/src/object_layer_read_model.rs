@@ -396,3 +396,6 @@ mod motion_tests;
 #[cfg(test)]
 #[path = "../tests/object_layer_read_model_three_d.rs"]
 mod three_d_tests;
+#[cfg(test)]
+#[path = "../tests/object_layer_read_model_blend_keys.rs"]
+mod blend_keys_tests;

@@ -1513,6 +1513,7 @@
         "object_layer_read_model_duplicator.rs",
         "object_layer_read_model_key_lock.rs",
         "object_layer_read_model_three_d.rs",
+        "object_layer_read_model_blend_keys.rs",
         "object_layer_read_model_motion.rs",
         "object_layer_link_set.rs",
         "object_layer_range_arrange.rs",
