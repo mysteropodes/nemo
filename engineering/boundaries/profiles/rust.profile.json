@@ -301,6 +301,7 @@
         "object_layer_lifecycle_ops.rs",
         "object_layer_lifecycle_link.rs",
         "object_layer_lifecycle_color.rs",
+        "object_layer_lifecycle_context.rs",
         "object_layer_kind_create.rs",
         "object_layer_folder_reparent.rs",
         "object_layer_lifecycle_parent.rs",

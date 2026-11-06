@@ -14,7 +14,7 @@
 //! The baseline never gated delete, duplicate, rename, recolour or reorder on a
 //! lock or a transform parent, so the owner hands the kernel the policy that
 //! permits every decision.
-use crate::commands::object_fill_owner::object_context_projection::{context_of, embed, project};
+use crate::commands::object_fill_owner::object_context_projection::{context_of, project};
 use crate::commands::object_fill_owner::object_frame_bulk_move::plan_arrange_json;
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
@@ -40,6 +40,10 @@ use link::{plan_follow_path, plan_time_link, TimeLinkRequest};
 // #2371 U11: the layer colour label.
 #[path = "object_layer_lifecycle_color.rs"]
 mod color;
+// #2256: a lifecycle kernel inside a declared component.
+#[path = "object_layer_lifecycle_context.rs"]
+mod context_plan;
+use context_plan::plan_in;
 // #2371 U11 / D36: Null, Effect, Guide, Folder and Effector creation, and folder membership.
 #[path = "object_layer_kind_create.rs"]
 mod kind_create;
@@ -282,26 +286,6 @@ impl PreparedLayerLifecycle {
         }
         Ok(Self { origin, plan, kind })
     }
-}
-
-/// #2256: run a lifecycle kernel inside `context`. A declared component is the scene of the unchanged kernel (`project`), and a changed
-/// plan is written back into the real document (`embed`); the selection slots, the removed and created uids are the kernel's own.
-fn plan_in(
-    origin: &ObjectSnapshot,
-    context: &str,
-    kernel: impl FnOnce(&ObjectDocument) -> Result<LifecyclePlan, LifecycleError>,
-) -> Result<Result<LifecyclePlan, LifecycleError>, DispatchErrorCode> {
-    let view = project(origin.document(), context)?;
-    let mut plan = match kernel(&view) {
-        Ok(plan) => plan,
-        Err(error) => return Ok(Err(error)),
-    };
-    plan.document = if plan.changed {
-        embed(origin.document(), context, &view, plan.document)?
-    } else {
-        origin.document().clone()
-    };
-    Ok(Ok(plan))
 }
 
 impl ObjectFillOwner {
