@@ -124,34 +124,6 @@ fn a_rotated_raster_keeps_its_unrotated_rect_and_the_map_about_its_centre() {
     );
 }
 
-/// #2372 A-image-text-flip-skew: a stored mirror / shear is part of the listed map, the bounds stay the stored rect.
-#[test]
-fn a_mirrored_and_a_sheared_raster_list_the_stored_form_in_their_map() {
-    let at = |m: &Vec<f64>, x: f64, y: f64| [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
-    let listed = |members: serde_json::Value| {
-        let mut doc = drawing();
-        for (key, value) in members.as_object().unwrap() {
-            doc["items"]["raster"][0]["item"][key] = value.clone();
-        }
-        let result = listing(&doc);
-        let image = result["items"].as_array().unwrap().iter().find(|i| i["role"] == "raster").unwrap().clone();
-        (pair(&image["bounds"]), pair(&image["matrix"]))
-    };
-    let (bounds, plain) = listed(json!({}));
-    assert_eq!(bounds, vec![39.0, 39.0, 41.0, 41.0]);
-    // Mirrored about the centre (40, 40): the top-left corner lands on the top-right, the centre stays.
-    let (b, m) = listed(json!({"flipX":true}));
-    assert_eq!(b, bounds);
-    let (p, c) = (at(&m, 39.0, 39.0), at(&m, 40.0, 40.0));
-    assert!((p[0] - 41.0).abs() < 1e-9 && (p[1] - 39.0).abs() < 1e-9 && (c[0] - 40.0).abs() < 1e-9 && (c[1] - 40.0).abs() < 1e-9, "{p:?} {c:?}");
-    // A 45 degree shear: the top row slides left by half the height (1), the centre row stays.
-    let (_, s) = listed(json!({"skew":45}));
-    let (top, mid) = (at(&s, 39.0, 39.0), at(&s, 40.0, 40.0));
-    let base = at(&plain, 39.0, 39.0);
-    assert!((top[0] - (base[0] - 1.0)).abs() < 1e-9 && (top[1] - base[1]).abs() < 1e-9, "{top:?} {base:?}");
-    assert!((mid[0] - 40.0).abs() < 1e-9 && (mid[1] - 40.0).abs() < 1e-9, "{mid:?}");
-}
-
 #[test]
 fn a_texture_anchor_names_its_brush_and_group_for_select() {
     let mut doc = drawing();

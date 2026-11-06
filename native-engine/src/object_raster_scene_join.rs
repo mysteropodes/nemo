@@ -20,7 +20,7 @@ pub(crate) struct RasterSource {
     pub(crate) placed: bool,
     pub(crate) source: RasterSceneSource,
     /// #2372: the item's stored mirror and shear (the identity for a placed component image).
-    pub(crate) form: crate::object_document::object_raster_asset_kernels::object_item_local_form::LocalForm,
+    pub(crate) form: crate::evaluation::object_item_local_form::LocalForm,
 }
 impl RasterSource {
     pub(crate) fn placed(source_index: usize, host: usize, source: RasterSceneSource) -> Self {

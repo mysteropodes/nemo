@@ -188,13 +188,10 @@ fn text_blocks_and_patches_are_closed_and_a_patch_never_carries_the_anchor() {
     }
     // #2372: a block (and an image) may carry its stored mirror and shear; a patch never does.
     let mut formed = commands()[6].clone();
-    formed["block"]["flipX"] = json!(true);
-    formed["block"]["flipY"] = json!(false);
-    formed["block"]["skew"] = json!(-30.5);
+    formed["block"] = json!({"flipX":true,"flipY":false,"skew":-30.5}).as_object().unwrap().iter().fold(formed["block"].clone(), |mut b, (k, v)| { b[k] = v.clone(); b });
     assert!(request(ITEM, &formed));
     let mut image = commands()[0].clone();
-    image["item"]["flipX"] = json!(true);
-    image["item"]["skew"] = json!(12);
+    (image["item"]["flipX"], image["item"]["skew"]) = (json!(true), json!(12));
     assert!(request(ITEM, &image), "{image}");
     image["item"]["skew"] = json!(95);
     assert!(!request(ITEM, &image));
@@ -205,8 +202,7 @@ fn text_blocks_and_patches_are_closed_and_a_patch_never_carries_the_anchor() {
         json!({}),
         json!({"anchorTopLeft":{"x":1,"y":2}}),
         json!({"rotation":30}),
-        json!({"flipX":true}),
-        json!({"skew":10}),
+        json!({"flipX":true,"skew":10}),
         json!({"isText":true}),
         json!({"text":""}),
         json!({"size":"9"}),

@@ -285,7 +285,7 @@ impl ObjectCompositionWitness {
             // #2267: a turned block's record space is its stored (unturned) frame about the anchor; the matrix is the turn then the layer's
             // chain, and the bounds are the contours' extent in that frame, so a client's conjugated gesture is what the batch applies.
             // #2372: the stored mirror and shear are part of the same map about the anchor.
-            return turned_text_item(target, source.item.scene().contours(), record.entry().block.anchor(), crate::object_document::object_raster_asset_kernels::object_item_local_form::mul(crate::object_document::object_raster_asset_kernels::object_item_local_form::turn(turn), form.linear()), chain.unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
+            return turned_text_item(target, source.item.scene().contours(), record.entry().block.anchor(), crate::evaluation::object_item_local_form::mul(crate::evaluation::object_item_local_form::turn(turn), form.linear()), chain.unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
         }
         let (bounds, matrix) = match chain {
             Some(m) if m != [1.0, 0.0, 0.0, 1.0, 0.0, 0.0] => {

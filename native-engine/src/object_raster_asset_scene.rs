@@ -25,7 +25,7 @@
 //! other lanes' layers; the item's reserved tags are not read here.
 
 use crate::evaluation::motion_parent_chain::{transform_image_rect, ChainEntry, ImageRect};
-use crate::object_document::object_raster_asset_kernels::object_item_local_form::LocalForm;
+use crate::evaluation::object_item_local_form::LocalForm;
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     ProducerOutput, ScenePin,
 };
