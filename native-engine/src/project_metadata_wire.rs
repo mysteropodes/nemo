@@ -2,6 +2,7 @@
 use crate::object_codec::project::ProjectWireError;
 use crate::object_document::{
     Presence, ProjectCameraKey, ProjectCommentRecord, ProjectMetadata, ProjectPresetCatalog,
+    RetainedTail,
     ProjectWorkspaceRecord, SymmetrySettings,
 };
 use serde::{Deserialize, Serialize};
@@ -139,6 +140,8 @@ pub(super) struct Metadata {
     camera_keys: Presence<Vec<ProjectCameraKey>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     camera_layer_on: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    retained_tail: Presence<RetainedTail>,
 }
 // Derived decoding alone admits positional arrays; reuse the drawing's
 // object-only visitor with strict duplicate/unknown/required-member checks.
@@ -173,7 +176,8 @@ crate::object_document::object_deserialize!(Metadata {
     #[serde(default)] comments:Presence<Vec<ProjectCommentRecord>>,
     #[serde(default)] custom_brush_presets:Presence<ProjectPresetCatalog>,
     #[serde(default)] camera_keys: Presence<Vec<ProjectCameraKey>>,
-    #[serde(default)] camera_layer_on: Presence<bool>
+    #[serde(default)] camera_layer_on: Presence<bool>,
+    #[serde(default)] retained_tail: Presence<RetainedTail>
 });
 
 impl Metadata {
@@ -284,6 +288,7 @@ impl Metadata {
                     self.camera_layer_on.value().copied(),
                 )
             })
+            .and_then(|value| value.with_retained_tail(self.retained_tail.value().cloned()))
             .map_err(|_| ProjectWireError::Invalid)
     }
     pub(super) fn from_metadata(value: &ProjectMetadata) -> Self {
@@ -394,6 +399,11 @@ impl Metadata {
                 .unwrap_or(Presence::Missing),
             camera_layer_on: value
                 .camera_layer_on()
+                .map(Presence::Present)
+                .unwrap_or(Presence::Missing),
+            retained_tail: value
+                .retained_tail()
+                .cloned()
                 .map(Presence::Present)
                 .unwrap_or(Presence::Missing),
         }

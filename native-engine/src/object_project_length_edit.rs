@@ -1,11 +1,13 @@
 //! Project length (F04/F11/U13): the Frames field and Trim to Work Area as one document-plus-settings candidate.
 //! Behavior source: src/js/timeline.js `setTotalFrames` and `trimToWorkArea` at 1065e9d8.
 //!
-//! The Frames field clamps to 1..=999. Growing only lengthens the timeline (the last exposure holds, as the
-//! baseline's empty padded frames do); shrinking drops the cells at or beyond the new end through the same
-//! frame-removal arithmetic F5/Remove use, because native storage admits no record past the last frame. The work
-//! area follows the baseline clamps: the end to the new last frame, then the start below the end. Layer in/out
-//! points, layer markers, composition markers and Motion keys are not touched by the Frames field.
+//! The Frames field clamps to 1..=999. Growing lengthens the timeline (the last exposure holds, as the baseline's
+//! empty padded frames do). Shrinking takes the cells at or beyond the new end off the drawing through the same
+//! frame-removal arithmetic F5/Remove use, so nothing past the end can render, export or play, and keeps them in
+//! the project metadata (`RetainedTail`): baseline never truncates the frames array, so growing again, or undoing,
+//! brings every cell back (120 -> 30 -> 120). The work area follows the baseline clamps: the end to the new last
+//! frame, then the start below the end. Layer in/out points, layer markers, composition markers and Motion keys
+//! are not touched by the Frames field.
 //!
 //! Trim keeps `in..=out` of the work area: cells outside it go, everything after the start re-bases on frame 0,
 //! and layer in/out points, layer and composition markers, camera keys and Motion keys shift by the start. A work
@@ -18,6 +20,9 @@ use crate::object_document::{
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde_json::Number;
+
+#[path = "object_project_length_tail.rs"]
+mod tail_cells;
 
 const MAX_FRAMES: f64 = 999.0;
 
@@ -38,6 +43,17 @@ fn cut(document: &ObjectDocument, min: u32, max: u32) -> Result<ObjectDocument, 
     let count = max - min + 1;
     let shrunk = total - count;
     let outside = |frame: u32| frame >= shrunk;
+    // A declared component keeps its own frame count: its records and order scopes are bounded by the
+    // component, never by the project length, so a shorter project cannot strand them. Only opaque contexts
+    // and Reference records, which no edit moves, can sit past the new end.
+    let components: std::collections::HashSet<&str> = document
+        .component_tables
+        .value()
+        .and_then(|tables| tables.components.value())
+        .into_iter()
+        .flat_map(|set| set.components.iter())
+        .map(|component| component.symbol_id())
+        .collect();
     let stuck = document.objects.iter().any(|record| {
         (record.target.context_id != "scene-root"
             || record.target.frame_scope.kind != crate::object_document::FrameScopeKind::Authored)
@@ -45,7 +61,9 @@ fn cut(document: &ObjectDocument, min: u32, max: u32) -> Result<ObjectDocument, 
     }) || document.composition_order.value().is_some_and(|plan| {
         plan.contexts
             .iter()
-            .filter(|context| context.context_id != "scene-root")
+            .filter(|context| {
+                context.context_id != "scene-root" && !components.contains(context.context_id.as_str())
+            })
             .flat_map(|context| context.scopes.iter())
             .any(|scope| outside(scope.frame_scope.frame))
     });
@@ -92,14 +110,30 @@ pub(super) fn set_total_frames(
     let value = frames.as_f64().filter(|v| v.is_finite()).ok_or_else(invalid)?;
     let wanted = value.floor().clamp(1.0, MAX_FRAMES) as u32;
     let total = document.total_frames;
+    let mut tail = metadata.retained_tail().cloned();
     let next = if wanted == total {
         None
     } else if wanted > total {
         let mut grown = document.clone();
         grown.total_frames = wanted;
+        // Baseline never truncated the frames array: the cells cut off by an earlier shrink come back, nearest first.
+        if let Some(held) = tail.take() {
+            let (front, rest) = held.split_front(wanted - total);
+            if let Ok(restored) = tail_cells::restore(&grown, &front, total).and_then(|d| admitted(d).map_err(|_| ())) {
+                grown = restored;
+            }
+            tail = Some(rest);
+        }
         Some(grown)
     } else {
-        Some(admitted(cut(document, wanted, total - 1)?)?)
+        // What leaves the timeline is kept (nearest first); cells already kept sit further from the new end.
+        let cut_off = tail_cells::extract(document, wanted);
+        let shrunk = admitted(cut(document, wanted, total - 1)?)?;
+        let mut kept = tail.take().unwrap_or_default();
+        kept.shift(total - wanted);
+        kept.prepend(cut_off);
+        tail = Some(kept);
+        Some(shrunk)
     };
     // waOut >= v -> v - 1, then waIn >= waOut -> max(0, waOut - 1); an unset end already means the last frame.
     let last = f64::from(wanted) - 1.0;
@@ -116,6 +150,7 @@ pub(super) fn set_total_frames(
     let metadata = metadata
         .clone()
         .with_work_area(start, out)
+        .and_then(|value| value.with_retained_tail(tail))
         .map_err(|_| invalid())?;
     Ok(LengthEdit {
         document: next,
@@ -217,8 +252,10 @@ pub(super) fn trim_to_work_area(
             .with_camera(keys, metadata.camera_layer_on())
             .map_err(|_| invalid())?;
     }
+    // Trim keeps its own baseline behaviour: the timeline is really cut to the work area, hidden cells included.
     let metadata = edited
         .with_work_area(Some(0.0), Some(span - 1.0))
+        .and_then(|value| value.with_retained_tail(None))
         .map_err(|_| invalid())?;
     Ok(LengthEdit {
         document: Some(document),

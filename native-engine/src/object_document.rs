@@ -44,6 +44,10 @@ pub(crate) use project::{
 #[path = "project_camera_state.rs"]
 mod camera;
 pub(crate) use camera::{ProjectCameraKey, ProjectCameraState};
+// Cells the Frames field cut off the end, kept for the next grow (baseline setTotalFrames never truncates).
+#[path = "project_retained_tail.rs"]
+mod retained_tail;
+pub(crate) use retained_tail::{canonical as canonical_tail, RetainedTail, TailLayer};
 
 #[path = "object_layer_timing.rs"]
 mod timing;
