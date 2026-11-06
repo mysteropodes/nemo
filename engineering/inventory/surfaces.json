@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "de8a72ebf02759cbc32ee5f404897eab147e4cac",
-  "describe": "v0.7.0-alpha.4-5547-gde8a72ebf-dirty"
+  "head": "d93b8f929b52c4c83df87ad816be15c177a65182",
+  "describe": "v0.7.0-alpha.4-5552-gd93b8f929-dirty"
  },
- "inputsDigest": "0f5e7572ab60bf6549322f251d6e987f26575aa9b2588e7e464ba9e7c91eb9ab",
+ "inputsDigest": "793bd2b74588f96acb20d459ed7f914542e1c45b203ca64d286e81b5921b77ab",
  "states": [
   "inventoried",
   "characterized",
@@ -2700,7 +2700,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 20,
+    "functionsVisited": 40,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9008 action()"
@@ -8412,7 +8412,7 @@
     "container": "kitsu-step-browse",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 22,
+    "functionsVisited": 42,
     "via": "helper el()",
     "references": []
    },
@@ -8527,7 +8527,7 @@
     "container": "kitsu-step-login",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 54,
+    "functionsVisited": 72,
     "via": "helper el()",
     "references": []
    },
@@ -22309,7 +22309,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/view-filter.js:46",
    "meta": {
-    "functionsVisited": 12
+    "functionsVisited": 13
    },
    "fixtures": []
   },
