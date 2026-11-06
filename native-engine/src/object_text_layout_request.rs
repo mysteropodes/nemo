@@ -9,6 +9,7 @@ use crate::object_document::object_text_layout_kernels::object_text_layout_recor
 use crate::object_document::object_text_layout_kernels::object_text_layout_record::{
     f64_of, TextBlockRecord,
 };
+use crate::object_document::object_raster_asset_kernels::object_item_local_form::LocalForm;
 use crate::object_document::Presence;
 use serde_json::Number;
 
@@ -42,6 +43,14 @@ impl TextBlockRecord {
     /// #2267: the turn of the whole block about its anchor, degrees (absent reads 0).
     pub(crate) fn rotation(&self) -> f64 {
         self.rotation.value().map(f64_of).unwrap_or(0.0)
+    }
+    /// #2372: the stored mirror and shear of the block about its anchor (absent reads as none).
+    pub(crate) fn local_form(&self) -> LocalForm {
+        LocalForm {
+            flip_x: self.flip_x.value() == Some(&true),
+            flip_y: self.flip_y.value() == Some(&true),
+            skew: self.skew.value().map(f64_of).unwrap_or(0.0),
+        }
     }
     /// Three states: `None` absent, `Some(None)` explicit `null`, `Some(Some(w))`.
     pub(crate) fn fixed_width_authored(&self) -> Option<Option<f64>> {
