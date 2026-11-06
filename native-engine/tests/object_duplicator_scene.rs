@@ -4,7 +4,8 @@ use crate::object_frame_packet::{
     prepare_object_exposure_frame,
 };
 use crate::object_render_scene::{
-    ordered_entries, prepare_object_paint_plan, prepare_object_render_scene, PaintEntry,
+    ordered_entries, prepare_object_composition, prepare_object_paint_plan,
+    prepare_object_render_scene, PaintEntry,
 };
 use serde_json::json;
 use vello::kurbo::PathEl;
@@ -121,7 +122,10 @@ fn actual_svg_serializes_each_temporal_copy_without_the_original_seed_or_persist
 }
 
 #[test]
-fn enabled_effects_only_on_hidden_or_shifted_sources_refuse_without_poisoning_disabled_stacks() {
+fn enabled_effects_only_on_hidden_or_shifted_sources_ride_every_copy_of_that_source() {
+    // #2257: a copy carries its source's item effects (baseline `cloneStrokeForTransform` keeps `effects`). The stack is
+    // joined onto the HOST layer under the source's object index even when the source sits in a hidden pool layer or
+    // in a shifted frame, where the packet's own selected-original table never holds it.
     for hidden_pool in [false, true] {
         for enabled in [false, true] {
             let mut value = if hidden_pool {
@@ -141,26 +145,22 @@ fn enabled_effects_only_on_hidden_or_shifted_sources_refuse_without_poisoning_di
             assert!(packet
                 .records()
                 .all(|record| !record.record().has_enabled_effects()));
-            let result = prepare_object_render_scene(&packet, &pin);
-            if enabled {
-                assert!(
-                    matches!(
-                        result,
-                        Err(
-                            crate::object_render_scene::ObjectSceneError::UnsupportedGeometry {
-                                reason:
-                                    "per-element effect evaluation awaits its native scene consumer",
-                                ..
-                            }
-                        )
-                    ),
-                    "hidden_pool={hidden_pool}: {result:?}"
-                );
-            } else {
-                let scene = result.unwrap();
-                let plan = prepare_object_paint_plan(&scene, &pin).unwrap();
-                assert_eq!(ordered_entries(&plan).count(), 3);
-            }
+            let scene = prepare_object_render_scene(&packet, &pin)
+                .unwrap_or_else(|error| panic!("hidden_pool={hidden_pool} enabled={enabled}: {error:?}"));
+            let plan = prepare_object_paint_plan(&scene, &pin).unwrap();
+            assert_eq!(ordered_entries(&plan).count(), 3);
+            let witness = prepare_object_composition(&plan, &pin).unwrap();
+            let host = packet.duplicator_outputs()[0].layer_index;
+            let planned = &witness.scene_effects().unwrap().layers()[host];
+            let keys: Vec<usize> = planned.item_stacks.iter().map(|(object, _)| *object).collect();
+            // The copies' sources are objects [1, 0, 0] in the shifted fixture (only object 0 is effected) and [1, 1, 1]
+            // in the hidden pool (every copy repeats object 1): one stack per effected source, shared by its copies.
+            let expected: Vec<usize> = match (enabled, hidden_pool) {
+                (false, _) => Vec::new(),
+                (true, false) => vec![0],
+                (true, true) => vec![1],
+            };
+            assert_eq!(keys, expected, "hidden_pool={hidden_pool} enabled={enabled}");
         }
     }
 }
