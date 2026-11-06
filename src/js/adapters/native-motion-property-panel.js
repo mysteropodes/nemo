@@ -17,6 +17,10 @@
   var baselineOrder=['position','positionZ','anchor','rotation','rotationX','rotationY','scale','opacity','order',
     // PROPS_DUP_EXTRA: the rows of a duplicator host, right after the Transform rows (the last three are the 3D per-copy offsets).
     'dupOffsetPos','dupOffsetRot','dupOffsetScale','dupOffsetOpacity','dupOffsetHue','dupOffsetPosZ','dupOffsetRotX','dupOffsetRotY'];
+  // Rows the baseline registers when its propsFor lists them (SMEffectorLayer.propKeysFor): the label table of the legacy Motion module only knows
+  // the rest. [i18n key, English text]; the channel offsets carry no i18n key in the baseline either.
+  var rowNames={effRadius:['propEffRadius','Radius'],effStrength:['propEffStrength','Strength'],effAngle:['propEffAngle','Angle'],effOffPosition:[null,'Offset Position'],
+    effOffRotation:[null,'Offset Rotation'],effOffScale:[null,'Offset Scale'],effOffOpacity:[null,'Offset Opacity'],effOffPositionZ:[null,'Offset Z'],effOffRotationX:[null,'Offset Rot X'],effOffRotationY:[null,'Offset Rot Y']};
   var modes=['all','animated','modified','expressions','errors','effects','mattes'];
   function key(t){return JSON.stringify([t.contextId,t.layerUid,t.strokeId===undefined?null:t.strokeId]);}
   function create(container,ports){
@@ -171,6 +175,10 @@
       // The strict public predicate still requires a currently presented view, including ready(false) refusals.
       Object.defineProperties(value,{isCurrent:{value:view.isCurrent},isSelectionCurrent:{value:isSelectionCurrent}});return Object.freeze(value);
     }
+    function rowLabel(property){
+      var named=ports.labelProperty&&ports.labelProperty(property),fallback=rowNames[property];
+      return fallback&&(!named||named===property)?(fallback[0]?tr(fallback[0],fallback[1]):fallback[1]):named||property;
+    }
     function make(tag,text){var node=doc.createElement(tag);node.textContent=text;return node;}
     function notify(message){if(retired)return;status.textContent=message||'';status.hidden=!message;}
     function setLoading(value){loading=value;toolbar.hidden=!value;}
@@ -217,7 +225,7 @@
         if(propertySet&&propertySet.indexOf(row.property)<0)return;
         var result=View.filterRow(row,mode);if(!result.available){unknown=true;return;}if(!result.matches)return;
         if(contentOnly){result=View.filterRow(row,'modified');if(!result.available){unknown=true;return;}if(!result.matches)return;}
-        var name=row.controlName||(ports.labelProperty&&ports.labelProperty(row.property))||row.property;
+        var name=row.controlName||rowLabel(row.property);
         if(!search||String(name).toLowerCase().indexOf(search)>=0||String(labelTarget(group.target,accepted.token)).toLowerCase().indexOf(search)>=0)rows.push({row:row,label:name});
       });
       var rank=function(entry){var at=baselineOrder.indexOf(entry.row.property);return at<0?baselineOrder.length:at;};

@@ -390,6 +390,29 @@ pub fn prepare_object_exposure_frame(
     prepare_frame_with_order(snapshot, selector, true, order::prepare_context, None)
 }
 
+/// The desktop exposure for a read of REST geometry only (the Motion canvas boxes, #2520/#2525): the packet of
+/// `prepare_object_exposure_frame` without the document-wide "every holder is consumed" gate, and with the draw order held at its natural
+/// value when an expression drives it. Nothing here evaluates a property, so it must never feed a render or an export.
+pub(crate) fn prepare_object_rest_geometry_frame(
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+) -> Result<ObjectFramePacket, ObjectFrameError> {
+    prepare::prepare_frame_admitting(snapshot, selector, true, order::prepare_context, None, false).or_else(|_| {
+        prepare::prepare_frame_admitting(
+            snapshot,
+            selector,
+            true,
+            |snapshot, context_id, frame, sources, exposure| {
+                order::prepare_context_with_resolver(snapshot, context_id, frame, sources, exposure, |_, _, _| {
+                    Ok::<f64, ObjectFrameError>(0.0)
+                })
+            },
+            None,
+            false,
+        )
+    })
+}
+
 /// Explicit exact-scoped resolver; its authored source equals the selector frame.
 pub(crate) fn prepare_object_frame_with_resolver<E, F>(
     snapshot: &ObjectSnapshot,

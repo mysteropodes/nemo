@@ -20,6 +20,26 @@ where
     E: From<ObjectFrameError>,
     F: FnOnce(&ObjectSnapshot, &str, u32, &[Option<u32>], bool) -> Result<NumericOrderPlan, E>,
 {
+    prepare_frame_admitting(snapshot, selector, exposure, prepare_order, motion, true)
+}
+
+/// The same construction; `require_consumed == false` skips the document-wide gate that every property holder is one a join consumes
+/// (and the unjoined-3D gate). Only a read of REST geometry may skip it (the Motion canvas boxes, #2520/#2525): such a read never
+/// evaluates a holder, so an expression, a control or an unconsumed property on some layer cannot change what it answers.
+pub(super) fn prepare_frame_admitting<E, F>(
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+    exposure: bool,
+    prepare_order: F,
+    motion: Option<
+        &dyn crate::evaluation::object_component_kernels::object_effector_layers::MotionPort,
+    >,
+    require_consumed: bool,
+) -> Result<ObjectFramePacket, E>
+where
+    E: From<ObjectFrameError>,
+    F: FnOnce(&ObjectSnapshot, &str, u32, &[Option<u32>], bool) -> Result<NumericOrderPlan, E>,
+{
     let context = FrameContext::admit(snapshot, selector, exposure)?;
     let document = snapshot.document();
     let context_layers = context.layers(document);
@@ -32,7 +52,7 @@ where
     } else {
         holders_fully_consumed(document)
     };
-    if snapshot.frame_has_unjoined_3d() || !consumed {
+    if require_consumed && (snapshot.frame_has_unjoined_3d() || !consumed) {
         return Err(ObjectFrameError::Unavailable.into());
     }
     let source_frames = sources::select(

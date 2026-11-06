@@ -27,6 +27,8 @@ mod key_action;
 mod key_batch;
 #[path = "object_property_pose_edit.rs"]
 mod pose_edit;
+#[path = "object_property_batch_edit.rs"]
+mod batch_edit;
 #[path = "object_property_keys_paste.rs"]
 mod keys_paste;
 #[path = "object_property_preset_apply.rs"]

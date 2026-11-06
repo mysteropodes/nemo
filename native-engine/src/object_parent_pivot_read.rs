@@ -74,7 +74,8 @@ pub(crate) fn layers_world_union(
 /// The layer's own bounds `[x0, y0, x1, y1]` before its Motion, for ANY layer that shows geometry at `frame`: the strict
 /// vector extents of `layer_pivot_extents`, else the extents of a mask or a duplicated source, else the display rectangles
 /// of its image and raster records. The baseline gizmo boxes every one of these (`motionBoxGeom`), and a 3D layer's own gizmo
-/// pivots about the same bounds; text, effect, rig and widget layers stay refused with a reason the caller shows.
+/// pivots about the same bounds. A rigged layer is boxed on its POSED strokes, an effect layer at the zero bounds of an empty layer, and an expression-driven
+/// document on its rest geometry; text and widget layers stay refused with a reason the caller shows.
 #[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
 pub(crate) fn layer_gizmo_bounds(
     snapshot: &ObjectSnapshot,
@@ -124,8 +125,8 @@ fn any_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) 
     if let Some(r) = loose.as_ref().ok().and_then(|all| all.first()).map(|e| e.1).filter(|r| finite(r)) {
         return Ok(r);
     }
-    raster_rect(snapshot, context_id, uid, frame)
-        .ok_or("the layer has no geometry the canvas box can follow (text, effect, rig, 3D or an empty layer)")
+    let why = loose.err().unwrap_or("the layer has no geometry the canvas box can follow (text or an empty layer)");
+    raster_rect(snapshot, context_id, uid, frame).ok_or(why)
 }
 
 #[cfg(feature = "evaluation")]
@@ -148,6 +149,7 @@ pub(crate) fn ancestor_affine(snapshot: &ObjectSnapshot, context_id: &str, uid: 
         let layer = document.layers().iter().find(|l| l.layer_uid() == at).ok_or("an ancestor layer is missing")?;
         let base = match layer.null_pivot_base(canvas) {
             Ok(Some(point)) => Some(point),
+            _ if layer.is_effect_layer.value() == Some(&true) => None,
             _ => any_rect(snapshot, context_id, &at, frame).ok().map(|r| [(r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0]),
         };
         if let Some(base) = base {
@@ -163,18 +165,23 @@ pub(crate) fn ancestor_affine(snapshot: &ObjectSnapshot, context_id: &str, uid: 
 
 #[cfg(feature = "evaluation")]
 fn rest_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) -> Option<[f64; 4]> {
-    if let Ok(rects) = layer_pivot_extents(snapshot, context_id, &[uid], frame) {
-        return rects.first().copied().filter(|r| r.iter().all(|v| v.is_finite()));
+    // The same bounds the Motion gizmo boxes (#2520/#2525): vector, mask, duplicated source, image, raster, rigged (posed) and expression-driven
+    // layers. A layer with none (text, an empty layer) adds nothing; an effect layer's zero bounds are skipped by the caller like a Null's.
+    let effect = snapshot
+        .document()
+        .layers()
+        .iter()
+        .any(|l| l.layer_uid() == uid && l.is_effect_layer.value() == Some(&true));
+    if effect {
+        return None;
     }
-    raster_rect(snapshot, context_id, uid, frame)
+    any_rect(snapshot, context_id, uid, frame).ok()
 }
 
 /// The union of the display rectangles (rotation included) of the image and raster records a layer shows at `frame`.
 #[cfg(feature = "evaluation")]
 pub(crate) fn raster_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str, frame: u32) -> Option<[f64; 4]> {
-    use crate::object_frame_packet::{
-        prepare_object_exposure_frame, FrameScopeKind, ObjectFrameSelector,
-    };
+    use crate::object_frame_packet::{FrameScopeKind, ObjectFrameSelector};
     let selector = ObjectFrameSelector {
         instance_id: snapshot.instance_id(),
         document_id: snapshot.document_id(),
@@ -184,7 +191,7 @@ pub(crate) fn raster_rect(snapshot: &ObjectSnapshot, context_id: &str, uid: &str
         scope_kind: FrameScopeKind::Authored,
         frame,
     };
-    let packet = prepare_object_exposure_frame(snapshot, &selector).ok()?;
+    let packet = crate::object_frame_packet::prepare_object_rest_geometry_frame(snapshot, &selector).ok()?;
     let index = packet.source_layers().iter().position(|l| l.layer_uid() == uid)?;
     let mut union: Option<[f64; 4]> = None;
     for record in packet.raster_records().filter(|r| r.layer_index() == index) {
@@ -321,10 +328,15 @@ fn bases(
         scope_kind: FrameScopeKind::Authored,
         frame,
     };
-    // Raw packets stay strict: an enabled expression anywhere needs the expression owner, which this read cannot be.
-    let packet = prepare_object_exposure_frame(snapshot, &selector).map_err(|_| {
-        "the held frame cannot be evaluated here (an expression or an unconsumed holder)"
-    })?;
+    // The strict pivot (reparenting keep-pose) stays strict: an enabled expression anywhere needs the expression owner, which this read cannot
+    // be. The gizmo read (#2520/#2525) boxes REST geometry, which no expression, control or unconsumed property of the document moves, so it
+    // prepares the same packet without the gate that every holder is consumed (see `prepare_object_rest_geometry_frame`).
+    let packet = if strict {
+        prepare_object_exposure_frame(snapshot, &selector)
+    } else {
+        crate::object_frame_packet::prepare_object_rest_geometry_frame(snapshot, &selector)
+    }
+    .map_err(|_| "the held frame cannot be evaluated here (an expression or an unconsumed holder)")?;
     let canvas = snapshot.project().map(|p| p.project().canvas_dimensions());
     let mut result = Vec::new();
     for uid in layer_uids {
@@ -339,6 +351,12 @@ fn bases(
             layer_uid: (*uid).to_owned(),
             stroke_id: Presence::Missing,
         };
+        // #2520/#2525: an effect layer holds no geometry; the baseline boxes it as an empty Paper layer, zero bounds at the origin
+        // (the canvas draws that as the Null marker), and a Motion edit still moves it.
+        if !strict && layer.is_effect_layer() {
+            result.push(([0.0, 0.0], [0.0; 4]));
+            continue;
+        }
         // The gizmo read (`strict == false`) boxes any layer that holds geometry, so a mask or a duplicated source is boxed
         // too; a layer with no geometry of its own (effect, widget), a 3D layer and a rig stay without a complete pivot.
         let boxable = if strict {
@@ -348,7 +366,7 @@ fn bases(
         };
         // The strict pivot (reparenting keep-pose) still refuses 3D; the gizmo read (#2520/#2525) answers a 3D layer's own
         // rest bounds, the centre the baseline `gizmo3DPose` pivots about.
-        if !boxable || (strict && layer.three_d.value() == Some(&true)) || layer.rig().is_some() {
+        if !boxable || (strict && (layer.three_d.value() == Some(&true) || layer.rig().is_some())) {
             return Err("the layer has no complete native pivot (text, image, mask, effect, 3D or rig content)");
         }
         if let Some(base) = layer
@@ -362,6 +380,19 @@ fn bases(
             .source_frame_for_layer(index)
             .ok_or("the layer shows no drawing at the edit frame")?;
         let mut vectors = Vec::new();
+        // #2520/#2525: a rigged layer is boxed on its POSED strokes (the baseline Paper bounds of the deformed layer), from the one rig pose
+        // kernel the scene uses; a stroke no bind drives keeps its stored geometry. A pose that cannot be evaluated is a typed refusal.
+        let pose = if layer.rig().is_some() {
+            use crate::evaluation::object_image_mesh_kernels::rig_pose_eval::{evaluate_rig_pose, RigPosePin};
+            let evaluation = evaluate_rig_pose(snapshot, &RigPosePin::of(snapshot), uid, packet.frame(), None)
+                .map_err(|_| "the rig pose of the layer cannot be evaluated here")?;
+            if evaluation.source_frame != held {
+                return Err("the rig pose and the shown drawing differ");
+            }
+            Some(evaluation)
+        } else {
+            None
+        };
         // #2256: a component's records live in its own table, indexed as its frame packet indexes them.
         let objects = if context_id == "scene-root" {
             snapshot.document().objects()
@@ -386,8 +417,11 @@ fn bases(
             if !is_vector_record(record) {
                 return Err("a legacy contour record has no evaluated pivot here");
             }
+            let posed = pose
+                .as_ref()
+                .and_then(|p| p.strokes.iter().find(|stroke| stroke.stroke_id == record.target.stroke_id));
             let vector = match packet.records().find(|r| r.source_object_index() == at) {
-                Some(source) => evaluate_record_rest_with_pose(&packet, source, None),
+                Some(source) => evaluate_record_rest_with_pose(&packet, source, posed),
                 // The scene index fallback reads the scene table: a component record absent from its own packet has no evaluation here.
                 None if context_id != "scene-root" => {
                     return Err("a component record is not in its frame packet");

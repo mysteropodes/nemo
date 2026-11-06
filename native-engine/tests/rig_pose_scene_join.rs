@@ -408,3 +408,55 @@ fn legacy_pose_must_match_selected_stored_id_closed_flag_and_topology() {
         ));
     }
 }
+
+/// #2520 / #2525: the Motion gizmo of a RIGGED layer is boxed on the POSED strokes (the baseline Paper bounds of the deformed layer), not on the
+/// stored rest geometry. The expected boxes are the tight cubic bounds of the original oracle's posed paths; the rest geometry differs.
+#[test]
+fn the_gizmo_bounds_of_a_rigged_layer_are_the_union_of_its_posed_strokes() {
+    use vello::kurbo::Shape;
+    let gizmo = crate::object_snapshot::object_parent_pivot_read::layer_gizmo_bounds;
+    let (mut checked, mut moved) = (0, 0);
+    for row in rows().into_iter().filter(|r| {
+        !r.strokes.is_empty() && r.meshes.as_object().unwrap().is_empty() && r.expect["throws"] == false
+    }) {
+        let mut source = document(&row);
+        // The gizmo read needs the desktop exposure, which asks every layer for explicit timing.
+        source["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+            "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+        // The ordinary vector family (the oracle's closed rows are legacy contour records, which carry no evaluated bounds).
+        for record in source["objects"].as_array_mut().unwrap() {
+            record["family"] = json!("editable-vector-path");
+            record["vector"] = json!({"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"round","strokeJoin":"round","opacity":1});
+        }
+        let snapshot = snapshot_of(&source);
+        let mut union: Option<[f64; 4]> = None;
+        let mut rest: Option<[f64; 4]> = None;
+        for record in snapshot.document().objects() {
+            let id = &record.target.stroke_id;
+            let box_of = |segments: &[[f64; 6]]| {
+                let b = expected_path(segments, record.geometry.closed).bounding_box();
+                [b.x0, b.y0, b.x1, b.y1]
+            };
+            let posed = box_of(&expected_segments(&row, id));
+            let stored: Vec<[f64; 6]> = row.strokes.iter().find(|s| s["id"] == id.as_str()).map_or(vec![], |s| {
+                s["segs"].as_array().unwrap().iter().map(|g| std::array::from_fn(|i| rows::num(&g[i]))).collect()
+            });
+            let join = |u: Option<[f64; 4]>, b: [f64; 4]| Some(u.map_or(b, |u| [u[0].min(b[0]), u[1].min(b[1]), u[2].max(b[2]), u[3].max(b[3])]));
+            union = join(union, posed);
+            if !stored.is_empty() {
+                rest = join(rest, box_of(&stored));
+            }
+        }
+        let want = union.unwrap();
+        let got = gizmo(&snapshot, "scene-root", "L1", 0).unwrap_or_else(|e| panic!("{}: {e}", row.name));
+        for (g, w) in got.iter().zip(want) {
+            assert!((g - w).abs() < 1e-6 * w.abs().max(1.0), "{}: {got:?} != {want:?}", row.name);
+        }
+        if rest.is_some_and(|r| r.iter().zip(want).any(|(a, b)| (a - b).abs() > 1e-3)) {
+            moved += 1;
+        }
+        checked += 1;
+    }
+    assert!(checked >= 8, "{checked}");
+    assert!(moved >= 1, "at least one oracle row moves the box away from the rest geometry");
+}
