@@ -38,13 +38,23 @@ fn invert() -> Value {
     json!([{"type": "invert", "enabled": true}])
 }
 
-fn rect_record(context: &str, layer: &str, id: &str, (x0, y0, x1, y1): (f64, f64, f64, f64), rgb: [f64; 3]) -> Value {
+fn rect_record(
+    context: &str,
+    layer: &str,
+    id: &str,
+    (x0, y0, x1, y1): (f64, f64, f64, f64),
+    rgb: [f64; 3],
+) -> Value {
     let mut record = support::legacy_record(layer, id);
     record["target"] = json!({"contextId":context,"layerUid":layer,"strokeId":id,
         "frameScope":{"kind":"authored","frame":0}});
     record["fill"] = json!({"kind":"solid","r":rgb[0],"g":rgb[1],"b":rgb[2],"a":1});
-    record["geometry"]["segments"] =
-        json!([corner(x0, y0), corner(x1, y0), corner(x1, y1), corner(x0, y1)]);
+    record["geometry"]["segments"] = json!([
+        corner(x0, y0),
+        corner(x1, y0),
+        corner(x1, y1),
+        corner(x0, y1)
+    ]);
     record
 }
 
@@ -84,7 +94,11 @@ fn duplicated(fx: Option<Value>) -> NativeObjectHistory {
     let tables = json!({"duplicators":{"format":"nemo.native-duplicator-set","formatVersion":1,
         "duplicators":[{"contextId":"scene-root","layerUid":"D",
             "duplicator":{"mode":"grid","rows":1,"cols":3,"spacingX":40}}],"effectorLayers":[]}});
-    owner_of("dup-fx", drawing("D", vec![record], &["src"], tables), (160, 60))
+    owner_of(
+        "dup-fx",
+        drawing("D", vec![record], &["src"], tables),
+        (160, 60),
+    )
 }
 
 /// A host layer `host` placing component `comp-a`: a red inner rectangle (`fx` on it) and a green one overlapping it.
@@ -93,7 +107,13 @@ fn placed(fx: Option<Value>) -> NativeObjectHistory {
     if let Some(fx) = fx {
         red["effects"] = fx;
     }
-    let green = rect_record("comp-a", "inner", "green", (30., 20., 56., 44.), [0., 1., 0.]);
+    let green = rect_record(
+        "comp-a",
+        "inner",
+        "green",
+        (30., 20., 56., 44.),
+        [0., 1., 0.],
+    );
     let tables = json!({"components":{"format":"nemo.native-component-set","formatVersion":1,
         "components":[{"symbolId":"comp-a","totalFrames":4,
             "layers":[{"layerUid":"inner","timing":timing()}],"objects":[red, green]}],
@@ -144,7 +164,9 @@ fn frame_of(owner: &NativeObjectHistory, dims: (u32, u32)) -> (bool, Vec<u8>) {
 }
 
 fn pixel(bytes: &[u8], width: u32, x: usize, y: usize) -> [u8; 4] {
-    bytes[(y * width as usize + x) * 4..][..4].try_into().unwrap()
+    bytes[(y * width as usize + x) * 4..][..4]
+        .try_into()
+        .unwrap()
 }
 
 fn count(bytes: &[u8], colour: [u8; 4]) -> usize {
@@ -163,7 +185,11 @@ fn every_duplicator_copy_carries_its_sources_item_effect() {
     assert_eq!(count(&graded, CYAN), reds, "each red pixel becomes cyan");
     assert_eq!(count(&graded, RED), 0);
     for (g, f) in graded.chunks_exact(4).zip(flat.chunks_exact(4)) {
-        let expected = if f == RED { CYAN } else { f.try_into().unwrap() };
+        let expected = if f == RED {
+            CYAN
+        } else {
+            f.try_into().unwrap()
+        };
         assert_eq!(g, expected);
     }
 }
@@ -174,10 +200,16 @@ fn each_duplicator_copy_is_its_own_run_on_its_own_box() {
     let witness = witness_of(&owner);
     let context = LayerContext::new(&witness).unwrap();
     let effects = witness.scene_effects().unwrap().clone();
-    let PathSelection::Layered(stack) = select_composition_path(&effects, witness.plan()).unwrap() else {
+    let PathSelection::Layered(stack) = select_composition_path(&effects, witness.plan()).unwrap()
+    else {
         panic!("the item stack selects the layer stack");
     };
-    let runs = crate::compositor::scene_effect_gpu_blend::items::runs(&context, 0, &stack.inputs()[0], (160, 60));
+    let runs = crate::compositor::scene_effect_gpu_blend::items::runs(
+        &context,
+        0,
+        &stack.inputs()[0],
+        (160, 60),
+    );
     assert_eq!(runs.len(), 3, "three copies, three effected runs");
     let boxes: Vec<(f32, f32, f32, f32)> = runs
         .iter()
@@ -212,11 +244,19 @@ fn a_placed_component_inner_record_is_graded_alone_and_the_next_record_composite
     // Red (8..40 x 8..36) is inverted alone; the plain green rectangle (30..56 x 20..44) is composited above it.
     assert_eq!(pixel(&flat, 64, 12, 12), RED);
     assert_eq!(pixel(&graded, 64, 12, 12), CYAN);
-    assert_eq!(pixel(&graded, 64, 35, 30), GREEN, "the overlap keeps the plain record on top, un-inverted");
+    assert_eq!(
+        pixel(&graded, 64, 35, 30),
+        GREEN,
+        "the overlap keeps the plain record on top, un-inverted"
+    );
     assert_eq!(pixel(&graded, 64, 50, 40), GREEN);
     assert_eq!(pixel(&graded, 64, 2, 2), WHITE);
     for (g, f) in graded.chunks_exact(4).zip(flat.chunks_exact(4)) {
-        let expected = if f == RED { CYAN } else { f.try_into().unwrap() };
+        let expected = if f == RED {
+            CYAN
+        } else {
+            f.try_into().unwrap()
+        };
         assert_eq!(g, expected);
     }
 }
@@ -249,19 +289,41 @@ fn a_brush_stroke_stack_rides_its_anchor_contour_and_the_ink_draws_plain_as_in_t
     let witness = brush_witness(&fx);
     let context = LayerContext::new(&witness).unwrap();
     let effects = witness.scene_effects().unwrap().clone();
-    let PathSelection::Layered(stack) = select_composition_path(&effects, witness.plan()).unwrap() else {
+    let PathSelection::Layered(stack) = select_composition_path(&effects, witness.plan()).unwrap()
+    else {
         panic!("the anchor's stack selects the layer stack");
     };
-    let runs = crate::compositor::scene_effect_gpu_blend::items::runs(&context, 0, &stack.inputs()[0], (48, 48));
-    let shape: Vec<(usize, bool)> = runs.iter().map(|run| (run.entries.len(), run.effect.is_some())).collect();
-    assert_eq!(shape, vec![(1, true), (1, false)], "anchor graded, ink plain");
-    let control = run_at(&mut gpu, (48, 48), &brush_witness(&super::docs::brush_with_effects(None, None, None)));
+    let runs = crate::compositor::scene_effect_gpu_blend::items::runs(
+        &context,
+        0,
+        &stack.inputs()[0],
+        (48, 48),
+    );
+    let shape: Vec<(usize, bool)> = runs
+        .iter()
+        .map(|run| (run.entries.len(), run.effect.is_some()))
+        .collect();
+    assert_eq!(
+        shape,
+        vec![(1, true), (1, false)],
+        "anchor graded, ink plain"
+    );
+    let control = run_at(
+        &mut gpu,
+        (48, 48),
+        &brush_witness(&super::docs::brush_with_effects(None, None, None)),
+    );
     let graded = run_at(&mut gpu, (48, 48), &witness);
-    let (Door::Pixels(control), Door::Pixels(graded)) = (&control.viewport, &graded.viewport) else {
+    let (Door::Pixels(control), Door::Pixels(graded)) = (&control.viewport, &graded.viewport)
+    else {
         panic!("both doors draw");
     };
     assert_eq!(graded.len(), control.len());
     assert!(graded != control, "the anchor contour is graded");
     let ink = pixel(control, 48, 24, 24);
-    assert_eq!(pixel(graded, 48, 24, 24), ink, "the ink centre is the control's");
+    assert_eq!(
+        pixel(graded, 48, 24, 24),
+        ink,
+        "the ink centre is the control's"
+    );
 }

@@ -31,7 +31,12 @@ fn record(layer: &str, (x0, y0, x1, y1): (f64, f64, f64, f64), rgb: [f64; 3], fr
     record["target"] = json!({"contextId":"scene-root","layerUid":layer,"strokeId":"s",
         "frameScope":{"kind":"authored","frame":frame}});
     record["fill"] = json!({"kind":"solid","r":rgb[0],"g":rgb[1],"b":rgb[2],"a":1});
-    record["geometry"]["segments"] = json!([corner(x0, y0), corner(x1, y0), corner(x1, y1), corner(x0, y1)]);
+    record["geometry"]["segments"] = json!([
+        corner(x0, y0),
+        corner(x1, y0),
+        corner(x1, y1),
+        corner(x0, y1)
+    ]);
     record
 }
 
@@ -42,7 +47,8 @@ fn document(code: &str) -> Value {
     let layers = json!([
         {"layerUid":"T","timing":timing,"matteMode":"alpha","matteSourceLayerUid":"S"},
         {"layerUid":"S","timing":timing}]);
-    let elements = |layer: &str| json!({"layerUid":layer,"strokeId":"s","naturalPosition":0,"order":{}});
+    let elements =
+        |layer: &str| json!({"layerUid":layer,"strokeId":"s","naturalPosition":0,"order":{}});
     let frames: Vec<Value> = (0..=4u32)
         .map(|frame| json!({"frameScope":{"kind":"authored","frame":frame},"elements":[elements("T"), elements("S")]}))
         .collect();
@@ -87,23 +93,35 @@ fn selector(s: &crate::revision::ObjectSnapshot, frame: u32) -> ObjectFrameSelec
 /// The export-door image of the owner-held packet at `frame` and whether the layer stack painted it.
 fn owner_held(doc: &Value, frame: u32) -> (bool, Vec<u8>) {
     let history = owner(doc);
-    let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
+    let snapshot = history
+        .acquire_snapshot(history.content_revision())
+        .unwrap();
     let pins = selector(&snapshot, frame);
     let mut retained = None;
-    let packet = prepare_object_motion_exposure_frame_for_owner(&history, &snapshot, &pins, &mut retained)
-        .expect("the owner's expression port evaluates the matte switch");
+    let packet =
+        prepare_object_motion_exposure_frame_for_owner(&history, &snapshot, &pins, &mut retained)
+            .expect("the owner's expression port evaluates the matte switch");
     assert!(retained.is_none());
     let scene = prepare_object_render_scene(&packet, &pins).unwrap();
     let plan = prepare_object_paint_plan(&scene, &pins).unwrap();
-    let witness = prepare_object_composition(&plan, &pins).expect("the evaluated matteOn is joined");
+    let witness =
+        prepare_object_composition(&plan, &pins).expect("the evaluated matteOn is joined");
     let effects = witness.scene_effects().unwrap().clone();
     let output = ObjectOutputSpec::new(160, 120, "project-srgb-normal-rgba8-area").unwrap();
     let mut gpu = gpu();
     let (layered, result) = match select_composition_path(&effects, witness.plan()).unwrap() {
-        PathSelection::Layered(stack) => (true, gpu.compose_object_layered(&witness, output, &stack)),
+        PathSelection::Layered(stack) => {
+            (true, gpu.compose_object_layered(&witness, output, &stack))
+        }
         PathSelection::Flat => (false, gpu.compose_object(&witness, output)),
     };
-    (layered, gpu.readback_object_rgba8(&result.unwrap()).unwrap().bytes().to_vec())
+    (
+        layered,
+        gpu.readback_object_rgba8(&result.unwrap())
+            .unwrap()
+            .bytes()
+            .to_vec(),
+    )
 }
 
 fn pixel(bytes: &[u8], x: usize, y: usize) -> [u8; 4] {
@@ -116,12 +134,28 @@ fn an_expressed_matte_switch_is_evaluated_at_the_frame_not_read_from_the_raw_val
     let doc = document("[frame * 30]");
     let (layered, matted) = owner_held(&doc, 2);
     assert!(layered);
-    assert_eq!(pixel(&matted, 50, 50), RED, "matted: T shows inside the matte source");
-    assert_eq!(pixel(&matted, 30, 30), WHITE, "matted: nothing of T outside it");
+    assert_eq!(
+        pixel(&matted, 50, 50),
+        RED,
+        "matted: T shows inside the matte source"
+    );
+    assert_eq!(
+        pixel(&matted, 30, 30),
+        WHITE,
+        "matted: nothing of T outside it"
+    );
     for frame in [0, 1] {
         let (_, whole) = owner_held(&doc, frame);
-        assert_eq!(pixel(&whole, 30, 30), RED, "frame {frame}: the matte is off, T is whole");
-        assert_eq!(pixel(&whole, 50, 50), BLUE, "frame {frame}: the source paints as its own layer, above T");
+        assert_eq!(
+            pixel(&whole, 30, 30),
+            RED,
+            "frame {frame}: the matte is off, T is whole"
+        );
+        assert_eq!(
+            pixel(&whole, 50, 50),
+            BLUE,
+            "frame {frame}: the source paints as its own layer, above T"
+        );
     }
 }
 
@@ -136,7 +170,9 @@ fn the_matte_switch_value_is_the_first_component_and_50_is_matted() {
 #[test]
 fn a_packet_without_the_owners_expression_port_refuses_the_expressed_switch() {
     let history = owner(&document("[frame * 30]"));
-    let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
+    let snapshot = history
+        .acquire_snapshot(history.content_revision())
+        .unwrap();
     let pins = selector(&snapshot, 2);
     // The strict raw packet carries no evaluated value and refuses an enabled expression outright; the raw 100 is
     // never substituted for it.
@@ -149,8 +185,12 @@ fn a_packet_without_the_owners_expression_port_refuses_the_expressed_switch() {
 fn keyed_blend(keys: &[(u32, &str)]) -> Value {
     let timing = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
         "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
-    let keys: Vec<Value> = keys.iter().map(|(frame, mode)| json!({"frame": frame, "mode": mode})).collect();
-    let elements = |layer: &str| json!({"layerUid":layer,"strokeId":"s","naturalPosition":0,"order":{}});
+    let keys: Vec<Value> = keys
+        .iter()
+        .map(|(frame, mode)| json!({"frame": frame, "mode": mode}))
+        .collect();
+    let elements =
+        |layer: &str| json!({"layerUid":layer,"strokeId":"s","naturalPosition":0,"order":{}});
     let scopes: Vec<Value> = (0..=4u32)
         .map(|frame| json!({"frameScope":{"kind":"authored","frame":frame},"elements":[elements("base"), elements("top")]}))
         .collect();
@@ -172,7 +212,9 @@ fn keyed_blend(keys: &[(u32, &str)]) -> Value {
 /// The export-door image of the raw packet at `frame` and whether the layer stack painted it.
 fn raw_frame(doc: &Value, frame: u32) -> (bool, Vec<u8>) {
     let history = owner(doc);
-    let snapshot = history.acquire_snapshot(history.content_revision()).unwrap();
+    let snapshot = history
+        .acquire_snapshot(history.content_revision())
+        .unwrap();
     let pins = selector(&snapshot, frame);
     let packet = prepare_object_exposure_frame(&snapshot, &pins).unwrap();
     let scene = prepare_object_render_scene(&packet, &pins).unwrap();
@@ -182,10 +224,18 @@ fn raw_frame(doc: &Value, frame: u32) -> (bool, Vec<u8>) {
     let output = ObjectOutputSpec::new(160, 120, "project-srgb-normal-rgba8-area").unwrap();
     let mut gpu = gpu();
     let (layered, result) = match select_composition_path(&effects, witness.plan()).unwrap() {
-        PathSelection::Layered(stack) => (true, gpu.compose_object_layered(&witness, output, &stack)),
+        PathSelection::Layered(stack) => {
+            (true, gpu.compose_object_layered(&witness, output, &stack))
+        }
         PathSelection::Flat => (false, gpu.compose_object(&witness, output)),
     };
-    (layered, gpu.readback_object_rgba8(&result.unwrap()).unwrap().bytes().to_vec())
+    (
+        layered,
+        gpu.readback_object_rgba8(&result.unwrap())
+            .unwrap()
+            .bytes()
+            .to_vec(),
+    )
 }
 
 const BLACK: [u8; 4] = [0, 0, 0, 255];
@@ -196,10 +246,22 @@ fn a_keyed_blend_mode_holds_between_its_keys_and_the_layer_stack_draws_it() {
     let doc = keyed_blend(&[(0, "normal"), (2, "multiply")]);
     for (frame, overlap) in [(0, BLUE), (1, BLUE), (2, BLACK), (3, BLACK), (4, BLACK)] {
         let (layered, image) = raw_frame(&doc, frame);
-        assert_eq!(layered, frame >= 2, "frame {frame}: a blended layer selects the layer stack, Normal stays flat");
+        assert_eq!(
+            layered,
+            frame >= 2,
+            "frame {frame}: a blended layer selects the layer stack, Normal stays flat"
+        );
         assert_eq!(pixel(&image, 80, 60), overlap, "frame {frame}: overlap");
-        assert_eq!(pixel(&image, 120, 60), BLUE, "frame {frame}: blue over white is blue in either mode");
-        assert_eq!(pixel(&image, 30, 30), RED, "frame {frame}: the base layer alone");
+        assert_eq!(
+            pixel(&image, 120, 60),
+            BLUE,
+            "frame {frame}: blue over white is blue in either mode"
+        );
+        assert_eq!(
+            pixel(&image, 30, 30),
+            RED,
+            "frame {frame}: the base layer alone"
+        );
     }
 }
 
@@ -208,7 +270,11 @@ fn before_its_first_key_a_keyed_layer_holds_the_first_keys_mode() {
     let doc = keyed_blend(&[(2, "multiply")]);
     let (layered, image) = raw_frame(&doc, 0);
     assert!(layered);
-    assert_eq!(pixel(&image, 80, 60), BLACK, "frame 0 is before the only key: its mode holds");
+    assert_eq!(
+        pixel(&image, 80, 60),
+        BLACK,
+        "frame 0 is before the only key: its mode holds"
+    );
 }
 
 #[test]
@@ -220,8 +286,14 @@ fn the_stored_blend_is_ignored_while_keys_exist_and_keys_equal_the_static_blend_
     assert_eq!(pixel(&image, 80, 60), BLUE);
     let mut plain = keyed_blend(&[(0, "multiply")]);
     let (_, with_key) = raw_frame(&plain, 3);
-    plain["layers"][1].as_object_mut().unwrap().remove("blendKeys");
+    plain["layers"][1]
+        .as_object_mut()
+        .unwrap()
+        .remove("blendKeys");
     plain["layers"][1]["blendMode"] = json!("multiply");
     let (_, stored) = raw_frame(&plain, 3);
-    assert_eq!(with_key, stored, "one key of Multiply is the stored Multiply");
+    assert_eq!(
+        with_key, stored,
+        "one key of Multiply is the stored Multiply"
+    );
 }
