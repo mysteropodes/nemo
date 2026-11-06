@@ -2995,7 +2995,8 @@
         "native-component-context.js",
         "native-component-frame-edit.js",
         "native-component-layer-edit.js",
-        "native-component-range-edit.js"
+        "native-component-range-edit.js",
+        "native-component-cell-selection.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [

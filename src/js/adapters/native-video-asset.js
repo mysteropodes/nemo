@@ -19,7 +19,12 @@
   function create(session,ports){
     if(!Command||!Contract)throw new Error('Native video link modules are unavailable');
     ports=ports||{};
-    var commands=Command.create(session,'video',Contract);
+    var commands=Command.create(session,'video',Contract),inside=null;
+    // #2256: a new layer inside an entered component goes over the component command route (the resource route is scene-only).
+    function componentCommands(){
+      if(typeof session.runComponentCommand!=='function')return null;
+      return inside||(inside=Command.create(Object.freeze({info:session.info,isActive:session.isActive,requestId:session.requestId,runResourceCommand:session.runComponentCommand.bind(session)}),'video',Contract));
+    }
     function routed(){var route=ports.videoRoute;return (typeof route==='function'?route():route)===true;}
     function gate(){return routed()?null:Promise.reject(fault('unavailable','video_host_route_unavailable','Video import is unavailable'));}
     function originPin(){
@@ -27,7 +32,8 @@
       if(!session.isActive()||!value)throw fault('unavailable','no_native_project','Video import is unavailable');
       return PIN_KEYS.reduce(function(out,key){out[key]=value[key];return out;},{});
     }
-    // intent: {kind:'newLayer'} or {kind:'replace',placementId}. options: origin (the picker's five pins) and current(queueScope).
+    // intent: {kind:'newLayer'} or {kind:'replace',placementId}. options: origin (the picker's five pins), current(queueScope) and, for a new layer only,
+    // contextId (the declared component the layer joins).
     function link(path,intent,options){
       var blocked=gate();if(blocked)return blocked;
       options=options||{};
@@ -35,13 +41,18 @@
       try{
         if(typeof path!=='string'||!path.length||path.includes('\0'))throw fault('invalid_request','local_validation','A video path must be a non-empty string without NUL');
         before=options.origin||originPin();disposition=JSON.parse(JSON.stringify(intent));
+        if(options.contextId!==undefined&&(typeof options.contextId!=='string'||!options.contextId||intent.kind!=='newLayer'))throw fault('invalid_request','local_validation','A video context applies to a new layer only');
       }catch(error){return Promise.reject(error);}
+      var send=options.contextId===undefined?commands:componentCommands();
+      if(!send)return Promise.reject(fault('unavailable','component_route_unavailable','Video import is unavailable'));
       // Admit the picker origin before entering a queue that deliberately hides the global presentation.
       if(options.current&&options.current()!==true)return Promise.reject(fault('stale_revision','video_origin_changed','Video import context changed'));
-      return commands.execute(Contract.LINK,function(pin,queueScope){
+      return send.execute(Contract.LINK,function(pin,queueScope){
         if(!routed())throw fault('unavailable','video_host_route_unavailable','Video import is unavailable');
         if(!sameOrigin(pin,before)||(options.current&&options.current(queueScope)!==true))throw fault('stale_revision','video_origin_changed','Video import context changed');
-        return {documentSnapshotId:pin.documentSnapshotId,lifecycleGeneration:pin.lifecycleGeneration,source:{kind:'file',path:path},intent:disposition};
+        var body={documentSnapshotId:pin.documentSnapshotId,lifecycleGeneration:pin.lifecycleGeneration,source:{kind:'file',path:path},intent:disposition};
+        if(options.contextId!==undefined)body.contextId=options.contextId;
+        return body;
       });
     }
     function importPath(path,options){return link(path,{kind:'newLayer'},options);}

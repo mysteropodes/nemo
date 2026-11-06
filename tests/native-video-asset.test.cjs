@@ -24,17 +24,24 @@ function fixture(options={}){
   const layerUid=fresh?'native-layer:'+next+':0':[...placements].find(([,id])=>id===intent.placementId)[0];
   const response={apiVersion:2,requestId:req.requestId,instanceId:req.instanceId,documentId:req.documentId,contentRevision:next,ok:true,
    result:{applied:true,historyEntriesAdded:1,assetId:'asset-'+req.requestId,placementId:fresh?'placement-'+req.requestId:intent.placementId,
-    target:{contextId:!fresh&&options.context||'scene-root',layerUid},newLayer:fresh,sourceWidth:32,sourceHeight:16,sourceFrameCount:12}};
-  pin={...pin,contentRevision:next,documentSnapshotId:'native-object:document:'+next,layers:fresh?[...pin.layers,{layerUid,name:'B',visible:true,locked:false}]:pin.layers};
+    target:{contextId:fresh&&req.payload.contextId||!fresh&&options.context||'scene-root',layerUid},newLayer:fresh,sourceWidth:32,sourceHeight:16,sourceFrameCount:12}};
+  // A new layer of a component request joins the component's rows (the entered view), never the scene table.
+  const inComponent=fresh&&req.payload.contextId;
+  pin={...pin,contentRevision:next,documentSnapshotId:'native-object:document:'+next,layers:fresh&&!inComponent?[...pin.layers,{layerUid,name:'B',visible:true,locked:false}]:pin.layers};
   if(fresh)placements.set(layerUid,response.result.placementId);
-  state.layers=pin.layers.map(r=>({layerUid:r.layerUid}));
+  state.layers=inComponent?[...state.layers,{layerUid}]:pin.layers.map(r=>({layerUid:r.layerUid}));
   return response;
  }
  function makeSession(){return {
   info:()=>pin,isActive:()=>active,blocksLegacy:()=>true,requestId:label=>label+'-'+(++count),
   importBatch:()=>assert.fail('video link must not use vector import.batch'),readSubscriptionGeneration:()=>1,
   readPresentedObjectSession:()=>({available:projected,...pin,presentation:{...pin,owner:'native',status:projected?'presented':'pending',frame:state.currentFrame}}),
-  runResourceCommand:action=>{const result=serial.then(()=>options.queue?options.queue.promise:undefined).then(()=>action({
+  runResourceCommand:action=>route(action,false),
+  runComponentCommand:action=>route(action,true),
+ };
+ function route(action,component){
+  if(options.component&&!component)assert.fail('a component import must use the component route');
+  {const result=serial.then(()=>options.queue?options.queue.promise:undefined).then(()=>action({
    dispatch:q=>SDK.createNativeApplicationAdapter('ui',{dispatch:async req=>{
     requests.push(structuredClone(req));
     let response=receipts.get(req.requestId);
@@ -43,13 +50,18 @@ function fixture(options={}){
     if(options.lostAck&&first){first=false;throw Error('lost ACK');}
     return structuredClone(response);
    }}).dispatch(q),
-   readPresentedObjectSession:()=>session.readPresentedObjectSession(),
+   readPresentedObjectSession:()=>component?{...pin,available:true,presentation:{...pin,owner:'native',status:'presented',frame:state.currentFrame,contextId:options.component}}:session.readPresentedObjectSession(),
    reconcile:async revision=>{if(revision!==undefined)assert.equal(revision,pin.contentRevision);if(options.unconfirmed)projected=false;if(options.afterCommit)options.afterCommit();return pin;},
-  }));serial=result.catch(()=>{});return result;},
- };}
+  }));serial=result.catch(()=>{});return result;}
+ }}
  session=makeSession();
  root.NemoNativeObjectProject={desktop:()=>options.noSession?null:session,selectLayerUI:(host,index)=>{state.activeLayerIdx=index;root._layerSel=[index];return true;}};
  root.NemoNativeObjectProjectFile={projectionReadyForUI:()=>projected};
+ // #2256: an entered component: the context controller holds it, its rows are the component's, a row pick goes through it.
+ const left={value:false};
+ if(options.component){state.activeSymbolId=options.component;state.layers=[{layerUid:'in_a'},{layerUid:'in_b'}];state.activeLayerIdx=0;root._layerSel=[0];
+  root.NemoNativeComponentContext={presented:()=>left.value?null:{contextId:options.component,totalFrames:12,fps:24},layers:()=>left.value?null:state.layers.map(r=>({layerUid:r.layerUid,name:r.layerUid})),
+   projectionReady:()=>projected,selectLayer:(host,index)=>{state.activeLayerIdx=index;root._layerSel=[index];return true;}};}
  root.NemoNativeObjectRasterAsset=require('../src/js/adapters/native-object-raster-asset.js');
  if(options.client!==false)root.NemoNativeVideoAsset=Video;
  if(options.provider!==false)root.NemoNativeImportVideo=Provider;
@@ -68,7 +80,7 @@ function fixture(options={}){
   SMNativeVideo:legacy.SMNativeVideo,FileReader:function(){assert.fail('no JS decoder');},Image:function(){assert.fail('no JS decoder');},
   saveAllLayerFrames:()=>assert.fail('no legacy save'),pushUndoLayers:()=>assert.fail('no legacy undo'),createUserLayer:()=>assert.fail('no legacy writer'),
   localStorage:{getItem:()=>null},setTimeout,clearTimeout}));
- return {root,state,controller,requests,picks,toasts,events,nodes,node,placements,
+ return {root,state,controller,requests,picks,toasts,events,nodes,node,placements,left,
   menu:()=>events.get('btn-import-video:click')(),
   change:next=>{pin={...pin,...next};},bump:()=>{pin={...pin,contentRevision:pin.contentRevision+1,documentSnapshotId:'native-object:document:'+(pin.contentRevision+1)};},deactivate:()=>{active=false;},show:()=>{projected=true;},
   reopen:()=>{pin={...pin,lifecycleGeneration:pin.lifecycleGeneration+1};session=makeSession();},
@@ -213,4 +225,41 @@ test('a presentation latch clears on the next status read once the chain present
  const next=await h.menu();assert.equal(next.requestId,'video-2');assert.equal(h.requests.length,2);
  const ctxFixture=fixture({context:'sym_comp'});await ctxFixture.controller.video.replaceActive('p1');ctxFixture.bump();
  assert.equal(ctxFixture.controller.video.status().status,'unconfirmed');
+});
+test('importing a video inside an entered component sends the held contextId over the component route and selects the new component layer',async()=>{
+ const h=fixture({component:'sym_comp'});
+ const r=await h.menu();assert.equal(r.status,'imported',JSON.stringify(r));assert.equal(r.readback,'confirmed');assert.equal(r.selected,true);
+ assert.equal(h.requests.length,1);
+ assert.deepEqual(h.requests[0].payload,{documentSnapshotId:'native-object:document:0',lifecycleGeneration:1,source:{kind:'file',path:'/footage/Take B.mov'},intent:{kind:'newLayer'},contextId:'sym_comp'});
+ assert.equal(r.receipt.target.contextId,'sym_comp');assert.equal(r.receipt.target.layerUid,'native-layer:1:0');
+ assert.deepEqual(h.state.layers.map(l=>l.layerUid),['in_a','in_b','native-layer:1:0'],'the component rows gained the layer');
+ assert.deepEqual(h.root._layerSel,[2],'the new component layer is the selected one');
+ assert.equal(h.controller.video.status(),null);
+ // A second import in the same component is a second closed request at the new revision.
+ const again=await h.root.SM.importVideo();assert.equal(again.status,'imported');assert.equal(h.requests[1].payload.contextId,'sym_comp');assert.equal(h.requests[1].expectedRevision,1);
+});
+test('a component import is refused before the picker when the component is not the presented one or its route is absent',async()=>{
+ const left=fixture({component:'sym_comp'});left.left.value=true;
+ const a=await left.menu();assert.equal(a.status,'unavailable');assert.equal(a.reason,'component_context_import_unavailable');assert.equal(left.picks.length,0);assert.equal(left.requests.length,0);
+ const stale=fixture({component:'sym_comp'});stale.show();stale.root.NemoNativeObjectProjectFile.projectionReadyForUI=()=>false;
+ const b=await stale.menu();assert.equal(b.status,'unavailable');assert.equal(stale.picks.length,0);assert.equal(stale.requests.length,0);
+ const none=fixture({component:'sym_comp'});delete none.root.NemoNativeObjectProject.desktop(none.root).runComponentCommand;
+ const c=await none.menu();assert.equal(c.status,'unavailable');assert.equal(none.picks.length,0);assert.equal(none.requests.length,0);
+});
+test('leaving the component, a changed playhead or a changed selection while the picker is open sends nothing',async()=>{
+ for(const change of ['leave','frame','selection','row']){
+  const gate=deferred(),h=fixture({component:'sym_comp',pick:()=>gate.promise});
+  const run=h.menu();await turn();
+  if(change==='leave')h.left.value=true;if(change==='frame')h.state.currentFrame=2;if(change==='selection')h.root._layerSel=[1];if(change==='row')h.state.activeLayerIdx=1;
+  gate.resolve('/footage/Take B.mov');const r=await run;
+  assert.notEqual(r.status,'imported',change);assert.equal(h.requests.length,0,change);
+ }
+});
+test('a component receipt naming another context is not confirmed and the contract refuses a context on a replace',async()=>{
+ const h=fixture({component:'sym_comp'}),session=h.root.NemoNativeObjectProject.desktop(h.root),client=Video.create(session,{videoRoute:true});
+ await assert.rejects(client.replacePath('p1','/footage/Take B.mov',{contextId:'sym_comp'}),e=>e.code==='invalid_request');
+ await assert.rejects(client.importPath('/footage/Take B.mov',{contextId:''}),e=>e.code==='invalid_request');
+ assert.equal(h.requests.length,0);
+ const none=fixture({component:'sym_comp'}),bare=none.root.NemoNativeObjectProject.desktop(none.root);delete bare.runComponentCommand;
+ await assert.rejects(Video.create(bare,{videoRoute:true}).importPath('/a.mov',{contextId:'sym_comp'}),e=>e.code==='unavailable'&&e.reason==='component_route_unavailable');
 });
