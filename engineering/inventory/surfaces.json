@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "ae68a331cf324ee52408ff1ff786b545d2ed68b2",
-  "describe": "v0.7.0-alpha.4-5441-gae68a331c-dirty"
+  "head": "ac2ec7b6cc3619db3583169bf9611059d756117c",
+  "describe": "v0.7.0-alpha.4-5444-gac2ec7b6c-dirty"
  },
- "inputsDigest": "c966c4c4a01eef1664dfa22ec35974801daf58e54975ae38e4d3bfbd71072b7f",
+ "inputsDigest": "7996d8298a1f11ed2bbcea7c3fdd99947deb16d4f0ab3bc5d8fb77b21a3ce462",
  "states": [
   "inventoried",
   "characterized",
@@ -15036,7 +15036,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/adapters/native-object-rig-canvas.js:32)",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/adapters/native-object-rig-canvas.js:45)",
    "source": "src/index.html:1580",
    "meta": {
     "data": {
@@ -15048,7 +15048,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/adapters/native-object-rig-canvas.js:32",
+     "src/js/adapters/native-object-rig-canvas.js:45",
      "src/js/rig-bridge.js:194 panelSoftness()",
      "src/js/timeline.js:11202"
     ]
@@ -15118,7 +15118,7 @@
    "platforms": "browser and desktop",
    "status": "unmapped",
    "reason": "helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/adapters/native-object-rig-canvas.js:31)",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/adapters/native-object-rig-canvas.js:44)",
    "source": "src/index.html:1579",
    "meta": {
     "data": {
@@ -15130,7 +15130,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/adapters/native-object-rig-canvas.js:31",
+     "src/js/adapters/native-object-rig-canvas.js:44",
      "src/js/engine-bridge.js:3663 buildRigPreviewItems()",
      "src/js/rig-bridge.js:192 panelDefaultRadius()",
      "src/js/timeline.js:11200"

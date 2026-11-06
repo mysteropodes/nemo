@@ -19,8 +19,7 @@
 //! Without the `evaluation` feature there is no kernel: each function reports
 //! [`KernelRefusal::Unavailable`]; nothing is defaulted, guessed or approximated.
 
-use crate::object_document::object_rig_record::{RigPair, RigRecord, RigSegment};
-use crate::object_document::Presence;
+use crate::object_codec::{Presence, RigPair, RigRecord, RigSegment};
 
 /// One bone vertex as the kernels read it: the anchor and its two handle vectors (zero when the
 /// record has no handle, exactly what `_boneSegsToPath` makes of a missing one).

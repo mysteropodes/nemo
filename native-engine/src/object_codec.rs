@@ -25,7 +25,7 @@ pub(crate) use crate::object_document::{subselect, OrderCurvePoint};
 pub(crate) use crate::object_document::{item_asset_issue, ObjectLayer, Presence, PropertyHolder};
 #[cfg(all(feature = "font_asset_wire", not(feature = "history")))]
 pub(crate) use crate::object_document::{AssetId, AssetKind};
-pub(crate) use crate::object_document::{ImageMesh, ImageMeshStore, ItemRecords, MeshIdSequence};
+pub(crate) use crate::object_document::{object_rig_record::{KeyedTable, RigPair, RigRecord, RigSegment}, ImageMesh, ImageMeshStore, ItemRecords, MeshIdSequence};
 use crate::object_document::{OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
 #[path = "object_property_codec.rs"]
 mod property_codec;

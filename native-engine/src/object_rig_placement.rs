@@ -11,7 +11,7 @@
 //! by the (candidate) rig: the very geometry the renderer's common layer stage pivots about (`render_vector_eval_pose`), so the
 //! overlay and the picture cannot disagree. A layer of rasters only pivots about their display rectangles (a mesh pose never moves the
 //! rect). A layer that mixes the two, a 3D layer, a legacy contour or an unreadable Motion is a typed reason, never a guessed map.
-use crate::object_document::object_rig_record::RigRecord;
+use crate::object_codec::RigRecord;
 use crate::revision::ObjectSnapshot;
 
 /// `Ok(None)`: the layer and every ancestor carry no Motion at `frame`; `Err(reason)`: the map is not available.

@@ -16,7 +16,7 @@
 //! packet): a store absent is [`PoseBind::Unavailable`], a mesh whose raster is absent or placed differently by
 //! several records has no rect and is [`PoseBind::Unavailable`] too; nothing is guessed. A CANDIDATE rig
 //! ([`evaluate_layer_pose_over`]) replaces the stored one for one detached evaluation (the live-pose preview).
-use crate::object_document::object_rig_record::RigRecord;
+use crate::object_codec::RigRecord;
 use crate::revision::ObjectSnapshot;
 
 /// One posed vertex: the anchor and both relative handle vectors.
@@ -121,9 +121,7 @@ mod provider {
     use crate::evaluation::object_image_mesh_kernels::rig_pose_eval::{
         source_frame_of, BindTarget, MeshPoseSource, MeshSnapshot,
     };
-    use crate::object_document::object_rig_record::RigRecord;
-    use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
-    use crate::object_document::FrameScopeKind;
+    use crate::object_codec::{FrameScopeKind, RigRecord};
     use crate::revision::ObjectSnapshot;
     use std::collections::BTreeMap;
 
@@ -143,7 +141,7 @@ mod provider {
         let mut found: Option<MeshRect> = None;
         for entry in entries {
             let target = &entry.target;
-            if target.context_id() != SCENE_CONTEXT
+            if target.context_id() != "scene-root"
                 || target.scope_kind() != &FrameScopeKind::Authored
                 || target.layer_uid() != layer_uid
                 || target.frame() != frame

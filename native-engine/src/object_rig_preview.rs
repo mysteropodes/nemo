@@ -7,8 +7,7 @@
 //! no revision, no history entry and nothing kept. The candidate is the stored rig with the same vertex writes the edit would
 //! make (the same handle mirror, the same IK solve through `object_rig_edit_read::ik_drag`); numbers are plain `f64`, since the
 //! candidate is evaluated and discarded, never stored.
-use crate::object_codec::{object_deserialize, Presence};
-use crate::object_document::object_rig_record::{KeyedTable, RigPair, RigRecord, RigSegment};
+use crate::object_codec::{object_deserialize, KeyedTable, Presence, RigPair, RigRecord, RigSegment};
 use crate::object_snapshot::object_rig_edit_read::{ik_drag, kernel_bones, KernelRef};
 use serde::Deserialize;
 use serde_json::Number;
