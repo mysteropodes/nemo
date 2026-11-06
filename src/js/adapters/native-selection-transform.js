@@ -10,8 +10,8 @@
  * press); the auto-repeat presses that arrive while an earlier one is still being written are summed into the next batch. A refusal is a
  * notice, never a throw. Baseline stays: no Paper writer is reached from here.
  * Flip horizontal / vertical (Shift+X / Shift+Alt+X, SM.flipHorizontal / flipVertical, baseline timeline.js): a mirror of the selection about the centre of
- * its union bounds, sent through the same batch as the fields (scale(-1, 1) or (1, -1)); the engine mirrors a ribbon's centreline with its handles. An image
- * or a text block has no stored mirror yet: the shared `unstorable` refusal names it, nothing is written. */
+ * its union bounds, sent through the same batch as the fields (scale(-1, 1) or (1, -1)); the engine mirrors a ribbon's centreline with its handles, and
+ * stores the mirror of an image or a text block as its `flipX` / `flipY` (A-image-text-flip-skew). */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;

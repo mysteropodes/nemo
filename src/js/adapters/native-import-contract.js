@@ -101,13 +101,14 @@
     if (finite(value, label) <= 0) fail(`${label} must be positive`);
   }
   function rasterItem(value, label) {
-    exact(value, ['assetId', 'x', 'y', 'width', 'height'], ['opacity', 'rotation', 'isBitmapBrush', 'brushGroupId', 'isBrushTextureCopy', 'meshId'], label);
+    exact(value, ['assetId', 'x', 'y', 'width', 'height'], ['opacity', 'rotation', 'flipX', 'flipY', 'skew', 'isBitmapBrush', 'brushGroupId', 'isBrushTextureCopy', 'meshId'], label);
     sourceId(value.assetId, `${label}.assetId`);
     xy({ x: value.x, y: value.y }, label);
     for (const key of ['width', 'height']) positive(value[key], `${label}.${key}`);
     if (has(value, 'rotation')) finite(value.rotation, `${label}.rotation`);
     if (has(value, 'opacity') && (finite(value.opacity, `${label}.opacity`) < 0 || value.opacity > 1)) fail(`${label}.opacity is outside 0..1`);
-    for (const key of ['isBitmapBrush', 'isBrushTextureCopy']) if (has(value, key) && typeof value[key] !== 'boolean') fail(`${label}.${key} must be boolean`);
+    for (const key of ['isBitmapBrush', 'isBrushTextureCopy', 'flipX', 'flipY']) if (has(value, key) && typeof value[key] !== 'boolean') fail(`${label}.${key} must be boolean`);
+    if (has(value, 'skew') && Math.abs(finite(value.skew, `${label}.skew`)) >= 90) fail(`${label}.skew is outside a quarter turn`);
     for (const key of ['brushGroupId', 'meshId']) if (has(value, key)) boundedTag(value[key], `${label}.${key}`);
   }
   const FONTS = ['Roboto-Regular', 'Roboto-Bold', 'DejaVuSans-Regular', 'DejaVuSans-Bold', 'DejaVuSerif-Regular', 'DejaVuSerif-Bold', 'Manrope-Regular', 'Inter-Regular'];

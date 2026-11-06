@@ -97,6 +97,9 @@ fn raster_item(value: &Value) -> bool {
     let optional = [
         "opacity",
         "rotation",
+        "flipX",
+        "flipY",
+        "skew",
         "isBitmapBrush",
         "brushGroupId",
         "isBrushTextureCopy",
@@ -110,7 +113,9 @@ fn raster_item(value: &Value) -> bool {
             && ["opacity", "rotation"]
                 .iter()
                 .all(|key| members.get(*key).is_none_or(Value::is_number))
-            && ["isBitmapBrush", "isBrushTextureCopy"]
+            // #2372: the stored mirror and shear of the image (degrees of x-shear, inside a quarter turn).
+            && members.get("skew").is_none_or(|d| d.as_f64().is_some_and(|d| d.abs() < 90.0))
+            && ["isBitmapBrush", "isBrushTextureCopy", "flipX", "flipY"]
                 .iter()
                 .all(|key| members.get(*key).is_none_or(Value::is_boolean))
             && ["brushGroupId", "meshId"]
@@ -158,6 +163,9 @@ fn text_fields(members: &Map<String, Value>) -> bool {
         ),
         // #2267: the stored turn of a block, degrees within one turn either way (a patch never carries it, see `text_patch`).
         "rotation" => value.as_f64().is_some_and(|d| d.abs() <= 360.0),
+        // #2372: the stored mirror and shear of a block about its anchor (a patch never carries them either, see `text_patch`).
+        "flipX" | "flipY" => value.is_boolean(),
+        "skew" => value.as_f64().is_some_and(|d| d.abs() < 90.0),
         "anchorTopLeft" => {
             exact(value, &["x", "y"], &[]).is_some()
                 && value["x"].is_number()
@@ -167,7 +175,7 @@ fn text_fields(members: &Map<String, Value>) -> bool {
     })
 }
 
-const TEXT_OPTIONAL: [&str; 12] = [
+const TEXT_OPTIONAL: [&str; 15] = [
     "fixedWidth",
     "fixedHeight",
     "bold",
@@ -180,6 +188,9 @@ const TEXT_OPTIONAL: [&str; 12] = [
     "textCase",
     "anchorTopLeft",
     "rotation",
+    "flipX",
+    "flipY",
+    "skew",
 ];
 
 fn text_block(value: &Value) -> bool {
@@ -191,12 +202,13 @@ fn text_block(value: &Value) -> bool {
     .is_some_and(text_fields)
 }
 
-/// A patch names members to replace; it never carries `anchorTopLeft` (an edit cannot re-anchor) or `rotation` (a Select turn owns it).
+/// A patch names members to replace; it never carries `anchorTopLeft` (an edit cannot re-anchor) or `rotation` / `flipX` / `flipY` / `skew` (a Select transform owns them).
 fn text_patch(value: &Value) -> bool {
     value.as_object().is_some_and(|members| {
         !members.is_empty()
             && !members.contains_key("anchorTopLeft")
             && !members.contains_key("rotation")
+            && !["flipX", "flipY", "skew"].iter().any(|key| members.contains_key(*key))
             && text_fields(members)
     })
 }

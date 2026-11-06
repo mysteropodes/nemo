@@ -77,7 +77,7 @@
         exact(entry.target, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], `${at}.target`);
         exact(entry.target.frameScope, ['kind', 'frame'], [], `${at}.target.frameScope`);
         exact(entry.item, ['assetId', 'x', 'y', 'width', 'height'],
-          ['opacity', 'rotation', 'isBitmapBrush', 'brushGroupId', 'isBrushTextureCopy', 'meshId'], `${at}.item`);
+          ['opacity', 'rotation', 'flipX', 'flipY', 'skew', 'isBitmapBrush', 'brushGroupId', 'isBrushTextureCopy', 'meshId'], `${at}.item`);
       });
       exact(value.source, ['instanceId', 'documentId', 'contentRevision', 'strokeIds'], [], `${label}.source`);
       ['instanceId', 'documentId'].forEach((key) => text(value.source[key], MAX_ID, `${label}.source.${key}`));
