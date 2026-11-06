@@ -61,10 +61,11 @@ object_deserialize!(ComponentSet {
 });
 
 /// One `state.symbols[symbolId]`. `cameraKeys` (the component's own camera, composed onto its instance) and `markers` (its
-/// composition markers) are stored here, exactly as `enterSymbol` / `exitToScene` swap them. `motionArcs`, `tweenOverrides`
-/// and `tweenEasing` are admitted as the baseline stores a symbol that has none (an empty table): the native tween store is
-/// keyed by context and owns that data for an entered component, so a non-empty legacy table is refused instead of being
-/// carried unread.
+/// composition markers) are stored here, exactly as `enterSymbol` / `exitToScene` swap them, and written by
+/// `object.component.state.edit`. `motionArcs`, `tweenOverrides` and `tweenEasing` are admitted as the baseline stores a symbol
+/// that has none (an empty table): the document-wide tween store and motion arcs own that data (their keys name the layer
+/// inside the component; the legacy importer moves a symbol's tables there), so a non-empty table on the record is refused
+/// instead of being carried twice.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ComponentRecord {
