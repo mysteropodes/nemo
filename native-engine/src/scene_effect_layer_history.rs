@@ -100,3 +100,6 @@ mod scene_effect_layer_record_nullable;
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/scene_effect_layer_record_blend_keys.rs"]
 mod scene_effect_layer_record_blend_keys;
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/scene_effect_layer_record_blend_keys_group.rs"]
+mod scene_effect_layer_record_blend_keys_group;

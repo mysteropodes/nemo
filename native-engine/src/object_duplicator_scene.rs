@@ -72,6 +72,14 @@ fn copy_segments(
     Ok((segments, record.geometry.closed))
 }
 
+impl DuplicatorScene {
+    /// Whether the plan draws the copies of `layer_index` in place of its original records (a host whose output may
+    /// be empty: the baseline then draws nothing for that layer).
+    pub(crate) fn is_host(&self, layer_index: usize) -> bool {
+        self.layers.contains_key(&layer_index)
+    }
+}
+
 pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, ObjectSceneError> {
     let mut result = DuplicatorScene::default();
     for layer in packet.duplicator_outputs() {

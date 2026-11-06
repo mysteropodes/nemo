@@ -4546,6 +4546,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-blend-key-grid.js",
+      "moduleId": "app.native.object.layer-compositing.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2490,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-layer-parent.js",
       "moduleId": "app.native.layer-parent.adapter",
       "executionClass": "document-classic",
