@@ -50,7 +50,7 @@ async function harness(options={}){
   if(q.operation==='query.document.object.layer.timing'){
    assert.equal(q.payload.view,'range');const {view,...selector}=q.payload;
    return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,
-    result:{kind:'layerRange',instanceId:q.instanceId,documentId:q.documentId,...selector,range:{...resolved,...(options.rangeExtras||{})}}};
+    result:{kind:'layerRange',instanceId:q.instanceId,documentId:q.documentId,...selector,range:{...resolved,...(typeof options.rangeExtras==='function'?options.rangeExtras(selector.layerUid):options.rangeExtras||{})}}};
   }
   if(/^command\.document\.object\.layer\.(range\.arrange|timeLink\.set)$/.test(q.operation)){if(options.arrangeRefusal)return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:false,error:{code:options.arrangeRefusal,message:'refused'}};
    revision++;return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};}

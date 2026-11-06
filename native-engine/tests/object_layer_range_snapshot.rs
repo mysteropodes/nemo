@@ -36,7 +36,7 @@ fn no_timing_layer_has_exact_real_raw_and_clamped_edges_without_a_fabricated_exp
         json!({"kind":"layerRange","instanceId":s.instance_id(),
         "documentId":s.document_id(),"atRevision":0,"documentSnapshotId":s.snapshot_id(),"contextId":"scene-root",
         "layerUid":"L0","frame":1,"range":{"rawInPoint":-2.0,"rawOutPoint":9.0,"inPoint":0.0,"outPoint":5.0,
-            "hasCustomRange":true,"hasTimeLink":false}})
+            "hasCustomRange":true,"hasTimeLink":false,"keyFrames":[1]}})
     );
     let mut old = q.clone();
     old.as_object_mut().unwrap().remove("view");
@@ -64,10 +64,29 @@ fn layer_markers_and_effect_keys_ride_the_range_read_as_the_baseline_snap_target
     );
     assert_eq!(range["effectKeys"], json!([1, 3, 5]));
     assert_eq!(range["rawInPoint"], -2.0);
-    // A plain layer keeps the six-field range: neither list is printed when empty.
-    let plain = snapshot(fixture::document());
+    // The fixture layer carries one rotation key at frame 1.
+    assert_eq!(range["keyFrames"], json!([1]));
+    // A plain layer keeps the six-field range: no list is printed when empty.
+    let mut bare = fixture::value(&fixture::document());
+    bare.as_object_mut().unwrap().remove("propertyHolders");
+    let plain = snapshot(fixture::admit(bare));
     let plain = read(&plain, &selector(&plain)).unwrap();
     assert_eq!(plain["range"].as_object().unwrap().len(), 6);
+}
+#[test]
+fn every_property_key_of_the_layer_rides_the_range_read_one_entry_per_key_and_no_other_layer_is_listed() {
+    let mut v = fixture::value(&fixture::document());
+    v["layers"][0].as_object_mut().unwrap().remove("timing");
+    v["layers"][0]["range"] = json!({"inPoint":-2,"outPoint":9});
+    // The fixture's L0 holder already carries a rotation key at frame 1; add a second property with two keys (one shared frame) and another layer's.
+    v["propertyHolders"][0]["properties"].as_array_mut().unwrap().push(
+        json!({"property":"opacity","track":{"keys":[{"frame":1,"v":[20]},{"frame":5,"v":[10]},{"frame":40,"v":[0]}]}}));
+    v["propertyHolders"].as_array_mut().unwrap().push(json!({"target":{"contextId":"scene-root","layerUid":"L1"},
+        "properties":[{"property":"opacity","track":{"keys":[{"frame":3,"v":[5]}]}}]}));
+    let s = snapshot(decode_storage_project(v.to_string().as_bytes()).expect("holders admitted"));
+    let range = read(&s, &selector(&s)).unwrap()["range"].clone();
+    // Ascending, a frame shared by two keys printed twice, a frame past the composition left out.
+    assert_eq!(range["keyFrames"], json!([1, 1, 5]));
 }
 #[test]
 fn original_timing_selector_and_range_view_are_closed_separate_reads_with_same_snapshot_identity() {
@@ -154,7 +173,7 @@ fn range_query_preserves_inverted_edges_and_its_complete_reply_guard() {
     let value = read(&s, &q).unwrap();
     assert_eq!(
         value["range"],
-        json!({"rawInPoint":4.0,"rawOutPoint":1.0,"inPoint":4.0,"outPoint":1.0,"hasCustomRange":true,"hasTimeLink":false})
+        json!({"rawInPoint":4.0,"rawOutPoint":1.0,"inPoint":4.0,"outPoint":1.0,"hasCustomRange":true,"hasTimeLink":false,"keyFrames":[1]})
     );
     let typed: OpacityRequest=serde_json::from_value(json!({"apiVersion":2,"requestId":"x".repeat(4096),
         "instanceId":s.instance_id(),"documentId":s.document_id(),"operation":"query.document.object.layer.timing","payload":q})).unwrap();
