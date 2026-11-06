@@ -23,6 +23,8 @@ mod mixed_subselect;
 mod font_refusal;
 #[path = "object_text_rotation.rs"]
 mod rotation;
+#[path = "object_text_scene_pivot_listing.rs"]
+mod pivot_listing;
 #[path = "object_text_scene_three_d.rs"]
 mod three_d;
 

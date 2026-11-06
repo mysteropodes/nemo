@@ -101,8 +101,11 @@ impl ObjectCompositionWitness {
                     continue;
                 }
                 PaintEntry::Text(source) => {
-                    let style = self.plan().packet().text_records().find(|r| r.source_index() == source.source_index).and_then(|r| record::style::text(r.entry().block.color()));
-                    items.extend(self.text_hit_item(index, source).map(|item| SubselectReadItem { style, ..item }));
+                    let stored = self.plan().packet().text_records().find(|r| r.source_index() == source.source_index);
+                    let style = stored.as_ref().and_then(|r| record::style::text(r.entry().block.color()));
+                    // #2372: the stored Select pivot of the block.
+                    let (key, custom) = stored.as_ref().map_or((None, None), |r| (r.entry().block.pivot_key(), r.entry().block.pivot_custom()));
+                    items.extend(self.text_hit_item(index, source).map(|item| SubselectReadItem { style, xform_anchor_key: key, xform_anchor_custom: custom, ..item }));
                     continue;
                 }
                 _ => continue,
@@ -276,7 +279,12 @@ impl ObjectCompositionWitness {
         let bounds = [cx - w / 2.0, cy - h / 2.0, cx + w / 2.0, cy + h / 2.0];
         (bounds.iter().chain(&matrix).all(|v| v.is_finite()) && w > 0.0 && h > 0.0 && rect.width > 0.0 && rect.height > 0.0)
             .then(|| hit_item(target, bounds, matrix, "raster"))
-            .map(|item| SubselectReadItem { style: record::style::raster(record.entry().item.opacity()), ..item })
+            .map(|item| SubselectReadItem {
+                style: record::style::raster(record.entry().item.opacity()),
+                xform_anchor_key: record.entry().item.pivot_key(),
+                xform_anchor_custom: record.entry().item.pivot_custom(),
+                ..item
+            })
     }
     fn text_hit_item(
         &self,

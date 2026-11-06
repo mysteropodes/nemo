@@ -1,7 +1,8 @@
 //! #2372 Select pivot: the `xformAnchorKey` / `xformAnchorCustom` members of a `restyle` step (baseline `serP` data.xformAnchorKey / xformAnchorCustom).
 //! The artist's last rotate/scale pivot for a stroke is one of the nine preset points of the selection box, or a custom world point that wins over it.
 //! The edit is its own: it combines with no other style member, changes nothing else about the record (a texture anchor, a bitmap anchor or a ribbon
-//! keeps its look and its derived pieces) and is stored on vector records only, never on an image or a text block.
+//! keeps its look and its derived pieces). It is stored on a vector record's extension and, as the same two members, on an image or a text block
+//! ([`Pivot::members`]).
 use crate::commands::object_fill_owner::vector_edit::batch_ops::style::{num, Style};
 use crate::object_document::{ObjectRecord, Presence, VectorExt};
 use crate::request_receipts::DispatchErrorCode;
@@ -40,6 +41,27 @@ pub(in crate::commands::object_fill_owner::vector_edit::batch_ops) fn checked(
         None => None,
     };
     Ok((key.is_some() || custom.is_some()).then_some(Pivot { key, custom }))
+}
+
+impl Pivot {
+    /// The members an image or a text block takes: each present member is set, a member the step clears is `Null` (removed).
+    pub(in crate::commands::object_fill_owner::vector_edit::batch_ops) fn members(&self) -> Result<Vec<(&'static str, serde_json::Value)>, DispatchErrorCode> {
+        use serde_json::Value;
+        let mut out = Vec::new();
+        if let Some(key) = &self.key {
+            out.push(("xformAnchorKey", key.clone().map_or(Value::Null, Value::String)));
+        }
+        if let Some(custom) = &self.custom {
+            out.push((
+                "xformAnchorCustom",
+                match custom {
+                    Some([x, y]) => Value::Array(vec![Value::Number(num(*x)?), Value::Number(num(*y)?)]),
+                    None => Value::Null,
+                },
+            ));
+        }
+        Ok(out)
+    }
 }
 
 /// The named record takes (or loses) the pivot; an extension left empty is omitted.

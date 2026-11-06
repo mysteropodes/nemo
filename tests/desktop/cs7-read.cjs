@@ -12,7 +12,7 @@
 //      captured at start refuses the batch;
 //   2. the registry is the candidate's own task-scoped directory and must hold exactly ONE record;
 //   3. the discovered instance must be that record (instanceId, buildId, whose version part is the candidate's
-//      app version) and its native host must be available;
+//      app version and the frozen source head, no '-dirty'; compared in full) and its native host must be available;
 //   4. the OS-level listener on the record's port must be exactly the candidate's pid (lsof), which ties the
 //      MCP endpoint to the owner pid even though the route itself does not report one;
 //   5. every ok reply must carry the same instanceId and documentId, and the document revision, lifecycle
@@ -69,7 +69,10 @@ function createReader({ currentIdentity, ownerIdentity, registry, appVersion, op
     const identity = await currentIdentity();
     check(same(identity, ownerIdentity()), 'installed candidate changed');
     const record = readRegistration(registry());
-    check(record.buildId.startsWith(appVersion() + ':'), 'registered build is not the candidate build');
+    // buildId is `<tauri version>:<build-time git HEAD>[-dirty]` (application_mcp.rs, nemo-mcp/build.rs), so the
+    // whole string must equal the version plus the frozen source head: another commit or a dirty tree differs.
+    check(/^[0-9a-f]{40}$/.test(identity.sourceSha) && record.buildId === appVersion() + ':' + identity.sourceSha,
+      'registered build is not the candidate build');
     client ||= await openClient();
     const found = structured(await client.callTool('nemo_discover', {}));
     check(Array.isArray(found.instances) && found.instances.length === 1, 'exactly one discovered application required');

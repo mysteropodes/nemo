@@ -81,6 +81,14 @@ function validGrant(grant) {
   return /^2804\/[0-9]+$/.test(grant || '');
 }
 
+// The read client must be the package's own: the build proof has to LIST Contents/MacOS/nemo-mcp and its hash has to
+// match the file that is about to run. A proof without the entry (an older build job) refuses; it never passes.
+function requireMcpPinned(proof, binary) {
+  const listed = (proof.artifacts || []).find(a => typeof a?.path === 'string' && a.path.endsWith('/Contents/MacOS/nemo-mcp'));
+  check(listed && /^[0-9a-f]{64}$/.test(listed.sha256 || ''), 'package proof does not pin the bundled nemo-mcp client');
+  check(listed.sha256 === hash(binary), 'packaged nemo-mcp differs from the package proof');
+}
+
 function createInstalledSession(config) {
   const identity = require('../../scripts/nemo/lib/identity.cjs');
   const runtime = require('../../scripts/nemo/lib/native-runtime.cjs');
@@ -150,8 +158,7 @@ function createInstalledSession(config) {
     async openClient() {
       const stat = fs.lstatSync(mcpBinary);
       check(stat.isFile() && !stat.isSymbolicLink() && (stat.mode & 0o111), 'packaged nemo-mcp executable required');
-      const listed = proof.artifacts?.find(a => typeof a.path === 'string' && a.path.endsWith('/Contents/MacOS/nemo-mcp'));
-      check(!listed || listed.sha256 === hash(mcpBinary), 'packaged nemo-mcp differs from the package proof');
+      requireMcpPinned(proof, mcpBinary);
       const { McpClient } = require('../mcp-parity/mcp-client.cjs');
       const client = new McpClient(mcpBinary, [], { NEMO_MCP_REGISTRY: path.join(latestSnapshot.runtime.roots.tauriDataDir, 'mcp') });
       try {
@@ -208,4 +215,4 @@ function createInstalledSession(config) {
   };
 }
 
-module.exports = { createInput, createInstalledSession, validGrant };
+module.exports = { createInput, createInstalledSession, requireMcpPinned, validGrant };
