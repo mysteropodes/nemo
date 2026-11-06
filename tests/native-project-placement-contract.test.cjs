@@ -91,3 +91,22 @@ test('T12 video timing edits: bounded remap intents and the footage interpolatio
     {kind:'setInterpMode',placementId:'p1',interpMode:'blend',frameBlend:true},
   ])assert.throws(()=>validateRequest(request(payload)),TypeError,JSON.stringify(payload));
 });
+
+test('editTimeRemapKeys: the selected remap keys under one closed key action',()=>{
+  const keys=(selections,action)=>({kind:'editTimeRemapKeys',placementId:'p1',selections,action});
+  for(const payload of [
+    keys([{frame:12}],{kind:'delete'}),keys([{ranges:[[5,10],[12,12]]},{frame:0}],{kind:'shift',delta:-3}),
+    keys([{frame:0}],{kind:'color',color:'#4ea9ff'}),keys([{frame:0}],{kind:'color',color:null}),
+    keys([{frame:0},{frame:5}],{kind:'preset',preset:'hold'}),keys([{frame:0}],{kind:'influence',side:'in',percent:40}),
+    keys([{ranges:[[0,9]]}],{kind:'warp',mode:'liquify',total:1.5,grab:4}),keys([{frame:0}],{kind:'lockTo',mode:null}),
+  ])assert.doesNotThrow(()=>validateRequest(request(payload)),JSON.stringify(payload));
+  for(const payload of [
+    keys([],{kind:'delete'}),keys([{}],{kind:'delete'}),keys([{frame:1,ranges:[[0,1]]}],{kind:'delete'}),
+    keys([{ranges:[[5,1]]}],{kind:'delete'}),keys([{ranges:[]}],{kind:'delete'}),keys([{frame:NaN}],{kind:'delete'}),
+    keys([{frame:1,property:'timeRemap'}],{kind:'delete'}),keys([{frame:1}],{kind:'shift',delta:0.5}),
+    keys([{frame:1}],{kind:'color',color:'blue'}),keys([{frame:1}],{kind:'color'}),keys([{frame:1}],{kind:'bake'}),
+    keys([{frame:1}],{kind:'warp',mode:'top',total:1,grab:1}),keys([{frame:1}],'delete'),
+    {kind:'editTimeRemapKeys',placementId:'p1',selections:[{frame:1}]},
+    Object.assign(keys([{frame:1}],{kind:'delete'}),{x:1}),
+  ])assert.throws(()=>validateRequest(request(payload)),TypeError,JSON.stringify(payload));
+});

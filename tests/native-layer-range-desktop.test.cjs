@@ -50,7 +50,7 @@ async function harness(options={}){
   if(q.operation==='query.document.object.layer.timing'){
    assert.equal(q.payload.view,'range');const {view,...selector}=q.payload;
    return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,
-    result:{kind:'layerRange',instanceId:q.instanceId,documentId:q.documentId,...selector,range:{...resolved}}};
+    result:{kind:'layerRange',instanceId:q.instanceId,documentId:q.documentId,...selector,range:{...resolved,...(options.rangeExtras||{})}}};
   }
   if(/^command\.document\.object\.layer\.(range\.arrange|timeLink\.set)$/.test(q.operation)){if(options.arrangeRefusal)return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:false,error:{code:options.arrangeRefusal,message:'refused'}};
    revision++;return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};}
@@ -291,13 +291,14 @@ test('frame drift during queued lease validation refuses before a native range d
  assert.equal(h.s.info().contentRevision,0);assert.equal(h.legacy(),0);
 });
 
-test('a native video placement\'s Time Remap keys draw as one inert lane from its read, beside the property keys',async()=>{
- const h=await harness();
- h.root.SM={timeRemapKeyFacts:li=>li===1?{keyCount:2,keyAtFrame:true,value:3,keys:[{frame:2,value:0},{frame:6,value:10}]}:li===0?{keyCount:0,keys:null}:null};
+test('a native video placement\'s Time Remap keys draw as one selectable lane from its read, beside the property keys',async()=>{
+ const h=await harness();h.root.NemoNativeTimeRemapKeys=require('../src/js/adapters/native-time-remap-keys.js');
+ h.root.SM={timeRemapKeyFacts:li=>li===1?{keyCount:2,keyAtFrame:true,value:3,keys:[{frame:2,value:0,color:'#4ea9ff'},{frame:6,value:10,hold:true}]}:li===0?{keyCount:0,keys:null}:null};
  Range.refreshKeys(h.root);
  const nodes=h.keyNodes();assert.equal(nodes.length,2);
- assert.deepEqual(nodes.map(n=>n.dataset.frame),['2','6']);assert.ok(nodes.every(n=>n.parentNode===h.rows()[1]&&n.disabled===true&&n.style.pointerEvents==='none'));
- assert.ok(nodes.every(n=>(n.events.get('mousedown')||[]).length===0),'no move-key op exists: the lane is inert');
+ assert.deepEqual(nodes.map(n=>n.dataset.frame),['2','6']);assert.ok(nodes.every(n=>n.parentNode===h.rows()[1]&&!n.disabled&&(n.events.get('mousedown')||[]).length===1));
+ assert.ok(nodes[0].classes.has('tinted')&&!nodes[1].classes.has('tinted'));
+ await nodes[0].fire('mousedown',{button:0});assert.deepEqual(h.keyNodes().map(n=>n.dataset.selected),['true','false']);
  h.root.SM={};Range.refreshKeys(h.root);assert.equal(h.keyNodes().length,0);
  assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
 });
@@ -487,6 +488,7 @@ test('#2377 a Time Remap key is a snap candidate for a key drag, as the baseline
   h.root.state.waOut = 39;
   const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.root.NemoNativeMotionKeyBox = KeyBox;
   h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  h.root.NemoNativeTimeRemapKeys = require('../src/js/adapters/native-time-remap-keys.js');
   h.root.SM = { timeRemapKeyFacts: (li) => (li === 1 ? { keyCount: 1, keyAtFrame: false, value: 0, keys: [{ frame: 10, value: 0 }] } : null) };
   Range.refreshKeys(h.root);
   h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 });
