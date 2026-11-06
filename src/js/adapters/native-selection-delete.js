@@ -1,8 +1,8 @@
 /* Native Select + Delete (#2256, baseline timeline.js onKeyDown -> SM.deleteSelStrokes @1065e9d8): Delete or Backspace with strokes picked by the Select tool removes
  * them as exactly ONE native `object.vector.batch` of deletes (one revision, one undo entry), on the scene root AND inside an entered component (the
  * batch rides the component command route on the context the workspace controller holds; the scene is untouched). Every selected record is deleted
- * with its linked fill; the families that have no stored delete here (texture and bitmap brush strokes, whose dabs would be orphaned) are refused with
- * a notice and nothing is written. The selection is re-read from the native listing first, so the batch names what the owner shows now, against the
+ * with its linked fill; a texture brush anchor takes its stored dabs and a bitmap brush anchor its baked companion image with it inside that same
+ * revision (the engine expands the delete, so no dab or companion is ever orphaned). The selection is re-read from the native listing first, so the batch names what the owner shows now, against the
  * document the key press found: a document that moved on writes nothing. Layer-row and frame-cell selections keep their own Delete on the scene root (this module
  * leaves the key alone for them; inside a component the key is refused with a notice, never handed to the legacy handler), and it owns no document state and has no fallback writer. */
 (function (root, factory) {
@@ -22,14 +22,6 @@
     var sel = (root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; });
     return sel.length ? sel : null;
   }
-  function refusal(sel) {
-    var found = [];
-    sel.forEach(function (p) {
-      var d = p.data, label = d.nativeBrush === 'bitmap' ? 'bitmap brushes' : d.nativeBrush === 'copy' || d.nativeBrush === 'anchor' ? 'texture brushes' : null;
-      if (label && found.indexOf(label) < 0) found.push(label);
-    });
-    return found.length ? found.join(', ') : null;
-  }
   // A record's delete steps: the record, and its linked fill (the ribbon's companion the listing named).
   function stepsOf(paths) {
     var steps = [];
@@ -41,9 +33,8 @@
     return steps;
   }
   async function remove(root, sel) {
-    var I = root.NemoSelectCanvasIntent, Labs = root.NemoNativeObjectLabs, route = Labs && Labs.desktop(root), bad = refusal(sel);
+    var I = root.NemoSelectCanvasIntent, Labs = root.NemoNativeObjectLabs, route = Labs && Labs.desktop(root);
     if (root.NemoNativeSelectionStyle && typeof root.NemoNativeSelectionStyle.flush === 'function') root.NemoNativeSelectionStyle.flush(root);
-    if (bad) { notice(root, 'Deleting ' + bad + ' is not available on native projects yet.'); return 'refused'; }
     if (sel.length > MAX_STEPS / 2) { notice(root, 'Too many items to delete at once (' + MAX_STEPS / 2 + ' at most).'); return 'refused'; }
     if (!route || sel.some(function (p) { return !Number.isInteger(p.data.nativeLayerIndex); })) { notice(root, 'Deleting is not available right now.'); return 'refused'; }
     var before = I.presentedState(root) || await I.presentedSettled(root), layers = before && await I.reread(root, sel, false), again = I.presentedState(root) || await I.presentedSettled(root);

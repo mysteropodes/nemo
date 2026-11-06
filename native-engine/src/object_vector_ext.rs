@@ -56,6 +56,12 @@ pub struct VectorExt {
     /// Absent = inferred from the handles; present only after a type was set. Never on a pressure ribbon.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) point_types: Presence<Vec<String>>,
+    /// #2372: the Select rotate/scale pivot the artist last chose for this stroke (baseline `serP` `xformAnchorKey` / `xformAnchorCustom`):
+    /// one of the nine preset points of the selection box (`tl tc tr ml mc mr bl bc br`), or a custom world point `[x, y]`, which wins over the preset.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) xform_anchor_key: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) xform_anchor_custom: Presence<Vec<Number>>,
 }
 object_deserialize!(VectorExt {
     #[serde(default)] pressure: Presence<PressureFields>,
@@ -72,7 +78,9 @@ object_deserialize!(VectorExt {
     #[serde(default)] brush_texture: Presence<BrushTexture>,
     #[serde(default)] shadow: Presence<ShadowChannel>,
     #[serde(default)] is_fill_shape: Presence<bool>,
-    #[serde(default)] point_types: Presence<Vec<String>>
+    #[serde(default)] point_types: Presence<Vec<String>>,
+    #[serde(default)] xform_anchor_key: Presence<String>,
+    #[serde(default)] xform_anchor_custom: Presence<Vec<Number>>
 });
 
 /// serP's shadow channel members: `channelTag` (only ever `'shadow'`, written when truthy) and the swatch that drew
@@ -120,6 +128,8 @@ impl VectorExt {
             && self.shadow.missing()
             && self.is_fill_shape.missing()
             && self.point_types.missing()
+            && self.xform_anchor_key.missing()
+            && self.xform_anchor_custom.missing()
     }
 }
 

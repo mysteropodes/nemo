@@ -48,7 +48,16 @@ pub(super) struct Detail {
     mask_mode: Option<String>,
     unmask: bool,
     gradient: Option<Option<StoredGradient>>,
+    pivot: Option<Pivot>,
 }
+
+/// The Select pivot a restyle step stores on a record (#2372): each member present is set (`Some`) or cleared (`None`).
+#[derive(Debug, Clone, Default)]
+pub(super) struct Pivot {
+    key: Option<Option<String>>,
+    custom: Option<Option<[f64; 2]>>,
+}
+const PRESETS: [&str; 9] = ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"];
 
 /// A member that names one of `allowed`.
 fn choice(v: &Presence<String>, allowed: &[&str]) -> Result<Option<String>, DispatchErrorCode> {
@@ -84,8 +93,23 @@ impl Detail {
             })
             .transpose()?;
         let gradient = gradient::checked(&style.fill_gradient)?;
+        let key = match style.xform_anchor_key.value() {
+            Some(Some(k)) if PRESETS.contains(&k.as_str()) => Some(Some(k.clone())),
+            Some(Some(_)) => return Err(DispatchErrorCode::InvalidRequest),
+            Some(None) => Some(None),
+            None => None,
+        };
+        let custom = match style.xform_anchor_custom.value() {
+            Some(Some(p)) => match p.iter().map(|n| n.as_f64().filter(|v| v.is_finite() && v.abs() <= 1.0e7)).collect::<Vec<_>>().as_slice() {
+                [Some(x), Some(y)] => Some(Some([*x, *y])),
+                _ => return Err(DispatchErrorCode::InvalidRequest),
+            },
+            Some(None) => Some(None),
+            None => None,
+        };
         Ok(Self {
             gradient,
+            pivot: (key.is_some() || custom.is_some()).then_some(Pivot { key, custom }),
             fill_enabled: style.fill_enabled.value().copied(),
             stroke_enabled: style.stroke_enabled.value().copied(),
             cap: choice(&style.cap, &CAPS)?,
@@ -116,6 +140,7 @@ impl Detail {
             + usize::from(self.mask_mode.is_some())
             + usize::from(self.unmask)
             + usize::from(self.gradient.is_some())
+            + usize::from(self.pivot.is_some())
     }
     /// Any member that is not a preset or a feather.
     pub(super) fn has_plain(&self) -> bool {
@@ -146,6 +171,10 @@ impl Detail {
     }
     pub(super) fn unmask(&self) -> bool {
         self.unmask
+    }
+    /// The pivot edit (#2372): stored on a vector record, never on an image or a text block.
+    pub(super) fn pivot(&self) -> Option<&Pivot> {
+        self.pivot.as_ref()
     }
     /// The fill gradient edit: `Some(Some(g))` stores `g`, `Some(None)` returns to the flat fill.
     pub(super) fn gradient(&self) -> Option<Option<&StoredGradient>> {
@@ -497,4 +526,30 @@ pub(super) fn feather(
         }
     }
     Ok(out)
+}
+
+/// The named record takes (or loses) the Select pivot (baseline `serP` `xformAnchorKey` / `xformAnchorCustom`). Nothing else about it changes, so a
+/// texture anchor, a bitmap anchor or a ribbon keeps its look and its derived pieces.
+pub(super) fn pivot(named: &ObjectRecord, edit: &Pivot) -> Result<Vec<ObjectRecord>, DispatchErrorCode> {
+    let mut record = named.clone();
+    let ext = record.vector_ext.value_mut();
+    let mut fresh = crate::object_document::VectorExt::default();
+    let ext = ext.unwrap_or(&mut fresh);
+    if let Some(key) = &edit.key {
+        ext.xform_anchor_key = key.clone().map_or(Presence::Missing, Presence::Present);
+    }
+    if let Some(custom) = &edit.custom {
+        ext.xform_anchor_custom = match custom {
+            Some([x, y]) => Presence::Present(vec![num(*x)?, num(*y)?]),
+            None => Presence::Missing,
+        };
+    }
+    let keep = !ext.is_empty();
+    let made = ext.clone();
+    if keep {
+        record.vector_ext = Presence::Present(made);
+    } else {
+        record.vector_ext = Presence::Missing;
+    }
+    Ok(vec![record])
 }

@@ -43,6 +43,13 @@ function harness(items, options = {}) {
     NemoNativeObjectProject: { desktop: () => session, selectLayerUI: () => true },
     NemoNativeViewportUnderlay: { canvasMapping: { point: (e) => ({ x: e.clientX, y: e.clientY }), transform: () => [1, 0, 0, 1, 0, 0] } },
     NemoNativeObjectLabs: { desktop: () => ({ batchStrokes: async (layerUid, frame, steps) => {
+      if (steps.every((s) => s.restyle)) { // a pivot write (A-select-skew-anchor-lasso): the engine stores the members on the listed record
+        batches.push({ layerUid, frame, steps });
+        steps.forEach((s) => { const it = store.find((i) => i.stableTarget.strokeId === s.restyle.stableTarget.strokeId), st = s.restyle.style;
+          for (const k of ['xformAnchorKey', 'xformAnchorCustom']) if (k in st) { if (st[k] === null) delete it[k]; else it[k] = st[k]; } });
+        pin = { ...pin, contentRevision: pin.contentRevision + 1, documentSnapshotId: 's' + (pin.contentRevision + 1) };
+        return { status: 'applied' };
+      }
       steps.forEach((s) => { const it = store.find((i) => i.stableTarget.strokeId === s.reshape.stableTarget.strokeId); s.before = it.segments.map((q) => q.point); });
       batches.push({ layerUid, frame, steps });
       if (options.refuse) return { status: 'invalid', reason: 'refused' };
@@ -723,7 +730,7 @@ test('the Alt press only copies INSIDE the selection box: outside it (even on an
   await h.select(35, 35);
   h.press(170, 170, { altKey: true }); h.drag(150, 150, { altKey: true }); await settle(); await h.release(150, 150, { altKey: true }); await settle();
   assert.equal(h.calls.length, 0, 'an unselected item under Alt is not copied');
-  assert.equal(h.batches.length, 0, 'and not moved: the baseline places the pivot there (A-select-skew-anchor-lasso)');
+  assert.ok(h.batches.every((b) => b.steps.every((st) => st.restyle && !st.reshape)), 'and not moved: the baseline places the pivot there, which is written as a pivot restyle only (A-select-skew-anchor-lasso)');
   assert.deepEqual(h.root.state.xformAnchorCustom, [150, 150]);
   const g = altHarness([BIG, FAR]);
   await g.select(35, 35);
@@ -859,23 +866,44 @@ test('Alt+press outside the selection box places the pivot (a click moves nothin
   h.press(140, 30, { altKey: true }); await h.release(140, 30, { altKey: true }); await settle();
   assert.deepEqual(h.root.state.xformAnchorCustom, [140, 30]);
   assert.deepEqual(h.ids(), ['A'], 'the click keeps the selection');
-  assert.deepEqual(h.batches, []);
+  assert.deepEqual(h.batches.map((b) => b.steps.map((st) => st.restyle.style)), [[{ xformAnchorCustom: [140, 30] }]], 'one pivot restyle, stored on the record (serP xformAnchorCustom)');
+  assert.deepEqual(h.store[0].xformAnchorCustom, [140, 30]);
   assert.ok(h.svg().children.some((c) => c.tag === 'circle' && c.attrs.cx === '140' && c.attrs.cy === '30'), 'the crosshair is drawn at the pivot');
   h.press(140, 10, { altKey: true, shiftKey: true }); await h.release(140, 10, { altKey: true, shiftKey: true }); await settle();
   assert.equal(h.root.state.xformAnchorKey, 'tr'); assert.equal(h.root.state.xformAnchorCustom, null, 'the nearest preset of the box wins, the custom point goes');
   assert.deepEqual(Pivot.pointOf(h.root, Overlay.boxOf(h.root, h.root.selectedPaths)), { x: 120, y: 20 });
-  assert.deepEqual(h.batches, []);
+  assert.deepEqual(h.batches.map((b) => b.steps.map((st) => st.restyle.style)), [[{ xformAnchorCustom: [140, 30] }], [{ xformAnchorKey: 'tr', xformAnchorCustom: null }]], 'the preset replaces the stored custom point');
+  assert.equal(h.store[0].xformAnchorKey, 'tr'); assert.equal('xformAnchorCustom' in h.store[0], false);
+});
+
+test('a stored pivot survives a deselect, a reselect and a reload of the listing; "Centrer le point d\'ancrage" writes the centre back and clears it', async () => {
+  const h = harness([{ ...BIG, xformAnchorCustom: [140, 30] }, FAR]);
+  await h.select(35, 35);
+  assert.deepEqual(h.root.state.xformAnchorCustom, [140, 30], 'the listing carried the stored pivot (a reopened project)');
+  assert.deepEqual(Pivot.pointOf(h.root, Overlay.boxOf(h.root, h.root.selectedPaths)), { x: 140, y: 30 });
+  await h.select(170, 170);
+  assert.equal(h.root.state.xformAnchorCustom, null, 'another stroke never given a pivot reads the centre');
+  await h.select(35, 35);
+  assert.deepEqual(h.root.state.xformAnchorCustom, [140, 30]);
+  assert.deepEqual(h.batches, [], 'reading a stored pivot writes nothing');
+  h.root.NemoNativeSelectionClipboard = { native: () => true, hasClip: () => false, copy() {}, cut() {}, paste() {}, duplicate() {} };
+  const rows = await Menu.rows(h.root, h.root.selectedPaths);
+  rows[rows.length - 1].action(); await settle();
+  assert.deepEqual(h.batches.map((b) => b.steps.map((st) => st.restyle.style)), [[{ xformAnchorKey: 'mc', xformAnchorCustom: null }]]);
+  assert.equal('xformAnchorCustom' in h.store[0], false); assert.equal(h.store[0].xformAnchorKey, 'mc');
+  assert.deepEqual(Pivot.pointOf(h.root, Overlay.boxOf(h.root, h.root.selectedPaths)), { x: 70, y: 70 });
 });
 
 test('Alt+drag moves the pivot with the pointer, and the rotate ring then turns the selection about it', async () => {
   const h = harness([BIG]); await h.select(35, 35);
   h.press(140, 30, { altKey: true }); h.drag(150, 30, { altKey: true }); h.drag(160, 40, { altKey: true }); await settle();
   await h.release(160, 40, { altKey: true }); await settle();
-  assert.deepEqual(h.root.state.xformAnchorCustom, [160, 40]); assert.deepEqual(h.batches, []);
+  assert.deepEqual(h.root.state.xformAnchorCustom, [160, 40]);
+  assert.deepEqual(h.batches.map((b) => b.steps.map((st) => st.restyle.style)), [[{ xformAnchorCustom: [160, 40] }]], 'the drag writes the pivot once, when it is released');
   // The ring is centred on the pivot now: 30 px right of it, dragged a quarter turn clockwise about (160,40).
   await gesture(h, [190, 40], [160, 70]);
-  assert.equal(h.batches.length, 1);
-  assert.deepEqual(M(h.batches[0].steps[0]), [0, 1, -1, 0, 200, -120], 'a quarter turn about the pivot');
+  assert.equal(h.batches.length, 2);
+  assert.deepEqual(M(h.batches[1].steps[0]), [0, 1, -1, 0, 200, -120], 'a quarter turn about the pivot');
 });
 
 test('a preset pivot follows the box and the inspector\'s numeric rotation reads the same point; the pivot comes back for the same stroke and resets for another', async () => {

@@ -40,7 +40,7 @@ pub(in crate::commands::object_fill_owner::vector_edit::batch_ops) fn has_anchor
 }
 
 /// The stored dabs of `anchor`'s group in its cell.
-pub(super) fn copies(source: &ObjectDocument, anchor: &ObjectRecord) -> Vec<ObjectTarget> {
+pub(in crate::commands::object_fill_owner::vector_edit::batch_ops) fn copies(source: &ObjectDocument, anchor: &ObjectRecord) -> Vec<ObjectTarget> {
     let Some((id, false)) = group(anchor) else {
         return Vec::new();
     };
@@ -74,6 +74,18 @@ pub(super) fn seed(record: &mut ObjectRecord) -> bool {
             Presence::Present(Number::from(detail::hash(&[&id, &preset, &group])));
     }
     true
+}
+
+/// A texture anchor with no fill keeps its item opacity at 0 (the camouflage); the opacity named is the one it remembers (`preTextureOpacity`).
+pub(super) fn remember_opacity(record: &mut ObjectRecord, opacity: f64) -> Result<(), DispatchErrorCode> {
+    if let Some(texture) = record
+        .vector_ext
+        .value_mut()
+        .and_then(|e| e.brush_texture.value_mut())
+    {
+        texture.pre_texture_opacity = Presence::Present(num(opacity)?);
+    }
+    Ok(())
 }
 
 /// A texture anchor whose own stroke is hidden by a fill remembers it for the strip; a new stroke colour is that memory.

@@ -6,7 +6,11 @@
  * fields all turn about the same point. Alt+click (or Alt+drag, following the pointer) outside the selection's box places it; Shift snaps to the nearest of
  * the 9 presets; Alt held over the crosshair grabs it. Moving the pivot is a tool preference, not a document edit: it writes no revision and no history
  * entry. Like the baseline's per-stroke `xformAnchorKey` / `xformAnchorCustom`, the choice is remembered per picked stroke, so a deselect and reselect
- * (or another item and back) brings the same pivot back; a stroke never given one reads the centre. */
+ * (or another item and back) brings the same pivot back; a stroke never given one reads the centre.
+ * Persistence (baseline serP data.xformAnchorKey / xformAnchorCustom): once the gesture ends (Alt release, the menu's "Centrer le point d'ancrage") the
+ * pivot is written onto every picked VECTOR record as the stored `xformAnchorKey` / `xformAnchorCustom` (one `restyle` batch: one revision, one undo
+ * entry), the listing reads it back, so a save and reopen, an undo or a frame change brings the same pivot back. An image or a text block has no stored
+ * pivot yet and keeps the session memory only. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -49,19 +53,52 @@
   function restore(root) {
     var st = root.state, first = (root.selectedPaths || []).find(function (p) { return p && p.data && p.data.strokeId; });
     if (!st || !first) return;
-    var kept = store(root)[first.data.strokeId];
+    var d = first.data, stored = Array.isArray(d.xformAnchorCustom) ? { custom: d.xformAnchorCustom.slice() } : d.xformAnchorKey ? { key: d.xformAnchorKey } : null;
+    // The live session value wins while a gesture holds it; once written (persist) the record's own stored pivot is the truth.
+    var kept = store(root)[first.data.strokeId] || stored;
     if (kept && kept.custom) { st.xformAnchorCustom = kept.custom.slice(); }
     else if (kept) { st.xformAnchorKey = kept.key; st.xformAnchorCustom = null; }
     else st.xformAnchorCustom = null;
     paintGrid(root);
   }
+  // The pivot as the state holds it now, written onto the picked vector records: ONE restyle batch against the document the selection was read from.
+  // Resolves to the batch status ('applied', 'noop' when no picked record can hold a pivot, 'stale' when the document moved on, 'unavailable').
+  async function persist(root, picked) {
+    var I = root.NemoSelectCanvasIntent, Labs = root.NemoNativeObjectLabs, route = Labs && typeof Labs.desktop === 'function' ? Labs.desktop(root) : null, st = root.state;
+    var sel = (picked || root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget && Number.isInteger(p.data.nativeLayerIndex) && p.data.nativeRole !== 'raster' && p.data.nativeRole !== 'text'; });
+    if (!I || !route || !st || !sel.length) return 'noop';
+    var custom = Array.isArray(st.xformAnchorCustom) && st.xformAnchorCustom.length === 2 ? st.xformAnchorCustom.slice() : null;
+    var style = custom ? { xformAnchorCustom: custom } : { xformAnchorKey: Object.prototype.hasOwnProperty.call(PRESETS, st.xformAnchorKey) ? st.xformAnchorKey : 'mc', xformAnchorCustom: null };
+    var before = I.presentedState(root) || await I.presentedSettled(root), layers = before && await I.reread(root, sel, false);
+    var again = I.presentedState(root) || await I.presentedSettled(root);
+    if (!layers || !layers.complete || !again || !before || JSON.stringify(again.pin) !== JSON.stringify(before.pin)) return 'stale';
+    // A record already holding exactly this pivot is not written again.
+    var same = function (d) {
+      if (custom) return Array.isArray(d.xformAnchorCustom) && d.xformAnchorCustom[0] === custom[0] && d.xformAnchorCustom[1] === custom[1];
+      return !Array.isArray(d.xformAnchorCustom) && (d.xformAnchorKey || 'mc') === style.xformAnchorKey;
+    };
+    var steps = layers.paths.filter(function (p) { return !same(p.data); }).map(function (p) { return { restyle: { stableTarget: p.data.nativeStableTarget, style: style } }; });
+    var forget = function () { sel.forEach(function (p) { delete store(root)[p.data.strokeId]; }); };
+    if (!steps.length) { forget(); return 'noop'; }
+    var result;
+    try { result = await route.batchStrokes(layers.layerUid, layers.frame, steps, { select: true }); } catch (_) { result = null; }
+    if (!result || (result.status !== 'applied' && result.status !== 'noop')) return result && result.status ? result.status : 'unavailable';
+    forget(); // the stored pivot is the truth now
+    var fresh = null;
+    try { fresh = await I.reread(root, sel, false); } catch (_) { fresh = null; }
+    if (fresh && fresh.complete && (root.selectedPaths || []).length === sel.length) root.selectedPaths = fresh.paths;
+    if (root.NemoNativeSelectOverlay) root.NemoNativeSelectOverlay.show(root);
+    return result.status;
+  }
   // The menu's "Centrer le point d'ancrage" (baseline select-bridge.js :3112): the pivot goes back to the centre of the selection, for every picked stroke.
   function center(root) {
     var st = root.state; st.xformAnchorCustom = null; st.xformAnchorKey = 'mc';
     remember(root); paintGrid(root);
+    var written = persist(root);
     if (root.NemoNativeSelectOverlay) root.NemoNativeSelectOverlay.show(root);
     if (typeof root.updateUI === 'function') root.updateUI();
     if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
+    return written;
   }
   // True when the world point `p` is on the crosshair (`wpp` world units per screen pixel).
   function grabs(root, box, p, wpp) { var c = pointOf(root, box); return Math.hypot(p.x - c.x, p.y - c.y) < GRAB_PX * wpp; }
@@ -75,5 +112,5 @@
     make('line', Object.assign({ x1: x - r, y1: y, x2: x + r, y2: y }, line));
     make('line', Object.assign({ x1: x, y1: y - r, x2: x, y2: y + r }, line));
   }
-  return Object.freeze({ pointOf: pointOf, place: place, center: center, restore: restore, remember: remember, grabs: grabs, draw: draw, nearestPreset: nearestPreset, presetPoint: presetPoint });
+  return Object.freeze({ pointOf: pointOf, place: place, center: center, persist: persist, restore: restore, remember: remember, grabs: grabs, draw: draw, nearestPreset: nearestPreset, presetPoint: presetPoint });
 }));

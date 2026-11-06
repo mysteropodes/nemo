@@ -170,14 +170,6 @@ fn a_brush_preset_leaves_ribbons_and_unstroked_records_alone_and_refuses_what_it
         vec![restyle("copy", json!({"brushPreset":"chalk-round"}))],
         "unavailable",
     );
-    refused(
-        &stored,
-        vec![restyle(
-            "anchor",
-            json!({"strokeEnabled":true,"stroke":"#ff0000"}),
-        )],
-        "unavailable",
-    );
 }
 
 fn masks() -> Value {
