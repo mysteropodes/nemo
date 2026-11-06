@@ -38,9 +38,16 @@ pub(crate) fn rebake(
         .value()
         .map_or(vec![], |i| i.text_entries().to_vec());
     for (index, anchor) in anchors.iter().enumerate() {
+        // The anchor is addressed by its full target: a scene record, or a record of the component the target names.
         let record = drawing
             .objects
             .iter()
+            .chain(
+                drawing
+                    .component_set()
+                    .and_then(|set| set.component(&anchor.context_id))
+                    .map_or(&[][..], |component| component.objects.as_slice()),
+            )
             .find(|r| &r.target == anchor)
             .ok_or(Error::Internal)?;
         let fields = record

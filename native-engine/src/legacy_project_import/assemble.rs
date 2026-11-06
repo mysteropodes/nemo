@@ -163,12 +163,20 @@ pub(super) fn drawing(
         .filter_map(|l| l["layerUid"].as_str().map(str::to_owned))
         .collect();
     let keys: HashMap<String, Vec<u32>> = std::mem::take(&mut set.keys);
+    let mut drawn = keys.clone();
+    let mut sampled = std::mem::take(&mut set.sampled);
+    if let Some(parts) = parts.as_mut() {
+        drawn.extend(std::mem::take(&mut parts.keys));
+        sampled.extend(std::mem::take(&mut parts.sampled));
+    }
     let manual = std::mem::take(&mut set.manual);
     let tween_store = tweens::convert(
         &tweens::Input {
             doc,
             uids: &uids,
             keys: &keys,
+            drawn: &drawn,
+            sampled: &sampled,
             manual: &manual,
         },
         ctx,

@@ -27,6 +27,8 @@ pub(super) struct Set {
     pub(super) manual: BTreeMap<(String, u32), Vec<String>>,
     /// Keyframe numbers per layer uid.
     pub(super) keys: HashMap<String, Vec<u32>>,
+    /// Layers that hold generated tween frames (timing samples).
+    pub(super) sampled: HashSet<String>,
 }
 
 /// Document facts the layers of one context are converted against.
@@ -87,7 +89,6 @@ pub(super) fn convert(
             set.objects.extend(records);
         }
         let mut record = layer_record(
-            scope.context,
             index,
             map,
             uid,
@@ -133,6 +134,9 @@ pub(super) fn convert(
         }
         if !drawn.frame_keys.is_empty() {
             set.frame_keys.insert(uid.to_owned(), drawn.frame_keys);
+        }
+        if !drawn.samples.is_empty() {
+            set.sampled.insert(uid.to_owned());
         }
         set.keys.insert(uid.to_owned(), drawn.keys);
     }
@@ -213,7 +217,6 @@ fn parents<'a>(
 
 #[allow(clippy::too_many_arguments)]
 fn layer_record(
-    context: &str,
     index: usize,
     map: &Map<String, Value>,
     uid: &str,
@@ -243,14 +246,12 @@ fn layer_record(
             PALETTE[index % PALETTE.len()].to_owned()
         }
     };
-    let timing = json!({"format": "nemo.native-layer-timing", "formatVersion": 1, "family": "drawing", "contextId": context,
+    // Sparse timing is stored per layer in every context. The native codec admits only the `scene-root` timing context
+    // (a component's inner layers carry it too: `object_component_convert` copies the scene layer's timing unchanged).
+    let timing = json!({"format": "nemo.native-layer-timing", "formatVersion": 1, "family": "drawing", "contextId": "scene-root",
         "keys": keys.iter().map(|f| json!({"frame": f})).collect::<Vec<_>>(), "samples": samples});
     let mut record = json!({"layerUid": uid, "name": name, "visible": map.get("visible") != Some(&Value::Bool(false)),
-        "locked": truthy(map.get("locked")), "color": color, "parentLayerUid": parent});
-    // Only the scene context carries sparse timing; a component layer's exposure comes from its drawing frames.
-    if context == "scene-root" {
-        record["timing"] = timing;
-    }
+        "locked": truthy(map.get("locked")), "color": color, "parentLayerUid": parent, "timing": timing});
     if truthy(map.get("shy")) {
         record["shy"] = Value::Bool(true);
     }
@@ -278,7 +279,6 @@ fn frames(
     ctx: &mut Ctx,
 ) -> Result<Drawn, LegacyImportError> {
     let mut out = Drawn::default();
-    let mut had_content = false;
     for (frame_index, frame) in map["frames"].as_array().into_iter().flatten().enumerate() {
         let frame_path = format!("{path}.frames[{frame_index}]");
         let members = object(frame, &frame_path)?;
@@ -305,14 +305,7 @@ fn frames(
             }
             continue;
         }
-        let scene = scope.context == "scene-root";
-        if !scene && keyframe && strokes.is_empty() && had_content {
-            ctx.warn(&frame_path, "blank_keyframe_in_component", "a blank keyframe inside a component keeps showing the previous drawing, because a component layer stores no blank frames");
-        }
-        had_content |= !strokes.is_empty();
-        if generated && !scene {
-            // A generated frame inside a component is stored as an ordinary drawing.
-        } else if generated {
+        if generated {
             let mut sample = json!({"frame": number});
             if truthy(members.get("isManualEdit")) {
                 sample["manualEdit"] = json!(true);

@@ -1,6 +1,7 @@
 //! Tween records: the per-span re-pairing overrides (`tweenOverrides`), custom easing (`tweenEasing`) and the manual
 //! mode (`tweenManualMode` with `tweenOn` strokes) become the native tween store; the project's resample, step and
-//! default easing become the options of every layer that has a span. Span keys are `layerUid:from-to`.
+//! default easing become the options of every layer that has a span or generated frames, and of every keyed layer when they
+//! differ from the native defaults. Span keys are `layerUid:from-to`.
 use super::classify::is_default;
 use super::{Ctx, LegacyImportError};
 use serde_json::{json, Map, Value};
@@ -59,6 +60,10 @@ pub(crate) struct Input<'a> {
     pub(crate) doc: &'a Map<String, Value>,
     pub(crate) uids: &'a HashSet<String>,
     pub(crate) keys: &'a HashMap<String, Vec<u32>>,
+    /// Keyframe numbers of every layer of the scene and of the components.
+    pub(crate) drawn: &'a HashMap<String, Vec<u32>>,
+    /// Layers (scene or component) that hold generated tween frames.
+    pub(crate) sampled: &'a HashSet<String>,
     pub(crate) manual: &'a BTreeMap<(String, u32), Vec<String>>,
 }
 
@@ -142,11 +147,24 @@ pub(crate) fn convert(input: &Input, ctx: &mut Ctx) -> Result<Option<Value>, Leg
         }
     }
     spans.retain(|_, s| !s.overrides.is_empty() || s.easing.is_some() || s.manual.is_some());
-    if spans.is_empty() {
+    let options = options(input.doc, ctx)?;
+    // The baseline settings are project-wide, the native ones belong to a layer: carry them onto every layer that has a span
+    // or generated frames, and, when they are not the native defaults, onto every layer that can be tweened.
+    let custom = options != default_options();
+    if spans.is_empty() && input.sampled.is_empty() && !custom {
         return Ok(None);
     }
-    let options = options(input.doc, ctx)?;
     let mut layers: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+    let carriers = input.sampled.iter().cloned().chain(
+        input
+            .drawn
+            .iter()
+            .filter(|(_, keys)| custom && !keys.is_empty())
+            .map(|(uid, _)| uid.clone()),
+    );
+    for uid in carriers {
+        layers.entry(uid).or_default();
+    }
     for ((uid, from, to), span) in spans {
         let mut entry = json!({"from": from, "to": to, "overrides": span.overrides});
         if let Some(easing) = span.easing {
@@ -162,6 +180,10 @@ pub(crate) fn convert(input: &Input, ctx: &mut Ctx) -> Result<Option<Value>, Leg
         .map(|(uid, spans)| json!({"layerUid": uid, "options": options, "spans": spans}))
         .collect();
     Ok(Some(json!({"layers": layers})))
+}
+
+fn default_options() -> Value {
+    json!({"resamplePoints": 50, "step": 1, "skipManual": true, "easing": []})
 }
 
 fn options(doc: &Map<String, Value>, ctx: &mut Ctx) -> Result<Value, LegacyImportError> {
