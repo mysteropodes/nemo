@@ -50,6 +50,12 @@ use crate::revision::ObjectSnapshot;
 mod deliver;
 #[path = "rig_pose_eval_inputs.rs"]
 mod inputs;
+#[path = "rig_pose_eval_view.rs"]
+mod view;
+#[allow(unused_imports)]
+pub(crate) use view::{
+    candidate_rig, evaluate_for_view, ik_writes, segment_writes, RigVertexWrite, ViewEvaluation, ViewMesh,
+};
 #[allow(unused_imports)]
 pub(crate) use deliver::{evaluate_and_deliver, PosedGeometrySink};
 use inputs::{deform_bones, owned_bind, OwnedBind};

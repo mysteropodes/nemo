@@ -22,8 +22,8 @@ use crate::object_document::object_rig_record::{
 };
 use crate::object_document::{FrameScopeKind, ObjectDocument, ObjectPoint, ObjectRecord, Presence};
 use crate::object_snapshot::object_rig_edit_read::{
-    auto_radius, ik_drag, ik_lengths, kernel_bones, offset_for, weigh_control, weigh_offset, ControlEntry,
-    IkDrag, KernelRef, KernelRefusal, OffsetEntry,
+    auto_radius, ik_drag, ik_lengths, offset_for, weigh_control, weigh_offset, ControlEntry, IkDrag,
+    KernelBone, KernelRef, KernelRefusal, KernelVertex, OffsetEntry,
 };
 use crate::request_receipts::DispatchErrorCode;
 use crate::commands::object_fill_owner::widget_edit::object_rig_edit::plan_mesh::{
@@ -109,6 +109,40 @@ pub(crate) struct AutoPlan {
 fn float(number: &Number) -> f64 {
     // Admitted numbers are finite; NaN marks a caller that skipped admission.
     number.as_f64().unwrap_or(f64::NAN)
+}
+
+fn pair(value: &RigPair) -> [f64; 2] {
+    [float(&value[0]), float(&value[1])]
+}
+
+fn handle(slot: &Presence<Option<RigPair>>) -> [f64; 2] {
+    match slot.value() {
+        Some(Some(value)) => pair(value),
+        _ => [0.0, 0.0],
+    }
+}
+
+fn vertex(segment: &RigSegment) -> KernelVertex {
+    KernelVertex {
+        point: pair(&segment.point),
+        handle_in: handle(&segment.handle_in),
+        handle_out: handle(&segment.handle_out),
+    }
+}
+
+/// The rig's bones in table order, as the kernels read them.
+pub(crate) fn kernel_bones(rig: &RigRecord) -> Vec<KernelBone> {
+    rig.bones
+        .entries()
+        .iter()
+        .map(|(id, bone)| KernelBone {
+            id: id.clone(),
+            radius: bone.radius_value(),
+            closed: bone.closed,
+            live: bone.segments.iter().map(vertex).collect(),
+            rest: bone.rest_segments.iter().map(vertex).collect(),
+        })
+        .collect()
 }
 
 pub(crate) fn every_bone_id(rig: &RigRecord) -> Vec<String> {
@@ -321,10 +355,6 @@ pub(crate) fn plan_auto_assign(
         skipped_unsupported: if want_paths { skipped } else { 0 },
         radius: needed,
     })
-}
-
-fn pair(value: &RigPair) -> [f64; 2] {
-    [float(&value[0]), float(&value[1])]
 }
 
 fn rest_point_of(bind: &RigBind, vertex: usize) -> Result<[f64; 2], PlanRefusal> {

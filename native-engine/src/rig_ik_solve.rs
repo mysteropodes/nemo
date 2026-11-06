@@ -320,6 +320,35 @@ pub(crate) fn drag_writes(
     ])
 }
 
+/// The whole Alt-drag of one chain end: the chain `findIKChain` finds, filed as `rigSetIK(.., false)` does at the start of the gesture
+/// (lengths of the LIVE pose), and the writes of ONE `rigDragIKEnd` solve (#2255).
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct IkDragPlan {
+    pub(crate) chain: IkChain,
+    pub(crate) writes: Vec<PointWrite>,
+}
+
+/// Why an Alt-drag has no plan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IkDragRefusal {
+    /// `findIKChain` returned `null`: the vertex is not the far end of a two-bone chain.
+    NoChain,
+    Ik(IkError),
+}
+
+/// `findIKChain` + `rigSetIK(.., false)` + one `rigDragIKEnd` toward `target`, nothing applied.
+pub(crate) fn plan_drag(
+    bones: &[IkBone],
+    bone_id: &str,
+    vi: usize,
+    target: Point2,
+) -> Result<IkDragPlan, IkDragRefusal> {
+    let spec = find_ik_chain(bones, bone_id, vi).ok_or(IkDragRefusal::NoChain)?;
+    let chain = set_ik(bones, &spec.root, &spec.joint, &spec.end, false).map_err(IkDragRefusal::Ik)?;
+    let writes = drag_writes(bones, &spec, &chain, target).map_err(IkDragRefusal::Ik)?;
+    Ok(IkDragPlan { chain, writes })
+}
+
 /// `otherEnd`: the opposite end of a bone with `len` vertices.
 fn other_end(len: usize, idx: usize) -> usize {
     if idx == 0 {

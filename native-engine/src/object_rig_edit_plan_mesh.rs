@@ -18,13 +18,13 @@
 //!   (`not_found`) for `bindMesh`, and is skipped without counting by `autoAssign`, like the baseline;
 //! - a mesh without vertices cannot be weighed: `EmptyStroke`.
 use crate::commands::object_fill_owner::widget_edit::object_rig_edit::plan::{
-    resolve_bone_ids, rig_of, PlanRefusal,
+    kernel_bones, resolve_bone_ids, rig_of, PlanRefusal,
 };
 use crate::commands::object_fill_owner::widget_edit::object_rig_edit::rules::js_number;
 use crate::object_document::object_rig_record::{RigPair, RigRecord};
 use crate::object_document::{FrameScopeKind, ObjectDocument, RasterEntry};
 use crate::object_snapshot::object_rig_edit_read::{
-    kernel_bones, mesh_rest_world, weigh_control, ControlEntry, MeshPlacement,
+    mesh_rest_world, weigh_control, ControlEntry, MeshPlacement,
 };
 
 /// A mesh carried by a raster, its rest vertices already in world space.

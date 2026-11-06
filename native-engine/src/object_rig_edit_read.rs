@@ -19,8 +19,6 @@
 //! Without the `evaluation` feature there is no kernel: each function reports
 //! [`KernelRefusal::Unavailable`]; nothing is defaulted, guessed or approximated.
 
-use crate::object_codec::{Presence, RigPair, RigRecord, RigSegment};
-
 /// One bone vertex as the kernels read it: the anchor and its two handle vectors (zero when the
 /// record has no handle, exactly what `_boneSegsToPath` makes of a missing one).
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -76,45 +74,6 @@ pub(crate) enum KernelRefusal {
     AnchorMissing,
     /// The dragged vertex is not the far end of a two-bone chain (`findIKChain` returns `null`).
     NoChain,
-}
-
-fn float(number: &serde_json::Number) -> f64 {
-    // Admitted numbers are finite; NaN marks a caller that skipped admission.
-    number.as_f64().unwrap_or(f64::NAN)
-}
-
-fn pair(value: &RigPair) -> [f64; 2] {
-    [float(&value[0]), float(&value[1])]
-}
-
-fn handle(slot: &Presence<Option<RigPair>>) -> [f64; 2] {
-    match slot.value() {
-        Some(Some(value)) => pair(value),
-        _ => [0.0, 0.0],
-    }
-}
-
-fn vertex(segment: &RigSegment) -> KernelVertex {
-    KernelVertex {
-        point: pair(&segment.point),
-        handle_in: handle(&segment.handle_in),
-        handle_out: handle(&segment.handle_out),
-    }
-}
-
-/// The rig's bones in table order, as the kernels read them.
-pub(crate) fn kernel_bones(rig: &RigRecord) -> Vec<KernelBone> {
-    rig.bones
-        .entries()
-        .iter()
-        .map(|(id, bone)| KernelBone {
-            id: id.clone(),
-            radius: bone.radius_value(),
-            closed: bone.closed,
-            live: bone.segments.iter().map(vertex).collect(),
-            rest: bone.rest_segments.iter().map(vertex).collect(),
-        })
-        .collect()
 }
 
 /// `rigWeighOnePointByControl` for every point; `radius` and `softness` are the raw bind arguments
@@ -336,7 +295,7 @@ pub(crate) fn ik_drag(
     #[cfg(feature = "evaluation")]
     {
         use crate::evaluation::object_image_mesh_kernels::rig_ik_solve::{
-            drag_writes, find_ik_chain, set_ik, IkBone, IkError, IkRef,
+            plan_drag, IkBone, IkDragRefusal, IkError, IkRef,
         };
         let ik_bones: Vec<IkBone> = bones
             .iter()
@@ -347,17 +306,16 @@ pub(crate) fn ik_drag(
                 rest_segments: bone.rest.iter().map(|v| v.point).collect(),
             })
             .collect();
-        let spec = find_ik_chain(&ik_bones, &end.bone_id, end.vi as usize).ok_or(KernelRefusal::NoChain)?;
-        let chain = set_ik(&ik_bones, &spec.root, &spec.joint, &spec.end, false).map_err(|error| match error {
-            IkError::AnchorMissing(_) => KernelRefusal::AnchorMissing,
-            _ => KernelRefusal::Unresolved,
+        let plan = plan_drag(&ik_bones, &end.bone_id, end.vi as usize, target).map_err(|refusal| match refusal {
+            IkDragRefusal::NoChain => KernelRefusal::NoChain,
+            IkDragRefusal::Ik(IkError::AnchorMissing(_)) => KernelRefusal::AnchorMissing,
+            IkDragRefusal::Ik(_) => KernelRefusal::Unresolved,
         })?;
-        let writes = drag_writes(&ik_bones, &spec, &chain, target).map_err(|_| KernelRefusal::Unresolved)?;
         let to_kernel = |r: &IkRef| KernelRef { bone_id: r.bone_id.clone(), vi: r.vi as u32 };
         Ok(IkDrag {
-            refs: [to_kernel(&spec.root), to_kernel(&spec.joint), to_kernel(&spec.end)],
-            lengths: [chain.l1, chain.l2],
-            writes: writes.iter().map(|w| (to_kernel(&w.target), w.point)).collect(),
+            refs: [to_kernel(&plan.chain.root), to_kernel(&plan.chain.joint), to_kernel(&plan.chain.end)],
+            lengths: [plan.chain.l1, plan.chain.l2],
+            writes: plan.writes.iter().map(|w| (to_kernel(&w.target), w.point)).collect(),
         })
     }
     #[cfg(not(feature = "evaluation"))]

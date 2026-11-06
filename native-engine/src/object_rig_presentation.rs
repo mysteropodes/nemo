@@ -11,9 +11,9 @@
 //! contour). Coordinates are the layer's own space (the space the edits write); a layer with Motion or a parent carries its
 //! world map as `matrix` (`object_rig_placement.rs`), computed on the first page of a part only, and a map that cannot be had is a
 //! typed reason (`three_d`, `expression`, `sample`, `parent`, `mixed`, `contour`, `empty`) and no geometry, never a guessed map.
-use crate::object_snapshot::object_rig_pose_read::{evaluate_layer_pose_over, PoseBind};
+use crate::object_snapshot::object_rig_pose_read::{evaluate_layer_pose_over, PoseBind, VertexWrite};
 use crate::object_snapshot::rig_placement::layer_matrix;
-use crate::object_snapshot::rig_preview::{candidate, Preview};
+use crate::object_snapshot::rig_preview::{writes, Preview};
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Number, Value};
@@ -70,25 +70,27 @@ impl ObjectSnapshot {
             matrix: None,
             items: Vec::new(),
         };
-        let held = match preview {
-            Some(p) => Some(
-                layer
-                    .rig()
-                    .and_then(|rig| candidate(rig, p))
-                    .ok_or(DispatchErrorCode::InvalidRequest)?,
-            ),
-            None => None,
+        let held: Vec<VertexWrite> = match preview {
+            Some(p) if layer.rig().is_some() => writes(self, layer_uid, p).ok_or(DispatchErrorCode::InvalidRequest)?,
+            Some(_) => return Err(DispatchErrorCode::InvalidRequest),
+            None => Vec::new(),
         };
         let matrix = if first_page && layer.rig().is_some() {
-            match layer_matrix(self, layer_uid, frame, held.as_ref()) {
+            match layer_matrix(self, layer_uid, frame, &held) {
                 Ok(matrix) => matrix,
                 Err(reason) => return Ok(none(Some(reason))),
             }
         } else {
             None
         };
-        let Some(rig) = held.as_ref().or(layer.rig()) else {
+        let Some(rig) = layer.rig() else {
             return Ok(none(None));
+        };
+        // A vertex `[anchor, handleIn, handleOut]` as the held gesture leaves it: the stored one with the writes laid over it.
+        let posed = |bone_id: &str, vi: usize, base: [[f64; 2]; 3]| {
+            held.iter().filter(|w| w.bone_id == bone_id && w.vi == vi).fold(base, |at, w| {
+                [w.point.unwrap_or(at[0]), w.handle_in.unwrap_or(at[1]), w.handle_out.unwrap_or(at[2])]
+            })
         };
         let pair = |value: &[Number; 2]| json!([value[0], value[1]]);
         let items = match part {
@@ -100,7 +102,8 @@ impl ObjectSnapshot {
                     let curves: Vec<[[f64; 2]; 3]> = bone
                         .segments
                         .iter()
-                        .map(|s| [s.point_value(), vector(s.handle_in.value()), vector(s.handle_out.value())])
+                        .enumerate()
+                        .map(|(vi, s)| posed(id, vi, [s.point_value(), vector(s.handle_in.value()), vector(s.handle_out.value())]))
                         .collect();
                     json!({"boneId":id,"closed":bone.closed,"radius":bone.radius.value(),
                         "count":bone.segments.len(),"center":bounds_center(&curves, bone.closed)})
@@ -114,8 +117,13 @@ impl ObjectSnapshot {
                     bone.segments.iter().enumerate().map(move |(vi, s)| (id, vi, s))
                 })
                 .map(|(id, vi, s)| {
-                    json!({"boneId":id,"vi":vi,"point":pair(&s.point),
-                        "handleIn":vector(s.handle_in.value()),"handleOut":vector(s.handle_out.value())})
+                    if !held.iter().any(|w| w.bone_id == *id && w.vi == vi) {
+                        return json!({"boneId":id,"vi":vi,"point":pair(&s.point),
+                            "handleIn":vector(s.handle_in.value()),"handleOut":vector(s.handle_out.value())});
+                    }
+                    let [point, handle_in, handle_out] =
+                        posed(id, vi, [s.point_value(), vector(s.handle_in.value()), vector(s.handle_out.value())]);
+                    json!({"boneId":id,"vi":vi,"point":point,"handleIn":handle_in,"handleOut":handle_out})
                 })
                 .collect(),
             "chains" => rig
@@ -133,7 +141,7 @@ impl ObjectSnapshot {
                 })
                 .collect(),
             "binds" | "bound" | "posed" => {
-                let pose = evaluate_layer_pose_over(self, layer_uid, frame, held.as_ref()).ok();
+                let pose = evaluate_layer_pose_over(self, layer_uid, frame, &held).ok();
                 if part == "binds" {
                     rig.binds
                         .iter()

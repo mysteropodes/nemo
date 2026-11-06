@@ -696,6 +696,7 @@
         "object_scene_paint_pose.rs",
         "rig_pose_eval.rs",
         "rig_pose_eval_inputs.rs",
+        "rig_pose_eval_view.rs",
         "rig_pose_eval_deliver.rs",
         "object_image_mesh_binding.rs",
         "object_image_mesh_binding_ops.rs",

@@ -11,7 +11,7 @@
 //! by the (candidate) rig: the very geometry the renderer's common layer stage pivots about (`render_vector_eval_pose`), so the
 //! overlay and the picture cannot disagree. A layer of rasters only pivots about their display rectangles (a mesh pose never moves the
 //! rect). A layer that mixes the two, a 3D layer, a legacy contour or an unreadable Motion is a typed reason, never a guessed map.
-use crate::object_codec::RigRecord;
+use crate::object_snapshot::object_rig_pose_read::VertexWrite;
 use crate::revision::ObjectSnapshot;
 
 /// `Ok(None)`: the layer and every ancestor carry no Motion at `frame`; `Err(reason)`: the map is not available.
@@ -20,11 +20,11 @@ pub(super) fn layer_matrix(
     snapshot: &ObjectSnapshot,
     layer_uid: &str,
     frame: u32,
-    candidate: Option<&RigRecord>,
+    writes: &[VertexWrite],
 ) -> Result<Option<[f64; 6]>, &'static str> {
     #[cfg(feature = "evaluation")]
     {
-        matrix(snapshot, layer_uid, frame, candidate)
+        matrix(snapshot, layer_uid, frame, writes)
     }
     #[cfg(not(feature = "evaluation"))]
     {
@@ -37,7 +37,7 @@ fn matrix(
     snapshot: &ObjectSnapshot,
     layer_uid: &str,
     frame: u32,
-    candidate: Option<&RigRecord>,
+    writes: &[VertexWrite],
 ) -> Result<Option<[f64; 6]>, &'static str> {
     use crate::object_snapshot::object_parent_pivot_read::ancestor_affine;
     use crate::object_snapshot::widget_presentation::kernels::layer_mat;
@@ -58,7 +58,7 @@ fn matrix(
     };
     // A pure translation turns about nothing, so a layer without content bounds still has its map.
     let turns = own.rot != 0.0 || own.sx != 1.0 || own.sy != 1.0 || own.ax != 0.0 || own.ay != 0.0;
-    let base = if turns { pivot_base(snapshot, layer_uid, frame, candidate)? } else { [0.0, 0.0] };
+    let base = if turns { pivot_base(snapshot, layer_uid, frame, writes)? } else { [0.0, 0.0] };
     let (px, py) = (base[0] + own.ax, base[1] + own.ay);
     let (s, c) = own.rot.to_radians().sin_cos();
     let (a, b, cc, d) = (c * own.sx, s * own.sx, -s * own.sy, c * own.sy);
@@ -86,9 +86,9 @@ fn pivot_base(
     snapshot: &ObjectSnapshot,
     layer_uid: &str,
     frame: u32,
-    candidate: Option<&RigRecord>,
+    writes: &[VertexWrite],
 ) -> Result<[f64; 2], &'static str> {
-    use crate::evaluation::object_image_mesh_kernels::rig_pose_eval::{evaluate_rig_pose_over, RigPosePin};
+    use crate::evaluation::object_image_mesh_kernels::rig_pose_eval::{evaluate_for_view, RigVertexWrite};
     use crate::evaluation::object_vector_kernels::render_vector_eval::{
         evaluate_record_rest_with_pose, evaluate_vector_rest, is_vector_record,
     };
@@ -107,8 +107,12 @@ fn pivot_base(
     let index = packet.source_layers().iter().position(|l| l.layer_uid() == layer_uid).ok_or("parent")?;
     let held = packet.source_frame_for_layer(index).ok_or("frame")?;
     let rasters = packet.raster_records().any(|r| r.layer_index() == index);
-    let posed = if packet.source_layers()[index].rig().is_some() || candidate.is_some() {
-        Some(evaluate_rig_pose_over(snapshot, &RigPosePin::of(snapshot), layer_uid, frame, None, candidate).map_err(|_| "pose")?)
+    let posed = if packet.source_layers()[index].rig().is_some() {
+        let writes: Vec<RigVertexWrite> = writes
+            .iter()
+            .map(|w| RigVertexWrite { bone_id: w.bone_id.clone(), vi: w.vi, point: w.point, handle_in: w.handle_in, handle_out: w.handle_out })
+            .collect();
+        Some(evaluate_for_view(snapshot, layer_uid, frame, &writes).map_err(|_| "pose")?.evaluation)
     } else {
         None
     };
