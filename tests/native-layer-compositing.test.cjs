@@ -448,3 +448,31 @@ test('the stopwatch is one native edit per click, decided from the pinned row', 
   await assert.rejects(h.adapter.setBlendKey(0, 1.5, 'screen'), (error) => error.code === 'invalid_request');
   assert.equal(h.sent.length, 5, 'refused-locally calls never reach the owner');
 });
+
+test('the Motion Blend row on a native project shows the engine keys and the stopwatch is one native edit, no legacy write', async () => {
+  const motion = source('motion.js');
+  const a = motion.indexOf('  function renderBlendRow(body, ld, li) {'), b = motion.indexOf('  // One menu: pick the SOURCE layer, then the MODE.', a);
+  assert.ok(a > 0 && b > a);
+  const h = harness({ layers: KEYED });
+  const node = () => ({ className: '', style: {}, children: [], title: '', textContent: '', innerHTML: '', handlers: {},
+    appendChild(child) { this.children.push(child); return child; }, addEventListener(type, fn) { this.handlers[type] = fn; } });
+  const refreshed = [];
+  const guard = (name) => () => { throw new Error('legacy path: ' + name); };
+  const legacyRow = new Proxy({}, { set() { throw new Error('legacy write'); } });
+  const context = vm.createContext({
+    window: { nativeCompositing: () => h.adapter, openBlendDropdownAt() {} }, document: { createElement: node }, state: { currentFrame: 7 },
+    SM: { t: (key) => key }, stopwatchTitle: () => 'title', BLEND_MODE_LABELS: { multiply: 'Multiply', screen: 'Screen' },
+    nativeCompositing: () => h.adapter, nativeCompositingRefresh: () => refreshed.push('ok'), nativeCompositingRefused: () => refreshed.push('refused'),
+    layerBlendModeAt: guard('layerBlendModeAt'), pushUndo: guard('pushUndo'), renderLayerList: guard('renderLayerList'),
+  });
+  vm.runInContext(motion.slice(a, b), context);
+  const body = node();
+  vm.runInContext('renderBlendRow', context)(body, legacyRow, 0);
+  const row = body.children[0], [stopwatch, , pill] = row.children;
+  assert.match(stopwatch.className, /\bon\b/, 'keyed: the stopwatch is on');
+  assert.equal(pill.children[0].textContent, 'Multiply', 'the mode held at frame 7 by the keys at 4 and 10');
+  stopwatch.handlers.click({ stopPropagation() {} });
+  await settle();
+  assert.deepEqual(plain(h.sent.map((r) => r.payload)), [{ command: COMPOSITING, layerUid: 'K-two', edit: 'blendKeySet', index: 7, mode: 'multiply' }]);
+  assert.deepEqual(refreshed, ['ok']);
+});
