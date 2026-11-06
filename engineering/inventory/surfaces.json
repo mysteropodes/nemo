@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "aebbb70730fd5c01c7ea8765958257d8dc48fecf",
-  "describe": "v0.7.0-alpha.4-5427-gaebbb7073-dirty"
+  "head": "2ce759719c02a18e2bdbd5de7bc0a149dba9e704",
+  "describe": "v0.7.0-alpha.4-5432-g2ce759719-dirty"
  },
- "inputsDigest": "e0f86e8d4f5bc5eee3b6eb80e509848a7dcc469983921e4e46dd52c6f0e6eeb1",
+ "inputsDigest": "75a857fcd56eab2330f1f5bc3b544bf75e3fd084ce29a2387b5b00e179e81b3c",
  "states": [
   "inventoried",
   "characterized",
@@ -2959,7 +2959,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 163,
+    "functionsVisited": 158,
     "via": "variable b",
     "references": [
      "src/js/motion.js:13219 setAppMode()",
@@ -23091,7 +23091,7 @@
    "source": "src/js/adapters/native-select-menu.js:37",
    "meta": {
     "i18n": null,
-    "functionsVisited": 7
+    "functionsVisited": 53
    },
    "fixtures": []
   },
@@ -23203,7 +23203,7 @@
    "source": "src/js/adapters/native-select-menu.js:44",
    "meta": {
     "i18n": null,
-    "functionsVisited": 7
+    "functionsVisited": 14
    },
    "fixtures": []
   },
@@ -28801,7 +28801,7 @@
    "source": "src/js/select-bridge.js:3007",
    "meta": {
     "i18n": null,
-    "functionsVisited": 114
+    "functionsVisited": 125
    },
    "fixtures": [
     "static-props",
@@ -28840,7 +28840,7 @@
    "source": "src/js/select-bridge.js:3043",
    "meta": {
     "i18n": null,
-    "functionsVisited": 114
+    "functionsVisited": 125
    },
    "fixtures": [
     "static-props",
@@ -28954,7 +28954,7 @@
    "source": "src/js/select-bridge.js:3041",
    "meta": {
     "i18n": null,
-    "functionsVisited": 26
+    "functionsVisited": 29
    },
    "fixtures": [
     "static-props",

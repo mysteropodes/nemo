@@ -54,7 +54,9 @@
         throw new Error('Native metadata result is uncorrelated');
       return ports.freeze(result);
     }
-    function targetsOf(payload){return Array.isArray(payload.selections)?payload.selections.map(function(s){return s&&s.target;}):[payload.target];}
+    function targetsOf(payload){return Array.isArray(payload.selections)?payload.selections.map(function(s){return s&&s.target;}):Array.isArray(payload.tracks)?payload.tracks.map(function(s){return s&&s.target;}):[payload.target];}
+    // #2524: a key paste is a third kind of property write (`track` is 'paste'): same route, its own operation and request label.
+    function operationOf(track){return track==='paste'?'command.document.object.property.keys.paste':track?'command.document.object.property.track.edit':'command.document.object.property.edit';}
     // The component route: ONE request whose targets all live in the held context, sent through the component command lane (so a gesture is one
     // revision and one history entry, as in the scene), then reconciled like every other component write. No scene mutation lane is involved.
     // What the engine's component paints (the entered view and every placement) render today is a component LAYER's Opacity, plain or keyed
@@ -62,7 +64,7 @@
     // those edits are refused here with a typed reason until the engine consumes them (then this list grows; the route itself is complete).
     var RENDERED=['opacity'],PLAIN=['setValue','setKey','setKeyHandle','removeKey','setAnimated'];
     function unrendered(copied){
-      var rows=Array.isArray(copied.selections)?copied.selections:[copied];
+      var rows=Array.isArray(copied.selections)?copied.selections:Array.isArray(copied.tracks)?copied.tracks:[copied];
       return rows.some(function(r){return !r.target||r.target.strokeId!==undefined||RENDERED.indexOf(r.property)<0;})||
         !!copied.action&&copied.action.kind!==undefined&&!Array.isArray(copied.selections)&&PLAIN.indexOf(copied.action.kind)<0;
     }
@@ -73,8 +75,8 @@
       return ports.runComponent(async function(ctx){
         var state=ports.state(),current=state.info;
         if(!ports.same(current,pin)||isCurrent()!==true||!ctx.readPresentedObjectSession()||!ports.held()||ports.held().contextId!==held.contextId)throw new Error('Native property edit intent is stale');
-        var request={apiVersion:2,requestId:ports.requestId(track?'property-track':'property'),instanceId:current.instanceId,documentId:current.documentId,
-          operation:track?'command.document.object.property.track.edit':'command.document.object.property.edit',expectedRevision:current.contentRevision,payload:copied};
+        var request={apiVersion:2,requestId:ports.requestId(track==='paste'?'property-keys-paste':track?'property-track':'property'),instanceId:current.instanceId,documentId:current.documentId,
+          operation:operationOf(track),expectedRevision:current.contentRevision,payload:copied};
         var response=await ctx.dispatch(request);
         if(!response||response.apiVersion!==2||response.requestId!==request.requestId||response.instanceId!==current.instanceId||response.documentId!==current.documentId||typeof response.ok!=='boolean')
           throw new Error('Native property edit response is uncorrelated');
@@ -98,12 +100,12 @@
         if(!state.active||state.opening||state.synchronizing||!state.subscribed||!state.presentationCurrent||
           !state.dispatchAvailable||!state.projectionReady||!state.subscriptionActive||state.sceneRoot===false)
           throw new Error('Native property edit owner or presentation is unavailable');
-        return {apiVersion:2,requestId:ports.requestId(track?'property-track':'property'),instanceId:current.instanceId,documentId:current.documentId,
-          operation:track?'command.document.object.property.track.edit':'command.document.object.property.edit',expectedRevision:current.contentRevision,payload:copied};
+        return {apiVersion:2,requestId:ports.requestId(track==='paste'?'property-keys-paste':track?'property-track':'property'),instanceId:current.instanceId,documentId:current.documentId,
+          operation:operationOf(track),expectedRevision:current.contentRevision,payload:copied};
       },'nemo_native_dispatch');
     }
     return Object.freeze({available:available,readPropertyMetadata:function(selector){return read(selector,'metadata');},
-      readProperty:function(selector){return read(selector,'property-read');},editProperty:function(payload,pin,current){return edit(payload,pin,current,false);},editPropertyTrack:function(payload,pin,current){return edit(payload,pin,current,true);}});
+      readProperty:function(selector){return read(selector,'property-read');},editProperty:function(payload,pin,current){return edit(payload,pin,current,false);},editPropertyTrack:function(payload,pin,current){return edit(payload,pin,current,true);},editPropertyKeysPaste:function(payload,pin,current){return edit(payload,pin,current,'paste');}});
   }
   return Object.freeze({create:create});
 }));

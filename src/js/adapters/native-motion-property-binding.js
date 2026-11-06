@@ -91,7 +91,7 @@
       return value;
     }
     async function editProperty(payload,pin,isCurrent,track){
-      var before=scope(),edit=track?ui.editPropertyTrack:ui.editProperty;
+      var before=scope(),edit=track==='paste'?ui.editPropertyKeysPaste:track?ui.editPropertyTrack:ui.editProperty;
       if(!before||!same(before.identity,pin)||typeof edit!=='function'||typeof isCurrent!=='function')
         throw new Error('Native property editing is unavailable');
       // Queue entry temporarily hides readPresentedObjectSession(). The owner
@@ -156,6 +156,7 @@
       translate:function(key){return root.SM&&typeof root.SM.t==='function'?root.SM.t(key):key;},
       get showContextMenu(){return typeof root.showContextMenu==='function'?function(x,y,items){return root.showContextMenu(x,y,items);}:undefined;},
       get editPropertyTrack(){return typeof ui.editPropertyTrack==='function'?function(payload,pin,current){return editProperty(payload,pin,current,true);}:undefined;},
+      get editPropertyKeysPaste(){return typeof ui.editPropertyKeysPaste==='function'?function(payload,pin,current){return editProperty(payload,pin,current,'paste');}:undefined;},
       get editProperty(){return typeof ui.editProperty==='function'?editProperty:undefined;},
       layerLinkRows:function(target){var rows=root.NemoNativeMotionLayerLinkRows,ctl=root.NemoNativeMotionControlRows,link=rows&&typeof rows.build==='function'?rows.build(root,target):null;
         // D18-B: the "Expression controls…" entry shares the layer's one row slot; it edits only through this binding's pinned owner port.
