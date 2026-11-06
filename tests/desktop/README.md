@@ -139,6 +139,33 @@ Run them in that order or separately; both capture with distinct names (`capture
 The first operator phase of both asks for the window at the top of display 2 (position 2880,-270, size
 1620x1420, raised).
 
+### Rows in package-h, part 3 (component-edit-draw, legacy-import)
+
+Both rows are `Ready`, run with no private packet and have not been run installed;
+`"rows": ["component-edit-draw", "legacy-import"]` selects exactly them (the older rows stay omitted).
+Neither needs a fixture from the operator: `legacy-import` copies the repository's own baseline files
+(`tests/fixtures/legacy-import/animation.json`, `media.json`, and two files derived from `single-frame.json` that
+add `exprGlobals` or `trackRoles`) into `<report>/legacy-source/` and asks the operator to open those copies.
+
+- `component-edit-draw` (#2256, foreground; PRs 2765, 2784, 2786, 2800, 2803). A person builds a small
+  document (a drawn layer, a component with a blank key on frame 2, an empty "Plain" layer, a "Bake" component),
+  draws one gesture per tool inside the entered component (Draw, Pen, Line, Rectangle, Ellipse, Fill Brush, Bitmap
+  Brush, each on its own empty cell), draws with Draw, Pen and a rectangle in Motion mode on "Plain", uses
+  Cmd+Z / Cmd+Shift+Z, leaves the component, exports a PNG, breaks the "Bake" component apart, saves and reopens.
+  After each gesture they attach the unedited read-only MCP replies (history, per-layer cells, and for Break apart
+  the scene layers page of `component.read`). The oracle computes the revision step, the history step, which cell
+  gained content or its own key, that the Scene stayed unchanged and that Break apart made a drawing layer holding
+  the component's keys. The instance pixels are measured from the helper capture taken before entering and after
+  leaving (rectangles are the only thing the person reports); the exported PNG is measured the same way. An
+  uniform capture leaves that one clause `unrun` with the reason. Not exercised (see the row's `taskEvidence`):
+  Text, the Fill tool, Pen continue, Perspective snap, bitmap re-bake on Select, component camera keys and markers.
+- `legacy-import` (#2355; PRs 2772, 2774, 2777). A person opens the copied baseline files through the native picker,
+  presses Cmd+S, Save As onto the original, F5, Cmd+Z, Cmd+Shift+Z and opens the saved file. The scenario measures the
+  sha256, size and modified time of every old file after every phase, compares the opened document (scene frames,
+  component frames, layer names) with what the file declares, reads the saved files from disk and reads the toast
+  text from the helper's accessibility observation. A toast it cannot read leaves its clause `unrun` with the reason.
+  It does not judge that Motion keys, expressions, pictures or audio render or play as in the old app.
+
 ### Refusals
 
 A refusal before or around launch prints one line to stderr:
