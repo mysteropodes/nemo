@@ -112,14 +112,29 @@ Run them in that order or separately; both capture with distinct names (`capture
   verdict field, missing/unpinned/non-tiling reads, or a `command.*` call is refused as operator input.
 - `settings-profile` (#2172). `session.input` drives the Settings entries, the eight tabs, close and
   backdrop, profile name/email/role with restore, the tool buttons and the empty sync-folder
-  open-cancel/check; `observe` supplies the raw accessibility facts. The helper **cannot** drive: File >
-  New (the `entry.*` commands need an entry mode this batch does not set), the colour swatch and its
-  alpha (judged from the helper capture of the swatch the person located), rebinding a shortcut and
-  "Reset all" (`shortcuts.reset` is denied; judged by comparing the Shortcuts tab labels before,
-  after rebind and after reset), and the real sync-owner publish/check/merge paths (declared as
-  `sync-owner-paths`, always returned `unrun` with its reason, so this row cannot reach
-  `installed-pass` until that clause is covered). Profile persistence across an app restart needs a
-  second lifetime and is not claimed.
+  open-cancel/check; `observe` supplies the raw accessibility facts. The helper **cannot** drive, so a
+  person performs (and the oracle judges the effect of):
+  - File > New (the `entry.*` commands need an entry mode this batch does not set);
+  - the colour swatch and its alpha (judged from the helper capture of the swatch the person located);
+  - rebinding a shortcut and "Reset all" (`shortcuts.reset` is denied; judged by comparing the Shortcuts
+    tab labels before, after rebind and after reset);
+  - the whole `sync-owner-paths` clause: drawing one stroke and a blank keyframe, then Publish with no
+    folder, Choose… in the native picker (the exact folder is named in the phase), Publish, Check, a
+    Merge row and a Publish into a folder the runner has made read-only. The helper has no Publish,
+    Merge or non-empty-folder command (it refuses a non-empty path), so every helper sync step runs first.
+  The sync oracle reads the disposable shared folder itself (what the app wrote, and the second profile
+  it seeded from the app's own published snapshot), the accessibility read (folder path, update rows,
+  Merge/Merged buttons, last toast text, which stays in `#toast` after it fades, so freshness is also
+  checked) and unedited MCP cell reads of the document before and after Merge. The clause is `unrun` with
+  its reason when a toast, the update list or the published snapshot shape is not readable, and `fail`
+  when the baseline contract is contradicted (for example the merge toast says `+1 ajout(s)` but frame 4
+  still has no content). #2355 (D06) migrates publish/pull/merge to native snapshots, so a first-run
+  failure there is a product finding. Things only the first installed run can show are never guessed: the
+  Producer tool state is trusted only after Brush then Hand moved the buttons' `selected` state (else
+  only the literal baseline toast speaks), a helper refusal of the backdrop press leaves that part of
+  `settings-entries-tabs` unrun, and MCP replies not shaped as read are kept privately as
+  `frame-edit-ui/mismatch-<phase>.json` with the reason. Profile persistence across an app restart needs
+  a second lifetime and is not claimed.
 
 The first operator phase of both asks for the window at the top of display 2 (position 2880,-270, size
 1620x1420, raised).

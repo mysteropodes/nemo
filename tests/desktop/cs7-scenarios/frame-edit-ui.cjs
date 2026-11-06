@@ -23,31 +23,32 @@ function pair(p, operation) {
 }
 // Expand the per-layer cell runs of one context into per-frame kind/content arrays. Anything that does not
 // tile frames 0..total exactly, or was not pinned to the revision the history read reports, is refused.
-function summarize(reads, context) {
-  if (!plain(reads)) return null;
+function summarize(reads, context, why = {}) {
+  const no = reason => { why.reason = reason; return null; };
+  if (!plain(reads)) return no('reads is not an object');
   const h = pair(reads.history, OP.history);
-  if (!h) return null;
+  if (!h) return no('history is not an ok query.document.object.history request/response pair');
   const r = h.response.result;
-  if (![r.atRevision, r.undoDepth, r.redoDepth].every(int) || !text(r.documentSnapshotId)) return null;
-  if (!Array.isArray(reads.layers) || !reads.layers.length) return null;
+  if (![r.atRevision, r.undoDepth, r.redoDepth].every(int) || !text(r.documentSnapshotId)) return no('history result lacks atRevision, undoDepth, redoDepth or documentSnapshotId');
+  if (!Array.isArray(reads.layers) || !reads.layers.length) return no('layers is not a non-empty array');
   const rows = {}; let total = null;
   for (const item of reads.layers) {
     const p = pair(item, OP.timing);
-    if (!p) return null;
+    if (!p) return no('a layer read is not an ok query.document.object.layer.timing pair');
     const q = p.request.payload, res = p.response.result;
-    if (q.view !== 'cells' || q.contextId !== context || q.atRevision !== r.atRevision || q.documentSnapshotId !== r.documentSnapshotId ||
-      p.response.documentId !== h.response.documentId || p.response.instanceId !== h.response.instanceId ||
-      res.kind !== 'layerCells' || res.contextId !== context || !text(res.layerUid) || res.layerUid !== q.layerUid ||
+    if (q.view !== 'cells' || q.contextId !== context || q.atRevision !== r.atRevision || q.documentSnapshotId !== r.documentSnapshotId) return no('a layer read is not view "cells" of the expected context pinned to the history revision');
+    if (p.response.documentId !== h.response.documentId || p.response.instanceId !== h.response.instanceId) return no('a layer read answers for another document or instance');
+    if (res.kind !== 'layerCells' || res.contextId !== context || !text(res.layerUid) || res.layerUid !== q.layerUid ||
       res.atRevision !== r.atRevision || res.documentSnapshotId !== r.documentSnapshotId || Object.hasOwn(rows, res.layerUid) ||
-      !plain(res.cells) || !Array.isArray(res.cells.runs) || res.cells.nextFrame !== null) return null;
+      !plain(res.cells) || !Array.isArray(res.cells.runs) || res.cells.nextFrame !== null) return no('a layer cells result does not have the layerCells shape (kind, contextId, layerUid, revision, cells.runs, nextFrame null)');
     const k = [], c = [];
     for (const run of res.cells.runs) {
-      if (!Array.isArray(run) || run.length !== 6) return null;
+      if (!Array.isArray(run) || run.length !== 6) return no('a cell run is not a six-element array');
       const [start, count, kind, , has] = run;
-      if (start !== k.length || !int(count) || count < 1 || count > 100000 || !KINDS.includes(kind) || typeof has !== 'boolean') return null;
+      if (start !== k.length || !int(count) || count < 1 || count > 100000 || !KINDS.includes(kind) || typeof has !== 'boolean') return no('a cell run does not tile from the previous run or has an unknown kind');
       for (let i = 0; i < count; i++) { k.push(kind); c.push(has); }
     }
-    if (!k.length || (total !== null && total !== k.length)) return null;
+    if (!k.length || (total !== null && total !== k.length)) return no('layers disagree on the total frame count');
     total = k.length; rows[res.layerUid] = { k, c };
   }
   return { documentId: h.response.documentId, instanceId: h.response.instanceId, revision: r.atRevision, snapshot: r.documentSnapshotId,
@@ -222,6 +223,7 @@ function createWorkflow({ reportDirectory }) {
     // (for undo/redo), and the last saved file.
     let scene = null, comp = null, drawing = null, compLayer = null, componentContext = null, saved = null;
     const lastEdit = {};
+    try {
     for (const step of PLAN) {
       if (!same(await session.identity(), owner.identity)) throw malformed(ROW, step.id);
       const details = { sourceSha: owner.identity.sourceSha, pid: owner.identity.pid, windowId: owner.window.windowId,
@@ -260,8 +262,12 @@ function createWorkflow({ reportDirectory }) {
         }
         outcome[step.check] = 'pass'; continue;
       }
-      const next = summarize(ev.reads, inComponent ? componentContext : 'scene-root');
-      const nextScene = inComponent ? summarize({ history: ev.reads?.history, layers: ev.sceneLayers }, 'scene-root') : next;
+      // The first installed run may meet MCP replies shaped differently from the contract this oracle reads. Such
+      // reads are never guessed at: the reason is kept privately, then the batch stops as operator input.
+      const why = {};
+      const next = summarize(ev.reads, inComponent ? componentContext : 'scene-root', why);
+      const nextScene = inComponent ? summarize({ history: ev.reads?.history, layers: ev.sceneLayers }, 'scene-root', why) : next;
+      if ((!next || !nextScene) && step.type !== 'enter') kit.privateEvidence(dir, 'mismatch-' + step.id, { schema: 'nemo.frame-edit-ui-private/1', phase: step.id, reason: why.reason });
       if (step.type === 'enter') {
         const c = ev.component;
         if (!plain(c) || !text(c.context) || c.context === 'scene-root' || !text(c.layerUid)) throw malformed(ROW, step.id);
@@ -328,6 +334,11 @@ function createWorkflow({ reportDirectory }) {
       if (--remaining[step.check] === 0) outcome[step.check] = 'pass';
     }
     return finish(false);
+    } catch (error) {
+      // Keep what was established before an unusable reply or an input refusal; the batch still stops.
+      try { kit.privateEvidence(dir, 'partial', { schema: 'nemo.frame-edit-ui-private/1', outcome, stoppedBy: error?.code || 'error' }); } catch { /* receipt directory unavailable */ }
+      throw error;
+    }
   } };
 }
 function prepare({ config }) { return createWorkflow({ reportDirectory: config.reportDirectory }); }
