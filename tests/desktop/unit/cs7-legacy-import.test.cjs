@@ -10,10 +10,11 @@ const { OperatorInputError } = require('../cs7-runner.cjs');
 const { LegacyWorld, legacySession } = require('./cs7-i-stubs.cjs');
 
 const row = extra => ({ id: 'legacy-import', issue: 2355, checks: CLAUSES.map(id => ({ id })), ...extra });
-function setup(t, faults = {}) {
+function setup(t, faults = {}, tamper) {
   const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cs7-legacy-')));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const world = new LegacyWorld(directory, faults);
+  if (tamper) world.tamper = (phase, pair) => tamper(phase, pair.request.operation, pair);
   return { directory, world, session: legacySession({ world }), workflow: createWorkflow({ reportDirectory: directory }) };
 }
 const statuses = result => Object.fromEntries(result.checks.map(c => [c.id, c.status]));
@@ -102,22 +103,28 @@ test('a failure the operator reports is taken as stated, never softened', async 
 });
 
 test('malformed or verdict-bearing evidence is an operator input error, never a pass or a product failure', async t => {
-  let { session, workflow } = setup(t, { malformedAt: 'open-animation' });
-  await assert.rejects(workflow.run({ session, row: row() }), error => error instanceof OperatorInputError && error.code === 'operator-evidence-malformed' &&
-    error.command === 'legacy-import.open-animation');
+  // The reply claims the file opened, but the harness' own read finds no open document: the batch stops, nothing passes.
+  let { session, workflow, directory } = setup(t, { malformedAt: 'open-animation' });
+  await assert.rejects(workflow.run({ session, row: row() }), /candidate has no open native document/);
+  assert.match(JSON.parse(fs.readFileSync(path.join(directory, 'legacy-import/read-refused-open-animation.json'), 'utf8')).reason, /no open native document/);
   ({ session, workflow } = setup(t, { verdictAt: 'open-animation' }));
   await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed');
-  for (const damage of [
-    ev => { delete ev.reads.contexts; },
-    ev => { ev.reads.layers.request.payload.selector.cursor = 5; },
-    ev => { ev.reads.history.request.operation = 'command.document.object.undo'; },
-    ev => { ev.reads.contexts.response.result.contextCount = 9; },
-    ev => { ev.reads.layers.request.payload.atRevision = 7; },
-  ]) {
+  // Attached reads are refused: the harness reads the document, the operator never attaches it.
+  for (const key of ['reads', 'sceneLayers', 'kinds']) {
     ({ session, workflow } = setup(t));
     const original = session.requestEvidence;
-    session.requestEvidence = async request => { const ev = await original(request); if (request.phase === 'legacy-edit') damage(ev); return ev; };
-    await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed');
+    session.requestEvidence = async request => { const ev = await original(request); if (request.phase === 'legacy-edit') ev[key] = {}; return ev; };
+    await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed' && error.command === 'legacy-import.legacy-edit', key);
+  }
+  for (const damage of [
+    (op, pair) => { if (op === 'query.document.object.component.read' && pair.request.payload.selector.kind === 'contexts') pair.response.ok = false; },
+    (op, pair) => { if (op === 'query.document.object.component.read' && pair.request.payload.selector.kind === 'layers') pair.response.result.cursor = 5; },
+    (op, pair) => { if (op === 'query.document.object.history') pair.response.result.atRevision = 'x'; },
+    (op, pair) => { if (op === 'query.document.object.component.read' && pair.request.payload.selector.kind === 'contexts') pair.response.result.contextCount = 9; },
+    (op, pair) => { if (op === 'query.document.object.component.read' && pair.request.payload.selector.kind === 'layers') pair.response.result.atRevision = 7; },
+  ]) {
+    ({ session, workflow } = setup(t, {}, (phase, op, pair) => { if (phase === 'legacy-edit') damage(op, pair); }));
+    await assert.rejects(workflow.run({ session, row: row() }), error => error.code === 'operator-evidence-malformed' || /not one complete page/.test(error.message));
   }
   // a save reply that does not name the agreed file, or a first save without the dialog fact
   for (const damage of [ev => { ev.savedFile = 'elsewhere.json'; }, ev => { delete ev.nameDialogOpened; }]) {

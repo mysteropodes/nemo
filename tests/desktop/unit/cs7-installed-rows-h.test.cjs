@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { readDeclarations, readyRows, selectRows, runInstalledRows } = require('../cs7-runner.cjs');
+const { readDeclarations, readyRows, selectRows, runInstalledRows, taskSurfaceIndex, checkTaskCoverage } = require('../cs7-runner.cjs');
 const frame = require('../cs7-scenarios/frame-edit-ui.cjs');
 const settings = require('../cs7-scenarios/settings-profile.cjs');
 const draw = require('../cs7-scenarios/component-edit-draw.cjs');
@@ -16,7 +16,7 @@ const { DrawWorld, drawSession, LegacyWorld, legacySession } = require('./cs7-i-
 const ROOT = path.resolve(__dirname, '../../..');
 const matrix = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/inventory/parity/matrix.json'), 'utf8'));
 const declarations = readDeclarations(path.join(ROOT, 'engineering/inventory/parity/installed'));
-const known = { taskIds: new Set(matrix.tasks.map(t => t.task)), surfaceIds: new Set(matrix.surfaces.map(s => s.id)) };
+const known = { taskIds: new Set(matrix.tasks.map(t => t.task)), surfaceIds: new Set(matrix.surfaces.map(s => s.id)), taskSurfaces: taskSurfaceIndex(matrix) };
 const IDS = ['frame-edit-ui', 'settings-profile'];
 const IDS3 = ['component-edit-draw', 'legacy-import'];
 const dirs = [];
@@ -31,7 +31,7 @@ test('both rows are Ready with merged-PR evidence, existing tasks and surfaces, 
     assert.match(r.evidence, /https:\/\/github\.com\/mysteropodes\/nemo\/pull\/[1-9][0-9]*/);
     assert.match(r.evidence, /\b[a-f0-9]{40}\b/);
     assert.deepEqual(r.dependsOn, []);
-    assert.ok(r.tasks.length && r.surfaces.length);
+    assert.ok((r.tasks.length || Object.keys(r.partialTasks).length) && r.surfaces.length);
   }
   assert.deepEqual(rows.find(r => r.id === 'frame-edit-ui').checks.map(c => c.id), frame.CLAUSES);
   assert.deepEqual(rows.find(r => r.id === 'settings-profile').checks.map(c => c.id), settings.CLAUSES);
@@ -91,7 +91,7 @@ test('component-edit-draw and legacy-import are Ready with merged-PR evidence, e
     assert.match(r.evidence, /https:\/\/github\.com\/mysteropodes\/nemo\/pull\/[1-9][0-9]*/);
     assert.match(r.evidence, /\b[a-f0-9]{40}\b/);
     assert.deepEqual(r.dependsOn, []);
-    assert.ok(r.tasks.length && r.surfaces.length);
+    assert.ok((r.tasks.length || Object.keys(r.partialTasks).length) && r.surfaces.length);
   }
   assert.equal(rows.find(r => r.id === 'component-edit-draw').issue, 2256);
   assert.equal(rows.find(r => r.id === 'legacy-import').issue, 2355);
@@ -133,4 +133,32 @@ test('an unreadable toast keeps the legacy-import receipt incomplete, and a draw
   result = await runInstalledRows({ rows, scenarios, session: stub });
   assert.equal(result.verdict, 'fail');
   assert.equal(result.installed.terminalCode, 'scenario-stopped');
+});
+
+test('every shipped row lists as tasks only tasks whose matrix surfaces it fully exercises; the rest are partialTasks with their missing surfaces', () => {
+  const rows = declarations.flatMap(d => d.rows);
+  assert.ok(rows.length >= 9);
+  for (const r of rows) {
+    assert.doesNotThrow(() => checkTaskCoverage(r, known.taskSurfaces), r.id);
+    for (const task of r.tasks) assert.deepEqual([...known.taskSurfaces.get(task)].filter(id => !r.surfaces.includes(id)), [], r.id + ' ' + task);
+    for (const [task, missing] of Object.entries(r.partialTasks || {})) {
+      assert.ok(missing.length > 0 && missing.every(id => known.taskSurfaces.get(task).has(id) && !r.surfaces.includes(id)), r.id + ' ' + task);
+    }
+  }
+  const by = Object.fromEntries(rows.map(r => [r.id, r]));
+  // The reviewed findings: these tasks were published as covered while their surfaces were not all exercised.
+  assert.deepEqual(by['frame-edit-ui'].tasks, ['F09', 'F10']);
+  assert.deepEqual(Object.keys(by['frame-edit-ui'].partialTasks), ['F11', 'F12', 'F13']);
+  assert.equal(by['frame-edit-ui'].partialTasks.F12.length, 7);
+  assert.deepEqual(by['settings-profile'].tasks, []);
+  assert.deepEqual(Object.keys(by['settings-profile'].partialTasks), ['U02', 'D06']);
+  assert.deepEqual(by['legacy-import'].tasks, []);
+  assert.deepEqual(by['legacy-import'].partialTasks, { F03: ['dom:#file-input'] });
+  assert.deepEqual(by['component-edit-draw'].tasks, []);
+  assert.deepEqual(Object.keys(by['component-edit-draw'].partialTasks).sort(), ['D08', 'D29', 'G15', 'I18']);
+  // A declaration that lists a partly exercised task as covered, or hides a missing surface, is refused by the real runner.
+  const lying = structuredClone(by['frame-edit-ui']); lying.tasks = ['F09', 'F10', 'F12']; delete lying.partialTasks.F12;
+  assert.throws(() => checkTaskCoverage(lying, known.taskSurfaces), /task F12 without all its matrix surfaces/);
+  const hiding = structuredClone(by['frame-edit-ui']); hiding.partialTasks.F12.pop();
+  assert.throws(() => checkTaskCoverage(hiding, known.taskSurfaces), /differs from the matrix surfaces/);
 });

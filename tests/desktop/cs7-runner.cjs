@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
+const same = isDeepStrictEqual;
 const { KINDS, RESULT_SCHEMA } = require('../../scripts/nemo/lib/family-acceptance.cjs');
 const { requireCheck: check } = require('./native-harness.cjs');
 const DECLARATION_SCHEMA = 'nemo.installed-parity/1';
@@ -36,7 +37,35 @@ function selectRows(declarations, requested) {
   return { ids, omittedReady: [...known.values()].filter(row => row.status === 'Ready' && !ids.has(row.id)).map(row => row.id) };
 }
 
-function readyRows(declarations, { taskIds, surfaceIds, scenarios, only }) {
+// task -> set of the matrix surfaces that name it. A task absent from every surface has an empty set.
+function taskSurfaceIndex(matrix) {
+  const index = new Map(matrix.tasks.map(t => [t.task, new Set()]));
+  for (const surface of matrix.surfaces) for (const task of surface.tasks || []) index.get(task)?.add(surface.id);
+  return index;
+}
+
+// A task listed in `tasks` must have EVERY one of its matrix surfaces in the row. A task the row exercises only in
+// part goes in `partialTasks` ({task: [the matrix surfaces of that task the row does not exercise]}, exactly that
+// set, never empty). The receipt publishes the two separately, so a passing row never reads as installed acceptance
+// of a task whose surfaces it did not all exercise.
+function checkTaskCoverage(row, taskSurfaces) {
+  const surfaces = new Set(row.surfaces), partial = row.partialTasks === undefined ? {} : row.partialTasks;
+  check(partial !== null && typeof partial === 'object' && !Array.isArray(partial), 'installed partialTasks must be an object');
+  for (const task of row.tasks) {
+    check(taskSurfaces.has(task), 'installed row references unknown tasks');
+    const missing = [...taskSurfaces.get(task)].filter(id => !surfaces.has(id));
+    check(missing.length === 0, 'installed row lists task ' + task + ' without all its matrix surfaces (' + missing.length + ' missing); list it in partialTasks');
+  }
+  for (const [task, listed] of Object.entries(partial)) {
+    check(taskSurfaces.has(task) && !row.tasks.includes(task), 'installed partialTasks entry unknown or also in tasks');
+    check(Array.isArray(listed) && listed.length > 0 && new Set(listed).size === listed.length, 'installed partialTasks entry must list its missing surfaces');
+    const expected = [...taskSurfaces.get(task)].filter(id => !surfaces.has(id)).sort();
+    check(same(listed.slice().sort(), expected), 'installed partialTasks entry for ' + task + ' differs from the matrix surfaces the row does not exercise');
+  }
+}
+
+function readyRows(declarations, { taskIds, surfaceIds, taskSurfaces, scenarios, only }) {
+  check(taskSurfaces instanceof Map, 'installed task coverage index required');
   const all = [], ids = new Set();
   for (const declaration of declarations) {
     check(declaration?.schema === DECLARATION_SCHEMA && Array.isArray(declaration.rows), 'installed declaration required');
@@ -49,9 +78,10 @@ function readyRows(declarations, { taskIds, surfaceIds, scenarios, only }) {
         /\b[a-f0-9]{40}\b/.test(row.evidence), 'Ready installed row needs cited source PR and SHA');
       check(Number.isSafeInteger(row.issue) && row.issue > 0, 'installed issue required');
       for (const [key, known] of [['tasks', taskIds], ['surfaces', surfaceIds]]) {
-        check(Array.isArray(row[key]) && (key === 'surfaces' || row.status === 'Blocked' || row[key].length > 0) && new Set(row[key]).size === row[key].length &&
-          row[key].every(id => known.has(id)), 'installed row references unknown or duplicate ' + key);
+        check(Array.isArray(row[key]) && (key === 'surfaces' || row.status === 'Blocked' || row[key].length > 0 || Object.keys(row.partialTasks || {}).length > 0) &&
+          new Set(row[key]).size === row[key].length && row[key].every(id => known.has(id)), 'installed row references unknown or duplicate ' + key);
       }
+      checkTaskCoverage(row, taskSurfaces);
       check(Array.isArray(row.dependsOn) && new Set(row.dependsOn).size === row.dependsOn.length, 'installed dependencies required');
       check(Array.isArray(row.checks) && row.checks.length > 0, 'installed assertions required');
       const checks = new Set();
@@ -106,7 +136,7 @@ function rowResult(row, observations, status) {
   const byId = new Map(observations.map(c => [c.id, c]));
   check(byId.size === observations.length && observations.every(c => row.checks.some(d => d.id === c.id)), 'unexpected installed assertion');
   return {
-    id: row.id, issue: row.issue, status, tasks: row.tasks, surfaces: row.surfaces,
+    id: row.id, issue: row.issue, status, tasks: row.tasks, partialTasks: structuredClone(row.partialTasks || {}), surfaces: row.surfaces,
     ...(row.acceptanceReference ? { acceptanceReference: row.acceptanceReference } : {}),
     checks: row.checks.map(c => {
       const result = byId.get(c.id);
@@ -116,13 +146,25 @@ function rowResult(row, observations, status) {
   };
 }
 
+// `tasks`: matrix tasks whose every surface a run row exercises. `partialTasks`: {task: surfaces no row of the run
+// exercises}, for tasks only partly exercised. A task is never in both. When several rows list the same task as
+// partial, only the surfaces missing from ALL of them are published.
+function publishedTasks(rows) {
+  const tasks = [...new Set(rows.flatMap(r => r.tasks))], partial = {};
+  for (const row of rows) for (const [task, missing] of Object.entries(row.partialTasks || {})) {
+    partial[task] = task in partial ? partial[task].filter(id => missing.includes(id)) : [...missing];
+  }
+  for (const task of Object.keys(partial)) if (tasks.includes(task) || partial[task].length === 0) delete partial[task];
+  return { tasks, partialTasks: partial };
+}
+
 // The session supplies the existing native owner handshake and real input driver.
 // A scenario asserts product behavior; this runner never equates posted input with PASS.
 async function runInstalledRows({ rows, scenarios, session, now = () => new Date().toISOString(), save = async () => {}, selection }) {
   check(rows.length > 0, 'empty installed batch refused');
-  // Present only for a config `rows` subset: `installed-pass` then means every SELECTED row
-  // passed, and the receipt says which Ready rows were not asked for. Absent otherwise, so the
-  // whole-census receipt is unchanged.
+  // Present only for a config `rows` allow-list. A passing run that left Ready rows out gets the distinct verdict
+  // `installed-subset-pass` (never `installed-pass`), and the receipt says which Ready rows were not asked for.
+  // Absent otherwise, so the whole-census receipt is unchanged.
   const selected = selection ? { scope: selection.omittedReady.length ? 'subset' : 'all-ready',
     selected: rows.map(r => r.id), omittedReady: [...selection.omittedReady] } : null;
   const results = rows.map(row => rowResult(row, [], 'unrun'));
@@ -205,7 +247,9 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
   })));
   const covered = new Set(results.flatMap(r => r.checks.filter(c => c.status === 'pass').flatMap(c => c.covers)));
   const passed = results.every(r => r.status === 'pass') && operatorInputFailures === 0 && cleanup === 'complete' && terminalCode === null;
-  const verdict = passed ? 'installed-pass' : checks.some(c => c.failed) || operatorInputFailures || cleanup === 'incomplete' ||
+  // `installed-pass` is the issue #2348 outcome (every Ready row on one candidate). A pass of fewer rows is a different
+  // verdict, so neither the verdict nor a process exit status can be read as that outcome.
+  const verdict = passed ? (selected?.scope === 'subset' ? 'installed-subset-pass' : 'installed-pass') : checks.some(c => c.failed) || operatorInputFailures || cleanup === 'incomplete' ||
     evidenceFailures > 0 ? 'fail' : 'incomplete';
   const result = {
     // Family-result fields are preserved, but this is a distinct installed extension.
@@ -214,11 +258,11 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
     sourceSha: identity?.sourceSha || null, tree: identity?.tree || null, generatedAt: now(), checks,
     kindsCovered: KINDS.filter(k => covered.has(k)), kindsMissing: KINDS.filter(k => !covered.has(k)), verdict,
     ...(selected ? { selection: selected } : {}),
-    tasks: [...new Set(rows.flatMap(r => r.tasks))],
+    ...publishedTasks(rows),
     installed: { identity: identity || null, operatorInputFailures, evidenceFailures, cleanup, terminalCode, failure, rows: results },
   };
   await save(result);
   return result;
 }
 
-module.exports = { DECLARATION_SCHEMA, OperatorInputError, selectRows, readyRows, readDeclarations, verifiedIdentity, runInstalledRows };
+module.exports = { DECLARATION_SCHEMA, OperatorInputError, selectRows, taskSurfaceIndex, checkTaskCoverage, readyRows, readDeclarations, verifiedIdentity, runInstalledRows };
