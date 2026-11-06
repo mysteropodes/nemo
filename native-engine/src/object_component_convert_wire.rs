@@ -23,6 +23,19 @@ object_deserialize!(ConvertPayload {
     layer_uids: Vec<String>
 });
 
+/// `object.component.breakApart`: the instance layer to bake back into an ordinary layer (scene root only).
+#[derive(Debug)]
+pub(super) struct BreakApartPayload {
+    pub(super) command: String,
+    pub(super) context_id: String,
+    pub(super) layer_uid: String,
+}
+object_deserialize!(BreakApartPayload {
+    command: String,
+    context_id: String,
+    layer_uid: String
+});
+
 #[derive(Debug)]
 pub(super) struct ExposePayload {
     pub(super) command: String,

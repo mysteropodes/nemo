@@ -4490,6 +4490,26 @@
         }
       }
     },
+    "ObjectComponentBreakApartPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.component.breakApart"
+        },
+        "contextId": {
+          "type": "string"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectComponentId"
+        }
+      }
+    },
     "ObjectComponentExposePayload": {
       "type": "object",
       "additionalProperties": false,
@@ -7879,6 +7899,23 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectComponentInstanceSetPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.component.breakApart"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectComponentBreakApartPayload"
                 }
               }
             }

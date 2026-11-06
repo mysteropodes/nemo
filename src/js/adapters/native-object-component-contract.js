@@ -101,6 +101,8 @@
     // #2256 Q5: the Component Instance panel's closed partial edit of the stored playback record.
     'component.instance.set': ['object.component.instance.set', 'command', [['layerUid', 'id'], ['mode', 'instMode', true], ['singleFrame', 'frame', true],
       ['placedAt', 'placedAt', true], ['speed', 'speed', true], ['atFrame', 'frame', true]]],
+    // D-comp-break-apart: the inverse of convert (the baseline convertComponentToLayer), one instance layer baked back into an ordinary layer.
+    'component.breakApart': ['object.component.breakApart', 'command', [['contextId', 'text'], ['layerUid', 'id']]],
   };
   const OPERATIONS = Object.freeze(Object.keys(SPEC).map((suffix) => PREFIX + suffix));
   const spec = (operation) => (typeof operation === 'string' && operation.startsWith(PREFIX) && has(SPEC, operation.slice(PREFIX.length)) ? SPEC[operation.slice(PREFIX.length)] : null);

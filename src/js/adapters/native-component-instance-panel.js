@@ -9,8 +9,8 @@
  * changed (a scrub previews in the field and sends its single request on release, the data-native-opacity-scrub contract of ui.js). The baseline
  * coercions are kept: single frame max(0, parseInt || 0), speed max(0.1, parseFloat || 1), offset parseInt || 0. A pick made while the playhead is
  * on an outer keyframe also names that frame (atFrame): the owner then writes the key's component frame like setSymbolSingleFrame did.
- * "Edit component" enters the real context of the row's component (the stub symbolId would name nothing). The preview window, the break-apart
- * and the lip-sync analysis have no native owner yet: they say so instead of acting on a stub row. ld.symPlayMode and its siblings, loadFrame and
+ * "Edit component" enters the real context of the row's component (the stub symbolId would name nothing). The preview window
+ * and the lip-sync analysis have no native owner yet (the break-apart rides native-component-convert-ui.js): they say so instead of acting on a stub row. ld.symPlayMode and its siblings, loadFrame and
  * resolveSymbolFrameIdx are never touched. */
 (function (root, factory) {
   const api = factory();
@@ -25,7 +25,6 @@
   // Controls with no native owner yet: said, never run against the stub row.
   const UNAVAILABLE = Object.freeze({
     'btn-comp-preview': 'The component preview window',
-    'btn-comp-detach': 'Breaking a component apart',
     'btn-lip-apply': 'Lip-sync analysis',
   });
   const states = new WeakMap();

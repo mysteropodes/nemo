@@ -220,6 +220,11 @@ fn convert_single(
         layers: vec![inner],
         objects: moved,
         exposed_props: Presence::Missing,
+        camera_keys: Presence::Missing,
+        markers: Presence::Missing,
+        motion_arcs: Presence::Missing,
+        tween_overrides: Presence::Missing,
+        tween_easing: Presence::Missing,
     };
     let mut candidate = document.clone();
     let order = items::move_images(
@@ -317,6 +322,11 @@ fn convert_merge(
         layers: inner_layers,
         objects: moved,
         exposed_props: Presence::Missing,
+        camera_keys: Presence::Missing,
+        markers: Presence::Missing,
+        motion_arcs: Presence::Missing,
+        tween_overrides: Presence::Missing,
+        tween_easing: Presence::Missing,
     };
     let lifted = document
         .duplicator_set()

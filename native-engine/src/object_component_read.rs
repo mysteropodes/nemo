@@ -8,7 +8,7 @@
 //!
 //! The pin is `(atRevision, documentSnapshotId)` of this snapshot; any other pin is `stale_revision`. An undeclared context
 //! id is `not_found`. `instances` answers for a component only: the scene is not instanced by anything. A component record
-//! natively carries no camera keys (they belong to an owner that does not exist yet), so its `hasCameraKeys` is false;
+//! stores its own camera keys (`sym.cameraKeys`), so its `hasCameraKeys` reports whether it holds at least one;
 //! the scene reports whether the project camera has keys. A page is cut by `limit` AND by the 4096-byte response bound; a
 //! layer or instance that cannot fit alone is a typed `unavailable`, but a CONTEXT whose summary cannot fit alone keeps its
 //! id and counts and has its name cut at a character boundary and flagged `nameTruncated: true`, so a listing walks past it.
@@ -255,7 +255,10 @@ impl ObjectSnapshot {
                     });
                     body["exposedPropertyCount"] =
                         json!(component.map_or(0, |c| c.exposed_props().len()));
-                    body["hasCameraKeys"] = json!(scene && scene_camera);
+                    body["hasCameraKeys"] = json!(match component {
+                        Some(c) => c.camera_keys().is_some_and(|keys| !keys.is_empty()),
+                        None => scene_camera,
+                    });
                     for (key, value) in body.as_object().into_iter().flatten() {
                         result[key] = value.clone();
                     }

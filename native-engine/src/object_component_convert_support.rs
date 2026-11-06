@@ -116,6 +116,9 @@ pub(crate) enum SetupError {
     ConfigInvalid,
     /// The layer is not a scene-root component instance (it carries no instance record).
     NotAnInstance(String),
+    /// The instance shows something a flat layer cannot hold yet (items, inner Motion, groups, a rig, a record that does not
+    /// bake); the text names it. Stable code `component-break-apart`.
+    BreakApartUnavailable(&'static str),
     /// A component playback setting outside its closed set (a mode label, a non-positive speed, a frame outside the document).
     PlaybackInvalid,
     IdUnavailable,

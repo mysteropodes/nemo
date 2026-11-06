@@ -13,6 +13,9 @@
 //! no-op keeps presence, serialized bytes, history depth and the redo stack. No
 //! history, receipt or clock lives here: ids derive from the revision, keys and
 //! seeds come from the caller, and the one history entry from `NativeObjectHistory`.
+use crate::commands::object_fill_owner::component_owner::object_component_break_apart::{
+    plan_break_apart, precheck,
+};
 use crate::commands::object_fill_owner::component_owner::object_component_convert::plan_convert;
 use crate::commands::object_fill_owner::component_owner::object_component_convert_support::{
     SetupError, SetupPlan,
@@ -40,7 +43,7 @@ use crate::request_receipts::DispatchErrorCode;
 #[path = "object_component_convert_wire.rs"]
 mod wire;
 use wire::{
-    id_ok, ids_ok, seed_of, ConvertPayload, DuplicatorConfigPayload, DuplicatorObjectsPayload,
+    id_ok, BreakApartPayload, ids_ok, seed_of, ConvertPayload, DuplicatorConfigPayload, DuplicatorObjectsPayload,
     DuplicatorPathPayload, DuplicatorSetPayload, ExposePayload, InstanceSetPayload, PlacePayload,
     MAX_PAYLOAD_BYTES,
 };
@@ -56,6 +59,7 @@ pub(crate) enum SetupKind {
     DuplicatorPath,
     DuplicatorConfig,
     InstanceSet,
+    BreakApart,
 }
 
 /// A typed refusal: the receipt vocabulary code, a fixed message and, when a
@@ -93,6 +97,7 @@ fn refusal_of(error: SetupError) -> SetupRefusal {
         SetupError::SeedRange => (InvalidRequest, "Seed must be an integer in 0..999999."),
         SetupError::ConfigInvalid => (InvalidRequest, "A duplicator setting is not valid."),
         SetupError::NotAnInstance(_) => (NotFound, "Layer is not a component instance."),
+        SetupError::BreakApartUnavailable(why) => (Unavailable, *why),
         SetupError::PlaybackInvalid => (InvalidRequest, "A component playback setting is not valid."),
         SetupError::V1Document => (Unavailable, "A v1 document cannot hold components."),
         SetupError::NestedContext(_) => (Unavailable, "Close the component first."),
@@ -348,6 +353,27 @@ impl ObjectFillOwner {
                 }
                 let edit = instance_edit(&payload).ok_or_else(malformed)?;
                 plan_instance_set(document, &payload.layer_uid, &edit)
+            }
+            SetupKind::BreakApart => {
+                let payload: BreakApartPayload = parse(bytes)?;
+                if payload.command != "object.component.breakApart" || !id_ok(&payload.layer_uid) {
+                    return Err(malformed());
+                }
+                if payload.context_id != SCENE_CONTEXT {
+                    return Err(refusal_of(SetupError::NestedContext(payload.context_id)));
+                }
+                precheck(document, &payload.layer_uid).map_err(refusal_of)?;
+                // The evaluation of every frame is the one component join; a build without it cannot bake.
+                #[cfg(feature = "evaluation")]
+                let baked = origin
+                    .bake_component_instance(&payload.layer_uid)
+                    .map_err(|why| refusal_of(SetupError::BreakApartUnavailable(why.0)))?;
+                #[cfg(not(feature = "evaluation"))]
+                let baked: Vec<(u32, Vec<crate::object_document::ObjectRecord>)> =
+                    return Err(refusal_of(SetupError::BreakApartUnavailable(
+                        "component-break-apart: this build cannot evaluate components.",
+                    )));
+                plan_break_apart(document, &payload.layer_uid, &baked)
             }
             SetupKind::DuplicatorConfig => {
                 let payload: DuplicatorConfigPayload = parse(bytes)?;

@@ -71,7 +71,6 @@ fn components_keep_symbols_instances_picks_exposed_props_and_time_remap() {
 #[test]
 fn component_content_without_a_native_owner_refuses() {
     for (member, value) in [
-        ("cameraKeys", json!([{"frame": 0, "x": 0, "y": 0, "w": 1}])),
         ("tweenOverrides", json!({"a:0-1": []})),
     ] {
         let mut doc = animation();
@@ -406,4 +405,24 @@ fn project_tween_options_travel_with_generated_frames_and_are_not_ignored() {
     let d = file(&import(&doc.to_string()))["drawing"].clone();
     assert_eq!(d["tweens"]["layers"].as_array().unwrap().len(), 1, "only the layer with generated frames");
     assert_eq!(tween_layer(&d, "ly_t")["options"]["resamplePoints"], 50);
+}
+
+#[test]
+fn a_component_keeps_its_own_camera_keys_and_markers() {
+    let mut doc = animation();
+    doc["symbols"]["sym_a"]["cameraKeys"] = json!([{"frame": 0, "x": 160, "y": 90, "w": 320}, {"frame": 2, "x": 100, "y": 90, "w": 160}]);
+    doc["symbols"]["sym_a"]["markers"] = json!([{"frame": 1, "name": "hit", "color": "#e8b64c"}]);
+    let d = drawing(&doc.to_string());
+    let component = &d["componentTables"]["components"]["components"][0];
+    assert_eq!(component["cameraKeys"].as_array().unwrap().len(), 2);
+    assert_eq!(component["cameraKeys"][1]["w"], 160);
+    assert_eq!(component["markers"][0]["name"], "hit");
+    // A symbol that was entered but never edited stores empty tables, which carry nothing.
+    let mut quiet = animation();
+    quiet["symbols"]["sym_a"]["cameraKeys"] = json!([]);
+    quiet["symbols"]["sym_a"]["markers"] = json!([]);
+    quiet["symbols"]["sym_a"]["motionArcs"] = json!({});
+    let d = drawing(&quiet.to_string());
+    let component = &d["componentTables"]["components"]["components"][0];
+    assert!(component.get("cameraKeys").is_none() && component.get("markers").is_none());
 }

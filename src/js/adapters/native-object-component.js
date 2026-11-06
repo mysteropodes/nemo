@@ -109,6 +109,17 @@
       });
     }
 
+    // convertComponentToLayer(layerIdx): the instance of `layerUid` baked back into an ordinary layer, ONE request on the scene root.
+    function breakApart(layerUid) {
+      return runner.exclusive(async (exec) => {
+        const operation = OP('component.breakApart');
+        if (typeof layerUid !== 'string' || !layerUid.length) return fail(operation, 'invalid_request', { reason: 'layerUid must name the instance layer' });
+        const ids = currentIds();
+        if (ids && core.stale([layerUid], ids).length) return fail(operation, 'stale_selection', { ids: [layerUid] });
+        return exec(operation, { contextId: contextNow(), layerUid }, 'component-break-apart');
+      });
+    }
+
     // #2256: the read-only native component model (contexts, one context's summary, its layers, the scene layers that instance it),
     // pinned to the presented revision and snapshot. Reads nothing from the legacy symbols table and opens no context. A response
     // is judged by the read contract at this edge, and an answer is discarded when the project moved on while it was read.
@@ -281,7 +292,7 @@
       return Object.freeze({ ok: true, operation, exited: true, contextId: SCENE });
     }
     return Object.freeze({
-      convert, convertLayer: (layerUid) => convert([layerUid]), place, expose, setInstance,
+      convert, convertLayer: (layerUid) => convert([layerUid]), place, expose, setInstance, breakApart,
       readModel, storyboard, enter, exit, read, listContexts, listLayers, listInstances, workspaceTransition, workspaceNow,
     });
   }
@@ -297,6 +308,6 @@
   }
   return Object.freeze({
     createComponentIntent, desktop, exposedKey,
-    OPERATIONS: Object.freeze(['component.convert', 'component.place', 'component.expose', 'component.instance.set'].map(OP)),
+    OPERATIONS: Object.freeze(['component.convert', 'component.place', 'component.expose', 'component.instance.set', 'component.breakApart'].map(OP)),
   });
 }));
