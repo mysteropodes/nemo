@@ -56,6 +56,12 @@ pub(crate) struct ItemPayload {
     pub(crate) animator_id: Presence<String>,
     pub(crate) edit:
         Presence<crate::commands::object_fill_owner::text_commands::animator::edit::AnimatorEdit>,
+    /// #2267 text only: the cell an edit or delete lands in (the playhead cell a held frame shows the key's text in).
+    pub(crate) frame: Presence<Number>,
+    /// #2267 text only: `"copy"` keys a held cell with a copy of what it showed before the edit (the baseline's ensureKeyframe).
+    pub(crate) keyframe: Presence<String>,
+    /// #2267 text animators only: the declared component whose layer holds them (absent = the scene).
+    pub(crate) context_id: Presence<String>,
 }
 object_deserialize!(ItemPayload {
     command: String,
@@ -73,7 +79,10 @@ object_deserialize!(ItemPayload {
     #[serde(default)] layer_uid: Presence<String>,
     #[serde(default)] animator: Presence<crate::object_document::object_text_layout_kernels::animator::AnimatorRecord>,
     #[serde(default)] animator_id: Presence<String>,
-    #[serde(default)] edit: Presence<crate::commands::object_fill_owner::text_commands::animator::edit::AnimatorEdit>
+    #[serde(default)] edit: Presence<crate::commands::object_fill_owner::text_commands::animator::edit::AnimatorEdit>,
+    #[serde(default)] frame: Presence<Number>,
+    #[serde(default)] keyframe: Presence<String>,
+    #[serde(default)] context_id: Presence<String>
 });
 
 impl ItemPayload {
@@ -96,6 +105,9 @@ impl ItemPayload {
             ("animator", !self.animator.missing()),
             ("animatorId", !self.animator_id.missing()),
             ("edit", !self.edit.missing()),
+            ("frame", !self.frame.missing()),
+            ("keyframe", !self.keyframe.missing()),
+            ("contextId", !self.context_id.missing()),
         ];
         for (name, present) in flags {
             if present {
@@ -107,6 +119,15 @@ impl ItemPayload {
     /// Exactly these members, no more and no fewer.
     pub(crate) fn expects(&self, names: &[&str]) -> Result<(), DispatchErrorCode> {
         if self.members() == names {
+            Ok(())
+        } else {
+            Err(DispatchErrorCode::InvalidRequest)
+        }
+    }
+    /// These members, plus any of the `optional` ones (in declaration order, nothing else).
+    pub(crate) fn expects_with(&self, names: &[&str], optional: &[&str]) -> Result<(), DispatchErrorCode> {
+        let present = self.members();
+        if names.iter().all(|name| present.contains(name)) && present.iter().all(|name| names.contains(name) || optional.contains(name)) {
             Ok(())
         } else {
             Err(DispatchErrorCode::InvalidRequest)
@@ -171,12 +192,25 @@ pub(crate) fn asset_code(issue: ItemAssetIssue) -> DispatchErrorCode {
     }
 }
 
+/// The layers and frame count the context of `target` owns: the scene's, or a declared component's (`None` for an undeclared context).
+pub(crate) fn scope_of<'a>(document: &'a ObjectDocument, target: &ObjectTarget) -> Option<(&'a [crate::object_document::ObjectLayer], u32)> {
+    if target.context_id() == "scene-root" {
+        return Some((document.layers.as_slice(), document.total_frames()));
+    }
+    document
+        .component_set()
+        .and_then(|set| set.component(target.context_id()))
+        .map(|component| (component.layers.as_slice(), component.total_frames))
+}
+
 /// Items need an authored target; reference records remain readable storage.
 pub(crate) fn check_target(
     document: &ObjectDocument,
     target: &ObjectTarget,
 ) -> Result<(), DispatchErrorCode> {
-    if !document.valid_target(target) || target.frame() >= document.total_frames() {
+    // A declared component's frames and layers are its own (#2267 T-text-context: the Text tool places and edits text inside it).
+    let total = scope_of(document, target).map_or_else(|| document.total_frames(), |(_, total)| total);
+    if !document.valid_target(target) || target.frame() >= total {
         return Err(DispatchErrorCode::InvalidRequest);
     }
     if target.frame_scope.kind == FrameScopeKind::Reference {
@@ -200,12 +234,13 @@ pub(crate) fn check_layer(
     document: &ObjectDocument,
     target: &ObjectTarget,
 ) -> Result<(), DispatchErrorCode> {
-    let layer = document
-        .layers
+    let scene = target.context_id() == "scene-root";
+    let layers = scope_of(document, target).map_or(document.layers.as_slice(), |(layers, _)| layers);
+    let layer = layers
         .iter()
         .find(|layer| layer.layer_uid() == target.layer_uid())
         .ok_or(DispatchErrorCode::NotFound)?;
-    if document.layer_is_locked(layer.layer_uid()) {
+    if if scene { document.layer_is_locked(layer.layer_uid()) } else { layer.locked() } {
         return Err(DispatchErrorCode::Unavailable);
     }
     if layer.widget.value().is_some() {

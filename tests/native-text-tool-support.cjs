@@ -37,7 +37,7 @@ function fixture(options={}){
     return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:p.contentRevision,ok:true,result};
   }});
   const session={...f.session,runResourceCommand:action=>f.session.runResourceCommand(async ctx=>{if(hold)await hold;return action({...ctx,dispatch:q=>sdk.dispatch(options.browserJsonBoundary?clone(q):q)});})};
-  const context=wantPresented=>!f.state.active||wantPresented&&!presented?null:{pin:clone(session.info()),layerUid:layer,frame,selectionKey:selection,viewKey:view};
+  const context=wantPresented=>!f.state.active||wantPresented&&!presented?null:{pin:clone(session.info()),contextId:'scene-root',layerUid:layer,frame,selectionKey:selection,viewKey:view};
   const ports={session,reader:Reader,writer:Writer,context,defaultColor:()=> '#123456',draft:d=>drafts.push(d),committed:r=>committed.push(r),state:s=>states.push(s),cancelled:()=>{}};
   return {...f,session,ports,context,core:Tool.create(ports),reads,drafts,committed,states,targets,
     seed(t=target(),value=block()){targets.set(t.strokeId,clone(t));f.owner.items.set(t.strokeId,clone(value));},

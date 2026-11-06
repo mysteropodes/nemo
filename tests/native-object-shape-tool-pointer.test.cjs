@@ -24,7 +24,7 @@ class Element{
 function baselineFunction(text,name){const start=text.indexOf('function '+name+'(');assert.ok(start>=0,name);let at=text.indexOf('{',start),depth=1,end=at+1;while(depth){if(text[end]==='{')depth++;if(text[end]==='}')depth--;end++;}return text.slice(start,end);}
 async function fixture(tool='rect',native=true,facts={}){
  let installed=false,generation=0,revision=0,hold=null,refusal=null,replyChange=null,wrongOwner=false,ack=null,binding=null;
- let rect={left:40,top:50,width:640,height:360};const records=new Map(),receipts=new Map(),calls=[],events=new Map(),log=[];
+ let rect={left:40,top:50,width:640,height:360};const records=new Map(),receipts=new Map(),calls=[],batches=[],events=new Map(),log=[];let listingFn=null;
  const canvas=new Element(),area=new Element(),body=new Element(),doc=new Element();canvas.getBoundingClientRect=()=>rect;
  const pills=new Element(),pill=new Element(),zoom=new Element(),fit=new Element(),ruler=new Element();
  zoom.id='zoom-scrub';zoom.tagName='INPUT';zoom.value='100';fit.id='canvas-fit-btn';ruler.id='ruler-h';
@@ -56,6 +56,10 @@ async function fixture(tool='rect',native=true,facts={}){
    return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true}};}
   assert.equal(command,'nemo_native_dispatch');calls.push(structuredClone(q));assert.equal(q.operation,'command.document.object.vector.edit');
   const prior=receipts.get(q.requestId);if(prior){assert.deepEqual(prior.request,q);const r=structuredClone(prior.response);if(replyChange)replyChange(r);return r;}
+  if(q.payload.command==='object.vector.batch'){assert.equal(q.expectedRevision,revision);batches.push(structuredClone(q));revision++;
+   const ids=q.payload.ops.map(op=>op.op==='replace'?op.record.target.strokeId:op.stableTarget.strokeId);
+   const r={apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1,operation:'batch',strokeId:ids[0],strokeIds:ids}};
+   receipts.set(q.requestId,{request:structuredClone(q),response:structuredClone(r)});return r;}
   assert.equal(q.expectedRevision,revision);const many=q.payload.command==='object.vector.createMany';
   if(!many){assert.equal(q.payload.command,'object.vector.create');assert.equal(q.payload.record.target.strokeId,'');}
   if(refusal)return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:false,error:{code:refusal,message:'Native refusal'}};
@@ -68,20 +72,23 @@ async function fixture(tool='rect',native=true,facts={}){
  const session=Project.desktop(root);if(native)await session.openPath('/simulated.json',{commit:meta=>Files.projectView(root,meta)});
  // VM global proxies have a different WeakMap identity; resolve the actual cached
  // desktop session explicitly, without substituting any Project/queue method.
- root.NemoNativeObjectProject={...Project,desktop:()=>session};
+ const listed=Object.assign({},session,{readPresentedStrokes:async(selector,pin,wanted)=>{
+  if(!listingFn)throw new Error('no listing');const shown=session.readPresentedObjectSession();
+  return {info:pin,presentation:shown.presentation,items:listingFn(selector).map(i=>wanted(i)?structuredClone(i):{...structuredClone(i),segments:undefined}),layerMatrix:null};}});
+ root.NemoNativeObjectProject={...Project,desktop:()=>listed};
  // Controlled immutable native Perspective projection; never read legacy Perspective fields.
- let perspectiveMode='disabled',perspectiveOwner=session;
+ let perspectiveMode='disabled',perspectiveOwner=session,perspectiveItems=[];
  const perspectiveKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'],perspectiveProofs=new WeakMap();
  root.NemoNativePerspectiveController=Object.freeze({read(){
   const owner=perspectiveOwner,info=owner.info(),shown=owner.readPresentedObjectSession();
   if(perspectiveMode==='unavailable'||!owner.isActive()||!shown||perspectiveKeys.some(k=>shown[k]!==info[k]))return null;
   const pin=Object.fromEntries(perspectiveKeys.map(k=>[k,info[k]]));
   if(perspectiveMode==='stale')pin.documentSnapshotId='stale-perspective-snapshot';
-  const value=Object.freeze({info:Object.freeze(pin),perspective:Object.freeze({settings:Object.freeze({perspectiveEnabled:perspectiveMode==='enabled'})})});
+  const value=Object.freeze({info:Object.freeze(pin),perspective:Object.freeze({settings:Object.freeze({perspectiveEnabled:perspectiveMode==='enabled'}),items:Object.freeze(perspectiveItems.map((v,i)=>Object.freeze({ordinal:i+1,x:v[0],y:v[1],locked:false})))})});
   perspectiveProofs.set(value,typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0);return value;
  },readForCommand(value){
   const owner=perspectiveOwner,info=owner.info(),ticket=typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0;
-  return perspectiveMode==='disabled'&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
+  return (perspectiveMode==='disabled'||perspectiveMode==='enabled')&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
  }});
 
  root.NemoNativeObjectProjectFile={...Files,projectionReadyForUI:(_proxy,pin)=>Files.projectionReadyForUI(root,pin)};
@@ -96,10 +103,12 @@ async function fixture(tool='rect',native=true,facts={}){
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-bitmap.js'),'utf8'),context,{filename:'native-object-draw-bitmap.js'});
  if(fs.existsSync(path.join(ROOT,'src/js/adapters/native-presentation-wait.js')))vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-presentation-wait.js'),'utf8'),context,{filename:'native-presentation-wait.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-layer-motion-pose.js'),'utf8'),context,{filename:'native-layer-motion-pose.js'});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-perspective-snap.js'),'utf8'),context,{filename:'native-object-perspective-snap.js'});
+ root.NemoNativePenContinue=require('../src/js/adapters/native-object-pen-continue.js'); // required like the Fill desktop: the geometry it builds must be a plain object of the SDK's own realm
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
  if(tool==='pen'){root.SM={setTool(t){root.state.tool=t;}};vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/pen-bridge.js'),'utf8'),context,{filename:'pen-bridge.js'});}
- return {perspectiveMode:value=>perspectiveMode=value,root,context,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,flags,undos,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
+ return {batches,listing:fn=>listingFn=fn,perspectiveMode:(value,items)=>{perspectiveMode=value;perspectiveItems=items||[];},root,context,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,flags,undos,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
   async external(g){ack=g;const from=revision;revision++;return events.get('nemo-native-revision')({payload:{instanceId:'instance-A',documentId:info().documentId,lifecycleGeneration:generation,requestId:'external-'+revision,fromRevision:from,toRevision:revision}});},
   async gesture(end={clientX:240,clientY:210}){area.fire('pointerdown');area.fire('pointermove',end);area.fire('pointerup',end);return root.NemoNativeShapeToolController.whenSettled();}};
 }
@@ -137,7 +146,7 @@ test('stale frame, selection, style, owner or viewport cancels without transport
 });
 test('native unavailable modes and unconfirmed presentation are consumed before any legacy writer',async()=>{
  for(const change of [f=>f.root.state.tool='star',f=>f.root.state.symmetryEnabled=true,f=>f.root.state.shadowMode=true,
-  f=>f.perspectiveMode('enabled'),f=>f.root.state.strokeStyle='dashed',f=>f.root.state.layers[0].locked=true,
+  f=>f.root.state.strokeStyle='dashed',f=>f.root.state.layers[0].locked=true,
   f=>f.root.state.strokeEnabled=f.root.state.fillEnabled=false,f=>f.root.document.documentElement.classList.remove('nemo-native-underlay')]){
   const f=await fixture();change(f);assert.equal(f.area.fire('pointerdown').stopped,true);f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0);
  }
@@ -224,8 +233,8 @@ test('all 45 retained bootstrap identities keep their frozen runs and adjacency 
  assert.match(fixture,/assertRuns\(positions, \[1, 10, 2\]/);
 });
 
-test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{
- for(const mode of ['unavailable','stale','enabled']){
+test('native drawing refuses unavailable and stale Perspective projections before a document command',async()=>{
+ for(const mode of ['unavailable','stale']){
   const f=await fixture();f.perspectiveMode(mode);
   Object.defineProperty(f.root.state,'perspectiveEnabled',{get(){throw new Error('legacy Perspective read');},set(){throw new Error('legacy Perspective write');}});
   f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});await turn();
@@ -609,4 +618,104 @@ test('a real change during the wait still refuses: the tool left or the playhead
 test('a queue that never frees gives one clear notice and draws nothing',async()=>{
  const f=await fixture(),q=await hide(f);f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});
  for(let i=0;i<40;i++)await turn();assert.equal(f.log.filter(x=>x===busyNotice).length,1);assert.equal(f.calls.length,0);await q.free();
+});
+
+test('B-draw-perspective-snap: with the guide on, Line snaps its end to the nearest VP axis; Rect and Pen are drawn, not refused',async()=>{
+ // Document points: press (20,20), release (100,23): 2.15 degrees off the axis toward a VP at (1000,20).
+ const l=await fixture('line');l.perspectiveMode('enabled',[[1000,20]]);
+ assert.equal((await l.gesture({clientX:240,clientY:96})).status,'applied');
+ const [a,b]=l.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]);
+ assert.deepEqual(a,[20,20]);assert.equal(b[1],20);assert.equal(b[0],Math.round((20+Math.hypot(80,3))*1000)/1000);
+ // Outside the catch angle the end stays where the pointer is.
+ const far=await fixture('line');far.perspectiveMode('enabled',[[1000,20]]);assert.equal((await far.gesture({clientX:240,clientY:210})).status,'applied');
+ assert.deepEqual(far.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[100,80]]);
+ // The guide off: the same release is not snapped.
+ const off=await fixture('line');assert.equal((await off.gesture({clientX:240,clientY:96})).status,'applied');
+ assert.deepEqual(off.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[100,23]]);
+ // Rect has no single direction: drawn exactly as without the guide.
+ const r=await fixture('rect');r.perspectiveMode('enabled',[[1000,20]]);assert.equal((await r.gesture({clientX:240,clientY:96})).status,'applied');
+ assert.deepEqual(r.calls[0].payload.record.vectorExt.paramShape.box,{x1:20,y1:20,x2:100,y2:23});
+ // Pen: anchors are placed exactly (no snap in the baseline), the gesture is not refused.
+ const penFixture=await fixture('pen');penFixture.perspectiveMode('enabled',[[1000,20]]);
+ const done=await pen(penFixture,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,96],['pointerup',240,96],['pointerdown',240,96]]);
+ assert.equal(done.status,'applied');assert.equal(penFixture.calls.length,1);
+ assert.deepEqual(penFixture.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[100,23]]);
+});
+
+// B-pen-continue (pen-bridge.js onDown @1065e9d8): a first press within 10 screen pixels of an open path's endpoint continues THAT path.
+const listed=(strokeId,pts,over={})=>Object.assign({stableTarget:{contextId:'scene-root',frameScope:{kind:'authored',frame:0},layerUid:'L1',strokeId},closed:false,count:pts.length,
+ matrix:[1,0,0,1,0,0],bounds:[0,0,200,200],role:'plain',filled:false,segments:pts.map(p=>({point:p.slice(0,2),handleIn:p[2]||[0,0],handleOut:p[3]||[0,0]}))},over);
+const sendPoints=(rec)=>rec.geometry.segments.map(s=>[s.point.x,s.point.y]);
+// A person's presses are milliseconds apart, so the endpoint search (a read) lands between them: the steps here yield a turn after each.
+async function penSlow(f,steps){let t=1000;const now=Date.now;Date.now=()=>t;
+ try{for(const [kind,x,y,extra] of steps){if(kind==='wait'){t+=x;continue;}f.area.fire(kind,{clientX:x,clientY:y,...(extra||{})});t+=kind==='pointerdown'?1:0;await turn();}}finally{Date.now=now;}
+ return f.root.NemoNativePenToolController.whenSettled();}
+async function penOn(listing,steps){const f=await fixture('pen');f.listing(()=>listing);const r=await penSlow(f,steps);return {f,r};}
+test('B-pen-continue: a press on the LAST point appends to that path as one batch step keeping its id; the path is not recreated',async()=>{
+ const {f,r}=await penOn([listed('native-stroke:0:0',[[20,20],[100,20]])],[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+assert.equal(r.status,'applied');assert.equal(f.calls.length,1);assert.equal(f.calls[0].payload.command,'object.vector.batch');assert.equal(f.batches.length,1);
+ const q=f.calls[0].payload,op=q.ops[0];assert.equal(q.ops.length,1);assert.equal(op.op,'reshape');assert.equal(op.stableTarget.strokeId,'native-stroke:0:0');assert.equal(op.frame,0);
+ assert.equal(q.keyframe,'copy','Animation 2D keys a held frame with a copy');
+ assert.deepEqual(sendPoints({geometry:op.geometry}),[[20,20],[100,20],[100,80]]);assert.equal(op.geometry.closed,false);
+ assert.equal(f.session.info().contentRevision,1,'one revision');
+});
+test('B-pen-continue: a press on the FIRST point reverses the path and appends, swapping every handle pair',async()=>{
+ const path=listed('native-stroke:0:0',[[20,20,[0,0],[10,0]],[100,20,[-4,0],[0,0]]]);
+ const {f,r}=await penOn([path],[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',80,210],['pointerup',80,210],['pointerdown',80,210]]);
+ assert.equal(r.status,'applied');const g=f.calls[0].payload.ops[0].geometry;
+ assert.deepEqual(sendPoints({geometry:g}),[[100,20],[20,20],[20,80]]);
+ assert.deepEqual([g.segments[0].handleIn,g.segments[0].handleOut],[{x:0,y:0},{x:-4,y:0}],'the old last anchor, reversed: its handles swap');
+ assert.deepEqual([g.segments[1].handleIn,g.segments[1].handleOut],[{x:10,y:0},{x:0,y:0}],'the pressed end keeps its handles, swapped');
+});
+test('B-pen-continue: clicking back on the far end closes the continued path',async()=>{
+ const {f,r}=await penOn([listed('native-stroke:0:0',[[20,20],[100,20]])],[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['wait',500],['pointerdown',80,90],['pointerup',80,90]]);
+assert.equal(r.status,'applied');const g=f.calls[0].payload.ops[0].geometry;assert.equal(g.closed,true);assert.deepEqual(sendPoints({geometry:g}),[[20,20],[100,20],[100,80]]);
+});
+test('B-pen-continue: a ribbon, a closed path, a fill shape, a texture anchor, a mask and text are never continued; the press starts a new path',async()=>{
+ for(const over of [{role:'ribbon'},{closed:true},{role:'shape'},{role:'brush',brush:'anchor',group:'g'},{role:'mask'},{role:'text'},{role:'fill',owner:'x'}]){
+  const {f,r}=await penOn([listed('native-stroke:0:0',[[20,20],[100,20]],over)],[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+  assert.equal(r.status,'applied',JSON.stringify(over));assert.equal(f.calls[0].payload.command,'object.vector.create',JSON.stringify(over));
+  assert.deepEqual(sendPoints(f.calls[0].payload.record),[[100,20],[100,80]],JSON.stringify(over));
+ }
+});
+test('B-pen-continue: the nearest endpoint within 10 screen pixels wins; farther than that starts a new path',async()=>{
+ const near=listed('native-stroke:0:1',[[100,60],[180,60]]),far=listed('native-stroke:0:0',[[100,20],[100,40]]);
+ // Press at document (100,41): 1 from far's last, 19 from near's first.
+ const a=await penOn([near,far],[['pointerdown',240,132],['pointerup',240,132],['wait',500],['pointerdown',300,200],['pointerup',300,200],['pointerdown',300,200]]);
+ assert.equal(a.f.calls[0].payload.ops[0].stableTarget.strokeId,'native-stroke:0:0');
+ // 5.5 document units = 11 screen pixels from the endpoint: outside the 10 px reach.
+ const b=await penOn([far],[['pointerdown',240,40+51*2-2+22],['pointerup',240,40+51*2-2+22],['wait',500],['pointerdown',300,200],['pointerup',300,200],['pointerdown',300,200]]);
+ assert.equal(b.f.calls[0].payload.command,'object.vector.create');
+ // An exact tie between two paths goes to the earlier one in the listing; first before last of the same path.
+ const t1=listed('native-stroke:0:0',[[100,20],[150,20]]),t2=listed('native-stroke:0:1',[[100,20],[150,40]]);
+ const c=await penOn([t1,t2],[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',300,200],['pointerup',300,200],['pointerdown',300,200]]);
+ assert.equal(c.f.calls[0].payload.ops[0].stableTarget.strokeId,'native-stroke:0:0');
+});
+test('B-pen-continue: a press that adds no anchor writes nothing; an unreadable listing starts a new path',async()=>{
+ const {f,r}=await penOn([listed('native-stroke:0:0',[[20,20],[100,20]])],[['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(r.status,'cancelled');assert.equal(f.calls.length,0);
+ const g=await fixture('pen');g.listing(()=>{throw new Error('unreadable');});
+ const done=await pen(g,[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+ assert.equal(done.status,'applied');assert.equal(g.calls[0].payload.command,'object.vector.create');
+});
+test('B-pen-continue: Motion edits the key the cell inherits in place (no copy key); a moved layer maps the new anchors through the record matrix',async()=>{
+ const key=listed('native-stroke:0:0',[[20,20],[100,20]],{matrix:[1,0,0,1,0,0]});
+ const f=await fixture('pen');f.root.state.appMode='motion';f.listing(()=>[key]);
+ const r=await pen(f,[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+ assert.equal(r.status,'applied');assert.equal(f.calls[0].payload.keyframe,undefined);assert.equal(f.calls[0].payload.ops[0].frame,0);
+ // A record shifted by (10,5) in the document: the press at document (110,25) is its last point; new anchors come back in record space.
+ const moved=await fixture('pen');moved.listing(()=>[listed('native-stroke:0:0',[[20,20],[100,20]],{matrix:[1,0,0,1,10,5]})]);
+ const m=await pen(moved,[['pointerdown',260,100],['pointerup',260,100],['wait',500],['pointerdown',260,220],['pointerup',260,220],['pointerdown',260,220]]);
+ assert.equal(m.status,'applied');assert.deepEqual(sendPoints({geometry:moved.calls[0].payload.ops[0].geometry}),[[20,20],[100,20],[100,80]]);
+});
+test('B-pen-continue with Taper ends: the continued path is replaced under its own id by the tapered ribbon of the current style (finalizePen); a moved layer refuses it',async()=>{
+ const steps=[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]];
+ const f=await fixture('pen');paperTaper(f);f.root.state.taperEnds=true;f.listing(()=>[listed('native-stroke:0:0',[[20,20],[100,20]])]);
+ const r=await penSlow(f,steps);assert.equal(r.status,'applied');assert.equal(f.calls.length,1);
+ const op=f.calls[0].payload.ops[0];assert.equal(op.op,'replace');assert.equal(op.record.target.strokeId,'native-stroke:0:0');assert.equal(op.record.target.frameScope.frame,0);
+ assert.ok(op.record.vectorExt.pressure.centerSegments.length>=3,'the ribbon is built on the whole continued centreline');
+ assert.equal(f.calls[0].payload.keyframe,'copy');
+ const moved=await fixture('pen');paperTaper(moved);moved.root.state.taperEnds=true;moved.listing(()=>[listed('native-stroke:0:0',[[20,20],[100,20]],{matrix:[1,0,0,1,10,5]})]);
+ const m=await penSlow(moved,[['pointerdown',260,100],['pointerup',260,100],['wait',500],['pointerdown',260,220],['pointerup',260,220],['pointerdown',260,220]]);
+ assert.equal(m.status,'unavailable');assert.equal(moved.calls.length,0);
 });

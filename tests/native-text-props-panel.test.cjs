@@ -19,14 +19,15 @@ const seg = (x, y) => ({ point: [x, y], handleIn: [0, 0], handleOut: [0, 0] });
 const FRAME = 3, TID = 'native-text:1:0';
 const STORED = () => ({ ...block('Hello native'), color: '#11223344', italic: false, wordSpacing: 1, lineHeightMult: 1.5, textCase: 'upper', align: 'center' });
 
-function harness(over, fixtureOptions) {
-  const f = fixture(fixtureOptions), toasts = [];
-  f.seed(target(TID, FRAME), STORED());
+function harness(over, fixtureOptions, context = 'scene-root') {
+  const f = fixture(fixtureOptions), toasts = [], tgt = () => ({ ...target(TID, FRAME), contextId: context });
+  let shownFrame = FRAME;
+  f.seed(tgt(), STORED());
   const info = () => ({ ...f.session.info(), canvasW: 400, canvasH: 400, layers: [{ layerUid: 'L0' }] });
   const kind = { role: 'text' };
-  const item = () => ({ stableTarget: target(TID, FRAME), closed: true, count: 4, role: kind.role, filled: true, bounds: [100, 100, 300, 200], matrix: [1, 0, 0, 1, 0, 0],
+  const item = () => ({ stableTarget: tgt(), closed: true, count: 4, role: kind.role, filled: true, bounds: [100, 100, 300, 200], matrix: [1, 0, 0, 1, 0, 0],
     segments: [seg(100, 100), seg(300, 100), seg(300, 200), seg(100, 200)], style: { fill: '#112233', width: 0, opacity: 1 } });
-  const session = { ...f.session, info, blocksLegacy: () => true, readPresentedObjectSession: () => ({ presentation: { ...info(), frame: FRAME } }),
+  const session = { ...f.session, info, blocksLegacy: () => true, runComponentCommand: f.session.runResourceCommand, readPresentedObjectSession: () => ({ presentation: { ...info(), frame: shownFrame, contextId: context } }),
     async readPresentedStrokes(_selector, _pin, wanted) { const { segments, ...rest } = item(); return { items: [wanted(rest) ? { ...rest, segments } : rest] }; } };
   const paper = Paper.load();
   const root = { paper, Path: paper.Path, Point: paper.Point, Matrix: paper.Matrix, state: { tool: 'select', appMode: 'anim2d', currentFrame: FRAME, activeLayerIdx: 0, layers: [{ layerUid: 'L0' }], selectedStrokeIndices: [] },
@@ -37,7 +38,7 @@ function harness(over, fixtureOptions) {
     NemoNativeTextRead: Reader, NemoNativeObjectTextLayout: Writer, NemoSelectCanvasIntent: Intent, NemoNativeSelectOverlay: overlayStub(Intent), NemoNativeTextPropsPanel: Panel };
   Object.assign(root, over);
   const edits = () => f.owner.log.received.filter((q) => q.payload && q.payload.command === 'object.text.edit');
-  return { f, root, toasts, kind, edits, stored: () => f.owner.items.get(TID),
+  return { f, root, toasts, kind, edits, shown: (v) => { shownFrame = v; }, stored: () => f.owner.items.get(TID),
     select: async () => { root.selectedPaths = [await Intent.pick(root, 200, 150)]; root.NemoNativeSelectOverlay.show(root); return root.selectedPaths[0]; } };
 }
 
@@ -223,4 +224,40 @@ test('off a native project the legacy vector-text path is unchanged (same listen
   assert.throws(() => ui.fire('tp-size', 'change'), /history checkpoint/);
   assert.deepEqual(calls, ['legacy:pushUndo']);
   assert.deepEqual(h.edits(), []);
+});
+
+test('#2267 a held frame: Animation 2D edits through the copy key at the playhead cell, Motion edits the inherited key in place', async () => {
+  for (const mode of ['anim2d', 'motion']) {
+    const h = harness();
+    h.shown(7); h.root.state.currentFrame = 7; h.root.state.appMode = mode;
+    await h.select();
+    const r = await Panel.edit(h.root, 'size', 60);
+    assert.equal(r.status, 'applied', mode);
+    const q = h.edits()[0].payload;
+    assert.deepEqual(q.stableTarget, target(TID, FRAME), mode);
+    if (mode === 'anim2d') { assert.equal(q.keyframe, 'copy'); assert.equal(q.frame, 7); } else { assert.equal(q.keyframe, undefined); assert.equal(q.frame, undefined); }
+    assert.equal(h.stored().size, 60);
+  }
+  // The key cell itself needs no copy.
+  const h = harness();
+  await h.select();
+  await Panel.edit(h.root, 'size', 61);
+  assert.equal(h.edits()[0].payload.keyframe, undefined);
+});
+test('#2267 inside an entered component the panel reads and edits the component\'s own block', async () => {
+  const routes = [];
+  const h = harness({ NemoNativeComponentContext: { contextId: () => 'comp-a' } }, undefined, 'comp-a');
+  const run = h.f.session.runResourceCommand;
+  h.root.NemoNativeObjectProject.desktop().runComponentCommand = (a) => { routes.push('component'); return run(a); };
+  await h.select();
+  const r = await Panel.edit(h.root, 'size', 62);
+  assert.equal(r.status, 'applied');
+  assert.equal(h.edits()[0].payload.stableTarget.contextId, 'comp-a');
+  assert.ok(routes.length > 0, 'the read and the write rode the component route');
+  assert.equal(h.stored().size, 62);
+  // A block of another context than the held one is not edited here.
+  const other = harness({ NemoNativeComponentContext: { contextId: () => 'comp-b' } }, undefined, 'comp-a');
+  await other.select();
+  assert.equal((await Panel.edit(other.root, 'size', 63)).status, 'unavailable');
+  assert.equal(other.edits().length, 0);
 });

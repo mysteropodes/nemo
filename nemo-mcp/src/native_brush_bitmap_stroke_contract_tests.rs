@@ -19,9 +19,13 @@ fn payload() -> Value {
 #[test]
 fn the_stroke_request_is_admitted_as_the_owner_reads_it_and_nothing_else() {
     assert!(request(&payload()));
+    let mut component = payload();
+    component["record"]["target"]["contextId"] = json!("component-1");
+    assert!(request(&component), "#2361 a declared component's cell; the owner resolves the context");
     let mut cases: Vec<(&str, Value)> = vec![
         ("/record/target/strokeId", json!("named")),
-        ("/record/target/contextId", json!("component-1")),
+        ("/record/target/contextId", json!("")),
+        ("/record/target/contextId", json!(7)),
         ("/record/target/frameScope/kind", json!("reference")),
         ("/record/family", json!("closed-solid-fill-cubic-path")),
         ("/record/geometry/segments", json!([])),

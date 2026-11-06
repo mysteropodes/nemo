@@ -19,6 +19,8 @@ use serde_json::{json, Value};
 
 #[path = "object_text_layout_commands_refusals.rs"]
 mod refusals;
+#[path = "object_text_layout_commands_component.rs"]
+mod component;
 
 pub(super) const ORACLE: &str = include_str!("fixtures/object-text-layout-commands/oracle.txt");
 

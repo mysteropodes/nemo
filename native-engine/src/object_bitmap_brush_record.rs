@@ -161,11 +161,6 @@ pub(crate) fn validate_record(record: &ObjectRecord) -> Result<(), BitmapBrushVa
         ));
     }
     validate_fields(fields)?;
-    if record.target().context_id() != "scene-root" {
-        return Err(BitmapBrushValueError::Unsupported(
-            "bitmap brushes inside component contexts are unavailable",
-        ));
-    }
     let Some(vector) = record.vector.value() else {
         return Err(invalid("bitmap brush anchor has no vector body"));
     };

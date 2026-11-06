@@ -496,3 +496,6 @@ fn the_shared_result_check_routes_the_item_operations_through_this_module() {
         &json!({"applied":true,"historyEntriesAdded":1,"assetId":"asset-x"})
     ));
 }
+
+#[path = "native_item_contract_component_tests.rs"]
+mod component;

@@ -6,8 +6,7 @@
 //! (`object_vector_edit_context`): its layers, records and frame count are the component's, and its order scopes live in the plan under
 //! the component's id. This module runs the same promotion over that view: the timing key is the scene's own (`promote_cell`), and the
 //! cell's records and order elements are re-homed with the same rules (a cell that is a key is left alone, anything stored at a promoted
-//! held cell is replaced by the copy, an in-between is promoted without a copy). Components hold no raster or text items, so there is
-//! nothing else to copy. The whole result is admitted by the one storage validator when the edit is restored into the document.
+//! held cell is replaced by the copy, an in-between is promoted without a copy). The text blocks and images a component holds (#2267) are copied with its records. The whole result is admitted by the one storage validator when the edit is restored into the document.
 use crate::commands::object_fill_owner::object_frame_edit_document::{
     promote_cells, DocumentEdit, FrameEditError,
 };
@@ -70,8 +69,36 @@ fn move_elements(
     }
 }
 
+/// The text blocks and images of the cell the promoted one showed, copied under their own ids; what the promoted cell stored goes (the scene's
+/// `clone_cell` does the same). #2267: a component can hold text, and the cell a copy key makes must keep showing it.
+fn copy_items(document: &mut ObjectDocument, context: &str, layer: &str, from: Option<u32>, to: u32) {
+    let Some(items) = document.item_records() else { return };
+    let at = |target: &crate::object_document::ObjectTarget, frame: u32| {
+        target.context_id == context
+            && target.layer_uid == layer
+            && target.frame_scope.kind == FrameScopeKind::Authored
+            && target.frame_scope.frame == frame
+    };
+    let (mut raster, mut text) = (items.raster_entries().to_vec(), items.text_entries().to_vec());
+    let before = (raster.len(), text.len());
+    raster.retain(|entry| !at(&entry.target, to));
+    text.retain(|entry| !at(&entry.target, to));
+    let dropped = (raster.len(), text.len()) != before;
+    let (mut copied_raster, mut copied_text) = (Vec::new(), Vec::new());
+    if let Some(from) = from {
+        copied_raster = raster.iter().filter(|entry| at(&entry.target, from)).cloned().map(|mut entry| { entry.target.frame_scope.frame = to; entry }).collect::<Vec<_>>();
+        copied_text = text.iter().filter(|entry| at(&entry.target, from)).cloned().map(|mut entry| { entry.target.frame_scope.frame = to; entry }).collect::<Vec<_>>();
+    }
+    if !dropped && copied_raster.is_empty() && copied_text.is_empty() {
+        return;
+    }
+    raster.extend(copied_raster);
+    text.extend(copied_text);
+    document.items = crate::object_document::ItemRecords::normalized(raster, text);
+}
+
 /// Key every listed cell of `layer_uid` with a copy of what it showed, in `context` (`document` is that context's view).
-pub(super) fn promote(
+pub(crate) fn promote(
     document: &ObjectDocument,
     context: &str,
     layer_uid: &str,
@@ -120,6 +147,7 @@ pub(super) fn promote(
                 .collect();
             next.objects.extend(copies);
         }
+        copy_items(&mut next, context, layer_uid, source, cell);
         move_elements(&mut next, context, layer_uid, source, cell);
     }
     Ok(if changed {

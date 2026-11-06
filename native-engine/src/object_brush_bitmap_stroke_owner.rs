@@ -7,7 +7,8 @@ use crate::commands::object_fill_owner::image_import::canonical;
 use crate::commands::object_fill_owner::item_commands::{
     allocate_id, check_layer, check_target, lists, order_insert, store,
 };
-use crate::commands::object_fill_owner::object_frame_edit_document::{promote_cells, DocumentEdit};
+use crate::commands::object_fill_owner::object_frame_edit_document::DocumentEdit;
+use crate::commands::object_fill_owner::vector_edit::{cells, context};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_raster_asset_kernels::object_raster_asset_item::RasterItem;
 use crate::object_document::{
@@ -102,7 +103,10 @@ impl ObjectFillOwner {
             .map_err(|_| refusal())?;
         let revision = origin.content_revision();
         let cell = &payload.record.target;
-        let mut drawing = origin.document().clone();
+        // #2256: a component cell is edited through a view of the document (its layers, records and frame count are the component's), as its
+        // vector edits are, then restored; an undeclared context is refused by the view / the target check, with nothing prepared.
+        let view = context::view(origin.document(), &cell.context_id)?;
+        let mut drawing = view.clone().unwrap_or_else(|| origin.document().clone());
         let held = drawing
             .layers
             .iter()
@@ -111,7 +115,7 @@ impl ObjectFillOwner {
             .is_some_and(|timing| matches!(timing.exposure(cell.frame()).0, "held" | "unexposed"));
         if held {
             if let DocumentEdit::Changed(next) =
-                promote_cells(&drawing, &cell.layer_uid, &[cell.frame()]).map_err(|_| refusal())?
+                cells::promote(&drawing, &cell.context_id, &cell.layer_uid, &[cell.frame()]).map_err(|_| refusal())?
             {
                 drawing = next;
             }
@@ -140,6 +144,9 @@ impl ObjectFillOwner {
             item,
         });
         store(&mut drawing, raster, text);
+        if view.is_some() {
+            drawing = context::restore(drawing, origin.document(), &cell.context_id)?;
+        }
         ObjectSnapshot::validate_drawing(&drawing)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
         if crate::object_document::item_asset_issue(&drawing, Some(&inventory)).is_some() {

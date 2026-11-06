@@ -86,3 +86,42 @@ test('Text application requires explicit real reader and writer ports without fa
   assert.equal(f.ports.reader,require('../src/js/adapters/native-text-read.js'));
   assert.equal(f.ports.writer,require('../src/js/adapters/native-object-text-layout.js'));
 });
+
+// #2267 T-text-context: held frames (copy key), Motion (in place) and an entered component's own context.
+test('a held frame edits the text of its key through the copy key; Motion edits that key in place; a key cell needs neither',async()=>{
+  const Tool=require('../src/js/adapters/native-text-tool.js'),t=target('held text',0);
+  const f=fixture();f.seed(t,block('Key text'));f.frame(3);
+  const draft=await f.core.openExisting(t);assert.equal(draft.block.text,'Key text','the playhead shows the text of an earlier key');
+  await f.core.commit({text:'Edited'});
+  const q=f.owner.log.received[0].payload;assert.equal(q.command,'object.text.edit');assert.deepEqual(q.stableTarget,t);assert.equal(q.keyframe,'copy');assert.equal(q.frame,3);
+  const inherit=fixture();inherit.seed(t,block('Key text'));inherit.frame(3);
+  const core=Tool.create({...inherit.ports,inherit:()=>true});await core.openExisting(t);await core.commit({text:'In place'});
+  const p=inherit.owner.log.received[0].payload;assert.equal(p.keyframe,undefined);assert.equal(p.frame,undefined);assert.deepEqual(p.stableTarget,t);
+  const keyed=fixture();keyed.seed(t,block('Key text'));await keyed.core.openExisting(t);await keyed.core.commit({text:'Same cell'});
+  const k=keyed.owner.log.received[0].payload;assert.equal(k.keyframe,undefined);assert.equal(k.frame,undefined);
+  const later=fixture();later.seed(target('later',5),block('Later key'));later.frame(3);
+  await assert.rejects(later.core.openExisting(target('later',5)),e=>e.code==='unavailable','text keyed after the playhead is not shown there');
+});
+test('new text on a held frame asks for the copy key, in both modes', async()=>{
+  const Tool=require('../src/js/adapters/native-text-tool.js');
+  for(const inherit of [false,true]){
+    const f=fixture();f.frame(4);const core=Tool.create({...f.ports,inherit:()=>inherit});await core.openNew(placement);await core.commit({text:'Fresh'});
+    const q=f.owner.log.received[0].payload;assert.equal(q.command,'object.text.create');assert.equal(q.keyframe,'copy');assert.deepEqual(q.target,target('',4));
+  }
+});
+test('inside an entered component the draft, its reads and its writes carry the component context and ride the component route', async()=>{
+  const Tool=require('../src/js/adapters/native-text-tool.js'),f=fixture(),routes=[];
+  const session={...f.session,runResourceCommand:a=>{routes.push('scene');return f.session.runResourceCommand(a);},runComponentCommand:a=>{routes.push('component');return f.session.runResourceCommand(a);}};
+  const inside={...target('comp text',0),contextId:'comp-a'};
+  // the double stores and lists targets by their context; the owner double validates the payload with the real contract
+  f.seed(inside,block('Inside'));
+  const core=Tool.create({...f.ports,session,context:p=>({...f.context(p),contextId:'comp-a'})});
+  const page=await core.page(0,8);assert.equal(page.context.contextId,'comp-a');assert.deepEqual(page.page.items.map(i=>i.target),[inside]);
+  await core.openExisting(inside);await core.commit({text:'Edited inside'});
+  assert.deepEqual(f.owner.log.received[0].payload.stableTarget,inside);
+  assert.ok(routes.length>0&&routes.every(r=>r==='component'),routes.join());
+  const other=Tool.create({...f.ports,session,context:p=>({...f.context(p),contextId:'comp-b'})});
+  await assert.rejects(other.openExisting(inside),e=>e.code==='unavailable','a block of another context is never opened here');
+  const made=Tool.create({...f.ports,session,context:p=>({...f.context(p),contextId:'comp-a'})});await made.openNew(placement);await made.commit({text:'New inside'});
+  assert.deepEqual(f.owner.log.received[1].payload.target,{...target('',0),contextId:'comp-a'});
+});

@@ -3843,6 +3843,8 @@
         "native-object-draw-bitmap.js",
         "native-object-draw-resize.js",
         "native-layer-motion-pose.js",
+        "native-object-perspective-snap.js",
+        "native-object-pen-continue.js",
         "native-object-eraser-tool.js"
       ],
       "sizeProfile": "Platform/engine adapter",

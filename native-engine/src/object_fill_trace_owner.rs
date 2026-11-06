@@ -2,9 +2,8 @@
 use crate::commands::object_fill_owner::group_edit::boolean_edit::{
     BooleanEditKind, PreparedBooleanEdit,
 };
-use crate::commands::object_fill_owner::object_frame_edit_document::{
-    promote_cells, DocumentEdit, FrameEditError,
-};
+use crate::commands::object_fill_owner::object_frame_edit_document::{DocumentEdit, FrameEditError};
+use crate::commands::object_fill_owner::vector_edit::{cells, context};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_boolean_ops::plan::{
     check_scope, PlanError,
@@ -79,11 +78,14 @@ impl ObjectFillOwner {
     ) -> Result<PreparedBooleanEdit, DispatchErrorCode> {
         let paint = paint_of(color).ok_or(DispatchErrorCode::InvalidRequest)?;
         let origin = self.current_snapshot();
-        check_scope(origin.document(), &scope).map_err(|error| Self::fill_plan_error(&error))?;
-        let promoted = promoted(origin.document(), &scope)?;
-        let walls = reference.then(|| reference_walls(origin.document(), &scope));
+        // #2256: a component target fills over that component's own layers and records through a view of the document (as Fill Brush and the vector owner do).
+        let view = context::view(origin.document(), &scope.context_id)?;
+        let document: &ObjectDocument = view.as_ref().unwrap_or_else(|| origin.document());
+        check_scope(document, &scope).map_err(|error| Self::fill_plan_error(&error))?;
+        let promoted = promoted(document, &scope)?;
+        let walls = reference.then(|| reference_walls(document, &scope));
         let mut plan = plan_trace(
-            promoted.as_ref().unwrap_or_else(|| origin.document()),
+            promoted.as_ref().unwrap_or(document),
             &scope,
             point,
             &paint,
@@ -94,6 +96,9 @@ impl ObjectFillOwner {
         )
         .map_err(|error| Self::fill_plan_error(&error))?;
         plan.changed |= promoted.is_some();
+        if view.is_some() {
+            plan.document = context::restore(plan.document, origin.document(), &scope.context_id)?;
+        }
         ObjectSnapshot::validate_drawing(&plan.document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
         Ok(PreparedBooleanEdit {
@@ -104,24 +109,23 @@ impl ObjectFillOwner {
     }
 }
 
-/// Ordinary Fill's ensureKeyframe is part of the same undo operation: a held or unexposed scene-root cell is promoted
-/// through the real detached frame kernel before the fill plans against the visible copy; a later geometry or provider
+/// Ordinary Fill's ensureKeyframe is part of the same undo operation: a held or unexposed cell (the scene's, or the entered component's
+/// in `document`, its view) is promoted through the real detached frame kernel before the fill plans against the visible copy; a later geometry or provider
 /// refusal still publishes neither change.
 pub(crate) fn promoted(
     document: &ObjectDocument,
     scope: &Scope,
 ) -> Result<Option<ObjectDocument>, DispatchErrorCode> {
-    let held = scope.context_id == "scene-root"
-        && document
-            .layers
-            .iter()
-            .find(|layer| layer.layer_uid == scope.layer_uid)
-            .and_then(|layer| layer.timing.value())
-            .is_some_and(|timing| matches!(timing.exposure(scope.frame).0, "held" | "unexposed"));
+    let held = document
+        .layers
+        .iter()
+        .find(|layer| layer.layer_uid == scope.layer_uid)
+        .and_then(|layer| layer.timing.value())
+        .is_some_and(|timing| matches!(timing.exposure(scope.frame).0, "held" | "unexposed"));
     if !held {
         return Ok(None);
     }
-    match promote_cells(document, &scope.layer_uid, &[scope.frame]) {
+    match cells::promote(document, &scope.context_id, &scope.layer_uid, &[scope.frame]) {
         Ok(DocumentEdit::Changed(document)) => Ok(Some(document)),
         Ok(DocumentEdit::NoChange) => Ok(None),
         Err(FrameEditError::Unsupported | FrameEditError::MissingTiming) => Err(DispatchErrorCode::Unavailable),
