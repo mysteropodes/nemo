@@ -96,6 +96,34 @@ line: `{ "scope": "subset", "selected": [...], "omittedReady": [...] }` (`"all-r
 list names every Ready row). Read a subset `installed-pass` as "these rows only"; the omitted
 Ready rows were not run and the receipt is not evidence about them.
 
+### Rows in package-h (frame-edit-ui, settings-profile)
+
+Both rows are `Ready` with merged-PR evidence and run with no private packet, so
+`"rows": ["frame-edit-ui", "settings-profile"]` selects exactly them. Neither has been run installed.
+Run them in that order or separately; both capture with distinct names (`capture-1`, `capture-11`..`14`).
+
+- `frame-edit-ui` (#2248, foreground). A person presses the real F5/F6/F7, `+`, a bound Duplicate
+  keyframe key, Cmd+Z / Cmd+Shift+Z and the timeline right-click items, in the scene and inside an
+  entered component (PR #2786). After every gesture they attach the unedited **read-only** Nemo MCP
+  replies (`query.document.object.history`, one `query.document.object.layer.timing` view `cells` per
+  layer, plus the Scene layers while inside a component). The oracle computes the revision step,
+  history depth, total frames and cell runs itself, reads the saved files from disk (hash, total
+  frames) and judges the layer-row styling from the helper's own owned-window capture. A reply with a
+  verdict field, missing/unpinned/non-tiling reads, or a `command.*` call is refused as operator input.
+- `settings-profile` (#2172). `session.input` drives the Settings entries, the eight tabs, close and
+  backdrop, profile name/email/role with restore, the tool buttons and the empty sync-folder
+  open-cancel/check; `observe` supplies the raw accessibility facts. The helper **cannot** drive: File >
+  New (the `entry.*` commands need an entry mode this batch does not set), the colour swatch and its
+  alpha (judged from the helper capture of the swatch the person located), rebinding a shortcut and
+  "Reset all" (`shortcuts.reset` is denied; judged by comparing the Shortcuts tab labels before,
+  after rebind and after reset), and the real sync-owner publish/check/merge paths (declared as
+  `sync-owner-paths`, always returned `unrun` with its reason, so this row cannot reach
+  `installed-pass` until that clause is covered). Profile persistence across an app restart needs a
+  second lifetime and is not claimed.
+
+The first operator phase of both asks for the window at the top of display 2 (position 2880,-270, size
+1620x1420, raised).
+
 ### Refusals
 
 A refusal before or around launch prints one line to stderr:
