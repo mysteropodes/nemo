@@ -8,13 +8,17 @@ const path = require('node:path');
 const { readDeclarations, readyRows, selectRows, runInstalledRows } = require('../cs7-runner.cjs');
 const frame = require('../cs7-scenarios/frame-edit-ui.cjs');
 const settings = require('../cs7-scenarios/settings-profile.cjs');
+const draw = require('../cs7-scenarios/component-edit-draw.cjs');
+const legacy = require('../cs7-scenarios/legacy-import.cjs');
 const { World, frameSession, SettingsApp, settingsSession } = require('./cs7-h-stubs.cjs');
+const { DrawWorld, drawSession, LegacyWorld, legacySession } = require('./cs7-i-stubs.cjs');
 
 const ROOT = path.resolve(__dirname, '../../..');
 const matrix = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/inventory/parity/matrix.json'), 'utf8'));
 const declarations = readDeclarations(path.join(ROOT, 'engineering/inventory/parity/installed'));
 const known = { taskIds: new Set(matrix.tasks.map(t => t.task)), surfaceIds: new Set(matrix.surfaces.map(s => s.id)) };
 const IDS = ['frame-edit-ui', 'settings-profile'];
+const IDS3 = ['component-edit-draw', 'legacy-import'];
 const dirs = [];
 test.after(() => { for (const d of dirs) fs.rmSync(d, { recursive: true, force: true }); });
 function temp() { const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cs7-h-'))); dirs.push(d); return d; }
@@ -38,7 +42,7 @@ test('both rows are Ready with merged-PR evidence, existing tasks and surfaces, 
 
 test('the rows load alone through the allow-list, leaving the three older Ready rows (and their private packets) out', () => {
   const selection = selectRows(declarations, IDS);
-  assert.deepEqual(selection.omittedReady.sort(), ['play-resume', 'text-targets', 'text20']);
+  assert.deepEqual(selection.omittedReady.sort(), ['component-edit-draw', 'legacy-import', 'play-resume', 'text-targets', 'text20']);
 });
 
 test('frame-edit-ui reaches installed-pass through the runner on a passing stub', async () => {
@@ -75,6 +79,58 @@ test('a product failure in a row keeps the receipt honest and the batch from con
   const scenarios = { 'frame-edit-ui': frame.prepare({ config: { reportDirectory: directory } }) };
   const rows = readyRows(declarations, { ...known, scenarios, only: new Set(['frame-edit-ui']) });
   const result = await runInstalledRows({ rows, scenarios, session: stub });
+  assert.equal(result.verdict, 'fail');
+  assert.equal(result.installed.terminalCode, 'scenario-stopped');
+});
+
+test('component-edit-draw and legacy-import are Ready with merged-PR evidence, existing tasks and surfaces, and load alone through the runner', () => {
+  const rows = declarations.flatMap(d => d.rows).filter(r => IDS3.includes(r.id));
+  assert.deepEqual(rows.map(r => r.id).sort(), IDS3);
+  for (const r of rows) {
+    assert.equal(r.status, 'Ready');
+    assert.match(r.evidence, /https:\/\/github\.com\/mysteropodes\/nemo\/pull\/[1-9][0-9]*/);
+    assert.match(r.evidence, /\b[a-f0-9]{40}\b/);
+    assert.deepEqual(r.dependsOn, []);
+    assert.ok(r.tasks.length && r.surfaces.length);
+  }
+  assert.equal(rows.find(r => r.id === 'component-edit-draw').issue, 2256);
+  assert.equal(rows.find(r => r.id === 'legacy-import').issue, 2355);
+  assert.deepEqual(rows.find(r => r.id === 'component-edit-draw').checks.map(c => c.id), draw.CLAUSES);
+  assert.deepEqual(rows.find(r => r.id === 'legacy-import').checks.map(c => c.id), legacy.CLAUSES);
+  const scenarios = { 'component-edit-draw': draw.prepare({ config: { reportDirectory: temp() } }), 'legacy-import': legacy.prepare({ config: { reportDirectory: temp() } }) };
+  assert.deepEqual(readyRows(declarations, { ...known, scenarios, only: new Set(IDS3) }).map(r => r.id), IDS3);
+  assert.deepEqual(selectRows(declarations, IDS3).omittedReady.sort(), ['frame-edit-ui', 'play-resume', 'settings-profile', 'text-targets', 'text20']);
+});
+
+test('component-edit-draw reaches installed-pass through the runner on a passing stub', async () => {
+  const directory = temp(), world = new DrawWorld(directory), stub = drawSession({ world });
+  const scenarios = { 'component-edit-draw': draw.prepare({ config: { reportDirectory: directory } }) };
+  const rows = readyRows(declarations, { ...known, scenarios, only: new Set(['component-edit-draw']) });
+  const result = await runInstalledRows({ rows, scenarios, session: stub });
+  assert.equal(result.verdict, 'installed-pass');
+  assert.deepEqual(result.installed.rows[0].checks.map(c => c.status), Array(draw.CLAUSES.length).fill('pass'));
+  assert.deepEqual(result.kindsMissing.filter(k => ['pixels', 'undo-redo', 'save-reopen'].includes(k)), []);
+});
+
+test('legacy-import reaches installed-pass through the runner on a passing stub', async () => {
+  const directory = temp(), world = new LegacyWorld(directory), stub = legacySession({ world });
+  const scenarios = { 'legacy-import': legacy.prepare({ config: { reportDirectory: directory } }) };
+  const rows = readyRows(declarations, { ...known, scenarios, only: new Set(['legacy-import']) });
+  const result = await runInstalledRows({ rows, scenarios, session: stub });
+  assert.equal(result.verdict, 'installed-pass');
+  assert.deepEqual(result.installed.rows[0].checks.map(c => c.status), Array(legacy.CLAUSES.length).fill('pass'));
+});
+
+test('an unreadable toast keeps the legacy-import receipt incomplete, and a drawing that never reaches the instance fails the draw receipt', async () => {
+  let directory = temp(), stub = legacySession({ world: new LegacyWorld(directory, { toastHidden: true }) });
+  let scenarios = { 'legacy-import': legacy.prepare({ config: { reportDirectory: directory } }) };
+  let rows = readyRows(declarations, { ...known, scenarios, only: new Set(['legacy-import']) });
+  let result = await runInstalledRows({ rows, scenarios, session: stub });
+  assert.equal(result.verdict, 'incomplete');
+  directory = temp(); stub = drawSession({ world: new DrawWorld(directory, { noInstance: true }) });
+  scenarios = { 'component-edit-draw': draw.prepare({ config: { reportDirectory: directory } }) };
+  rows = readyRows(declarations, { ...known, scenarios, only: new Set(['component-edit-draw']) });
+  result = await runInstalledRows({ rows, scenarios, session: stub });
   assert.equal(result.verdict, 'fail');
   assert.equal(result.installed.terminalCode, 'scenario-stopped');
 });
