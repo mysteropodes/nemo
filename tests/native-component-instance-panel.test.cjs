@@ -237,13 +237,15 @@ test('a refusal toasts the owner reason, changes nothing and shows the stored va
 
 test('the controls with no native owner say so instead of acting on a stub row, and are marked unavailable', async () => {
   const h = harness(); h.sync(); await settle();
-  for (const id of ['btn-comp-preview', 'btn-comp-detach', 'btn-lip-apply']) {
+  // Break apart has a native owner now (native-component-convert-ui.js): the panel leaves its button alone.
+  assert.equal(h.nodes.get('btn-comp-detach').dataset.nativeUnavailable, undefined);
+  for (const id of ['btn-comp-preview', 'btn-lip-apply']) {
     assert.equal(h.nodes.get(id).dataset.nativeUnavailable, '1');
     assert.equal(h.nodes.get(id).attributes['aria-disabled'], 'true');
     fire(h.section, h.nodes.get(id), 'click');
   }
   await settle();
-  assert.deepEqual(h.toasts, ['The component preview window is not available on this project yet.', 'Breaking a component apart is not available on this project yet.',
+  assert.deepEqual(h.toasts, ['The component preview window is not available on this project yet.',
     'Lip-sync analysis is not available on this project yet.']);
   assert.equal(writes(h).length, 0);
   assert.deepEqual(h.legacy, []);

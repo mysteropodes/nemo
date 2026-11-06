@@ -406,17 +406,16 @@ fn decoding_is_object_only_strict_and_bounded() {
     ] {
         assert!(decode_fails(unknown(&path)), "{path:?}");
     }
-    // A baseline symbol also carries these; they are refused, never silently dropped.
-    for dropped in [
-        "cameraKeys",
-        "markers",
-        "motionArcs",
-        "tweenOverrides",
-        "tweenEasing",
-    ] {
+    // A baseline symbol also carries these; a wrong shape is refused, never silently dropped.
+    for wrong in ["motionArcs", "tweenOverrides", "tweenEasing"] {
         let mut v = set_value();
-        v["components"][0][dropped] = json!([]);
-        assert!(decode_fails(v), "{dropped}");
+        v["components"][0][wrong] = json!([]);
+        assert!(decode_fails(v), "{wrong}");
+    }
+    for wrong in ["cameraKeys", "markers"] {
+        let mut v = set_value();
+        v["components"][0][wrong] = json!({});
+        assert!(decode_fails(v), "{wrong}");
     }
     let json = set_json();
     assert!(serde_json::from_str::<ComponentSet>(&json.replacen(
@@ -446,5 +445,59 @@ fn decoding_is_object_only_strict_and_bounded() {
         let mut v = set_value();
         v["instances"] = Value::Array(vec![one.clone(); count]);
         assert_eq!(!decode_fails(v), ok, "{count} instances");
+    }
+}
+
+// C-comp-owned-state: the members `enterSymbol` / `exitToScene` swap per component.
+#[test]
+fn owned_state_members_round_trip_and_a_baseline_empty_symbol_is_admitted() {
+    let empty = run(|v| {
+        let c = &mut v["components"][0];
+        c["cameraKeys"] = json!([]);
+        c["markers"] = json!([]);
+        c["motionArcs"] = json!({});
+        c["tweenOverrides"] = json!({});
+        c["tweenEasing"] = json!({});
+    });
+    assert_eq!(empty, Ok(()), "a symbol that was entered but never edited stores empty tables");
+    let mut v = set_value();
+    v["components"][0]["cameraKeys"] = json!([{"frame":0,"x":960,"y":540,"w":1920},
+        {"frame":12,"x":400,"y":300,"w":960,"rot":15,"hOut":[1,2],"hIn":[3,4],"ease":[0.25,0.1,0.25,1]}]);
+    v["components"][0]["markers"] = json!([{"frame":2,"name":"hit","color":"#e8b64c"},{"frame":9,"name":"","color":"#fff"}]);
+    let set: ComponentSet = serde_json::from_value(v.clone()).unwrap();
+    assert_eq!(set.validate(&hosts()), Ok(()));
+    let component = &set.components[0];
+    assert_eq!(component.camera_keys().unwrap().len(), 2);
+    assert_eq!(component.markers().len(), 2);
+    let reread: ComponentSet = serde_json::from_slice(&serde_json::to_vec(&set).unwrap()).unwrap();
+    assert_eq!(reread, set);
+    assert_eq!(serde_json::to_value(&set).unwrap()["components"][0]["markers"], v["components"][0]["markers"]);
+    // Missing and explicit empty stay apart.
+    let missing: ComponentSet = serde_json::from_value(set_value()).unwrap();
+    assert!(missing.components[0].camera_keys().is_none());
+    assert!(serde_json::to_value(&missing).unwrap()["components"][0].get("cameraKeys").is_none());
+}
+
+#[test]
+fn owned_state_controls() {
+    let invalid = |edit: &dyn Fn(&mut Value)| matches!(run(|v| edit(v)), Err(ComponentRecordError::Invalid(_)));
+    let total = set_value()["components"][0]["totalFrames"].as_u64().unwrap();
+    assert!(invalid(&|v| v["components"][0]["markers"] = json!([{"frame": total, "name":"", "color":"#fff"}])));
+    assert!(invalid(&|v| v["components"][0]["markers"] = json!([
+        {"frame":1,"name":"a","color":"#fff"},{"frame":1,"name":"b","color":"#fff"}])));
+    assert!(invalid(&|v| v["components"][0]["markers"] = json!([{"frame":1,"name":"a","color":""}])));
+    assert!(decode_fails({
+        let mut v = set_value();
+        v["components"][0]["markers"] = json!([{"frame":1,"name":"a","color":"#fff","extra":1}]);
+        v
+    }));
+    assert!(decode_fails({
+        let mut v = set_value();
+        v["components"][0]["cameraKeys"] = json!([{"frame":0,"x":0,"y":0}]);
+        v
+    }));
+    for table in ["motionArcs", "tweenOverrides", "tweenEasing"] {
+        let result = run(|v| v["components"][0][table] = json!({"k": {"out":[1,2]}}));
+        assert!(matches!(result, Err(ComponentRecordError::Unsupported(_))), "{table}: {result:?}");
     }
 }

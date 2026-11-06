@@ -60,7 +60,7 @@ enum Receipt {
 }
 
 /// (operation suffix, command, receipt, "member:kind" in wire order; a trailing `?` marks an optional member).
-static SPECS: [(&str, &str, Receipt, &str); 8] = [
+static SPECS: [(&str, &str, Receipt, &str); 9] = [
     (
         "component.convert",
         "object.component.convert",
@@ -110,6 +110,13 @@ static SPECS: [(&str, &str, Receipt, &str); 8] = [
         "object.component.instance.set",
         Receipt::Command,
         "layerUid:id mode:instMode? singleFrame:frame? placedAt:placedAt? speed:speed? atFrame:frame?",
+    ),
+    // D-comp-break-apart: the inverse of convert, one instance layer baked back into an ordinary layer.
+    (
+        "component.breakApart",
+        "object.component.breakApart",
+        Receipt::Command,
+        "contextId:text layerUid:id",
     ),
 ];
 const PREFIX: &str = "command.document.object.";

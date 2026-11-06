@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "33d50605347efc035bd2755f2c9a6f7b4286e0aa",
-  "describe": "v0.7.0-alpha.4-5416-g33d506053-dirty"
+  "head": "ca1949516829e0f2be10973de700816d346735f5",
+  "describe": "v0.7.0-alpha.4-5422-gca1949516-dirty"
  },
- "inputsDigest": "2a71aa002c9dc50b59bcdd19574fbc3c26f1911ff48eaf6db3f303d033257768",
+ "inputsDigest": "69599fdd8fc398a70a8e2e532f815a39d148f028bdc2a06d62094ff566c2f31a",
  "states": [
   "inventoried",
   "characterized",
@@ -2489,7 +2489,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 89,
+    "functionsVisited": 90,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9019 action()"
@@ -10289,7 +10289,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 61,
+    "functionsVisited": 62,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2784 updateCornersPanel()",
@@ -12016,7 +12016,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 73,
+    "functionsVisited": 74,
     "via": "chain",
     "references": [
      "src/js/timeline.js:3656 updateSelPropsPanel()",
@@ -12936,7 +12936,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 88,
+    "functionsVisited": 89,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6299 paintStrokeSwatches()"

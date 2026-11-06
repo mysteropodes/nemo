@@ -174,3 +174,35 @@ fn a_malformed_instance_view_is_not_an_answer() {
     missing.as_object_mut().unwrap().remove("explicit");
     assert!(!read::result(&payload, &missing));
 }
+
+const BREAK: &str = "command.document.object.component.breakApart";
+
+fn break_apart(extra: Value) -> Value {
+    let mut payload = json!({"command":"object.component.breakApart","contextId":"scene-root","layerUid":"layer-a"});
+    for (key, value) in extra.as_object().expect("object") {
+        payload[key] = value.clone();
+    }
+    payload
+}
+
+#[test]
+fn break_apart_names_a_context_and_a_layer_and_nothing_else() {
+    assert!(request(BREAK, &break_apart(json!({}))));
+    assert!(crate::native_contract::validate_request(BREAK, &break_apart(json!({}))));
+    for bad in [
+        json!({"extra":1}),
+        json!({"layerUid":""}),
+        json!({"layerUid":null}),
+        json!({"layerUid":7}),
+        json!({"contextId":null}),
+        json!({"command":"object.component.convert"}),
+    ] {
+        assert!(!request(BREAK, &break_apart(bad.clone())), "{bad}");
+    }
+    let mut missing = break_apart(json!({}));
+    missing.as_object_mut().unwrap().remove("layerUid");
+    assert!(!request(BREAK, &missing));
+    let mut no_context = break_apart(json!({}));
+    no_context.as_object_mut().unwrap().remove("contextId");
+    assert!(!request(BREAK, &no_context));
+}
