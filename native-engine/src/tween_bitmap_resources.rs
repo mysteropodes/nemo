@@ -18,28 +18,40 @@ pub(crate) fn prepare_tween_resources(
     drawing: ObjectDocument,
     bakes: Vec<BitmapTweenBake>,
 ) -> Result<PreparedTweenResources, Error> {
-    #[cfg(not(feature = "project_media_codec"))]
-    {
-        let _ = (origin, drawing, bakes);
-        Err(Error::Unavailable)
-    }
-    #[cfg(feature = "project_media_codec")]
-    prepare(origin, drawing, bakes)
+    prepare_tween_resources_in(origin, drawing, bakes, Ok)
 }
-#[cfg(feature = "project_media_codec")]
-fn prepare(
+/// #2358: the bakes of a tween planned on a PROJECTED component (the component is the scene of the kernels). `finish` writes the baked
+/// view drawing back into the real document (the component embedding) before the drawing is validated and published with the new resources.
+pub(crate) fn prepare_tween_resources_in(
     origin: &ObjectSnapshot,
     drawing: ObjectDocument,
     bakes: Vec<BitmapTweenBake>,
+    finish: impl FnOnce(ObjectDocument) -> Result<ObjectDocument, Error>,
 ) -> Result<PreparedTweenResources, Error> {
-    prepare_with(origin, drawing, bakes, |_, _| Ok(()))
+    #[cfg(not(feature = "project_media_codec"))]
+    {
+        let _ = (origin, drawing, bakes, finish);
+        Err(Error::Unavailable)
+    }
+    #[cfg(feature = "project_media_codec")]
+    prepare_finishing(origin, drawing, bakes, |_, _| Ok(()), finish)
+}
+#[cfg(all(test, feature = "project_media_codec"))]
+fn prepare_with(
+    origin: &ObjectSnapshot,
+    drawing: ObjectDocument,
+    bakes: Vec<BitmapTweenBake>,
+    before_bake: impl FnMut(usize, &ProjectEnvelope) -> Result<(), Error>,
+) -> Result<PreparedTweenResources, Error> {
+    prepare_finishing(origin, drawing, bakes, before_bake, Ok)
 }
 #[cfg(feature = "project_media_codec")]
-fn prepare_with(
+fn prepare_finishing(
     origin: &ObjectSnapshot,
     mut drawing: ObjectDocument,
     bakes: Vec<BitmapTweenBake>,
     mut before_bake: impl FnMut(usize, &ProjectEnvelope) -> Result<(), Error>,
+    finish: impl FnOnce(ObjectDocument) -> Result<ObjectDocument, Error>,
 ) -> Result<PreparedTweenResources, Error> {
     if bakes.len() > crate::object_codec::MAX_TWEEN_BAKES {
         return Err(Error::Unavailable);
@@ -127,6 +139,7 @@ fn prepare_with(
         target.item = serde_json::from_value(value).map_err(|_| Error::InvalidRequest)?;
     }
     drawing.items = ItemRecords::normalized(rasters, texts);
+    let drawing = finish(drawing)?;
     ObjectSnapshot::validate_drawing(&drawing).map_err(|_| Error::InvalidRequest)?;
     if crate::object_codec::item_asset_issue(&drawing, project.asset_inventory()).is_some() {
         return Err(Error::Unavailable);

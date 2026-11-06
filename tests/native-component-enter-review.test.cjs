@@ -170,7 +170,7 @@ test('a component DELETED while it is entered leaves the context during the revi
 test('nothing is edited while a component is presented: every write path refuses through the one scene-root guard', async () => {
   const f = fixture(); await f.open();
   const writers = (s) => ({ createLayer: s.createLayer, editProjectSettings: s.editProjectSettings, importBatch: s.importBatch, editLayerPolicy: s.editLayerPolicy,
-    editFrames: s.editFrames, toggleLayerVisibility: s.toggleLayerVisibility, editProperty: s.editProperty, editPropertyTrack: s.editPropertyTrack });
+    editFrames: s.editFrames, toggleLayerVisibility: s.toggleLayerVisibility });
   const before = writers(f.session);
   const reachable = Object.keys(before).filter((k) => typeof before[k] === 'function');
   assert.ok(reachable.length >= 1, 'the scene offers editors (' + reachable.join(',') + ')');
@@ -187,6 +187,12 @@ test('nothing is edited while a component is presented: every write path refuses
   await assert.rejects(f.session.setLayerVisibility('L1', false), /inside a component/);
   await assert.rejects(f.session.reference({ kind: 'remove' }), /inside a component/);
   await assert.rejects(f.session.reference(() => ({ kind: 'attach', id: 'x', sourcePath: '/p.png' })), /inside a component/);
+  // #2256 B-comp-edit-rest: the property editors are the one family also offered inside a component, through the COMPONENT lane only: a scene-root
+  // target (a stale scene binding) is refused before anything is sent.
+  const sceneTarget = { contextId: 'scene-root', layerUid: 'L1' };
+  assert.equal(typeof f.session.editProperty, 'function', 'the Motion property editor is offered inside a component');
+  await assert.rejects(f.session.editProperty({ command: 'object.property.edit', target: sceneTarget, property: 'opacity', action: { kind: 'setValue', frame: 0, values: [50] } }, f.session.info(), () => true), /not in the entered component/);
+  await assert.rejects(f.session.editPropertyTrack({ command: 'object.property.track.edit', selections: [{ target: sceneTarget, property: 'opacity', frame: 0 }], action: { kind: 'preset', preset: 'linear' } }, f.session.info(), () => true), /not in the entered component/);
   assert.equal(writes(), base, 'no write command reached the native owner');
   await Context.exit(f.root);
   assert.deepEqual(Object.keys(writers(f.session)).filter((k) => typeof writers(f.session)[k] === 'function'), reachable, 'the same editors are offered again on the scene');

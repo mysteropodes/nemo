@@ -14,7 +14,7 @@ function harness(options) {
   const o = options || {}, values = Object.assign({}, BASE, o.values), keys = o.keys || [], pan = { dx: o.dx || 0, dy: o.dy || 0 };
   const sandbox = { console, setTimeout, clearTimeout, setInterval: () => 0 };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
-  sandbox.state = { appMode: o.appMode || 'motion', tool: o.tool || 'select', currentFrame: o.frame === undefined ? 0 : o.frame, activeLayerIdx: 0, playing: false, activeSymbolId: null };
+  sandbox.state = { appMode: o.appMode || 'motion', tool: o.tool || 'select', currentFrame: o.frame === undefined ? 0 : o.frame, activeLayerIdx: 0, playing: false, activeSymbolId: o.component ? 'comp-a' : null };
   const toasts = [], reads = [], edits = [], listeners = [], frames = [];
   sandbox.showToast = (m) => toasts.push(m);
   let revision = 4, busyQueue = false, shown = null, shownKey = '';
@@ -25,7 +25,7 @@ function harness(options) {
     readPresentedObjectSession(why) {
       if (busyQueue) { if (why) why('queue-pending'); return null; }
       const key = revision + ':' + sandbox.state.currentFrame;
-      if (key !== shownKey) { shownKey = key; shown = Object.assign(info(), { kind: 'native-object', available: true, presentation: Object.assign(info(), { owner: 'native', status: 'presented', contextId: 'scene-root', frame: sandbox.state.currentFrame }) }); }
+      if (key !== shownKey) { shownKey = key; shown = Object.assign(info(), { kind: 'native-object', available: true, presentation: Object.assign(info(), { owner: 'native', status: 'presented', contextId: o.component ? 'comp-a' : 'scene-root', frame: sandbox.state.currentFrame }) }); }
       return shown;
     },
     async readProperty(selector) {
@@ -46,6 +46,7 @@ function harness(options) {
       return { ok: true, result: { applied: true, historyEntriesAdded: 1 } };
     },
   };
+  if (o.component) sandbox.NemoNativeComponentContext = { presented: () => ({ contextId: 'comp-a', totalFrames: 12, fps: 12 }), layers: () => [Object.assign({ layerUid: 'in-1', visible: true, locked: false }, o.row)] };
   sandbox.NemoNativeObjectProject = { desktop: () => session };
   sandbox.NemoNativeViewportUnderlay = { canvasMapping: Object.freeze({ bounds: () => ({ left: 0, top: 0, width: 960, height: 540 }), matchesView: () => true,
     point: (e) => ({ x: e.clientX - pan.dx, y: e.clientY - pan.dy }), screen: (p) => ({ x: p.x + pan.dx, y: p.y + pan.dy }) }) };
@@ -259,4 +260,29 @@ test('a layer the native read cannot box says so once instead of staying silent 
   assert.equal(h.edits.length, 0);
   const transient = harness({ boundsError: 'stale_revision' }); await transient.ready();
   assert.deepEqual(transient.toasts, [], 'only a typed unavailable is a notice');
+});
+
+// #2256 B-comp-edit-rest: the whole-layer gizmo on the active layer of an ENTERED component (baseline enterSymbol swapped state.layers, so the Motion
+// box worked on the component's layers). Every read and the edit carry the held context id and the entered row's uid.
+test('inside a component the gizmo is drawn for the entered row, every read and the edit carry the held context id', async () => {
+  const h = harness({ component: true });
+  await h.ready();
+  assert.ok(h.overlay(), 'the box is drawn');
+  assert.ok(h.reads.length >= 6 && plain(h.reads.map((v) => v.target.contextId)).every((id) => id === 'comp-a'));
+  assert.ok(h.reads.every((v) => v.target.layerUid === 'in-1'), 'the entered row, not the scene layer');
+  await h.drag([200, 150], [260, 170]);
+  assert.deepEqual(written(h), [{ property: 'position', action: { kind: 'setValue', frame: 0, values: [60, 20] } }]);
+  assert.deepEqual(plain(h.edits[0].payload.target), { contextId: 'comp-a', layerUid: 'in-1' });
+});
+test('inside a component a locked row, several selected rows and another mode take no gesture; the scene is unchanged', async () => {
+  for (const [name, opts, prep] of [['locked row', { component: true, row: { locked: true } }], ['anim2d', { component: true, appMode: 'anim2d' }],
+    ['several', { component: true }, (h) => { h.sandbox._layerSel = [0, 1]; }]]) {
+    const h = harness(opts); if (prep) prep(h);
+    await h.ready();
+    const { d } = await h.drag([200, 150], [260, 170]);
+    assert.equal(d.stopped, false, name);
+    assert.equal(h.edits.length, 0, name);
+  }
+  const scene = harness(); await scene.ready();
+  assert.ok(scene.reads.every((v) => v.target.contextId === 'scene-root' && v.target.layerUid === LAYER), 'the scene root keeps its own context');
 });

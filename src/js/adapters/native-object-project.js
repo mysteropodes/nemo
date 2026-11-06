@@ -388,7 +388,7 @@
       state:function(){return {info:info,presented:presentedSession(),ticket:subscriptionTicket,active:active(),
         opening:openingRequested,pending:pending,synchronizing:synchronizing,
         projectionReady:typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true};}});
-    var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,
+    var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,held:function(){return ports.context?ports.context():null;},runComponent:function(action){return runFontResource(action,true);},
       dispatchApplication:function(request){if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');return ports.dispatchApplication(request);},
       state:function(){return {info:info,presentation:presentation,ticket:subscriptionTicket,active:active(),opening:openingRequested,pending:pending,
         synchronizing:synchronizing,subscribed:!!subscription,presentationCurrent:active()&&!synchronizing&&presentation&&same(info,presentation),
@@ -475,7 +475,7 @@
       if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.restoreInspector)root.NemoNativeObjectUI.restoreInspector(root);
       return false;
     }
-    var entered=root.NemoNativeComponentContext;if(entered&&!session.isIndeterminate()&&entered.paint(root,frameOnly))return true; // #2256: an entered component paints read-only
+    var entered=root.NemoNativeComponentContext;if(entered&&!session.isIndeterminate()&&entered.paint(root,frameOnly)){if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.paintMotionHeld)root.NemoNativeObjectUI.paintMotionHeld(root,nativeObjectUiPorts(root));return true;} // #2256: an entered component paints its own timeline; the Motion inspector reads the entered rows
     var ports=nativeObjectUiPorts(root);
     try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info(),frameOnly,ports)!==true)
       throw new Error('Native document UI presentation is unavailable');
