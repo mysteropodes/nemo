@@ -338,12 +338,12 @@ test('#2520: the 3D switch is saved with a revision and no history entry; the re
 });
 test('#2520: a row of a kind the engine cannot place in 3D shows no 3D cell; every other row does, and a stored switch stays switchable off',async()=>{
   const h=await open();assert.ok(threeDCell(h),'a drawing row (no kind fact) keeps its cell');
-  for(const kind of ['image','sequence','null','folder','effect','widget','guide']){
+  for(const kind of ['image','sequence','null','folder','effect','widget','guide','text']){
     await h.external('kind',kind);h.render();assert.equal(h.session.info().layers[0].kind,kind);
     assert.ok(threeDCell(h),kind+' row offers the 3D switch');
   }
-  await h.external('kind','text');h.render();assert.equal(h.session.info().layers[0].kind,'text');
-  assert.equal(threeDCell(h),undefined,'a text row offers no 3D switch');
+  await h.external('kind','component');h.render();assert.equal(h.session.info().layers[0].kind,'component');
+  assert.equal(threeDCell(h),undefined,'a component row offers no 3D switch');
   await h.external('threeD',true);h.render();
   assert.equal(threeDCell(h).dataset.nativeLayerThreeD,'true','an imported switch that is already on can still be switched off');
 });

@@ -349,7 +349,10 @@ pub(crate) fn duplicator_geometry(
         segments =
             motion::apply_element_motion(packet.snapshot(), record, packet.frame(), segments)?;
     }
-    segments = motion::apply_duplicator_layer_position(packet, record, layer_index, segments)?;
+    // A 3D layer's Position is part of its Pose3D: the projector replaces the 2D layer Position (baseline `is3D`).
+    if layer.three_d.value() != Some(&true) {
+        segments = motion::apply_duplicator_layer_position(packet, record, layer_index, segments)?;
+    }
     Ok((segments, record.geometry.closed))
 }
 

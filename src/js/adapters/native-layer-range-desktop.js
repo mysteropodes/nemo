@@ -166,7 +166,7 @@
       boxUpdate(root,w);
     }catch(_){clearKeys(w);try{keyRows(root,w,[]);}catch(_){}notice(root,'Native key timeline coordinates are unavailable.');}
   }
-  // A press on a connector selects its two end keys (baseline: "le trait est une cible").
+  // A press on a connector selects its two end keys (baseline: "le trait est une cible") and moves the playhead to the first of them.
   function pickSpan(root,w,event,track,a,b){
     event.preventDefault();event.stopPropagation();if(event.button!==undefined&&event.button!==0)return;
     try{
@@ -175,6 +175,10 @@
       if(live.selectKeys([keyAddress(track,a.frame),keyAddress(track,b.frame)])!==true)throw Error('Native key selection refused');
       refreshKeys(root);
       if(event.detail!==0)dragSpan(root,w,event,track,a,b);
+      // Baseline motion.js: the press then moves the playhead to the connector's first key (goToFrame(keyA.frame)).
+      if(a.frame!==root.state.currentFrame&&typeof root.goToFrame==='function'){
+        var jump=root.goToFrame(a.frame);if(jump&&typeof jump.catch==='function')jump.catch(function(){notice(root,'The playhead could not move to the key.');});
+      }
     }catch(_){notice(root,'Native key selection is unavailable or stale.');}
   }
   // #2377: dragging a connector moves its two end keys by one delta; Alt retimes the second key alone (baseline motion.js connector drag).

@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use vello::kurbo::{Rect, Shape};
 
 #[path = "object_scene_parent_curve.rs"]
-mod curve;
+pub(crate) mod curve;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ChainUnavailable {
