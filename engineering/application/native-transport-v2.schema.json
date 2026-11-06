@@ -5458,6 +5458,10 @@
         "cell"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.insert"
         },
@@ -5484,6 +5488,10 @@
         "count"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.extend"
         },
@@ -5506,6 +5514,10 @@
         "cell"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.duplicate"
         },
@@ -5526,6 +5538,10 @@
         "to"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.frames.remove"
         },
@@ -5545,6 +5561,10 @@
         "cells"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.key.promote"
         },
@@ -5577,6 +5597,10 @@
         "cell"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.key.blank"
         },
@@ -5597,6 +5621,10 @@
         "cell"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.key.clear"
         },
@@ -5616,6 +5644,10 @@
         "targets"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.key.clear_cells"
         },
@@ -5640,6 +5672,10 @@
         "to"
       ],
       "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "The declared component the edit works inside (#2256); absent is the scene root."
+        },
         "command": {
           "const": "object.layer.tween.remove"
         },

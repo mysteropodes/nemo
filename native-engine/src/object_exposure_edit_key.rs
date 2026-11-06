@@ -19,6 +19,7 @@
 use crate::commands::object_fill_owner::object_frame_edit_document::{
     clear_cells, clear_key, demote_span, promote_cells, DocumentEdit, FrameEditError,
 };
+use crate::commands::object_fill_owner::object_context_projection::{context_of, through};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{object_deserialize, ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;
@@ -50,6 +51,8 @@ struct KeyPayload {
     targets: Presence<Vec<CellTarget>>,
     from: Presence<u32>,
     to: Presence<u32>,
+    /// #2256: the declared component the edit works inside; absent is the scene root.
+    context_id: Presence<String>,
 }
 object_deserialize!(KeyPayload {
     command: String,
@@ -59,7 +62,8 @@ object_deserialize!(KeyPayload {
     #[serde(default)] cell: Presence<u32>,
     #[serde(default)] targets: Presence<Vec<CellTarget>>,
     #[serde(default)] from: Presence<u32>,
-    #[serde(default)] to: Presence<u32>
+    #[serde(default)] to: Presence<u32>,
+    #[serde(default)] context_id: Presence<String>
 });
 
 /// One typed operation; every command admits exactly its own fields.
@@ -120,6 +124,7 @@ impl KeyPayload {
             targets,
             from,
             to,
+            context_id: _,
         } = self;
         match command.as_str() {
             "object.layer.key.promote" => {
@@ -391,12 +396,15 @@ impl ObjectFillOwner {
         }
         let payload: KeyPayload =
             serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        let context = context_of(&payload.context_id)?.to_owned();
         let operation = payload.operation()?;
         let origin = self.current_snapshot();
-        let document = match plan(origin.document(), &operation)? {
-            DocumentEdit::Changed(next) => Some(next),
-            DocumentEdit::NoChange => None,
-        };
+        let document = through(origin.document(), &context, |view| {
+            match plan(view, &operation)? {
+                DocumentEdit::Changed(next) => Ok(Some(next)),
+                DocumentEdit::NoChange => Ok(None),
+            }
+        })?;
         Ok(PreparedExposureKey {
             origin,
             document,

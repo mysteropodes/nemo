@@ -53,7 +53,7 @@
     'command.document.object.frames.repeat': 'object.frames.repeat'
   });
   var OPERATIONS = Object.freeze(Object.keys(COMMANDS));
-  var OPAQUE_PATH = /^payload\.(?:layerUid|activeLayerUid|fromLayerUid|toLayerUid)$|^payload\.layerUids\.\d+$|^payload\.(?:targets|selection)\.\d+\.layerUid$/;
+  var OPAQUE_PATH = /^payload\.(?:contextId|layerUid|activeLayerUid|fromLayerUid|toLayerUid)$|^payload\.layerUids\.\d+$|^payload\.(?:targets|selection)\.\d+\.layerUid$/;
 
   function has(value, key) { return Object.prototype.hasOwnProperty.call(value, key); }
   function fail(message) { throw new TypeError(message); }
@@ -86,6 +86,8 @@
       seen.add(token);
     });
   }
+  // #2256: the optional declared component an edit works inside (absent is the scene root); the native owner resolves it.
+  function context(p) { if (has(p, 'contextId')) uid(p.contextId, 'contextId'); }
   function layerList(value, label) { list(value, label, function (item) { uid(item, label + ' entry'); }); }
   function cell(value) {
     exact(value, ['layerUid', 'frame'], [], 'cell reference');
@@ -168,37 +170,37 @@
       uid(p.instanceId, 'instanceId'); uid(p.documentId, 'documentId'); uid(p.layerUid, 'layerUid'); u32(p.frame, 'frame'); packetCells(p.cells);
     },
     'object.frames.insert': function (p) {
-      exact(p, ['command', 'cell'], ['layerUids'], 'frames insert');
-      u32(p.cell, 'cell'); if (has(p, 'layerUids')) layerList(p.layerUids, 'layerUids');
+      exact(p, ['command', 'cell'], ['layerUids', 'contextId'], 'frames insert');
+      context(p); u32(p.cell, 'cell'); if (has(p, 'layerUids')) layerList(p.layerUids, 'layerUids');
     },
     'object.frames.extend': function (p) {
-      exact(p, ['command', 'cell', 'count'], [], 'frames extend');
-      u32(p.cell, 'cell'); u32(p.count, 'count');
+      exact(p, ['command', 'cell', 'count'], ['contextId'], 'frames extend');
+      context(p); u32(p.cell, 'cell'); u32(p.count, 'count');
       if (p.count > MAX_EXTEND) fail('count exceeds the frame-count field bound');
     },
     'object.frames.duplicate': function (p) {
-      exact(p, ['command', 'layerUid', 'cell'], [], 'frames duplicate'); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
+      exact(p, ['command', 'layerUid', 'cell'], ['contextId'], 'frames duplicate'); context(p); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
     },
     'object.frames.remove': function (p) {
-      exact(p, ['command', 'from', 'to'], [], 'frames remove'); u32(p.from, 'from'); u32(p.to, 'to');
+      exact(p, ['command', 'from', 'to'], ['contextId'], 'frames remove'); context(p); u32(p.from, 'from'); u32(p.to, 'to');
     },
     'object.layer.key.promote': function (p) {
-      exact(p, ['command', 'cells'], ['layerUids'], 'key promote');
+      exact(p, ['command', 'cells'], ['layerUids', 'contextId'], 'key promote'); context(p);
       list(p.cells, 'cells', function (item) { u32(item, 'cell'); });
       if (has(p, 'layerUids')) layerList(p.layerUids, 'layerUids');
     },
     'object.layer.key.blank': function (p) {
-      exact(p, ['command', 'layerUid', 'cell'], [], 'key blank'); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
+      exact(p, ['command', 'layerUid', 'cell'], ['contextId'], 'key blank'); context(p); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
     },
     'object.layer.key.clear': function (p) {
-      exact(p, ['command', 'layerUid', 'cell'], [], 'key clear'); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
+      exact(p, ['command', 'layerUid', 'cell'], ['contextId'], 'key clear'); context(p); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
     },
     'object.layer.key.clear_cells': function (p) {
-      exact(p, ['command', 'targets'], [], 'clear cells'); list(p.targets, 'targets', cell, cellKey);
+      exact(p, ['command', 'targets'], ['contextId'], 'clear cells'); context(p); list(p.targets, 'targets', cell, cellKey);
     },
     'object.layer.tween.remove': function (p) {
-      exact(p, ['command', 'layerUid', 'from', 'to'], [], 'tween remove');
-      uid(p.layerUid, 'layerUid'); u32(p.from, 'from'); u32(p.to, 'to');
+      exact(p, ['command', 'layerUid', 'from', 'to'], ['contextId'], 'tween remove');
+      context(p); uid(p.layerUid, 'layerUid'); u32(p.from, 'from'); u32(p.to, 'to');
     },
     'object.layer.key.move': function (p) {
       exact(p, ['command', 'layerUid', 'from', 'to'], ['activeLayerUid'], 'key move');

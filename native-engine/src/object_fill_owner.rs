@@ -58,6 +58,9 @@ pub(crate) use group_edit::{PreparedBooleanEdit, PreparedGroupEdit};
 #[path = "object_frame_edit_document.rs"]
 #[allow(dead_code)]
 mod object_frame_edit_document;
+// #2256: a declared component as the scene of the document-level timing kernels (project / embed).
+#[path = "object_context_projection.rs"]
+mod object_context_projection;
 // L05-C (lane #2111): sealed insert / extend / duplicate / remove frame transactions.
 #[path = "object_frame_edit_structure.rs"]
 mod object_frame_edit_structure;

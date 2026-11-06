@@ -8,6 +8,7 @@
 //! Only scene-root timing is admitted. Reference/other-context records, property
 //! holders, assets, other layers and frames, total length and component interiors stay.
 use crate::commands::object_fill_owner::object_frame_edit_document::drop_cells;
+use crate::commands::object_fill_owner::object_context_projection::{context_of, through};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_component_record_kernels::object_component_records::FrameKey;
 use crate::object_document::{
@@ -28,11 +29,14 @@ struct BlankKeyPayload {
     command: String,
     layer_uid: String,
     cell: u32,
+    /// #2256: the declared component the edit works inside; absent is the scene root.
+    context_id: Presence<String>,
 }
 object_deserialize!(BlankKeyPayload {
     command: String,
     layer_uid: String,
-    cell: u32
+    cell: u32,
+    #[serde(default)] context_id: Presence<String>
 });
 
 fn targeted(target: &ObjectTarget, layer: &str, cell: u32) -> bool {
@@ -213,8 +217,12 @@ impl ObjectFillOwner {
         if payload.command != COMMAND || payload.layer_uid.is_empty() {
             return Err(DispatchErrorCode::InvalidRequest);
         }
+        let context = context_of(&payload.context_id)?.to_owned();
         let origin = self.current_snapshot();
-        let document = plan(origin.document(), &payload.layer_uid, payload.cell)?;
+        let document = through(origin.document(), &context, |view| {
+            plan(view, &payload.layer_uid, payload.cell).map(Some)
+        })?
+        .ok_or(DispatchErrorCode::Internal)?;
         Ok(PreparedBlankKey { origin, document })
     }
 
