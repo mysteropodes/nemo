@@ -4630,6 +4630,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-layer-three-d.js",
+      "moduleId": "app.native.layer-three-d.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2707,
+          "scriptOrdinal": 356
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-motion-layer-link-rows.js",
       "moduleId": "app.native.layer-parent.adapter",
       "executionClass": "document-classic",
@@ -4871,6 +4883,18 @@
     },
     {
       "path": "src/js/adapters/native-motion-effector.js",
+      "moduleId": "app.native.motion.properties.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2482,
+          "scriptOrdinal": 155
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-motion-gizmo-3d.js",
       "moduleId": "app.native.motion.properties.adapter",
       "executionClass": "document-classic",
       "loadSites": [

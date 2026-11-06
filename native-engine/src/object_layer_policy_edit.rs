@@ -10,7 +10,7 @@ struct LayerPolicyPayload {
     command: String,
     layer_uid: String,
     flag: String,
-    // bool for locked/shy; null or an in/out/layer string for keyLock.
+    // bool for locked/shy/threeD; null or an in/out/layer string for keyLock.
     value: serde_json::Value,
 }
 object_deserialize!(LayerPolicyPayload {
@@ -24,6 +24,7 @@ object_deserialize!(LayerPolicyPayload {
 enum LayerPolicyIntent {
     Locked(bool),
     Shy(bool),
+    ThreeD(bool),
     KeyLock(Option<KeyLockMode>),
 }
 
@@ -60,6 +61,8 @@ impl ObjectFillOwner {
         let intent = match (payload.flag.as_str(), flag_value) {
             ("locked", Some(value)) => LayerPolicyIntent::Locked(value),
             ("shy", Some(value)) => LayerPolicyIntent::Shy(value),
+            // #2520/#2525: the baseline `toggleLayer3D` flag; false and absent read the same, so a no-op authors nothing.
+            ("threeD", Some(value)) => LayerPolicyIntent::ThreeD(value),
             ("keyLock", None) => LayerPolicyIntent::KeyLock(match payload.value.as_str() {
                 None if payload.value.is_null() => None,
                 Some("in") => Some(KeyLockMode::In),
@@ -87,6 +90,7 @@ impl ObjectFillOwner {
         let changed = match intent {
             LayerPolicyIntent::Locked(value) => set_flag(&mut layer.locked, value),
             LayerPolicyIntent::Shy(value) => set_flag(&mut layer.shy, value),
+            LayerPolicyIntent::ThreeD(value) => set_flag(&mut layer.three_d, value),
             LayerPolicyIntent::KeyLock(mode) => {
                 // Missing and explicit null both read as no lock; only a real
                 // change authors the field (clearing writes the baseline null).

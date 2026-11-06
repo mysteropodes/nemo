@@ -11,18 +11,19 @@
  * locks) move one effector anchor through ONE `object.duplicator.config` `effectorPos` edit, a static setting and never a key; a layer the native read cannot box (text, effect, rig, 3D, expression) says so once in a notice instead of staying silent. The pointer listeners stay on `document` in the capture phase (CLAUDE.md section 13). This file never reads or writes a JS layer record. */
 (function (root, factory) {
   const CJS = typeof module === 'object' && module.exports;
-  const api = factory(CJS ? require('./native-motion-canvas-math.js') : root.NemoNativeMotionCanvasMath, CJS ? require('./native-motion-effector.js') : root.NemoNativeMotionEffector);
+  const api = factory(CJS ? require('./native-motion-canvas-math.js') : root.NemoNativeMotionCanvasMath, CJS ? require('./native-motion-effector.js') : root.NemoNativeMotionEffector,
+    CJS ? require('./native-motion-gizmo-3d.js') : root.NemoNativeMotionGizmo3d);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else {
     root.NemoNativeMotionCanvas = api;
     if (root.document && typeof root.document.addEventListener === 'function') { try { api.desktop(root).install(); } catch (_) { /* nothing to listen on */ } }
   }
-}(typeof globalThis === 'object' ? globalThis : this, function (Math2, Eff) {
+}(typeof globalThis === 'object' ? globalThis : this, function (Math2, Eff, Giz) {
   'use strict';
   const SVG = 'http://www.w3.org/2000/svg', PIN = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   const HANDLE = 'rgba(255,184,108,.9)', BLUE = 'rgba(74,158,255,.86)', RING = 'rgba(74,158,255,.67)', PATH = 'rgba(120,170,255,.8)', WHITE = 'rgba(255,255,255,1)', ACCENT = 'rgba(255,184,108,1)', DOT = 'rgba(230,230,230,1)', CUR = 'rgba(255,170,40,1)';
   const THRESHOLD = 3, MAX_KEY_PAGES = 4, MAX_FRAME_DOTS = 120, round = (v) => Math.round(v * 1e6) / 1e6;
-  const UNBOXED = 'The Motion box is not available for this layer on a native project (text, effect, rig, 3D and expression-driven layers have none yet). Use the property fields.';
+  const UNBOXED = 'The Motion box is not available for this layer on a native project (text, effect, rig and expression-driven layers have none yet). Use the property fields.';
 
   function create(win) {
     let cached = null, noticed = '', serial = 0, drag = null, busy = false, overlay = null, queued = false, watching = false, signature = '';
@@ -72,7 +73,13 @@
         if (page.nextOffset === null || page.nextOffset === undefined) break;
         offset = page.nextOffset;
       }
-      return { layerUid: layer.layerUid, locked: layer.locked === true, outer: geo.parentAffine, bounds: geo.bounds, position, anchor, rotation: rotation[0], scale, keys, effectors: await effectors };
+      // A 3D layer (the baseline `ld.threeD`) swaps the box for the 3D gizmo: its three extra values and the canvas size give the pose it is drawn from.
+      let pose3d = null;
+      if (layer.threeD === true) {
+        const [z, rx, ry] = await Promise.all([raw('positionZ'), raw('rotationX'), raw('rotationY')]);
+        pose3d = Giz.pose({ bounds: geo.bounds, position, anchor, rotation: rotation[0], positionZ: z[0], rotationX: rx[0], rotationY: ry[0], canvasW: proof.info.canvasW, canvasH: proof.info.canvasH });
+      }
+      return { layerUid: layer.layerUid, locked: layer.locked === true, outer: geo.parentAffine, bounds: geo.bounds, position, anchor, rotation: rotation[0], scale, keys, pose3d, effectors: await effectors };
     }
     // A typed refusal of the geometry read means this layer has no box to follow: say so once per layer instead of drawing nothing.
     function unboxed(error, layer) {
@@ -146,7 +153,8 @@
       const effs = entry && map ? Eff.preview(entry.read.effectors, drag && drag.preview && drag.preview.effector) : [];
       if (!l && !effs.length) return;
       const c = client(map), scale = pxPerUnit(map);
-      if (l) drawBox(svg, entry, l, c, scale, prev);
+      if (l) drawBox(svg, entry, l, c, scale, prev, !!entry.read.pose3d);
+      if (l && entry.read.pose3d) draw3d(svg, entry.read, Giz.preview(entry.read.pose3d, prev), c);
       effs.forEach((h) => drawEffector(svg, Eff.glyph(h, entry.read.outer, c, scale)));
     }
     // The effector handle of motion.js@1065e9d8: a crosshair in a circle, plus a thin ring of the effector's own radius.
@@ -157,7 +165,17 @@
       svg.appendChild(node('circle', { cx: g.c.x, cy: g.c.y, r: g.dot, fill: 'none', stroke: col, 'stroke-width': 1.5 }));
       svg.appendChild(node('circle', { cx: g.c.x, cy: g.c.y, r: g.ring, fill: 'none', stroke: 'rgba(255,120,220,.35)', 'stroke-width': 1 }));
     }
-    function drawBox(svg, entry, l, c, scale, prev) {
+    // The 3D gizmo of motion.js@1065e9d8: three coloured arrows along the layer's local axes with a head each, and three translucent rings.
+    function draw3d(svg, read, pose, c) {
+      const through = (q) => c(Giz.through(read.outer, q)), arrows = Giz.arrows(pose), rings = Giz.rings(pose), col = (k, a) => 'rgba(' + Giz.COLORS[k].slice(0, 3).concat(a).join(',') + ')';
+      Giz.AXES.forEach((k) => {
+        const o = through(arrows[k].origin), t = through(arrows[k].tip);
+        svg.appendChild(node('line', { x1: o.x, y1: o.y, x2: t.x, y2: t.y, stroke: col(k, 1), 'stroke-width': 2.2 }));
+        svg.appendChild(node('polygon', { points: Giz.head(t, o, 9, 4).map(pt).join(' '), fill: col(k, 1), stroke: 'none' }));
+      });
+      Giz.AXES.forEach((k) => svg.appendChild(node('polygon', { points: rings[k].map((q) => pt(through(q))).join(' '), fill: 'none', stroke: col(k, 0.59), 'stroke-width': 1.4 })));
+    }
+    function drawBox(svg, entry, l, c, scale, prev, flat) {
       const color = drag ? ACCENT : BLUE;
       const keys = Math2.path(l, keysNow(entry, prev), easing());
       if (keys.dots.length) {
@@ -179,8 +197,8 @@
         });
       }
       const box = ['nw', 'ne', 'se', 'sw'].map((k) => c(l.corners[k]));
-      svg.appendChild(node('polygon', { points: box.map(pt).join(' '), fill: 'none', stroke: color, 'stroke-width': 1.2 }));
-      if (!l.isNull) {
+      if (!flat) svg.appendChild(node('polygon', { points: box.map(pt).join(' '), fill: 'none', stroke: color, 'stroke-width': 1.2 })); // the 3D gizmo replaces the box
+      if (!l.isNull && !flat) {
         Math2.EDGES.forEach((k) => { const p = c(l.corners[k]), r = k.length === 2 ? 3.8 : 3; svg.appendChild(node('rect', { x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r, fill: WHITE, stroke: color, 'stroke-width': 1 })); });
         const ring = c(l.pivot);
         svg.appendChild(node('circle', { cx: ring.x, cy: ring.y, r: l.ringRadius * scale, fill: 'none', stroke: RING, 'stroke-width': 1.1 }));
@@ -206,9 +224,12 @@
       let found = null;
       const probe = (body) => {
         const grabs = Math2.path(l, entry.read.keys);
-        return Math2.hit(l, pointer, { client: c, pxPerUnit: pxPerUnit(map), alt: !!e.altKey, body, dots: grabs.dots, handles: grabs.handles, frame: entry.proof.selector.frame });
+        return Math2.hit(l, pointer, { client: c, pxPerUnit: pxPerUnit(map), alt: !!e.altKey, body, dots: grabs.dots, handles: grabs.handles, frame: entry.proof.selector.frame, noBox: !!entry.read.pose3d });
       };
-      if (l) found = probe(false);
+      // The 3D arrows and rings are the precise grab of a 3D layer and win over its key dots and anchor, as the baseline orders them.
+      const g3 = l && entry.read.pose3d ? Giz.hit(entry.read.pose3d, entry.read.outer, c, pointer) : null;
+      if (g3) found = Giz.begin(g3, entry.read.pose3d, entry.read.outer, world);
+      if (!found && l) found = probe(false);
       if (!found) found = Eff.hit(entry.read.effectors, entry.read.outer, c, pointer);
       if (!found && l && st.tool === 'select') found = probe(true); // the body of the box is the last grab, as the layer move of select-bridge is
       if (!found) return;
@@ -229,7 +250,7 @@
         paint();
         return;
       }
-      const out = Math2.drag(drag.mode, drag.layout, drag.from, to, { shift: !!e.shiftKey });
+      const out = drag.mode.type === 'axis3d' || drag.mode.type === 'ring3d' ? Giz.drag(drag.mode, to) : Math2.drag(drag.mode, drag.layout, drag.from, to, { shift: !!e.shiftKey });
       drag.preview = out && out.values ? out : null;
       paint();
     }

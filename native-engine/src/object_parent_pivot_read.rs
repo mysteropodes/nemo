@@ -73,8 +73,8 @@ pub(crate) fn layers_world_union(
 
 /// The layer's own bounds `[x0, y0, x1, y1]` before its Motion, for ANY layer that shows geometry at `frame`: the strict
 /// vector extents of `layer_pivot_extents`, else the extents of a mask or a duplicated source, else the display rectangles
-/// of its image and raster records. The baseline gizmo boxes every one of these (`motionBoxGeom`); text, effect, rig, 3D and
-/// widget layers stay refused with a reason the caller shows.
+/// of its image and raster records. The baseline gizmo boxes every one of these (`motionBoxGeom`), and a 3D layer's own gizmo
+/// pivots about the same bounds; text, effect, rig and widget layers stay refused with a reason the caller shows.
 #[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
 pub(crate) fn layer_gizmo_bounds(
     snapshot: &ObjectSnapshot,
@@ -346,7 +346,9 @@ fn bases(
         } else {
             !layer.is_effect_layer() && layer.widget.value().is_none()
         };
-        if !boxable || layer.three_d.value() == Some(&true) || layer.rig().is_some() {
+        // The strict pivot (reparenting keep-pose) still refuses 3D; the gizmo read (#2520/#2525) answers a 3D layer's own
+        // rest bounds, the centre the baseline `gizmo3DPose` pivots about.
+        if !boxable || (strict && layer.three_d.value() == Some(&true)) || layer.rig().is_some() {
             return Err("the layer has no complete native pivot (text, image, mask, effect, 3D or rig content)");
         }
         if let Some(base) = layer
