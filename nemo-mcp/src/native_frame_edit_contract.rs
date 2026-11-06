@@ -246,28 +246,30 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
         KEY_MOVE => exact(
             value,
             &["command", "layerUid", "from", "to"],
-            &["activeLayerUid"],
+            &["activeLayerUid", "contextId"],
         )
         .is_some_and(|p| {
             command_is(p, "object.layer.key.move")
+                && context(p)
                 && span(p)
                 && p.get("activeLayerUid")
                     .is_none_or(|value| name(Some(value)))
         }),
-        SELECTION_DUPLICATE => exact(value, &["command", "layerUid", "selection"], &[])
+        SELECTION_DUPLICATE => exact(value, &["command", "layerUid", "selection"], &["contextId"])
             .is_some_and(|p| {
                 command_is(p, "object.frames.clipboard.duplicate")
+                    && context(p)
                     && name(p.get("layerUid"))
                     && unique_cells(p.get("selection"))
             }),
         CLIPBOARD_COPY | CLIPBOARD_CUT => {
-            exact(value, &["command", "selection"], &[]).is_some_and(|p| {
+            exact(value, &["command", "selection"], &["contextId"]).is_some_and(|p| {
                 let command = if operation == CLIPBOARD_COPY {
                     "object.frames.clipboard.copy"
                 } else {
                     "object.frames.clipboard.cut"
                 };
-                command_is(p, command) && clipboard_selection(p.get("selection"))
+                command_is(p, command) && context(p) && clipboard_selection(p.get("selection"))
             })
         }
         CLIPBOARD_PASTE => exact(
@@ -280,10 +282,11 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
                 "frame",
                 "cells",
             ],
-            &[],
+            &["contextId"],
         )
         .is_some_and(|p| {
             command_is(p, "object.frames.clipboard.paste")
+                && context(p)
                 && name(p.get("instanceId"))
                 && name(p.get("documentId"))
                 && name(p.get("layerUid"))
@@ -292,8 +295,14 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
         }),
         RANGE_DRAG => layer_shift::request(value),
         MOVE => {
-            exact(value, &["command", "selection", "layerUid", "frame"], &[]).is_some_and(|p| {
+            exact(
+                value,
+                &["command", "selection", "layerUid", "frame"],
+                &["contextId"],
+            )
+            .is_some_and(|p| {
                 command_is(p, "object.frames.move")
+                    && context(p)
                     && clipboard_selection(p.get("selection"))
                     && name(p.get("layerUid"))
                     && frame(p.get("frame")).is_some()
@@ -309,10 +318,11 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
                 "toFrame",
                 "times",
             ],
-            &[],
+            &["contextId"],
         )
         .is_some_and(|p| {
             command_is(p, "object.frames.repeat")
+                && context(p)
                 && name(p.get("fromLayerUid"))
                 && name(p.get("toLayerUid"))
                 && frame(p.get("fromFrame")).is_some()

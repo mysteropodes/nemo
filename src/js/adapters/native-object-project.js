@@ -489,7 +489,7 @@
   function selectLayerUI(root,index,preserveLayerSel,uid,expected){
     var session=uiSession(root);if(!session)return false;
     if(expected&&!same(session.info(),expected))return true;
-    if(root.NemoNativeComponentContext&&root.NemoNativeComponentContext.presented(root))return true; // #2256: no scene selection inside a component
+    var inside=root.NemoNativeComponentContext;if(inside&&inside.presented(root)){inside.selectLayer(root,index);return true;} // #2256: inside a component the component's own layer is activated, never a scene row
     try{if(!root.NemoNativeObjectUI)throw new Error('Native document UI selection is unavailable');
       root.NemoNativeObjectUI.select(root,session.info(),index,preserveLayerSel,uid,session.readPresentedObjectSession(),nativeObjectUiPorts(root));}
     catch(error){return uiFailure(root,error);}

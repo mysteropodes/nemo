@@ -80,14 +80,18 @@
       var name = node(host, 'span', 'lnm', layer.name); name.title = layer.name + ' — ' + layer.layerKind;
       row.appendChild(ico); row.appendChild(name);
       row.addEventListener('click', function () { if (ports.current()) ports.select(i); });
+      // The eye, the padlock and the row menu: layer-level edits of the component (native-component-layer-edit.js), one native request each.
+      if (host.NemoNativeComponentLayerEdit) host.NemoNativeComponentLayerEdit.decorate(host, row, layer, i);
       return row;
     });
+    // The selected cells stay painted across a repaint (the legacy selection helpers keep them in `_sel.frames`).
+    var picked = new Set((host._sel && Array.isArray(host._sel.frames) ? host._sel.frames : []).map(function (c) { return c.layer + ':' + c.frame; }));
     var frows = st.rows.map(function (layer, i) {
       var row = node(host, 'div', 'frow native-component-row' + (i === active ? ' act' : '')), cells = [];
       row.dataset.layer = String(i); row.dataset.layerUid = layer.layerUid; row.style.position = 'relative'; row.style.width = (st.totalFrames * fc) + 'px';
       if (layer.color) { row.style.setProperty('--dot-color', layer.color); }
       for (var fi = 0; fi < st.totalFrames; fi += 1) {
-        var cell = node(host, 'div', 'fc' + (fi === frame ? ' cur' : '') + (fi < s.waIn || fi > s.waOut ? ' outside-wa' : '')); cell.dataset.frame = String(fi); cell.dataset.layer = String(i);
+        var cell = node(host, 'div', 'fc' + (fi === frame ? ' cur' : '') + (fi < s.waIn || fi > s.waOut ? ' outside-wa' : '') + (picked.has(i + ':' + fi) ? ' sel' : '')); cell.dataset.frame = String(fi); cell.dataset.layer = String(i);
         if (layer.color) cell.style.setProperty('--dot-color', layer.color);
         cells.push(cell); row.appendChild(cell);
       }

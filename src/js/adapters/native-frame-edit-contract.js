@@ -163,10 +163,10 @@
   }
   var SHAPES = {
     'object.layer.range.drag': rangeDrag,
-    'object.frames.clipboard.copy': function (p) { exact(p, ['command', 'selection'], [], 'clipboard copy'); selectedCells(p.selection); },
-    'object.frames.clipboard.cut': function (p) { exact(p, ['command', 'selection'], [], 'clipboard cut'); selectedCells(p.selection); },
+    'object.frames.clipboard.copy': function (p) { exact(p, ['command', 'selection'], ['contextId'], 'clipboard copy'); context(p); selectedCells(p.selection); },
+    'object.frames.clipboard.cut': function (p) { exact(p, ['command', 'selection'], ['contextId'], 'clipboard cut'); context(p); selectedCells(p.selection); },
     'object.frames.clipboard.paste': function (p) {
-      exact(p, ['command', 'instanceId', 'documentId', 'layerUid', 'frame', 'cells'], [], 'clipboard paste');
+      exact(p, ['command', 'instanceId', 'documentId', 'layerUid', 'frame', 'cells'], ['contextId'], 'clipboard paste'); context(p);
       uid(p.instanceId, 'instanceId'); uid(p.documentId, 'documentId'); uid(p.layerUid, 'layerUid'); u32(p.frame, 'frame'); packetCells(p.cells);
     },
     'object.frames.insert': function (p) {
@@ -203,20 +203,20 @@
       context(p); uid(p.layerUid, 'layerUid'); u32(p.from, 'from'); u32(p.to, 'to');
     },
     'object.layer.key.move': function (p) {
-      exact(p, ['command', 'layerUid', 'from', 'to'], ['activeLayerUid'], 'key move');
+      exact(p, ['command', 'layerUid', 'from', 'to'], ['activeLayerUid', 'contextId'], 'key move'); context(p);
       if (has(p, 'activeLayerUid')) uid(p.activeLayerUid, 'activeLayerUid');
       uid(p.layerUid, 'layerUid'); u32(p.from, 'from'); u32(p.to, 'to');
     },
     'object.frames.clipboard.duplicate': function (p) {
-      exact(p, ['command', 'layerUid', 'selection'], [], 'selection duplicate');
+      exact(p, ['command', 'layerUid', 'selection'], ['contextId'], 'selection duplicate'); context(p);
       uid(p.layerUid, 'layerUid'); list(p.selection, 'selection', cell, cellKey);
     },
     'object.frames.move': function (p) {
-      exact(p, ['command', 'selection', 'layerUid', 'frame'], [], 'frames move');
+      exact(p, ['command', 'selection', 'layerUid', 'frame'], ['contextId'], 'frames move'); context(p);
       selectedCells(p.selection); uid(p.layerUid, 'layerUid'); u32(p.frame, 'frame');
     },
     'object.frames.repeat': function (p) {
-      exact(p, ['command', 'fromLayerUid', 'toLayerUid', 'fromFrame', 'toFrame', 'times'], [], 'frames repeat');
+      exact(p, ['command', 'fromLayerUid', 'toLayerUid', 'fromFrame', 'toFrame', 'times'], ['contextId'], 'frames repeat'); context(p);
       uid(p.fromLayerUid, 'fromLayerUid'); uid(p.toLayerUid, 'toLayerUid'); u32(p.fromFrame, 'fromFrame'); u32(p.toFrame, 'toFrame');
       if (!Number.isSafeInteger(p.times)) fail('times must be an integer');
     }

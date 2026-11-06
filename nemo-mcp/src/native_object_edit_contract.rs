@@ -46,11 +46,16 @@ enum K {
 /// (operation suffix, command, "member:kind ..." in wire order). Every operation is a revisioned command; only a
 /// duplicate names its minted identity; copy/cut carry a bounded clipboard; other receipts are compact.
 static SPECS: [(&str, &str, &str); 21] = [
-    ("layer.delete", "object.layer.delete", "selection:selection"),
+    // `contextId:uid?` (#2256): the declared component whose layers the edit works on; absent is the scene root.
+    (
+        "layer.delete",
+        "object.layer.delete",
+        "selection:selection contextId:uid?",
+    ),
     (
         "layer.duplicate",
         "object.layer.duplicate",
-        "layerUid:opaque",
+        "layerUid:opaque contextId:uid?",
     ),
     (
         "layer.rename",
@@ -60,7 +65,7 @@ static SPECS: [(&str, &str, &str); 21] = [
     (
         "layer.reorder",
         "object.layer.reorder",
-        "layerUids:opaques gap:gap selection:selection",
+        "layerUids:opaques gap:gap selection:selection contextId:uid?",
     ),
     (
         "group.create",

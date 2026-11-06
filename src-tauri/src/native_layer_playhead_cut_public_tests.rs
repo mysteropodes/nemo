@@ -184,7 +184,8 @@ fn public_cut_raw_original_bytes_refuse_duplicates_size_cancel_stale_foreign_non
     nested["payload"]["contextId"] = json!("component context/α");
     let typed: NativeApplicationRequest = serde_json::from_value(nested.clone()).unwrap();
     assert!(typed.validate().is_ok());
-    assert_eq!(dispatch(&state, nested)["error"]["code"], "unavailable");
+    // #2256: a component the document does not declare is unknown; a declared one is the scene of the cut.
+    assert_eq!(dispatch(&state, nested)["error"]["code"], "not_found");
     assert_eq!(saved(&state, &receipt), before);
     assert_eq!(state.dispatch_object_request_json(&raw).unwrap().ok, true);
     let changed = saved(&state, &receipt);

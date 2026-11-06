@@ -25,9 +25,9 @@ function harness(options = {}) {
     dispatch: async (request) => {
       sent.push(request);
       if (options.refuse) return { apiVersion: 2, requestId: request.requestId, instanceId: 'i', documentId: 'd', contentRevision: revision, ok: false, error: { code: options.refuse } };
-      const applied = options.noop !== true;
+      const applied = options.noop !== true && request.operation !== P + 'frames.clipboard.copy';
       if (applied) revision += 1;
-      return { apiVersion: 2, requestId: request.requestId, instanceId: 'i', documentId: 'd', contentRevision: revision, ok: true, result: { applied, historyEntriesAdded: applied ? 1 : 0 } };
+      return { apiVersion: 2, requestId: request.requestId, instanceId: 'i', documentId: 'd', contentRevision: revision, ok: true, result: resultFor(request.operation, applied) };
     },
     reconcile: async () => { total = request_total(sent.at(-1), total); state.totalFrames = total; return pin(); },
   })); };
@@ -38,6 +38,15 @@ function harness(options = {}) {
     NemoNativeObjectProject: { desktop: () => session }, goToFrame: async (f) => { navigation.push(f); state.currentFrame = f; },
     showToast: (m) => notices.push(m) };
   return { host, sent, routes, navigation, notices, state, bump: () => { revision += 1; } };
+}
+// The result members each operation carries (the frame-edit contract closes them): Move names the landed cells, Repeat its counts, Copy / Cut a packet.
+const PACKET = { instanceId: 'i', documentId: 'd', cells: [{ relLayer: 0, relFrame: 0, keyframe: true, records: [] }] };
+function resultFor(operation, applied) {
+  const base = { applied, historyEntriesAdded: applied ? 1 : 0 };
+  if (operation === P + 'frames.move') return Object.assign(base, { selection: applied ? [{ layerUid: 'in_c', frame: 3 }] : null });
+  if (operation === P + 'frames.repeat') return Object.assign(base, { cycledLayers: 2, skippedComponentLayers: 1 });
+  if (operation === P + 'frames.clipboard.copy' || operation === P + 'frames.clipboard.cut') return Object.assign(base, { clipboard: PACKET });
+  return base;
 }
 function request_total(request, total) {
   if (!request) return total;
@@ -101,15 +110,59 @@ test('a frame outside the component is judged against its own length, not the sc
   assert.equal(h.sent.length, 0);
 });
 
-test('actions without a component route answer a typed unavailable code and send nothing', async () => {
-  const actions = [{ kind: 'moveKey', layer: 0, from: 0, to: 1 }, { kind: 'duplicateSelection' }, { kind: 'repeatSelection', times: 2 }, { kind: 'copyFrames' },
-    { kind: 'cutFrames' }, { kind: 'pasteFrames' }, { kind: 'moveFrames', selection: [], layer: 0, frame: 1 }, { kind: 'rangeDrag', gesture: {}, capture: {} }];
-  for (const action of actions) {
-    const h = harness({ cells: [{ layer: 0, frame: 1 }] });
-    const result = await CompEdit.run(h.host, action);
-    assert.deepEqual([result.status, result.code], ['unavailable', CompEdit.CODES.unavailable], action.kind);
-    assert.equal(h.sent.length, 0, action.kind);
-  }
+test('the layer-bar drag has no component route yet: a typed unavailable code, nothing sent', async () => {
+  const h = harness({ cells: [{ layer: 0, frame: 1 }] });
+  const result = await CompEdit.run(h.host, { kind: 'rangeDrag', gesture: {}, capture: {} });
+  assert.deepEqual([result.status, result.code], ['unavailable', CompEdit.CODES.unavailable]);
+  assert.equal(h.sent.length, 0);
+});
+
+test('Move Key and Move Frames name the held context and the component rows; the moved cells stay selected', async () => {
+  let h = harness();
+  assert.equal((await CompEdit.run(h.host, { kind: 'moveKey', layer: 0, from: 0, to: 2 })).status, 'applied-presented');
+  assert.deepEqual([h.sent[0].operation, h.sent[0].payload], [P + 'layer.key.move', { command: 'object.layer.key.move', layerUid: 'in_a', activeLayerUid: 'in_b', from: 0, to: 2, contextId: 'sym_a' }]);
+  h = harness({ cells: [{ layer: 0, frame: 1 }] });
+  const moved = await CompEdit.run(h.host, { kind: 'moveFrames', selection: [{ layer: 0, frame: 1 }], layer: 2, frame: 3 });
+  assert.equal(moved.status, 'applied-presented');
+  assert.deepEqual([h.sent[0].operation, h.sent[0].payload], [P + 'frames.move',
+    { command: 'object.frames.move', selection: [{ layerUid: 'in_a', frame: 1 }], layerUid: 'in_c', frame: 3, contextId: 'sym_a' }]);
+  assert.deepEqual(h.host._sel.frames, [{ layer: 2, frame: 3 }], 'the selection follows the cells, as the baseline');
+  assert.deepEqual([...new Set(h.routes)], ['component']);
+  h = harness({ cells: [{ layer: 0, frame: 1 }] });
+  assert.equal((await CompEdit.run(h.host, { kind: 'moveFrames', selection: [{ layer: 1, frame: 1 }], layer: 2, frame: 3 })).code, Intent.CODES.stale, 'a selection that changed is stale');
+  assert.equal(h.sent.length, 0);
+});
+
+test('Repeat Selection and Duplicate Selection work on the selected component cells and report the native counts', async () => {
+  let h = harness({ cells: [{ layer: 0, frame: 1 }, { layer: 1, frame: 2 }] });
+  const repeated = await CompEdit.run(h.host, { kind: 'repeatSelection', times: 3 });
+  assert.deepEqual(h.sent[0].payload, { command: 'object.frames.repeat', fromLayerUid: 'in_a', toLayerUid: 'in_b', fromFrame: 1, toFrame: 2, times: 3, contextId: 'sym_a' });
+  assert.deepEqual([repeated.status, repeated.cycledLayers, repeated.skippedComponentLayers], ['applied-presented', 2, 1]);
+  h = harness({ cells: [{ layer: 0, frame: 1 }] });
+  await CompEdit.run(h.host, { kind: 'duplicateSelection' });
+  assert.deepEqual(h.sent[0].payload, { command: 'object.frames.clipboard.duplicate', layerUid: 'in_b', selection: [{ layerUid: 'in_a', frame: 1 }], contextId: 'sym_a' });
+  h = harness();
+  assert.equal((await CompEdit.run(h.host, { kind: 'repeatSelection', times: 2 })).code, Intent.CODES.selection);
+  assert.equal(h.sent.length, 0);
+});
+
+test('Copy, Cut and Paste use the cell selection clipboard inside the component and select the pasted block', async () => {
+  let h = harness({ cells: [{ layer: 0, frame: 1 }] });
+  assert.equal((await CompEdit.run(h.host, { kind: 'copyFrames' })).status, 'unchanged');
+  assert.deepEqual(h.sent[0].payload, { command: 'object.frames.clipboard.copy', selection: [{ layerUid: 'in_a', frame: 1 }], contextId: 'sym_a' });
+  assert.deepEqual(JSON.parse(JSON.stringify(h.host._sel.clipboard)), PACKET);
+  assert.equal(h.host._sel.clipOp, 'copy');
+  assert.equal((await CompEdit.run(h.host, { kind: 'pasteFrames' })).status, 'applied-presented');
+  assert.deepEqual(h.sent[1].payload, { command: 'object.frames.clipboard.paste', instanceId: 'i', documentId: 'd', layerUid: 'in_b', frame: 1, cells: PACKET.cells, contextId: 'sym_a' });
+  assert.deepEqual(h.host._sel.frames, [{ layer: 1, frame: 1 }], 'the pasted block is selected at the active layer and frame');
+  h = harness({ cells: [{ layer: 0, frame: 1 }] });
+  assert.equal((await CompEdit.run(h.host, { kind: 'cutFrames' })).status, 'applied-presented');
+  assert.deepEqual([h.host._sel.clipOp, h.host._sel.frames], ['cut', []], 'a cut clears the selection and keeps the packet');
+  h = harness();
+  assert.equal((await CompEdit.run(h.host, { kind: 'pasteFrames' })).code, Intent.CODES.packet, 'nothing to paste');
+  h.host._sel.clipboard = Object.assign({}, { cells: PACKET.cells, instanceId: 'other', documentId: 'd' });
+  assert.equal((await CompEdit.run(h.host, { kind: 'pasteFrames' })).code, Intent.CODES.stale, 'a packet of another project is stale');
+  assert.equal(h.sent.length, 0);
 });
 
 test('stale component, missing route, refusal and no-op are typed and never reach the scene route', async () => {
