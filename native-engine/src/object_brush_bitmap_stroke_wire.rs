@@ -59,7 +59,9 @@ impl BitmapStroke {
             || path.contains('\0')
             || parsed.record.family != VECTOR_FAMILY
             || !target.stroke_id.is_empty()
-            || target.context_id != "scene-root"
+            || target.context_id.is_empty()
+            || target.context_id.len() > 128
+            || target.context_id.contains('\0')
             || brush_group(&parsed.record).is_none_or(str::is_empty)
             || !(finite(c.x) && finite(c.y) && finite(c.width) && finite(c.height))
             || c.width <= 0.0

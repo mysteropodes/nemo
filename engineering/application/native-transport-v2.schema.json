@@ -176,6 +176,32 @@
         }
       }
     },
+    "ObjectTextReadTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "frameScope": {
+          "$ref": "#/$defs/ObjectFrameScope"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "strokeId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        }
+      }
+    },
     "ObjectContextTarget": {
       "type": "object",
       "additionalProperties": false,
@@ -12649,7 +12675,9 @@
       ],
       "properties": {
         "contextId": {
-          "const": "scene-root"
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
         },
         "layerUid": {
           "type": "string",
@@ -12886,7 +12914,7 @@
                   "const": "inspect"
                 },
                 "target": {
-                  "$ref": "#/$defs/ObjectTarget"
+                  "$ref": "#/$defs/ObjectTextReadTarget"
                 }
               }
             },
@@ -12904,7 +12932,7 @@
                   "const": "text"
                 },
                 "target": {
-                  "$ref": "#/$defs/ObjectTarget"
+                  "$ref": "#/$defs/ObjectTextReadTarget"
                 },
                 "offset": {
                   "type": "integer",
@@ -12943,6 +12971,11 @@
                   "maximum": 1024
                 },
                 "layerUid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "contextId": {
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 255
@@ -13016,7 +13049,7 @@
                 ],
                 "properties": {
                   "target": {
-                    "$ref": "#/$defs/ObjectTarget"
+                    "$ref": "#/$defs/ObjectTextReadTarget"
                   }
                 }
               }
@@ -13067,7 +13100,7 @@
               "const": "inspect"
             },
             "target": {
-              "$ref": "#/$defs/ObjectTarget"
+              "$ref": "#/$defs/ObjectTextReadTarget"
             },
             "textBytes": {
               "type": "integer",
@@ -13113,7 +13146,7 @@
               "const": "text"
             },
             "target": {
-              "$ref": "#/$defs/ObjectTarget"
+              "$ref": "#/$defs/ObjectTextReadTarget"
             },
             "textBytes": {
               "type": "integer",
@@ -13204,6 +13237,11 @@
               ]
             },
             "layerUid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "contextId": {
               "type": "string",
               "minLength": 1,
               "maxLength": 255
@@ -14875,7 +14913,9 @@
               ],
               "properties": {
                 "contextId": {
-                  "const": "scene-root"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
                 },
                 "strokeId": {
                   "const": ""

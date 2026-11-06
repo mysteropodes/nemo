@@ -966,10 +966,12 @@ test('Fill Brush inside an entered component sends the component context to the 
  assert.equal(q.operation,'command.document.object.fill.brush');
  assert.deepEqual([q.payload.contextId,q.payload.layerUid,q.payload.frame],['comp-a','inner',2]);leave();
 });
-test('a bitmap brush inside a component is a typed refusal that writes nothing (the bitmap stroke command is scene-root only)',async()=>{
+test('a bitmap brush inside an entered component sends the anchor to the component context and rides the component route',async()=>{
  const f=await fixture();bitmapPorts(f);f.root.state.bitmapBrushOn=true;const leave=enter(f);await f.session.presentPreview(2);
  send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.5});send(f,'pointermove',45,30,{pointerType:'pen',pressure:.5});send(f,'pointerup',100,80,{pointerType:'pen',pressure:0});
- const r=await settled(f);assert.equal(r.status,'unavailable');assert.equal(f.calls.length,0);assert.ok(f.log.includes('Bitmap brushes are not available inside a component.'),JSON.stringify(f.log));leave();
+ const r=await settled(f);assert.equal(r.status,'applied',JSON.stringify(f.log));assert.equal(f.calls.length,1);
+ const q=plain(f.calls[0]),t=q.payload.record.target;assert.equal(q.operation,'command.document.object.brush.bitmap.stroke');
+ assert.deepEqual([t.contextId,t.layerUid,t.frameScope.frame,t.strokeId],['comp-a','inner',2,'']);leave();
 });
 test('Draw and Fill Brush work in Motion mode, on the playhead frame, and other modes stay refused',async()=>{
  const d=await fixture();d.root.state.appMode='motion';d.root.state.currentFrame=3;await d.session.presentPreview(3);

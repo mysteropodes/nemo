@@ -1613,6 +1613,7 @@
         "object_raster_asset_commands_reopen.rs",
         "object_text_layout_commands.rs",
         "object_text_layout_commands_refusals.rs",
+        "object_text_layout_commands_component.rs",
         "text_glyph_source.rs",
         "text_glyph_source_oracle.rs",
         "text_glyph_source_controls.rs",

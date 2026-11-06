@@ -11,7 +11,7 @@ fn opaque(v: &Value) -> bool {
 }
 fn scope(v: &Value) -> bool {
     exact(v, &["contextId", "layerUid", "frameScope"], &[]).is_some()
-        && v["contextId"] == "scene-root"
+        && (v["contextId"] == "scene-root" || opaque(&v["contextId"]))
         && opaque(&v["layerUid"])
         && exact(&v["frameScope"], &["kind", "frame"], &[]).is_some()
         && matches!(
@@ -37,7 +37,8 @@ pub(super) fn request(v: &Value) -> bool {
     let x = &v["view"];
     match x["kind"].as_str() {
         Some("animators") => {
-            exact(x, &["kind", "layerUid", "frame", "offset", "limit"], &[]).is_some()
+            exact(x, &["kind", "layerUid", "frame", "offset", "limit"], &["contextId"]).is_some()
+                && x.get("contextId").is_none_or(opaque)
                 && opaque(&x["layerUid"])
                 && x["frame"]
                     .as_f64()
@@ -224,10 +225,15 @@ pub(super) fn result(document: &str, p: &Value, r: &Value) -> bool {
             required.push(if animator { "layerUid" } else { "target" });
             if animator {
                 required.push("frame");
+                if v.get("contextId").is_some() {
+                    required.push("contextId");
+                }
             }
             if exact(r, &required, &[]).is_none()
                 || if animator {
-                    r["layerUid"] != v["layerUid"] || r["frame"].as_f64() != v["frame"].as_f64()
+                    r["layerUid"] != v["layerUid"]
+                        || r.get("contextId") != v.get("contextId")
+                        || r["frame"].as_f64() != v["frame"].as_f64()
                 } else {
                     r["target"] != v["target"]
                 }

@@ -33,9 +33,10 @@
   function opaque(v,max,raw){if(typeof v!=='string'||!v.length||(!raw&&!v.trim())||v.includes('\0')||bytes(v)>(max||255))fail('opaque string invalid');}
   function oneOf(v,list){if(!list.includes(v))fail('enumerated value invalid');}
   function frameScope(v){exact(v,['kind','frame'],[],'frameScope');oneOf(v.kind,['authored','reference']);int(v.frame,0,4294967295);}
-  function target(v,create){
+  // `declared` (text only, #2267): the context may be a declared component's id; the owner refuses an undeclared one.
+  function target(v,create,declared){
     exact(v,['contextId','frameScope','layerUid','strokeId'],[],'target');
-    if(v.contextId!=='scene-root')fail('contextId invalid');frameScope(v.frameScope);opaque(v.layerUid);
+    if(declared)opaque(v.contextId);else if(v.contextId!=='scene-root')fail('contextId invalid');frameScope(v.frameScope);opaque(v.layerUid);
     if(create){if(v.strokeId!=='')fail('a created item names no stroke id; the owner allocates it');}else opaque(v.strokeId);
   }
   function rasterItem(v){
@@ -111,9 +112,13 @@
   };
   function itemPayload(p){
     if(!plain(p)||!Object.prototype.hasOwnProperty.call(SHAPES,p.command))fail('item command invalid');
-    exact(p,['command'].concat(SHAPES[p.command]),[],'item command');
+    // Text transactions may carry the copy key (a held cell is keyed with a copy first); an edit or delete may name the cell it lands in, with it.
+    const text=p.command==='object.text.create'||p.command==='object.text.edit'||p.command==='object.text.delete';
+    exact(p,['command'].concat(SHAPES[p.command]),text?(p.command==='object.text.create'?['keyframe']:['frame','keyframe']):p.command.startsWith('object.text.animator.')?['contextId']:[],'item command'); // an animator may name the declared component whose layer holds it (#2267)
+    if('contextId' in p)opaque(p.contextId);
+    if('keyframe' in p)oneOf(p.keyframe,['copy']);if('frame' in p){int(p.frame,0,4294967295);if(!('keyframe' in p))fail('a landing frame needs the copy key');}
     if('layerUid' in p)opaque(p.layerUid);if('animator' in p)animator(p.animator);if('animatorId' in p)opaque(p.animatorId);if('edit' in p)animatorEdit(p.edit);
-    if('target' in p)target(p.target,true);if('stableTarget' in p)target(p.stableTarget,false);
+    if('target' in p)target(p.target,true,text);if('stableTarget' in p)target(p.stableTarget,false,text);
     if('item' in p)rasterItem(p.item);if('block' in p)textBlock(p.block);if('patch' in p)textPatch(p.patch);
     ['x','y','width','height','rotation','opacity'].forEach(k=>{if(k in p)num(p[k]);});
   }

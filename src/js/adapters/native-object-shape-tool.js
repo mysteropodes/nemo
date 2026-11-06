@@ -164,8 +164,9 @@
         .then(function(r){if(r&&r.applied&&fbStamps.length&&typeof root.SMLabs.multiframeStamped==='function')root.SMLabs.multiframeStamped(fbStamps.length);
           return {status:r&&r.applied?'applied':'noop'};},root.NemoNativeObjectVector.statusOf);
       // draw-bridge.js Bitmap Brush: the anchor, its baked companion and the PNG in one native command.
-      if(t.style&&t.style.bitmap){if(t.context!=='scene-root'){t.refusal='Bitmap brushes are not available inside a component.';return Promise.resolve({status:'unavailable',reason:'bitmap_component_unavailable'});} // the bitmap stroke command is scene-root only
-        return Bitmap.commit(root,guarded,t,dict,root.NemoNativeObjectVector.statusOf);}
+      if(t.style&&t.style.bitmap){var bitmapRoute=t.context==='scene-root'?guarded:guarded.runComponentCommand?Object.assign({},guarded,{runResourceCommand:guarded.runComponentCommand}):null; // an entered component: the stroke rides the component route (the resource route is scene-only)
+        if(!bitmapRoute){t.refusal='Bitmap brushes are not available inside a component.';return Promise.resolve({status:'unavailable',reason:'bitmap_component_unavailable'});}
+        return Bitmap.commit(root,bitmapRoute,t,dict,root.NemoNativeObjectVector.statusOf);}
       // tools.js @1065e9d8 Draw commit: drawMode 'behind' slips the stroke under the layer's artwork.
       // G23 (symmetry-bridge.js onStrokeCommitted @1065e9d8): the stroke and its copies, each linked fill below its ribbon,
       // in one createMany (behind keeps the order at the bottom).

@@ -31,11 +31,18 @@
   function blank(text){return typeof text==='string'&&!text.trim();}
   // Baseline guards (commitText, applyTextPropsEdit): a blank text never creates or rebuilds a block.
   function skipped(){return Promise.resolve(Object.freeze({applied:false,skipped:'blank_text'}));}
-  function stableTarget(layerUid,strokeId,frame){return {contextId:'scene-root',frameScope:{kind:'authored',frame:frame},layerUid:layerUid,strokeId:strokeId};}
+  function stableTarget(layerUid,strokeId,frame,contextId){return {contextId:contextId||'scene-root',frameScope:{kind:'authored',frame:frame},layerUid:layerUid,strokeId:strokeId};}
   function create(session){
-    var commands=Command.create(session,'item');
-    function send(payload,origin,guard){
-      var expected=origin&&Object.assign({},origin);
+    var scene=Command.create(session,'item'),component=null;
+    // #2267: an entered component's text rides the component command route (the presented context must be that component), like the vector writes.
+    function route(contextId){
+      if(!contextId||contextId==='scene-root')return scene;
+      if(typeof session.runComponentCommand!=='function')return null;
+      return component||(component=Command.create(Object.freeze({info:session.info,isActive:session.isActive,requestId:session.requestId,runResourceCommand:session.runComponentCommand.bind(session)}),'item'));
+    }
+    function send(payload,origin,guard,contextId){
+      var commands=route(contextId),expected=origin&&Object.assign({},origin);
+      if(!commands)return Promise.reject(fault('unavailable','component_route_unavailable','Native component route is unavailable'));
       return commands.execute(Contract.ITEM,function(pin,ctx){
         if(expected&&['instanceId','documentId','lifecycleGeneration'].some(function(k){return pin[k]!==expected[k];}))throw fault('stale_owner','owner_changed','Native text owner changed before execution');
         if(expected&&['contentRevision','documentSnapshotId'].some(function(k){return pin[k]!==expected[k];}))throw fault('stale_revision','snapshot_changed','Native text snapshot changed before execution');
@@ -43,16 +50,25 @@
         return payload;
       });
     }
+    // `opts.copy` asks the owner to key a held cell with a copy of what it showed first (the baseline's ensureKeyframe); `opts.frame` names the cell an edit or delete lands in.
     return Object.freeze({
-      createBlock:function(layerUid,frame,block,origin,guard){
+      createBlock:function(layerUid,frame,block,origin,guard,opts){
         if(block&&blank(block.text))return skipped();
-        return send({command:'object.text.create',target:stableTarget(layerUid,'',frame),block:block},origin,guard);
+        var payload={command:'object.text.create',target:stableTarget(layerUid,'',frame,opts&&opts.contextId),block:block};
+        if(opts&&opts.copy)payload.keyframe='copy';
+        return send(payload,origin,guard,opts&&opts.contextId);
       },
-      editBlock:function(target,patch,origin,guard){
+      editBlock:function(target,patch,origin,guard,opts){
         if(patch&&blank(patch.text))return skipped();
-        return send({command:'object.text.edit',stableTarget:target,patch:patch},origin,guard);
+        var payload={command:'object.text.edit',stableTarget:target,patch:patch};
+        if(opts&&opts.copy){payload.frame=opts.frame;payload.keyframe='copy';}
+        return send(payload,origin,guard,target&&target.contextId);
       },
-      deleteBlock:function(target){return send({command:'object.text.delete',stableTarget:target});},
+      deleteBlock:function(target,origin,guard,opts){
+        var payload={command:'object.text.delete',stableTarget:target};
+        if(opts&&opts.copy){payload.frame=opts.frame;payload.keyframe='copy';}
+        return send(payload,origin,guard,target&&target.contextId);
+      },
     });
   }
   var bindings=new WeakMap();

@@ -108,5 +108,5 @@
       }
     }
   ],
-  "supportedContext": "scene-root; exact native authored/reference scope only. No inferred held/interpolated identities or hit bounds."
+  "supportedContext": "scene-root or a declared component context; exact native authored/reference scope only. No inferred held/interpolated identities or hit bounds."
 }

@@ -70,17 +70,19 @@
     function context(presented,lease){
       var current=b.ports.currentSession(),s=root.state,info=current&&current.info();
       var port=root.NemoNativePerspectiveController,perspective=port&&(presented?port.read():typeof port.readForCommand==='function'&&port.readForCommand(perspectiveProof));
-      if(b.retired||current!==session||!current.isActive()||!info||!s||s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.activeSymbolId||s.shadowMode||s.maskMode||s.symmetryEnabled||!perspective||!Tool.samePin(perspective.info,info)||perspective.perspective.settings.perspectiveEnabled)return null;
+      if(b.retired||current!==session||!current.isActive()||!info||!s||!(s.appMode==='anim2d'||s.appMode==='motion')||s.playing||s.spaceDown||s.isPanning||s.shadowMode||s.maskMode||s.symmetryEnabled||!perspective||!Tool.samePin(perspective.info,info))return null;
       if(presented)perspectiveProof=perspective;
-      var layer=info.layers[s.activeLayerIdx],frame=s.currentFrame,rect=bounds(root,info);
-      if(!rect||!layer||layer.locked||!Number.isInteger(frame)||frame<0||frame>=info.totalFrames)return null;
+      // #2267: inside an entered component the context, its layer rows and its frame count are the component's (the ones the workspace controller holds); the Perspective guide does not gate Text.
+      var comp=root.NemoNativeComponentContext,held=comp?comp.contextId(root):'scene-root',rows=comp&&comp.layerRows(root)||info.layers;
+      var layer=rows[s.activeLayerIdx],frame=s.currentFrame,rect=bounds(root,info);
+      if(s.activeSymbolId&&s.activeSymbolId!==held||!rect||!layer||layer.locked||!Number.isInteger(frame)||frame<0||frame>=(comp?comp.frameBound(root,info):info.totalFrames))return null;
       if(!presented&&(!lease||typeof lease.readPresentedObjectSession!=='function'))return null;
       var p=presented?current.readPresentedObjectSession():lease.readPresentedObjectSession();
-      if(!p||!Tool.samePin(p,info)||!p.presentation||p.presentation.frame!==frame)return null;
+      if(!p||!Tool.samePin(p,info)||!p.presentation||p.presentation.frame!==frame||(p.presentation.contextId||'scene-root')!==held)return null;
       if(presented){if(!Mapping.matchesView(root,p.presentation))return null;presentedView=p.presentation;}
       else if(p.presentation!==presentedView||(p.presentation.view?p.presentation.view.mode:'canvas')!==(s.cameraView===true?'stored-camera':'canvas'))return null;
       return {pin:{instanceId:info.instanceId,documentId:info.documentId,lifecycleGeneration:info.lifecycleGeneration,contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId},layerUid:layer.layerUid,frame:frame,
-        selectionKey:JSON.stringify([s.activeLayerIdx,root._layerSel||[],s.tool]),viewKey:JSON.stringify([rect,presentedView.view||null]),presentation:presentedView,bounds:rect,canvasW:info.canvasW,canvasH:info.canvasH};
+        contextId:held,selectionKey:JSON.stringify([held,s.activeLayerIdx,root._layerSel||[],s.tool]),viewKey:JSON.stringify([rect,presentedView.view||null]),presentation:presentedView,bounds:rect,canvasW:info.canvasW,canvasH:info.canvasH};
     }
     function controls(){if(!ownsUI())return;var c=context(true),blocked=modelState.busy||modelState.unknown;
       if(apply)apply.disabled=blocked||!shown||!c||invalidHex;colorHex.disabled=blocked||!shown||!c;select.disabled=blocked||!page;refresh.disabled=b.retired||refreshing||modelState.busy;
@@ -145,7 +147,7 @@
       controls();trace(root,'show.visible',null,{area:!!area});
     }
     var core=Tool.create({session:session,reader:Reader,writer:Writer,context:context,defaultColor:function(){var color=root.state.strokeColor||'#000000';return /^#[0-9a-fA-F]{3}$/.test(color)?'#'+color.slice(1).split('').map(function(x){return x+x;}).join(''):color;},
-      draft:show,state:function(s){modelState=s;controls();flushPerspectiveRefresh();},cancelled:hide,committed:function(){hide();notify('Text updated.');b.refresh();}});
+      inherit:function(){return root.state.appMode==='motion';},draft:show,state:function(s){modelState=s;controls();flushPerspectiveRefresh();},cancelled:hide,committed:function(){hide();notify('Text updated.');b.refresh();}});
     async function commit(){if(!ownsUI()||!shown||modelState.busy||modelState.unknown)return;
       if(!hexValidity()){notify('Enter a color as #rrggbb.');controls();return;}var changes={};
       dirty.forEach(function(k){changes[k]=k==='font'?chosenFont(font.value):k==='size'?Number(fields.size.value):k==='text'&&area?area.value:fields[k].value;
@@ -186,8 +188,8 @@
         var d=hit&&hit.data,t=d&&d.nativeRole==='text'&&d.nativeStableTarget;
         if(!t)return null;
         if(Number.isInteger(d.nativeLayerIndex)&&d.nativeLayerIndex!==root.state.activeLayerIdx){
-          var project=root.NemoNativeObjectProject;
-          if(!project||typeof project.selectLayerUI!=='function'||project.selectLayerUI(root,d.nativeLayerIndex,false,d.nativeLayerUid)!==true||root.state.activeLayerIdx!==d.nativeLayerIndex)throw new Error('That text layer could not be selected.');
+          var project=root.NemoNativeObjectProject,comp=root.NemoNativeComponentContext,inComp=comp&&comp.contextId(root)!=='scene-root';
+          if(inComp?!comp.selectLayer(root,d.nativeLayerIndex):(!project||typeof project.selectLayerUI!=='function'||project.selectLayerUI(root,d.nativeLayerIndex,false,d.nativeLayerUid)!==true)||root.state.activeLayerIdx!==d.nativeLayerIndex)throw new Error('That text layer could not be selected.');
         }
         return {contextId:t.contextId,layerUid:t.layerUid,frameScope:t.frameScope,strokeId:t.strokeId};});
     }

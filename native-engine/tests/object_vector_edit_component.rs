@@ -416,3 +416,47 @@ fn a_fill_brush_in_a_component_places_in_that_component_as_one_entry_and_one_und
     stray["layerUid"] = json!("L1");
     assert!(owner.prepare_fill_brush_json(stray.to_string().as_bytes()).is_err());
 }
+
+/// #2256 Paint bucket (Fill tool, `fill.trace`) inside an entered component: it traces the component's own walls, places the fill in that
+/// component, keys a held component cell first, and is one revision and one undo entry; the scene root is untouched.
+#[test]
+fn a_paint_bucket_fill_in_a_component_traces_its_walls_and_keys_a_held_cell() {
+    let wall = |frame: u32| {
+        let mut w = crec(frame, "wall");
+        w["geometry"]["closed"] = json!(true);
+        w["geometry"]["segments"] = json!([[0.0, 0.0], [40.0, 0.0], [40.0, 40.0], [0.0, 40.0]]
+            .map(|p| json!({"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"point":{"x":p[0],"y":p[1]}})));
+        w
+    };
+    let mut d = doc();
+    d["componentTables"]["components"]["components"][0]["objects"] = json!([wall(0)]);
+    d["compositionOrder"]["contexts"][1]["scopes"] = json!([scope(0, &[("inner", "wall")])]);
+    let mut owner = owner_of(&d);
+    let (before, bytes_before) = (state(&owner), bytes(&owner));
+    let trace = |frame: u32| json!({"command":"object.fill.trace","layerUid":"inner","contextId":CTX,"frame":frame,
+        "point":[20,20],"color":"#336699ff","opacity":1,"remove":false});
+    let candidate = owner.prepare_fill_trace_json(trace(0).to_string().as_bytes()).unwrap();
+    owner.commit_boolean_edit(candidate).unwrap();
+    let after = state(&owner);
+    assert_eq!(owner.history_depths(), (1, 0), "one history entry");
+    let filled = component(&after).iter().find(|r| r["vectorExt"]["fillTrace"].is_object()).expect("the fill joined the component");
+    assert_eq!(filled["vectorExt"]["fillTrace"]["walls"], json!(["wall"]));
+    assert_eq!(filled["target"]["contextId"], CTX);
+    assert_eq!(scene_part(&after), scene_part(&before), "the scene root is untouched");
+    undo(&mut owner);
+    assert_eq!(bytes(&owner), bytes_before, "one Undo restores the bytes");
+    // Held cell 3 of the 8-frame component: keyed with a copy of the key's wall first, then filled -- in the same entry.
+    let candidate = owner.prepare_fill_trace_json(trace(3).to_string().as_bytes()).unwrap();
+    owner.commit_boolean_edit(candidate).unwrap();
+    let held = state(&owner);
+    let at_frame = |n: u64| component(&held).iter().filter(|r| r["target"]["frameScope"]["frame"] == n).count();
+    assert_eq!((at_frame(0), at_frame(3)), (1, 2), "the key keeps its wall; the keyed cell holds the wall copy and the fill");
+    assert_eq!(owner.history_depths(), (1, 0), "key and fill are one entry");
+    undo(&mut owner);
+    assert_eq!(bytes(&owner), bytes_before);
+    // Past the component's 8 frames and an undeclared layer are refused with nothing prepared.
+    assert!(owner.prepare_fill_trace_json(trace(8).to_string().as_bytes()).is_err());
+    let mut stray = trace(0);
+    stray["layerUid"] = json!("L1");
+    assert!(owner.prepare_fill_trace_json(stray.to_string().as_bytes()).is_err());
+}
