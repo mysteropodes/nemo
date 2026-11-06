@@ -14,7 +14,9 @@
   var MAX_SELECTED=4096; // a guard against a runaway selection; the edit request names runs of keys, so the count never sizes it
   var shortcuts={p:'position',a:'anchor',r:'rotation',s:'scale',t:'opacity'};
   // Baseline propsFor() order (motion.js PROPS / PROPS_WITH_3D); anything else keeps its native order after these.
-  var baselineOrder=['position','positionZ','anchor','rotation','rotationX','rotationY','scale','opacity','order'];
+  var baselineOrder=['position','positionZ','anchor','rotation','rotationX','rotationY','scale','opacity','order',
+    // PROPS_DUP_EXTRA: the rows of a duplicator host, right after the Transform rows (the last three are the 3D per-copy offsets).
+    'dupOffsetPos','dupOffsetRot','dupOffsetScale','dupOffsetOpacity','dupOffsetHue','dupOffsetPosZ','dupOffsetRotX','dupOffsetRotY'];
   var modes=['all','animated','modified','expressions','errors','effects','mattes'];
   function key(t){return JSON.stringify([t.contextId,t.layerUid,t.strokeId===undefined?null:t.strokeId]);}
   function create(container,ports){

@@ -468,6 +468,13 @@ test('property rows follow the baseline propsFor order regardless of native page
  assert.deepEqual(d.body().filter(n=>n.className==='lrow motion-prop-row').map(n=>n.dataset.property),['position','anchor','opacity']);
  d.panel.dispose();
 });
+test('a duplicator host lists its eight per-copy offsets in the baseline order, the 3D ones last, whatever the native page order',async()=>{
+ const names=async rows=>{const d=directPanel({selected:[directPanel().layer],rows});assert.equal(await d.panel.refresh(true),true);const out=d.body().filter(n=>n.className==='lrow motion-prop-row').map(n=>n.dataset.property);d.panel.dispose();return out;};
+ // A native page is bounded (3072 bytes), so the eight rows arrive over pages; each page is ordered on its own.
+ assert.deepEqual(await names(['dupOffsetRotY','dupOffsetPosZ','dupOffsetHue','dupOffsetPos']),['dupOffsetPos','dupOffsetHue','dupOffsetPosZ','dupOffsetRotY']);
+ assert.deepEqual(await names(['dupOffsetRotX','dupOffsetRot','dupOffsetScale','dupOffsetOpacity']),['dupOffsetRot','dupOffsetScale','dupOffsetOpacity','dupOffsetRotX']);
+ assert.deepEqual(await names(['dupOffsetRotX','order','dupOffsetPos','position']),['position','order','dupOffsetPos','dupOffsetRotX'],'the Transform rows come first');
+});
 test('Cancel is visible only while the native read is in flight and cancelling clears the read',async()=>{
  const d=directPanel({selected:[directPanel().layer]}),release=d.hold();
  const first=d.panel.refresh(true);await tick();

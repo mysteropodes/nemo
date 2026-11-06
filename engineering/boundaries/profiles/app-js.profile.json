@@ -3386,6 +3386,7 @@
         "native-motion-effector.js",
         "native-motion-gizmo-3d.js",
         "native-motion-canvas.js",
+        "native-motion-element.js",
         "native-motion-property-value.js",
         "native-motion-control-rows.js",
         "native-motion-expression-snippets.js",

@@ -32,6 +32,18 @@ const BASE_3D: [&str; 9] = [
     "order",
 ];
 
+/// Baseline `PROPS_DUP_EXTRA`: the per-copy offsets a duplicator host lists after its Transform rows (the last three are the 3D ones).
+const DUPLICATOR_ROWS: [&str; 8] = [
+    "dupOffsetPos",
+    "dupOffsetRot",
+    "dupOffsetScale",
+    "dupOffsetOpacity",
+    "dupOffsetHue",
+    "dupOffsetPosZ",
+    "dupOffsetRotX",
+    "dupOffsetRotY",
+];
+
 #[derive(Debug)]
 struct Selector {
     instance_id: String,
@@ -341,6 +353,17 @@ impl ObjectSnapshot {
                         .iter()
                         .any(|l| l.layer_uid() == target.layer_uid() && l.three_d.value() == Some(&true));
                 let mut keys: Vec<&str> = if three_d { BASE_3D.to_vec() } else { BASE.to_vec() };
+                // #2520/#2525: baseline `PROPS_DUP_EXTRA` (motion.js@1065e9d8 propsFor): a layer that hosts a duplicator lists its
+                // eight per-copy offsets right after the Transform rows, the three 3D ones included whether or not the 3D switch is on.
+                if target.stroke_id().is_none()
+                    && self
+                        .document()
+                        .duplicator_set()
+                        .and_then(|set| set.duplicator(target.context_id(), target.layer_uid()))
+                        .is_some()
+                {
+                    keys.extend(DUPLICATOR_ROWS);
+                }
                 // Actual admitted family has a solid fill. This describes the
                 // opt-in Fill row; null default means inherit actual source paint.
                 // No conversion/sampling of that paint is performed here.

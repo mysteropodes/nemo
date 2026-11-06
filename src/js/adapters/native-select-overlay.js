@@ -130,17 +130,18 @@
       var box = orientedBox(root, shown), r = HANDLE * c.pin.canvasW / c.bounds.width;
       if (box) {
         // The rotate ring (baseline buildTransformBoxItems): centred on the box, 36 screen px at most, 30% of the box otherwise.
+        // Motion (#2520/#2525): the shape's box alone - its scale and rotate belong to its Motion properties, not to the geometry handles.
         // #2372: the ring turns about the pivot (the box centre unless a preset or an Alt+clicked point was chosen), where the crosshair sits.
-        var pivot = root.NemoNativeSelectPivot ? root.NemoNativeSelectPivot.pointOf(root, box) : box.center, mid = at(c.V, pivot.x, pivot.y);
-        svg.appendChild(node(root, 'circle', line(root, { cx: mid[0], cy: mid[1], stroke: BLUE, 'stroke-opacity': '0.63', 'stroke-width': '1',
+        var motion = !!root.state && root.state.appMode === 'motion', pivot = !motion && root.NemoNativeSelectPivot ? root.NemoNativeSelectPivot.pointOf(root, box) : box.center, mid = at(c.V, pivot.x, pivot.y);
+        if (!motion) svg.appendChild(node(root, 'circle', line(root, { cx: mid[0], cy: mid[1], stroke: BLUE, 'stroke-opacity': '0.63', 'stroke-width': '1',
           r: Math.min(36 * c.pin.canvasW / c.bounds.width, Math.max(box.width, box.height) * 0.3 * Math.hypot(c.V[0], c.V[1])) })));
         svg.appendChild(polygon(root, c.V, box, { stroke: BLUE, 'stroke-opacity': '0.8', 'stroke-width': '1' }));
-        box.handles.forEach(function (h) {
+        (motion ? [] : box.handles).forEach(function (h) {
           var p = at(c.V, h[0], h[1]);
           svg.appendChild(node(root, 'rect', line(root, { x: p[0] - r, y: p[1] - r, width: 2 * r, height: 2 * r, fill: '#ffffff', stroke: BLUE, 'stroke-width': '1.2' })));
         });
-        if (root.NemoNativeSelectSkew) root.NemoNativeSelectSkew.draw(root, svg, c, box); // the skew zones' tick marks
-        if (root.NemoNativeSelectPivot) root.NemoNativeSelectPivot.draw(root, svg, c, box); // the pivot crosshair
+        if (!motion && root.NemoNativeSelectSkew) root.NemoNativeSelectSkew.draw(root, svg, c, box); // the skew zones' tick marks
+        if (!motion && root.NemoNativeSelectPivot) root.NemoNativeSelectPivot.draw(root, svg, c, box); // the pivot crosshair
       }
     }
     // #2372 native-fill-gradient: the Fill row's gradient gizmo (line, end handles, stop diamonds) joins the selection's drawing.
@@ -198,8 +199,8 @@
   // and a read whose context changed before it returned is discarded.
   function hoverAt(root, e) {
     var s = state(root), I = root.NemoSelectCanvasIntent, st = root.state;
-    if (e && !e.buttons && root.NemoNativeSelectSkew && st && st.tool === 'select' && I && I.objectProject(root)) root.NemoNativeSelectSkew.hover(root, e); // handle cursors, hovered skew edge
-    if (!e || e.buttons || !I || !st || st.tool !== 'select' || st.appMode === 'motion' || !I.objectProject(root)) { s.next = null; hover(root, null); return; }
+    if (e && !e.buttons && root.NemoNativeSelectSkew && st && st.tool === 'select' && st.appMode !== 'motion' && I && I.objectProject(root)) root.NemoNativeSelectSkew.hover(root, e); // handle cursors, hovered skew edge
+    if (!e || e.buttons || !I || !st || st.tool !== 'select' || !I.objectProject(root)) { s.next = null; hover(root, null); return; }
     s.next = { x: e.clientX, y: e.clientY };
     if (s.busy) return;
     s.busy = true;
