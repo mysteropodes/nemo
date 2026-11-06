@@ -757,6 +757,7 @@
         "render_scene.rs",
         "render_geometry.rs",
         "object_render_scene.rs",
+        "object_layer_join.rs",
         "object_component_render_contour.rs",
         "object_component_render_image.rs",
         "object_component_render_scene.rs",

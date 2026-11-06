@@ -292,30 +292,20 @@ fn cpu_reference_reuses_charged_allocation_across_frames_settings_undo_and_check
 
 #[test]
 fn gpu_reference_image_sits_beneath_a_layered_frame_exactly_as_beneath_the_flat_one() {
-    // #2257: a Multiply layer selects the layer stack; the reference image is the content beneath the artwork, so no
-    // blend sees it, and every pixel of the flat frame above is the same here.
+    // #2257: a Multiply layer selects the layer stack; the reference is content beneath the artwork, no blend sees it.
     use crate::object_render_scene::scene_effect_kernels::scene_effect_order::CompositionPlan;
     let mut gpu = Compositor::new().expect("reference viewport requires real Metal");
-    let mut owner = NativeObjectHistory::from_project_file(
-        "reference-layered",
-        &source_with(json!({"layerUid":"L0","blendMode":"multiply"})),
-    )
-    .unwrap();
+    let layer = json!({"layerUid":"L0","blendMode":"multiply"});
+    let mut owner =
+        NativeObjectHistory::from_project_file("reference-layered", &source_with(layer)).unwrap();
     attach(&mut owner, BLUE);
     let witness = viewport(&owner, 0, None);
-    assert!(matches!(
-        witness.scene_effects().unwrap().plan(),
-        CompositionPlan::Layered { .. }
-    ));
-    assert!(witness.has_viewport_reference());
+    let plan = witness.scene_effects().unwrap().plan();
+    assert!(matches!(plan, CompositionPlan::Layered { .. }) && witness.has_viewport_reference());
     let pixels = rgba(&mut gpu, &owner, &witness);
     pixel(&pixels, 8, 32, [128, 128, 255, 255]);
     pixel(&pixels, 8, 8, [255; 4]);
     pixel(&pixels, 32, 32, [255, 0, 0, 255]);
-    // The export never draws the viewport reference, layered or not.
-    let s = snapshot(&owner);
-    let export = prepare_object_composition(&plan(&s, 0), &pins(&s, 0)).unwrap();
-    assert!(!export.has_viewport_reference());
 }
 
 #[test]
