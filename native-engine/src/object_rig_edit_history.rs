@@ -112,3 +112,7 @@ mod object_rig_edit_mesh_control_tests;
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_rig_view.rs"]
 mod object_rig_view_tests;
+// #2255: the held pose drag, the Alt-drag IK edit and the world map of a rig layer with Motion.
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_rig_view_pose.rs"]
+mod object_rig_view_pose_tests;

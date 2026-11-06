@@ -288,6 +288,7 @@ fn allowed_members(kind: &str) -> Option<&'static [&'static str]> {
         "removeWeight" => &["kind", "target", "vertex", "entry"],
         "resetWeights" => &["kind", "target", "vertex", "radius", "softness"],
         "setIk" => &["kind", "root", "joint", "end", "flip"],
+        "dragIk" => &["kind", "end", "to"],
         "removeIk" => &["kind", "endKey"],
         "removeBone" => &["kind", "boneId"],
         "removeBind" => &["kind", "target"],
@@ -379,6 +380,10 @@ fn action_of(table: &KeyedTable<Value>) -> Result<RigAction, Refusal> {
             joint: m.reference("joint")?,
             end: m.reference("end")?,
             flip: m.flag("flip", false)?,
+        }),
+        "dragIk" => Ok(RigAction::DragIk {
+            end: m.reference("end")?,
+            to: pair(&m.req::<[Number; 2]>("to")?)?,
         }),
         "removeIk" => {
             let end_key = m.req::<String>("endKey")?;

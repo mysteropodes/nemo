@@ -288,7 +288,7 @@ fn a_read_changes_nothing_and_a_move_then_undo_moves_the_anchor_back() {
 }
 
 #[test]
-fn a_layer_or_parent_with_motion_is_a_typed_reason_and_lists_no_geometry() {
+fn a_layer_with_motion_lists_its_geometry_with_the_map_to_the_world_and_a_parent_without_bounds_adds_none() {
     use crate::history::object_history::object_widget_edit_rows as rows;
     let rig = json!({"bones":{"bone1":{"segments":[{"point":[0,0]},{"point":[10,0]}],
         "restSegments":[{"point":[0,0]},{"point":[10,0]}],"closed":false}},"ikChains":{},"nextId":2,"binds":[]});
@@ -308,15 +308,17 @@ fn a_layer_or_parent_with_motion_is_a_typed_reason_and_lists_no_geometry() {
     let holder = |uid: &str, property: &str, values: Value| json!({"target":{"contextId":"scene-root","layerUid":uid},"properties":[{"property":property,"static":values}]});
     value["propertyHolders"] = json!([holder(LAYER, "position", json!([10, 0]))]);
     let moved = at(&value, LAYER);
+    // #2255: Motion is no longer a refusal: the geometry stays in the layer's own space and the map to the world rides along.
     assert_eq!(
         (
             moved["unavailable"].clone(),
             moved["total"].clone(),
-            moved["items"].clone()
+            moved["matrix"].clone()
         ),
-        (json!("motion"), json!(0), json!([]))
+        (Value::Null, json!(1), json!([1.0, 0.0, 0.0, 1.0, 10.0, 0.0]))
     );
-    // A parent's motion moves the rig as well; an expression on a transform is not evaluated here.
+    assert_eq!(still["matrix"], Value::Null, "an unmoved layer has the identity, spelled null");
+    // A parent without content bounds contributes nothing (the baseline's ancestor map), so the rig stays where it is.
     value["propertyHolders"] = json!([holder("P", "rotation", json!([30]))]);
     value["layers"][0]["parentLayerUid"] = json!("P");
     value["layers"]
@@ -332,5 +334,6 @@ fn a_layer_or_parent_with_motion_is_a_typed_reason_and_lists_no_geometry() {
             .unwrap()
             .push(json!({"layerUid":"P","naturalPosition":1,"order":{}}));
     }
-    assert_eq!(at(&value, LAYER)["unavailable"], "motion");
+    let parented = at(&value, LAYER);
+    assert_eq!((parented["unavailable"].clone(), parented["matrix"].clone()), (Value::Null, Value::Null));
 }

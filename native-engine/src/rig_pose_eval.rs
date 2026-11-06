@@ -50,6 +50,12 @@ use crate::revision::ObjectSnapshot;
 mod deliver;
 #[path = "rig_pose_eval_inputs.rs"]
 mod inputs;
+#[path = "rig_pose_eval_view.rs"]
+mod view;
+#[allow(unused_imports)]
+pub(crate) use view::{
+    candidate_rig, evaluate_for_view, ik_writes, segment_writes, RigVertexWrite, ViewEvaluation, ViewMesh,
+};
 #[allow(unused_imports)]
 pub(crate) use deliver::{evaluate_and_deliver, PosedGeometrySink};
 use inputs::{deform_bones, owned_bind, OwnedBind};
@@ -212,7 +218,7 @@ fn check_pin(snapshot: &ObjectSnapshot, pin: &RigPosePin<'_>) -> Result<(), RigP
 
 /// The authored frame the layer shows at `frame`: the frame packet's `exposure(frame).1`, or `frame`
 /// itself for a layer without timing.
-fn source_frame_of(layer: &ObjectLayer, frame: u32) -> Option<u32> {
+pub(crate) fn source_frame_of(layer: &ObjectLayer, frame: u32) -> Option<u32> {
     match layer.timing.value() {
         Some(timing) => timing.exposure(frame).1,
         None => Some(frame),
@@ -316,6 +322,19 @@ pub(crate) fn evaluate_rig_pose(
     frame: u32,
     meshes: Option<&dyn MeshPoseSource>,
 ) -> Result<RigPoseEvaluation, RigPoseRefusal> {
+    evaluate_rig_pose_over(snapshot, pin, layer_uid, frame, meshes, None)
+}
+
+/// [`evaluate_rig_pose`] over a CANDIDATE rig: `rig` replaces the stored record of the layer for this one detached
+/// evaluation (the live-pose preview of a drag). `None` reads the stored rig. Nothing is written anywhere.
+pub(crate) fn evaluate_rig_pose_over(
+    snapshot: &ObjectSnapshot,
+    pin: &RigPosePin<'_>,
+    layer_uid: &str,
+    frame: u32,
+    meshes: Option<&dyn MeshPoseSource>,
+    candidate: Option<&crate::object_document::object_rig_record::RigRecord>,
+) -> Result<RigPoseEvaluation, RigPoseRefusal> {
     check_pin(snapshot, pin)?;
     let document = snapshot.document();
     if frame >= document.total_frames() {
@@ -326,7 +345,7 @@ pub(crate) fn evaluate_rig_pose(
         .iter()
         .find(|layer| layer.layer_uid() == layer_uid)
         .ok_or(RigPoseRefusal::LayerAbsent)?;
-    let rig = layer.rig().ok_or(RigPoseRefusal::NoRig)?;
+    let rig = candidate.or_else(|| layer.rig()).ok_or(RigPoseRefusal::NoRig)?;
     let source_frame = source_frame_of(layer, frame).ok_or(RigPoseRefusal::NotExposed)?;
 
     let vertex_count = |id: &str| -> Option<usize> {

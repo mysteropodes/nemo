@@ -40,6 +40,8 @@ const CALLS = [
     { kind: 'setIk', root: { boneId: 'bone1', vi: 0 }, joint: { boneId: 'bone1', vi: 1 }, end: { boneId: 'bone2', vi: 1 }, flip: true }],
   [(r) => r.setIk(L, { boneId: 'bone1', vi: 0 }, { boneId: 'bone1', vi: 1 }, { boneId: 'bone2', vi: 1 }),
     { kind: 'setIk', root: { boneId: 'bone1', vi: 0 }, joint: { boneId: 'bone1', vi: 1 }, end: { boneId: 'bone2', vi: 1 } }],
+  // #2255: the Alt-drag of a chain end is ONE edit; the end is copied to the wire member by member, never by reference.
+  [(r) => r.dragIk(L, { boneId: 'bone2', vi: 1, extra: 9 }, [210.5, -3]), { kind: 'dragIk', end: { boneId: 'bone2', vi: 1 }, to: [210.5, -3] }],
   [(r) => r.removeIk(L, 'bone2:1'), { kind: 'removeIk', endKey: 'bone2:1' }],
   [(r) => r.removeBone(L, 'bone2'), { kind: 'removeBone', boneId: 'bone2' }],
   [(r) => r.removeBind(L, stroke), { kind: 'removeBind', target: stroke }],
@@ -136,13 +138,17 @@ test('a bone with too many anchors for the public 4096-byte bound is refused loc
   assert.equal(fx.owner.log.received.length, 0);
 });
 
-test('the live pose and IK drag is evaluation, not an operation: typed unavailability, zero requests', async () => {
+test('the Alt-drag of a chain end is a native dragIk, and its bad shapes are refused locally with no request', async () => {
   const fx = createFixture({});
   const rig = Rig.create(fx.session);
-  assert.deepEqual(Rig.UNAVAILABLE, { dragPose: 'rig_pose_drag_unavailable', dragIkEnd: 'rig_pose_drag_unavailable' });
-  for (const name of Object.keys(Rig.UNAVAILABLE)) {
-    const error = await refused(rig[name](L, 'bone2:1', 10, 10));
-    assert.deepEqual([error.code, error.reason], ['unavailable', 'rig_pose_drag_unavailable']);
+  assert.equal(Rig.UNAVAILABLE, undefined, 'the typed rig_pose_drag_unavailable is retired');
+  assert.equal(rig.dragPose, undefined);
+  assert.equal(rig.dragIkEnd, undefined);
+  for (const call of [() => rig.dragIk(L, null, [1, 1]), () => rig.dragIk(L, { boneId: 'b' }, [1, 1]), () => rig.dragIk(L, { boneId: 'b', vi: 1 }, [1]),
+    () => rig.dragIk(L, { boneId: 'b', vi: 1 }, [1, NaN]), () => rig.dragIk(L, { boneId: '', vi: 1 }, [1, 1]), () => rig.dragIk(L, { boneId: 'b', vi: -1 }, [1, 1]),
+    () => rig.dragIk(L, { boneId: 'b', vi: 1 }, [2e9, 1])]) {
+    const error = await refused(call());
+    assert.deepEqual([error.code, error.reason], ['invalid_request', 'local_validation']);
   }
   assert.equal(fx.owner.log.received.length, 0);
 });
@@ -184,7 +190,7 @@ test('no legacy rig writer is reachable and the rig bridge keeps its capture poi
     await rig.resetPose(L);
     await rig.commitPose(L, 0);
     await rig.setIk(L, { boneId: 'a', vi: 0 }, { boneId: 'a', vi: 1 }, { boneId: 'b', vi: 1 }, true);
-    await refused(rig.dragIkEnd());
+    await rig.dragIk(L, { boneId: 'b', vi: 1 }, [10, 10]);
   } finally { guard.restore(); }
   const source = fs.readFileSync(path.join(__dirname, '../src/js/adapters/native-object-rig.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   for (const name of ['ld.rig', 'ensureLayerRig', 'rigResetPose', 'rigCommitFrame', 'applyRigDeform', 'paper', 'userLayers', 'localStorage', 'addEventListener', 'n20AllowLegacyWrite']) assert.equal(source.includes(name), false, name);
