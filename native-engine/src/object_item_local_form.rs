@@ -15,8 +15,33 @@
 /// The skew a stored record may carry stays strictly inside a quarter turn.
 pub(crate) const MAX_SKEW_DEGREES: f64 = 89.9;
 const EPS: f64 = 1e-9;
+use crate::object_document::Presence;
+use serde_json::Number;
 
 pub(crate) type Lin = [f64; 4];
+
+/// The nine preset pivots of a selection box (a stored `xformAnchorKey`).
+pub(crate) const PIVOT_PRESETS: [&str; 9] = ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"];
+
+/// #2372: the optional stored Select pivot of an image or a text block (baseline `serP` `xformAnchorKey` / `xformAnchorCustom`): one of the
+/// nine presets, or a custom world point `[x, y]` that wins over it. Absent reads as none, so an old document loads and saves byte-identical.
+pub(crate) fn pivot_valid(key: &Presence<String>, custom: &Presence<Vec<Number>>) -> bool {
+    key.value().is_none_or(|k| PIVOT_PRESETS.contains(&k.as_str()))
+        && custom.value().is_none_or(|p| p.len() == 2 && p.iter().all(|n| n.as_f64().is_some_and(f64::is_finite)))
+}
+
+/// The stored preset, if any.
+pub(crate) fn pivot_key(key: &Presence<String>) -> Option<String> {
+    key.value().cloned()
+}
+
+/// The stored custom world point, if any.
+pub(crate) fn pivot_custom(custom: &Presence<Vec<Number>>) -> Option<[f64; 2]> {
+    match custom.value()?.as_slice() {
+        [x, y] => Some([x.as_f64()?, y.as_f64()?]),
+        _ => None,
+    }
+}
 
 /// The mirror flags and the x-shear of one item (identity when all are off).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

@@ -110,6 +110,8 @@ impl TextBlockRecord {
             flip_x: Presence::Missing,
             flip_y: Presence::Missing,
             skew: Presence::Missing,
+            xform_anchor_key: Presence::Missing,
+            xform_anchor_custom: Presence::Missing,
         };
         record.validate()?;
         Ok(record)
