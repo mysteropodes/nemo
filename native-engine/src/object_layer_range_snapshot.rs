@@ -32,8 +32,8 @@ fn range_error(error: RangeError) -> DispatchErrorCode {
         _ => DispatchErrorCode::Unavailable,
     }
 }
-/// Bytes each optional snap list may take of the 4 KiB read; a longer list is cut at the last entry that fits.
-const SNAP_LIST_BYTES: usize = 1536;
+/// Bytes each of the three optional snap lists may take of the 4 KiB read; a longer list is cut at the last entry that fits.
+const SNAP_LIST_BYTES: usize = 1024;
 const MAX_MARKER_NAME: usize = 32;
 /// The entries of `list` that still fit `SNAP_LIST_BYTES`, in order; the first entry that does not fit ends the list.
 fn within_budget<T>(list: Vec<T>, size: impl Fn(&T) -> usize) -> Vec<T> {
@@ -163,6 +163,28 @@ impl ObjectSnapshot {
         let effect_keys = within_budget(effect_keys, |frame| frame.to_string().len());
         if !effect_keys.is_empty() {
             value["range"]["effectKeys"] = json!(effect_keys);
+        }
+        // Every key of the layer's own property holders (the layer and its elements), one entry per key so the caller can leave out the keys it
+        // is dragging: the baseline `collectMotionSnapCandidates` over `holder.motion` and `ld.elementMotion`.
+        let mut key_frames: Vec<i64> = document
+            .property_holders()
+            .into_iter()
+            .flatten()
+            .filter(|h| {
+                h.target().context_id() == selector.context_id
+                    && h.target().layer_uid() == selector.layer_uid
+            })
+            .flat_map(|h| h.properties().iter())
+            .filter_map(|record| record.track.value())
+            .flat_map(|track| track.keys.iter())
+            .filter_map(|key| key.frame.as_f64().filter(|f| f.fract() == 0.0))
+            .map(|f| f as i64)
+            .filter(|f| *f >= 0 && *f < total)
+            .collect();
+        key_frames.sort_unstable();
+        let key_frames = within_budget(key_frames, |frame| frame.to_string().len());
+        if !key_frames.is_empty() {
+            value["range"]["keyFrames"] = json!(key_frames);
         }
         if serde_json::to_vec(&value).map_err(|_| Unavailable)?.len() > MAX_MESSAGE_BYTES {
             return Err(Unavailable);

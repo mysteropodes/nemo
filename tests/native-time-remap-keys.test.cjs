@@ -161,6 +161,42 @@ test('layer markers and effect-stack keys are snap candidates beside the keys, l
   assert.deepEqual(KeyGesture.snapCandidates({ state: { currentFrame: 0 } }, { tracks: [], extra: [{ frame: 5, label: 'X' }, { frame: 99, label: 'out of range' }] }, 12).map((c) => c.frame), [0, 5]);
 });
 
+test('the keys of every layer are snap candidates, the dragged keys left out, and the BPM beats follow the grid', async () => {
+  // alpha carries the dragged key (frame 3) and others at 3, 3 and 5 as the layer read lists them; beta has a key at 11.
+  const h = await remapHarness({ propertyKeys: [3], rangeExtras: (uid) => ({ keyFrames: uid === 'alpha' ? [3, 3, 5] : [11] }) });
+  const wrap = h.doc.createElement('div'); h.doc.body.appendChild(wrap);
+  h.doc.getElementById = (id) => (id === 'fg-wrap' ? wrap : wrap.children.find((c) => c.id === id) || null);
+  Range.refreshKeys(h.root);
+  const edits = []; h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  const drag = (to) => { h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 }); h.doc.fire('mousemove', { clientX: 100 + to * 10 }); const label = wrap.children[0] && wrap.children[0].dataset.label; h.doc.fire('mouseup', { clientX: 100 + to * 10 }); return label; };
+  assert.equal(drag(1), 'Clé · 4', 'a second key on the same frame stays a target; only the dragged one is left out');
+  assert.deepEqual(edits, [], 'a shift of 0 sends no edit');
+  assert.equal(drag(8), 'Clé · 12', 'a key of another layer, which no drawer shows, is a target');
+  assert.deepEqual(edits.pop(), { kind: 'shift', delta: 8 });
+  // The same key alone on its frame is the dragged key, not a target of itself.
+  const alone = await remapHarness({ propertyKeys: [3], rangeExtras: (uid) => ({ keyFrames: uid === 'alpha' ? [3] : [] }) });
+  const wrap2 = alone.doc.createElement('div'); alone.doc.body.appendChild(wrap2);
+  alone.doc.getElementById = (id) => (id === 'fg-wrap' ? wrap2 : wrap2.children.find((c) => c.id === id) || null);
+  Range.refreshKeys(alone.root);
+  alone.ports.editSelectedKeys = () => Promise.resolve(true);
+  alone.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 }); alone.doc.fire('mousemove', { clientX: 110 });
+  assert.equal(wrap2.children[0], undefined, 'no guide: the dragged key at 3 is no candidate');
+  alone.doc.fire('mouseup', { clientX: 110 });
+  // BPM beats (baseline state.bpmShow): candidates only while the grid is shown.
+  const beats = await remapHarness({ propertyKeys: [3] });
+  const wrap3 = beats.doc.createElement('div'); beats.doc.body.appendChild(wrap3);
+  beats.doc.getElementById = (id) => (id === 'fg-wrap' ? wrap3 : wrap3.children.find((c) => c.id === id) || null);
+  const show = { on: true };
+  Object.assign(beats.root, { SMBpm: { beatFrames: () => [{ frame: 0, beat: 0 }, { frame: 4, beat: 1 }] }, NemoNativeCompositionController: { read: () => ({ composition: { effectiveBpmShow: show.on, effectiveBpm: 180, effectiveBpmOffset: 0 } }) } });
+  beats.root.state.fps = 24;
+  Range.refreshKeys(beats.root);
+  beats.ports.editSelectedKeys = () => Promise.resolve(true);
+  const dragBeat = () => { beats.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 }); beats.doc.fire('mousemove', { clientX: 110 }); const label = wrap3.children[0] && wrap3.children[0].dataset.label; beats.doc.fire('mouseup', { clientX: 110 }); return label; };
+  assert.equal(dragBeat(), 'Temps BPM · 5', 'a key dropped on the beat at 4 snaps to it');
+  show.on = false;
+  assert.equal(dragBeat(), undefined, 'a hidden grid is no snap target');
+});
+
 test('the property key editor does not answer an interpolation shortcut with "no selection" while remap keys hold the selection', async () => {
   const h = await remapHarness();
   const seen = { noSelection: 0, edits: 0 };

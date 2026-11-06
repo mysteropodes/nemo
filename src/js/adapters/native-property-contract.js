@@ -12,9 +12,10 @@
       id(value.instanceId,'instanceId');id(value.documentId,'documentId');revision(value.atRevision,'atRevision');
       objectUid(value.documentSnapshotId);objectUid(value.layerUid);frame(value.frame);
       if(typeof value.contextId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId))throw new TypeError('invalid range context'); // #2256: the scene root or a component context id
-      exact(value.range,['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'],['markers','effectKeys'],'resolved range');
+      exact(value.range,['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'],['markers','effectKeys','keyFrames'],'resolved range');
       const rg=value.range,lists=(!has(rg,'markers')||Array.isArray(rg.markers)&&rg.markers.length<=64&&rg.markers.every(m=>plain(m)&&Number.isSafeInteger(m.frame)&&m.frame>=0&&Object.keys(m).every(k=>k==='frame'||k==='name')&&(!has(m,'name')||typeof m.name==='string'&&m.name.length>=1&&m.name.length<=32)))&&
-        (!has(rg,'effectKeys')||Array.isArray(rg.effectKeys)&&rg.effectKeys.length<=512&&rg.effectKeys.every(f=>Number.isSafeInteger(f)&&f>=0));
+        (!has(rg,'effectKeys')||Array.isArray(rg.effectKeys)&&rg.effectKeys.length<=512&&rg.effectKeys.every(f=>Number.isSafeInteger(f)&&f>=0))&&
+        (!has(rg,'keyFrames')||Array.isArray(rg.keyFrames)&&rg.keyFrames.length<=512&&rg.keyFrames.every(f=>Number.isSafeInteger(f)&&f>=0));
       if(!lists)throw new TypeError('invalid range snap lists');
       if(!['rawInPoint','rawOutPoint','inPoint','outPoint'].every(k=>Number.isFinite(value.range[k]))||
          typeof value.range.hasCustomRange!=='boolean'||typeof value.range.hasTimeLink!=='boolean')throw new TypeError('invalid resolved range');

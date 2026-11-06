@@ -110,18 +110,37 @@
     });
   }
   // #2377: the frames a drag may snap to beyond the playhead, work area and composition markers (the baseline snapMotionFrame): every key track in the
-  // key read (open drawers and Time Remap lanes), the markers of each layer ('Repère calque') and the keys of each layer's effect stack.
+  // key read (open drawers and Time Remap lanes), the markers of each layer ('Repère calque'), the keys of each layer's effect stack, the keys of every
+  // layer's own property holders (the dragged keys left out) and the BPM beats while the grid is shown.
   function snapLists(range){
-    var own=function(o,k){return Object.prototype.hasOwnProperty.call(o,k);};
+    var own=function(o,k){return Object.prototype.hasOwnProperty.call(o,k);},frames=function(k){return !own(range,k)||Array.isArray(range[k])&&range[k].length<=512&&range[k].every(function(f){return Number.isSafeInteger(f)&&f>=0;});};
     return (!own(range,'markers')||Array.isArray(range.markers)&&range.markers.length<=64&&range.markers.every(function(m){return !!m&&typeof m==='object'&&Number.isSafeInteger(m.frame)&&m.frame>=0&&
-      Object.keys(m).every(function(k){return k==='frame'||k==='name';})&&(!own(m,'name')||typeof m.name==='string'&&m.name.length>=1&&m.name.length<=32);}))&&
-      (!own(range,'effectKeys')||Array.isArray(range.effectKeys)&&range.effectKeys.length<=512&&range.effectKeys.every(function(f){return Number.isSafeInteger(f)&&f>=0;}));
+      Object.keys(m).every(function(k){return k==='frame'||k==='name';})&&(!own(m,'name')||typeof m.name==='string'&&m.name.length>=1&&m.name.length<=32);}))&&frames('effectKeys')&&frames('keyFrames');
+  }
+  // The selected property keys of the key read per layer and frame: the keys a drag is moving, which must not be a snap target of themselves.
+  function draggedKeys(v){
+    var out=new Map();
+    ((v&&v.tracks)||[]).forEach(function(t){if(t.remap)return;t.items.forEach(function(k){if(!k.selected)return;
+      var m=out.get(t.target.layerUid)||new Map();m.set(k.frame,(m.get(k.frame)||0)+1);out.set(t.target.layerUid,m);});});
+    return out;
+  }
+  // Baseline collectMotionSnapCandidates: state.bpmShow beats ('Temps BPM'), read from the native composition projection through SMBpm.
+  function beatCandidates(root){
+    try{
+      var bpm=root.SMBpm,ctl=root.NemoNativeCompositionController,p=ctl&&typeof ctl.read==='function'?ctl.read():null,c=p&&p.composition;
+      if(!bpm||typeof bpm.beatFrames!=='function'||!c||c.effectiveBpmShow!==true||!(c.effectiveBpm>0)||!(root.state.fps>0))return [];
+      return bpm.beatFrames().map(function(b){return {frame:b.frame,label:'Temps BPM'};});
+    }catch(_){return [];}
   }
   function snapView(root,w){
-    var v=keyViews(root,w),extra=[];
-    w.rows.forEach(function(row){var r=row.nativeRange&&same(row.nativeRange.pin,w.info)?row.nativeRange.range:null;if(!r)return;
+    var v=keyViews(root,w),extra=[],dragged=draggedKeys(v);
+    w.rows.forEach(function(row,i){var r=row.nativeRange&&same(row.nativeRange.pin,w.info)?row.nativeRange.range:null;if(!r)return;
       (r.markers||[]).forEach(function(m){extra.push({frame:m.frame,label:m.name||'Repère calque'});});
-      (r.effectKeys||[]).forEach(function(f){extra.push({frame:f,label:'Clé'});});});
+      (r.effectKeys||[]).forEach(function(f){extra.push({frame:f,label:'Clé'});});
+      var mine=dragged.get(w.info.layers[i].layerUid),skipped=new Map();
+      (r.keyFrames||[]).forEach(function(f){var out=mine&&mine.get(f)||0,seen=skipped.get(f)||0;
+        if(seen<out){skipped.set(f,seen+1);return;}extra.push({frame:f,label:'Clé'});});});
+    beatCandidates(root).forEach(function(b){extra.push(b);});
     return v||extra.length?{tracks:v?v.tracks:[],extra:extra}:null;
   }
   function resetKeys(root,w){clearKeys(w);keyRows(root,w,[]);}
@@ -406,7 +425,7 @@
         result.instanceId!==info.instanceId||result.documentId!==info.documentId||result.atRevision!==info.contentRevision||result.documentSnapshotId!==info.documentSnapshotId||
         result.contextId!=='scene-root'||result.layerUid!==info.layers[li].layerUid||result.frame!==frame)return;
       var range=result.range,fields=['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'];
-      if(!range||!Object.keys(range).every(function(k){return fields.includes(k)||k==='markers'||k==='effectKeys';})||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||!snapLists(range)||
+      if(!range||!Object.keys(range).every(function(k){return fields.includes(k)||k==='markers'||k==='effectKeys'||k==='keyFrames';})||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||!snapLists(range)||
         !fields.slice(0,4).every(function(k){return Number.isFinite(range[k]);})||typeof range.hasCustomRange!=='boolean'||typeof range.hasTimeLink!=='boolean')return;
       row.nativeRange=freeze({pin:Object.assign({},info),range:JSON.parse(JSON.stringify(range))});paint(root,row,li);
     }).catch(function(){});

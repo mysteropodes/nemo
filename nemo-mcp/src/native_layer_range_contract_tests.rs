@@ -57,6 +57,7 @@ fn the_optional_snap_lists_are_closed_and_a_plain_range_keeps_its_six_fields() {
     let mut with = output();
     with["range"]["markers"] = json!([{"frame":3,"name":"Cut"},{"frame":9}]);
     with["range"]["effectKeys"] = json!([0, 4, 12]);
+    with["range"]["keyFrames"] = json!([0, 4, 4, 9]);
     assert!(result("document", &q, &with));
     assert!(super::super::timing_result("document", &q, &with));
     for (field, bad) in [
@@ -75,6 +76,10 @@ fn the_optional_snap_lists_are_closed_and_a_plain_range_keeps_its_six_fields() {
         ("effectKeys", json!([1.5])),
         ("effectKeys", json!((0..513).collect::<Vec<_>>())),
         ("effectKeys", Value::Null),
+        ("keyFrames", json!([-1])),
+        ("keyFrames", json!([1.5])),
+        ("keyFrames", json!((0..513).collect::<Vec<_>>())),
+        ("keyFrames", Value::Null),
     ] {
         let mut broken = with.clone();
         broken["range"][field] = bad;

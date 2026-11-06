@@ -38,7 +38,7 @@ fn markers(value: &Value) -> bool {
             })
     })
 }
-/// The frames of the effect stack's keys: at most 512 whole frames.
+/// The frames of the effect stack's keys, or of the layer's property keys: at most 512 whole frames.
 fn effect_keys(value: &Value) -> bool {
     value
         .as_array()
@@ -87,7 +87,7 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
                         "hasCustomRange",
                         "hasTimeLink",
                     ],
-                    &["markers", "effectKeys"],
+                    &["markers", "effectKeys", "keyFrames"],
                 )
                 .is_some_and(|r| {
                     ["rawInPoint", "rawOutPoint", "inPoint", "outPoint"]
@@ -97,6 +97,7 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
                         && r["hasTimeLink"].is_boolean()
                         && r.get("markers").is_none_or(markers)
                         && r.get("effectKeys").is_none_or(effect_keys)
+                        && r.get("keyFrames").is_none_or(effect_keys)
                 })
         })
 }

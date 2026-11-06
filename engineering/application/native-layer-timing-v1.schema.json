@@ -441,6 +441,15 @@
                 "type": "integer",
                 "minimum": 0
               }
+            },
+            "keyFrames": {
+              "description": "The frame of every key on the layer's own property holders (the layer and its elements), ascending, one entry per key and so repeated where keys share a frame, as printed while they fit the read; absent without any.",
+              "type": "array",
+              "maxItems": 512,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
             }
           }
         }
