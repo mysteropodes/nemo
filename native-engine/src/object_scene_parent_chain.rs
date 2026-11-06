@@ -242,12 +242,16 @@ impl SceneParentChains {
                     if !in_context && !identity_v1 {
                         return Err(ChainUnavailable::Context);
                     }
-                    if pose.mat(index == start).is_some() {
+                    // A 3D consumer layer is placed by its 3D projection around the union bounds of its content, and ignores
+                    // its own parents (baseline `is3D`: `motionMat = null; parentChain = []`).
+                    let three_d_start = index == start && layer.three_d.value() == Some(&true);
+                    if pose.mat(index == start).is_some() || three_d_start {
                         result.needed.insert(index);
                     }
                     result.samples.insert(index, pose);
                     walk.push(index);
                     next = match parent_uid {
+                        _ if three_d_start => None,
                         None => None,
                         Some(uid) => Some(
                             packet
@@ -413,10 +417,12 @@ impl SceneParentChains {
     /// `own`, when given, replaces the consumer layer's own pivot geometry (a vector preview, #2372).
     pub(crate) fn chain_with(&self, layer: usize, own: Option<Rect>) -> Result<Vec<ChainEntry>, ChainUnavailable> {
         let mut chain = Vec::new();
-        for &index in self
-            .walks
-            .get(&layer)
-            .ok_or(ChainUnavailable::MissingLayer)?
+        let walk = self.walks.get(&layer).ok_or(ChainUnavailable::MissingLayer)?;
+        // A 3D consumer is placed by `place_image` / the 3D vector batch, never by a 2D chain.
+        if self.packet.source_layers().get(layer).is_some_and(|l| l.three_d.value() == Some(&true)) {
+            return Ok(chain);
+        }
+        for &index in walk
         {
             if let Some(mat) = self.samples[&index].mat(index == layer) {
                 let canvas = self

@@ -122,18 +122,15 @@ fn missing_timing_outside_the_window_is_still_unavailable_not_fake_empty() {
 }
 
 #[test]
-fn source_range_support_does_not_admit_unsupported_visible_vector_parenting() {
+fn source_range_support_admits_a_3d_vector_parent_through_its_2d_motion() {
     let mut value = drawing(2, 8, true);
     value["layers"][0]["parentLayerUid"] = json!("L1");
-    // The static2D parent producer is admitted; a3D ancestor is still unjoined.
+    // #2520: a 3D ancestor contributes its 2D Motion to the layers parented to it (baseline `computeMotionMat`), so it is joined.
     value["layers"][1]["threeD"] = json!(true);
     value["layers"][0]["range"] = json!({"inPoint":2,"outPoint":4});
     let snapshot = snapshot(&value);
     let bytes = encode_storage_project(snapshot.document()).unwrap();
-    assert_eq!(
-        prepare_object_exposure_frame(&snapshot, &selector(&snapshot, 3)).err(),
-        Some(ObjectFrameError::Unavailable)
-    );
+    assert!(prepare_object_exposure_frame(&snapshot, &selector(&snapshot, 3)).is_ok());
     assert_eq!(encode_storage_project(snapshot.document()).unwrap(), bytes);
 }
 

@@ -164,7 +164,6 @@ pub(crate) fn null_layer_motion_target(
         return false;
     };
     layer.is_null_layer()
-        && layer.three_d.value() != Some(&true)
         && !layer.is_effect_layer()
         && layer.widget.value().is_none()
         && layer.groups.value().is_none()

@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "d2cf63020bddc98dd7b489fb6da2b0108427c0ca",
-    "sourceRootTree": "f538d8e17b4838cf05f617279637010739bd7fc1",
+    "candidateCommit": "e72e794834666c3c18d7ee9ad7216e740c63c200",
+    "sourceRootTree": "ca01e64ae543fd8dc688df05754e4715678b6e65",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "cf065b918f95aa16b746603d7736d91f6c9118ee",
-      "lastChangedCommit": "d2cf63020bddc98dd7b489fb6da2b0108427c0ca"
+      "gitTree": "7bad43b02bba1d1ead1f4a22e5af017231e26573",
+      "lastChangedCommit": "e72e794834666c3c18d7ee9ad7216e740c63c200"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "00239c3feb82b32c7c76c1d97f507bf8de364ade",
-      "sha256": "89ab516c5af743335d2763aebeff6222ef83001f20aac9e3a000baceee17ea9a",
+      "gitBlob": "c3d2e9f5f5f3c8deb38a201aa52f45ddfd6423cc",
+      "sha256": "650c0a3cece85b8d68167686d21c0d7b0a2c4675be7816fb1b83e99503eb21a6",
       "lastChangedCommit": "f606f3b2ea60c6bf5cdb7d031b8c54b3b60d291a"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "fdbd04af4c79ce1b42ee21227375ff8efd8c1473de5723f33e6875d63991e88f"
+      "value": "aaa21d9ea2fb3949c88eb76b07f8b8546639c119bdce0edf6ac69fcb64f4c024"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "29755d2c76e2d4b59dcffa3dbeba9fd83794a916",
-        "sha256": "3250bd9fa74f6f894aeaa7dc406cf871f626a1286e7e16a5746ceee85bde7ba0",
+        "gitBlob": "bdb645a6921425c5ddad990891b5b694aa544a02",
+        "sha256": "b4a2d0dc037ad445ab1057f8fc908afef3c126e33e40b90c4fbce31465fb49a6",
         "moduleCount": 307,
-        "basedOnCommit": "d2cf63020bddc98dd7b489fb6da2b0108427c0ca"
+        "basedOnCommit": "e72e794834666c3c18d7ee9ad7216e740c63c200"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -4654,6 +4654,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/native-motion-connector-drag.js",
+      "moduleId": "app.native.motion-connector-drag.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2775,
+          "scriptOrdinal": 421
+        }
+      ]
+    },
+    {
       "path": "src/js/adapters/native-motion-layer-link-rows.js",
       "moduleId": "app.native.layer-parent.adapter",
       "executionClass": "document-classic",
@@ -5236,8 +5248,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2775,
-          "scriptOrdinal": 421
+          "line": 1,
+          "scriptOrdinal": 1
         }
       ]
     },

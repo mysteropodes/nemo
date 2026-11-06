@@ -174,7 +174,20 @@
       if(root.state.appMode!=='motion'||!live||live.frame!==root.state.currentFrame||!live.isCurrent())throw Error('Stale native key selection');
       if(live.selectKeys([keyAddress(track,a.frame),keyAddress(track,b.frame)])!==true)throw Error('Native key selection refused');
       refreshKeys(root);
+      if(event.detail!==0)dragSpan(root,w,event,track,a,b);
     }catch(_){notice(root,'Native key selection is unavailable or stale.');}
+  }
+  // #2377: dragging a connector moves its two end keys by one delta; Alt retimes the second key alone (baseline motion.js connector drag).
+  function dragSpan(root,w,event,track,a,b){
+    var gesture=root.NemoNativeMotionKeyGesture,drag=root.NemoNativeMotionConnectorDrag;
+    if(!gesture||!drag||!w.ports||typeof w.ports.editSelectedKeys!=='function'||w.keyDrag)return;
+    var id=trackIdentity(track);
+    w.keyDrag=drag.start({gesture:gesture,doc:root.document,event:event,fc:root.FC,total:w.info.totalFrames,track:track,a:a,b:b,address:keyAddress,
+      view:function(){try{return keyViews(root,w);}catch(_){return null;}},edit:w.ports.editSelectedKeys,refresh:function(){refreshKeys(root);},
+      nodes:function(frames){return (w.keyNodes||[]).filter(function(n){return n.dataset.keyTrack===id&&frames.indexOf(Number(n.dataset.frame))>=0;});},
+      snap:{first:event.altKey?b.frame:a.frame,on:function(){try{return root.localStorage.getItem('nemo-motion-snap')!=='0';}catch(_){return true;}},
+        frames:function(){try{return gesture.snapCandidates(root,keyViews(root,w),w.info.totalFrames);}catch(_){return [];}}},
+      onEnd:function(){w.keyDrag=null;}});
   }
   // #2524: dragging selected keys previews a shift and commits ONE native shift on release (baseline motion.js onDragMove/onDragUp).
   function dragKeys(root,w,fc,event,node){

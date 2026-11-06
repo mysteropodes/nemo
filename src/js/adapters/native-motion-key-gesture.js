@@ -108,7 +108,7 @@
     }
     return items;
   }
-  /* A group drag. opts: {startX, fc, total, nodes() (the selected key buttons), tracks() (a fresh read, for collisions), edit(action),
+  /* A group drag. opts: {startX, fc, total, clamp(delta) (optional), nodes() (the selected key buttons), tracks() (a fresh read, for collisions), edit(action),
    * doc (document), onEnd(), snap: {first (the frame of the grabbed key), frames() (candidates), on() (the preference)}}. The preview never
    * exceeds a shift the engine would accept: an unreachable frame keeps the last valid one; a snap the engine would refuse falls back
    * to the raw frame. Cmd/Ctrl turns the snap off for that move. */
@@ -132,13 +132,14 @@
     function move(e) {
       if (!armed && Math.abs(e.clientX - opts.startX) < 3) return;
       armed = true;
-      const raw = Math.round((e.clientX - opts.startX) / opts.fc);
+      const clamp = typeof opts.clamp === 'function' ? opts.clamp : (n) => n; // a connector never crosses a key outside its pair
+      const raw = clamp(Math.round((e.clientX - opts.startX) / opts.fc));
       const tracks = opts.tracks();
       if (guide) guide.clear();
       let want = raw, hit = null;
       if (opts.snap && !e.metaKey && !e.ctrlKey && opts.snap.on()) {
         hit = snapFrame(opts.snap.first + raw, opts.snap.frames(), opts.fc);
-        if (hit) want = hit.frame - opts.snap.first;
+        if (hit) want = clamp(hit.frame - opts.snap.first);
       }
       if (tracks && hit && !KeyEdit.canShift(tracks, want, opts.total)) { hit = null; want = raw; }
       if (!tracks || !KeyEdit.canShift(tracks, want, opts.total)) return;

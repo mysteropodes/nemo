@@ -133,6 +133,14 @@ fn vector_layer_holder_consumed(document: &ObjectDocument, holder: &PropertyHold
                     "anchor" | "rotation" | "scale" => {
                         contentless_unreferenced_layer(document, target)
                     }
+                    // A layer with nothing to place (Folder, Effect, widget, Null, empty drawing) has nothing for the 3D
+                    // keys to move; the baseline `toggleLayer3D` takes on any layer and the document keeps rendering.
+                    "positionZ" | "rotationX" | "rotationY" => {
+                        crate::evaluation::object_vector_kernels::render_vector_eval::plain_empty_layer(
+                            document,
+                            target.layer_uid(),
+                        )
+                    }
                     _ => false,
                 }
         })
@@ -279,6 +287,17 @@ pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &Property
         return true;
     }
     let target = holder.target();
+    // The 3D keys of a layer with nothing to place (Folder, Effect, widget, Null, empty drawing): nothing for them to move.
+    if target.context_id() == "scene-root"
+        && target.stroke_id().is_none()
+        && !holder.properties().is_empty()
+        && holder.properties().iter().all(|p| {
+            matches!(p.property(), "positionZ" | "rotationX" | "rotationY") && !p.expression.value().is_some_and(|c| c.enabled)
+        })
+        && crate::evaluation::object_vector_kernels::render_vector_eval::plain_empty_layer(document, target.layer_uid())
+    {
+        return true;
+    }
     if !scene_consumer_uses_layer(document, target) || holder.properties().is_empty() {
         return false;
     }

@@ -336,10 +336,14 @@ test('#2520: the 3D switch is saved with a revision and no history entry; the re
   assert.deepEqual(response.result,{applied:true,historyEntriesAdded:0});assert.equal(response.contentRevision,1);
   assert.equal(h.session.info().layers[0].threeD,true);
 });
-test('#2520: a row of a kind the engine cannot place in 3D shows no 3D cell; a drawing row does, and a stored switch stays switchable off',async()=>{
+test('#2520: a row of a kind the engine cannot place in 3D shows no 3D cell; every other row does, and a stored switch stays switchable off',async()=>{
   const h=await open();assert.ok(threeDCell(h),'a drawing row (no kind fact) keeps its cell');
-  await h.external('kind','image');h.render();assert.equal(h.session.info().layers[0].kind,'image');
-  assert.equal(threeDCell(h),undefined,'an image row offers no 3D switch');
+  for(const kind of ['image','sequence','null','folder','effect','widget','guide']){
+    await h.external('kind',kind);h.render();assert.equal(h.session.info().layers[0].kind,kind);
+    assert.ok(threeDCell(h),kind+' row offers the 3D switch');
+  }
+  await h.external('kind','text');h.render();assert.equal(h.session.info().layers[0].kind,'text');
+  assert.equal(threeDCell(h),undefined,'a text row offers no 3D switch');
   await h.external('threeD',true);h.render();
   assert.equal(threeDCell(h).dataset.nativeLayerThreeD,'true','an imported switch that is already on can still be switched off');
 });

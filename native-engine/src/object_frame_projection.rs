@@ -140,6 +140,18 @@ pub(crate) fn project_layer_3d(
     canvas: [f64; 2],
     extras: &[Option<ExtraDelta>],
 ) -> Result<Vec<EvaluatedVector>, ProjectionError> {
+    project_layer_3d_bounded(vectors, pose, canvas, extras, None)
+}
+
+/// [`project_layer_3d`] with the layer pivot bound supplied by the caller: a layer that also holds images pivots around the
+/// union of its geometry and its images (baseline `userLayers[i].bounds`), not around the vectors alone.
+pub(crate) fn project_layer_3d_bounded(
+    vectors: &[EvaluatedVector],
+    pose: &Pose3D,
+    canvas: [f64; 2],
+    extras: &[Option<ExtraDelta>],
+    bounds_override: Option<crate::evaluation::property_projection_3d::Bounds>,
+) -> Result<Vec<EvaluatedVector>, ProjectionError> {
     canvas_valid(canvas)?;
     if extras.len() != vectors.len() {
         return Err(ProjectionError::MismatchedExtras);
@@ -165,7 +177,10 @@ pub(crate) fn project_layer_3d(
     {
         return Err(ProjectionError::NonFinite);
     }
-    let Some(bounds) = geometry::bounds(vectors)? else {
+    let Some(bounds) = (match bounds_override {
+        Some(bounds) => Some(bounds),
+        None => geometry::bounds(vectors)?,
+    }) else {
         return Ok(vectors.to_vec());
     };
     vectors
