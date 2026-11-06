@@ -175,7 +175,7 @@
           }catch(_){return false;}
         }
         var projection={pin:Object.assign({},value.token.pin),frame:value.frame,viewGeneration:value.token.viewGeneration,
-          target:Object.assign({},value.target),property:value.property,items:value.items.map(function(k){var item={frame:k.frame,selected:selected.has(k.frame)};if(k.hold===true)item.hold=true;if(k.lockTo)item.lockTo=k.lockTo;if(k.color)item.color=k.color;return item;})};
+          target:Object.assign({},value.target),property:value.property,items:value.items.map(function(k){var item={frame:k.frame,selected:selected.has(k.frame)};if(k.hold===true)item.hold=true;if(k.lockTo)item.lockTo=k.lockTo;if(k.color)item.color=k.color;if(Array.isArray(k.v))item.v=k.v.slice();return item;})};
         Object.defineProperties(projection,{isCurrent:{value:isCurrent},selectFrames:{value:selectFrames},canSelectFrames:{value:canSelectFrames}});
         return freeze(projection);
       }catch(_){return null;}

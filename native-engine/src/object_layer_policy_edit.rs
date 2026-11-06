@@ -34,6 +34,15 @@ pub(crate) struct PreparedLayerPolicy {
     origin: ObjectSnapshot,
     document: ObjectDocument,
     changed: bool,
+    /// The 3D switch is a presentation toggle: saved with the layer, but never an undo step (baseline `toggleLayer3D`
+    /// pushed no undo snapshot).
+    disclosure: bool,
+}
+
+impl PreparedLayerPolicy {
+    pub(crate) fn disclosure(&self) -> bool {
+        self.disclosure
+    }
 }
 
 fn set_flag(field: &mut Presence<bool>, value: bool) -> bool {
@@ -81,6 +90,7 @@ impl ObjectFillOwner {
         {
             return Err(DispatchErrorCode::Unavailable);
         }
+        let mut three_d = None;
         let layer = document
             .layers
             .iter_mut()
@@ -90,7 +100,11 @@ impl ObjectFillOwner {
         let changed = match intent {
             LayerPolicyIntent::Locked(value) => set_flag(&mut layer.locked, value),
             LayerPolicyIntent::Shy(value) => set_flag(&mut layer.shy, value),
-            LayerPolicyIntent::ThreeD(value) => set_flag(&mut layer.three_d, value),
+            LayerPolicyIntent::ThreeD(value) => {
+                let changed = set_flag(&mut layer.three_d, value);
+                three_d = changed.then_some(value);
+                changed
+            }
             LayerPolicyIntent::KeyLock(mode) => {
                 // Missing and explicit null both read as no lock; only a real
                 // change authors the field (clearing writes the baseline null).
@@ -101,12 +115,18 @@ impl ObjectFillOwner {
                 changed
             }
         };
+        // #2520: switching a layer to 3D is refused, with no revision, where the frame path cannot place it in 3D; otherwise
+        // the one click would leave every frame of the document unavailable.
+        if three_d == Some(true) && !ObjectSnapshot::three_d_switch_joins(&document, &payload.layer_uid) {
+            return Err(DispatchErrorCode::Unavailable);
+        }
         ObjectSnapshot::validate_drawing(&document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
         Ok(PreparedLayerPolicy {
             origin,
             document,
             changed,
+            disclosure: three_d.is_some(),
         })
     }
 

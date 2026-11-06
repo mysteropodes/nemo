@@ -36,7 +36,7 @@ async function harness(options={}){
  const root={document:doc,NemoLayerInOutSelection:Selection,FC:10,state:{currentFrame:2,activeLayerIdx:0,totalFrames:12,appMode:'motion',activeSymbolId:null,activeCompositionId:null,layers:[{layerUid:'alpha'},{layerUid:'beta'}]},_layerSel:[],_sel:{frames:[]},events:new Map(),notices:[]};
  root.addEventListener=(k,f)=>root.events.set(k,f);root.showToast=m=>root.notices.push(m);
  Object.assign(root,{menus:[],showContextMenu:(x,y,items)=>root.menus.push({x,y,items}),NemoNativeObjectRigCommand:require('../src/js/adapters/native-object-rig-command.js'),NemoNativeObjectRigContract:require('../src/js/adapters/native-object-rig-contract.js'),
-  NemoNativeLayerRangeMenu:require('../src/js/adapters/native-layer-range-menu.js'),NemoNativeLayerParent:require('../src/js/adapters/native-layer-parent.js')});
+  NemoNativeLayerRangeMenu:require('../src/js/adapters/native-layer-range-menu.js'),NemoNativeMotionKeySpans:require('../src/js/adapters/native-motion-key-spans.js'),NemoNativeLayerParent:require('../src/js/adapters/native-layer-parent.js')});
  for(const layer of root.state.layers)for(const field of ['inPoint','outPoint','frames','timeLink'])Object.defineProperty(layer,field,{get(){legacy++;throw Error('LEGACY '+field);}});
  const queuedPublic=[],calls=[],info=()=>({apiVersion:2,instanceId:'range-instance',documentId:'range-document',lifecycleGeneration:1,contentRevision:revision,documentSnapshotId:'range-snapshot-'+revision,
   documentDigest:String(revision).repeat(64),byteCount:1200,canvasW:320,canvasH:180,fps:24,totalFrames:12,layers:[{layerUid:'alpha'},{layerUid:'beta'}],reference:null,undoDepth:revision,redoDepth:0});
@@ -367,6 +367,21 @@ test('a tinted key carries the baseline tint class and colour; the tint is part 
   assert.equal(plain.classes.has('tinted'), false);
   assert.equal(tinted.style['--key-color'], '#e8b64c');
   assert.equal(plain.style['--key-color'], undefined);
+});
+
+test('#2377: a connector bar joins two consecutive keys whose value changes, tinted only when both carry the same colour; a press selects both end keys', async () => {
+  const target = { contextId: 'scene-root', layerUid: 'alpha' };
+  const h = await harness({ propertyTracks: [{ target, property: 'opacity', dimension: 1, items: [
+    { frame: 1, v: [10], color: '#e8b64c' }, { frame: 4, v: [20], color: '#e8b64c' }, { frame: 6, v: [20] }, { frame: 9, v: [30], color: '#e8b64c' }, { frame: 11, v: [40], color: '#111111' }] }] });
+  const bars = () => h.grid.querySelectorAll('.native-key-connect');
+  // 1->4 changes (same colour: tinted); 4->6 holds the value (no bar); 6->9 changes (one end uncoloured: default); 9->11 changes (two colours: a boundary, default).
+  assert.deepEqual(bars().map((b) => [b.dataset.keyFrom, b.dataset.keyTo, b.style.left, b.style.width, b.classes.has('tinted'), b.style['--key-color']]),
+    [['1', '4', '15px', '30px', true, '#e8b64c'], ['6', '9', '65px', '30px', false, undefined], ['9', '11', '95px', '20px', false, undefined]]);
+  assert.equal(h.grid.querySelectorAll('.native-key-durblock').length, 0, 'below 18px per frame no duration blocks, as the baseline');
+  const before = bars()[0];
+  await before.fire('mousedown', { button: 0 });
+  assert.equal(h.keyNodes().filter((n) => n.dataset.selected === 'true').map((n) => n.dataset.frame).join(), '1,4');
+  assert.equal(bars().find((b) => b.dataset.keyFrom === '1').classes.has('sel'), true, 'both end keys selected: the bar reads selected');
 });
 
 test('the selection box appears over keys on two rows and a skew drag commits ONE warp; Alt + dragging a selected key skews like the bottom edge', async () => {

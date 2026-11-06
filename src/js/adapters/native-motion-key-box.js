@@ -27,7 +27,8 @@
     return mode === 'top' ? (n - 1 - r) / (n - 1) : r / (n - 1);
   }
   /* rows: [{id, selected: [frames], staying: [frames]}] in row order. Returns [{id, from: [..], to: [..]}] per row, or null when any key
-   * would leave 0..last, land on a key that stays or on another moved key (the engine refuses the same gestures). */
+   * would leave 0..last or land on a key that stays (the engine refuses the same gestures). Moved keys may pile onto one frame, as the
+   * baseline `onDragMove` allowed: the engine keeps the one key the baseline evaluation answers with on that frame (#2377). */
   function plan(rows, mode, total, grab, last) {
     const all = rows.flatMap((r) => r.selected);
     if (!all.length) return null;
@@ -37,7 +38,7 @@
       const r = rows[row], to = [];
       for (const at of r.selected) {
         const next = at + round(total * share(mode, at, Object.assign({ row }, extent), grab));
-        if (next < 0 || next > last || r.staying.includes(next) || to.includes(next)) return null;
+        if (next < 0 || next > last || r.staying.includes(next)) return null;
         to.push(next);
       }
       out.push({ id: r.id, from: r.selected.slice(), to });

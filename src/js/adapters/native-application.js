@@ -346,7 +346,7 @@
       objectUid(value.layerUid);
     } else if (['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit'].includes(operation)) {
       exact(value, ['applied', 'historyEntriesAdded'], [], 'visibility result');
-      if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) throw new TypeError('invalid visibility disposition');
+      if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0) && !(operation === 'command.document.object.layer.policy.edit' && value.applied && value.historyEntriesAdded === 0)) throw new TypeError('invalid visibility disposition'); // #2520: the 3D switch saves a revision with no undo entry
     } else if (objectHistoryOperations.includes(operation)) { exact(value, ['applied', 'historyEntriesAdded'], [], 'object history result'); if (value.applied !== true || value.historyEntriesAdded !== 0) throw new TypeError('invalid object history disposition'); } else if (operation === 'query.diagnostics.recent') {
       exact(value, ['records', 'truncated'], [], 'diagnostics result');
       if (!Array.isArray(value.records) || value.records.length > 32 || typeof value.truncated !== 'boolean') throw new TypeError('invalid diagnostics bounds');
@@ -479,6 +479,7 @@
                 response.contentRevision !== outbound.expectedRevision + 1) throw new TypeError(objectHistoryOperations.includes(outbound.operation) ? 'object history receipt revision mismatch' : 'creation receipt revision mismatch');
             if (response.ok && ['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation].includes(outbound.operation) &&
                 response.contentRevision !== outbound.expectedRevision + (response.result.applied ? 1 : 0)) throw new TypeError('visibility receipt revision mismatch');
+            if (response.ok && outbound.operation === 'command.document.object.layer.policy.edit' && response.result.applied && response.result.historyEntriesAdded === 0 && outbound.payload.flag !== 'threeD') throw new TypeError('invalid visibility disposition');
           }
           if (['query.diagnostics.recent', 'query.reproduction.report'].includes(outbound.operation) &&
               (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId)) throw new TypeError('diagnostics response identity mismatch');

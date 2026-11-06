@@ -1197,6 +1197,7 @@
         "object_duplicator_lock_policy.rs",
         "object_key_lock_edit.rs",
         "object_layer_three_d.rs",
+        "object_layer_three_d_guard.rs",
         "object_key_batch_edit.rs",
         "object_key_warp_color_edit.rs",
         "object_expression_property.rs",

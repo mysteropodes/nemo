@@ -124,10 +124,11 @@ impl NativeObjectHistory {
         match self.prepare_layer_policy_json(payload) {
             Ok(candidate) => {
                 let before = self.content_revision();
+                let disclosure = candidate.disclosure();
                 self.commit_layer_policy(candidate)
                     .map(|revision| CompactResult::Command {
                         applied: revision != before,
-                        history_entries_added: u64::from(revision != before),
+                        history_entries_added: u64::from(revision != before && !disclosure),
                     })
                     .map_err(|code| (code, "Layer policy could not commit."))
             }

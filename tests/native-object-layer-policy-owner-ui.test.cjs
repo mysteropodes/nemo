@@ -78,10 +78,11 @@ function scenario(openFault){
     assert.equal(command,'nemo_native_dispatch');routes.push(command);assert.equal(r.expectedRevision,revision);
     assert.equal(r.documentId,info().documentId);commands.push(r);
     assert.equal(r.operation,'command.document.object.layer.policy.edit');assert.equal(r.payload.command,'object.layer.policy.edit');assert.ok(['locked','shy','threeD','keyLock'].includes(r.payload.flag));
+    if(failure==='unavailable'){return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:revision,ok:false,error:{code:'unavailable',message:'Layer policy could not commit.'}};}
     const keyLock=r.payload.flag==='keyLock',applied=keyLock?(policy.keyLock===undefined?null:policy.keyLock)!==r.payload.value:(policy[r.payload.flag]===true)!==r.payload.value;
     if(applied){if(keyLock&&r.payload.value===null)delete policy.keyLock;else if(r.payload.flag==='threeD'&&r.payload.value===false)delete policy.threeD;else policy[r.payload.flag]=r.payload.value;revision++;}
     const response={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,
-      contentRevision:revision,ok:true,result:{applied,historyEntriesAdded:applied?1:0}};
+      contentRevision:revision,ok:true,result:{applied,historyEntriesAdded:applied&&r.payload.flag!=='threeD'?1:0}}; // #2520: the 3D switch is saved with a revision but is no undo step
     if(replyGate){const gate=replyGate;replyGate=null;await gate.promise;}
     if(failure==='malformed-reply')response.result.historyEntriesAdded=2;
     return response;
@@ -328,4 +329,28 @@ test('native policy intent accepts threeD as a boolean only',async()=>{
   const h=await open();
   for(const value of [1,null,'in'])await assert.rejects(h.session.editLayerPolicy(payload('threeD',value),h.session.info()),/stale or invalid/);
   assert.equal(h.sdkCalls,0);assert.equal(h.commands.length,0);
+});
+
+test('#2520: the 3D switch is saved with a revision and no history entry; the receipt is accepted and the row lights',async()=>{
+  const h=await open(),response=await h.session.editLayerPolicy(payload('threeD',true),h.session.info());
+  assert.deepEqual(response.result,{applied:true,historyEntriesAdded:0});assert.equal(response.contentRevision,1);
+  assert.equal(h.session.info().layers[0].threeD,true);
+});
+test('#2520: a row of a kind the engine cannot place in 3D shows no 3D cell; a drawing row does, and a stored switch stays switchable off',async()=>{
+  const h=await open();assert.ok(threeDCell(h),'a drawing row (no kind fact) keeps its cell');
+  await h.external('kind','image');h.render();assert.equal(h.session.info().layers[0].kind,'image');
+  assert.equal(threeDCell(h),undefined,'an image row offers no 3D switch');
+  await h.external('threeD',true);h.render();
+  assert.equal(threeDCell(h).dataset.nativeLayerThreeD,'true','an imported switch that is already on can still be switched off');
+});
+test('#2520: a refused 3D switch shows the specific toast, commits nothing and leaves the row unchanged',async()=>{
+  const h=await open(),toasts=[];h.root.showToast=m=>toasts.push(m);
+  h.fail('unavailable');
+  assert.equal(await h.UI.setLayerPolicy(h.root,'legacy layer:alpha','threeD',true,h.session.info(),h.uiPorts),false);
+  assert.deepEqual(toasts,['3D is not available for this layer yet.']);
+  assert.equal(h.session.info().contentRevision,0);assert.equal(h.session.info().layers[0].threeD,undefined);
+  // The same refusal on another flag keeps the generic wording.
+  toasts.length=0;
+  assert.equal(await h.UI.setLayerPolicy(h.root,'legacy layer:alpha','locked',true,h.session.info(),h.uiPorts),false);
+  assert.deepEqual(toasts,['Native layer policy was not confirmed.']);
 });
