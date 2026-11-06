@@ -1,8 +1,8 @@
 //! #2257: a decoded video slot on the layered compositor. A Multiply layer over an empty backdrop is the source itself, so
 //! the layered image of a project that draws a video must equal the flat Normal image of the same project, whichever
 //! layer carries the blend. Real Metal; a missing adapter is a test FAILURE, never a skip.
-use super::tests::{base, selector, wire, Fake, BOTH};
-use super::*;
+use crate::native_media_frame_export::tests::{base, selector, wire, Fake, BOTH};
+use crate::native_media_frame_export::*;
 use crate::compositor::Compositor;
 use crate::history::NativeObjectHistory;
 use crate::object_render_scene::prepare_scheduled_object_composition_from_witness;

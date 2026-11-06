@@ -191,3 +191,7 @@ fn gpu_composing_a_raster_and_video_frame_releases_every_lease_for_the_next_fram
         scheduler.succeed(work.work_id()).unwrap();
     }
 }
+
+// #2257: the decoded video slot on the layered compositor (real Metal).
+#[path = "native_media_layered_pixels.rs"]
+mod layered_pixels;
