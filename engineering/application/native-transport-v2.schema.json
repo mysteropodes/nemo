@@ -3043,6 +3043,34 @@
           "additionalProperties": false,
           "required": [
             "kind",
+            "end",
+            "to"
+          ],
+          "properties": {
+            "kind": {
+              "const": "dragIk"
+            },
+            "end": {
+              "$ref": "#/$defs/ObjectRigRef"
+            },
+            "to": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "description": "#2255: the Alt-drag of a chain end (baseline rig-bridge.js onDown/onMove). `end` must be the far end of a two-bone chain (invalid_request otherwise): the chain is filed with flip false and the lengths of the live pose, ONE solve toward `to` writes the joint, the end and the coincident near vertex of the end bone. One revision and one history entry."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
             "endKey"
           ],
           "properties": {
@@ -24199,7 +24227,8 @@
                 "chains",
                 "binds",
                 "bound",
-                "weights"
+                "weights",
+                "posed"
               ]
             },
             "bind": {
@@ -24221,6 +24250,95 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 64
+            },
+            "preview": {
+              "type": "object",
+              "description": "#2255: a held pose drag. The view answers every part from a CANDIDATE rig (the stored one with the vertex writes the edit would make); nothing is published, kept or added to history. Exactly one of segment (moveSegment) or ik (dragIk).",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "segment"
+                  ],
+                  "properties": {
+                    "segment": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "boneId",
+                        "vi",
+                        "part",
+                        "to"
+                      ],
+                      "properties": {
+                        "boneId": {
+                          "$ref": "#/$defs/ObjectRigId"
+                        },
+                        "vi": {
+                          "$ref": "#/$defs/ObjectFrame"
+                        },
+                        "part": {
+                          "enum": [
+                            "point",
+                            "handleIn",
+                            "handleOut"
+                          ]
+                        },
+                        "to": {
+                          "type": "array",
+                          "items": {
+                            "type": "number",
+                            "minimum": -1000000000,
+                            "maximum": 1000000000
+                          },
+                          "minItems": 2,
+                          "maxItems": 2
+                        },
+                        "breakTangent": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ik"
+                  ],
+                  "properties": {
+                    "ik": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "boneId",
+                        "vi",
+                        "to"
+                      ],
+                      "properties": {
+                        "boneId": {
+                          "$ref": "#/$defs/ObjectRigId"
+                        },
+                        "vi": {
+                          "$ref": "#/$defs/ObjectFrame"
+                        },
+                        "to": {
+                          "type": "array",
+                          "items": {
+                            "type": "number",
+                            "minimum": -1000000000,
+                            "maximum": 1000000000
+                          },
+                          "minItems": 2,
+                          "maxItems": 2
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
             }
           },
           "allOf": [
@@ -24336,6 +24454,24 @@
               "if": {
                 "properties": {
                   "part": {
+                    "const": "posed"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 24
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "part": {
                     "const": "weights"
                   }
                 },
@@ -24377,7 +24513,9 @@
         "total",
         "nextCursor",
         "unavailable",
-        "items"
+        "items",
+        "preview",
+        "matrix"
       ],
       "properties": {
         "atRevision": {
@@ -24421,7 +24559,8 @@
             "chains",
             "binds",
             "bound",
-            "weights"
+            "weights",
+            "posed"
           ]
         },
         "bind": {
@@ -24468,13 +24607,38 @@
                 "expression",
                 "sample",
                 "parent",
-                "motion"
+                "three_d",
+                "mixed",
+                "contour",
+                "empty",
+                "frame",
+                "pose"
               ]
             },
             {
               "type": "null"
             }
           ]
+        },
+        "preview": {
+          "type": "boolean",
+          "description": "#2255: the answer came from a candidate rig (a held pose drag)."
+        },
+        "matrix": {
+          "oneOf": [
+            {
+              "type": "array",
+              "minItems": 6,
+              "maxItems": 6,
+              "items": {
+                "type": "number"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "#2255: the affine [a, b, c, d, e, f] (x' = a x + c y + e, y' = b x + d y + f) from the layer's own space, where every item is spelled, to the world (its Motion about its pivot, then every ancestor's). Null is the identity, and on every page after the first. The pivot is the centre of the layer's content bounds, the bound strokes posed by the (candidate) rig."
         }
       },
       "allOf": [
@@ -24908,6 +25072,32 @@
               },
               "items": {
                 "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "part": {
+                "const": "posed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "type": "array",
+                "maxItems": 24,
+                "items": {
+                  "type": "array",
+                  "minItems": 9,
+                  "maxItems": 9,
+                  "items": {
+                    "type": "number"
+                  },
+                  "description": "[bind, vertex, x, y, inX, inY, outX, outY, closed]: the posed outline of a bind (a stroke's segments with their relative handles, a mesh's contour with none), rounded to 0.01."
+                }
               }
             }
           }

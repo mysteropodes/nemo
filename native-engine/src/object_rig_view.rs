@@ -3,7 +3,8 @@
 //! The host proves that the request names its actual successful presentation (work, generation, context and frame); the facts
 //! themselves come from the immutable snapshot (`object_rig_presentation.rs`). A request names one layer and one part of its
 //! rig; `bind` and `vertex` select the vertex of `weights` and are zero for every other part.
-use crate::object_codec::object_deserialize;
+use crate::object_codec::{object_deserialize, Presence};
+use crate::object_snapshot::rig_preview::Preview;
 use crate::object_snapshot::{ObjectSnapshot, ReadAdmission, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{
     DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
@@ -33,6 +34,7 @@ struct View {
     vertex: usize,
     cursor: usize,
     limit: usize,
+    preview: Presence<Preview>,
 }
 object_deserialize!(View {
     kind: String,
@@ -45,7 +47,8 @@ object_deserialize!(View {
     bind: usize,
     vertex: usize,
     cursor: usize,
-    limit: usize
+    limit: usize,
+    #[serde(default)] preview: Presence<Preview>
 });
 
 impl ObjectSnapshot {
@@ -100,7 +103,7 @@ impl ObjectSnapshot {
             return refused(DispatchErrorCode::StaleRevision, "Rig presentation changed");
         }
         let presented =
-            match self.rig_presentation_items(&v.layer_uid, &v.part, v.frame, v.bind, v.vertex) {
+            match self.rig_presentation_items(&v.layer_uid, &v.part, v.frame, (v.bind, v.vertex), v.preview.value(), v.cursor == 0) {
                 Ok(presented) => presented,
                 Err(code) => return refused(code, "Rig presentation is unavailable"),
             };
@@ -125,6 +128,7 @@ impl ObjectSnapshot {
                 "workId":v.work_id,"viewGeneration":v.view_generation,"layerUid":v.layer_uid,
                 "part":v.part,"bind":v.bind,"vertex":v.vertex,"cursor":v.cursor,"total":items.len(),
                 "nextCursor":(end < items.len()).then_some(end),"unavailable":presented.unavailable,
+                "preview":v.preview.value().is_some(),"matrix":presented.matrix,
                 "items":&items[v.cursor..end]})),
         };
         if serde_json::to_vec(&response)

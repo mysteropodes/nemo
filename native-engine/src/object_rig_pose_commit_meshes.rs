@@ -9,9 +9,16 @@
 //! counted, never dropped or rewritten. An offsets array that already is all zero (or absent, which
 //! `load()` reads as zeros) is left as authored, so a reset that changes nothing rewrites no byte.
 //! Unlike a commit, a reset needs no raster rect: zero displacement needs no placement.
+//!
+//! The commit half (#2255): `rigCommitFrame` ends with `applyRigDeform`, which writes the posed normalized
+//! offsets of every linked mesh bind into the mesh store (`mesh.offsets[mi]`, exact zeros included).
+//! [`write_pose_offsets`] stores the evaluation's posed offsets of the same binds; an offsets array that is
+//! already equal keeps its spelling, so a commit that poses nothing new rewrites no byte.
 use crate::commands::object_fill_owner::widget_edit::object_rig_pose_commit::PoseRefusal;
 use crate::object_document::object_rig_record::{BindTarget, RigRecord};
+use crate::commands::object_fill_owner::widget_edit::object_rig_pose_commit::rules::js_number;
 use crate::object_document::{ImageMesh, ImageMeshStore, ObjectDocument, Presence};
+use crate::object_snapshot::object_rig_pose_read::PoseMesh;
 use serde_json::Number;
 
 /// How many binds a reset zeroed and how many it could not reach.
@@ -68,4 +75,37 @@ pub(super) fn zero_pose_offsets(
         document.image_meshes = Presence::Present(store);
     }
     Ok(counts)
+}
+
+/// Stores the posed offsets of `posed` meshes in `document`; returns how many arrays changed.
+pub(super) fn write_pose_offsets(
+    document: &mut ObjectDocument,
+    posed: &[PoseMesh],
+) -> Result<u32, PoseRefusal> {
+    let Some(store) = document.image_meshes.value() else {
+        return Ok(0);
+    };
+    let mut entries: Vec<(String, ImageMesh)> = store.entries().to_vec();
+    let mut changed = 0u32;
+    for mesh_pose in posed {
+        let Some(at) = entries.iter().position(|(key, _)| key == &mesh_pose.mesh_id) else {
+            continue;
+        };
+        let mesh = &mut entries[at].1;
+        if mesh_pose.offsets.len() != mesh.verts.len() || mesh.effective_offsets() == mesh_pose.offsets {
+            continue;
+        }
+        let mut written = Vec::with_capacity(mesh_pose.offsets.len());
+        for offset in &mesh_pose.offsets {
+            let spell = |v: f64| js_number(v).ok_or(PoseRefusal::Internal);
+            written.push([spell(offset[0])?, spell(offset[1])?]);
+        }
+        mesh.offsets = Presence::Present(written);
+        changed += 1;
+    }
+    if changed > 0 {
+        let store = ImageMeshStore::try_new(entries).map_err(|_| PoseRefusal::Internal)?;
+        document.image_meshes = Presence::Present(store);
+    }
+    Ok(changed)
 }

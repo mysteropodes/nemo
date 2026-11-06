@@ -180,25 +180,28 @@
       }
     }
     // #2255: the rig of one layer at the presented frame, read part by part in the bounded pages of the one rig view. `parts` names the
-    // lists wanted (bones, vertices, chains, binds, bound); `weights` is one vertex of one bind and has its own call. A reason (`unavailable`)
-    // replaces every list: nothing is guessed.
-    const RIG_CAPS = { bones: 8, vertices: 16, chains: 8, binds: 8, bound: 64, weights: 8 };
-    async function pageRig(o, selector, part, bind, vertex) {
-      let cursor = 0, total = null, items = [], unavailable = null;
+    // lists wanted (bones, vertices, chains, binds, bound, posed); `weights` is one vertex of one bind and has its own call. A reason (`unavailable`)
+    // replaces every list: nothing is guessed. `matrix` is the layer-to-world affine of a layer with Motion (null: the identity); a `preview` (a
+    // held pose drag) answers every part from the candidate rig it names, publishing nothing.
+    const RIG_CAPS = { bones: 8, vertices: 16, chains: 8, binds: 8, bound: 64, weights: 8, posed: 24 };
+    async function pageRig(o, selector, part, bind, vertex, preview) {
+      let cursor = 0, total = null, items = [], unavailable = null, matrix = null;
       for (;;) {
         const view = { kind: 'rig', contextId: selector.contextId, frame: selector.frame, workId: o.workId, viewGeneration: o.viewGeneration,
           layerUid: selector.layerUid, part: part, bind: bind, vertex: vertex, cursor: cursor, limit: RIG_CAPS[part] };
+        if (preview) view.preview = preview;
         const r = await queryBody(o, { atRevision: o.info.contentRevision, documentSnapshotId: o.info.documentSnapshotId, view: view });
         if (total !== null && total !== r.total) throw fault('uncorrelated', 'Rig list changed between pages', 'rig_page_total');
         total = r.total; items = items.concat(r.items); unavailable = r.unavailable;
+        if (cursor === 0) matrix = r.matrix;
         if (r.nextCursor === null) break;
         if (r.nextCursor <= cursor) throw fault('uncorrelated', 'Rig page cursor made no progress', 'rig_page_stale');
         cursor = r.nextCursor;
       }
       if (items.length !== total) throw fault('uncorrelated', 'Rig list is incomplete', 'rig_page_incomplete');
-      return { items: items, unavailable: unavailable };
+      return { items: items, unavailable: unavailable, matrix: matrix };
     }
-    async function readRigParts(selector, pin, parts, bind, vertex) {
+    async function readRigParts(selector, pin, parts, bind, vertex, preview) {
       if (!exact(selector, ['contextId', 'frame', 'layerUid'], []) || selector.contextId !== 'scene-root' || !integer(selector.frame, 0, 4294967295) ||
         typeof selector.layerUid !== 'string' || !selector.layerUid || !pins(pin) || !Array.isArray(parts) || !parts.length || !parts.every((p) => own(RIG_CAPS, p)))
         throw fault('invalid_request', 'Rig selector is invalid', 'local_validation');
@@ -206,16 +209,17 @@
       if (!o) throw fault('unavailable', 'No matching presented native rig view', 'rig_view_unavailable');
       await settle(o);
       const out = {};
-      let unavailable = null;
+      let unavailable = null, matrix = null;
       for (const part of parts) {
-        const page = await pageRig(o, selector, part, bind, vertex);
+        const page = await pageRig(o, selector, part, bind, vertex, preview);
         out[part] = page.items;
+        if (page.matrix) matrix = page.matrix;
         if (page.unavailable) { unavailable = page.unavailable; break; }
       }
       requireCurrent(o);
-      return freeze({ info: copyPins(o.info), presentation: o.presentation, layerUid: selector.layerUid, unavailable: unavailable, parts: freeze(out) });
+      return freeze({ info: copyPins(o.info), presentation: o.presentation, layerUid: selector.layerUid, unavailable: unavailable, matrix: matrix, parts: freeze(out) });
     }
-    const readRig = (selector, pin, parts) => readRigParts(selector, pin, parts, 0, 0);
+    const readRig = (selector, pin, parts, preview) => readRigParts(selector, pin, parts, 0, 0, preview);
     const readRigWeights = (selector, pin, bind, vertex) => (integer(bind, 0, 4294967295) && integer(vertex, 0, 4294967295)
       ? readRigParts(selector, pin, ['weights'], bind, vertex) : Promise.reject(fault('invalid_request', 'Rig weight selector is invalid', 'local_validation')));
     // #2255: every widget layer of the presented frame (pad, puck, rest, axes), read in bounded pages of the one widget view.

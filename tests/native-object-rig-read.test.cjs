@@ -10,8 +10,8 @@ const bone = (n) => ({ boneId: 'bone' + n, closed: false, radius: null, count: 2
 const vertex = (n) => ({ boneId: 'bone1', vi: n, point: [n, n], handleIn: [0, 0], handleOut: [1, 0] });
 const LISTS = { bones: Array.from({ length: 9 }, (_, n) => bone(n + 1)), vertices: Array.from({ length: 17 }, (_, n) => vertex(n)), chains: [],
   binds: [{ index: 0, strokeId: 's1', meshId: null, points: 3, rotate: false, state: 'posed' }], bound: Array.from({ length: 65 }, (_, n) => [0, n, n, -n]),
-  weights: [{ entry: 0, boneId: 'bone1', ptIndex: 2, offset: null, w: 0.5 }] };
-const CAP = { bones: 8, vertices: 16, chains: 8, binds: 8, bound: 64, weights: 8 };
+  weights: [{ entry: 0, boneId: 'bone1', ptIndex: 2, offset: null, w: 0.5 }], posed: Array.from({ length: 5 }, (_, n) => [0, n, n, -n, 0, 0, 1, 1, 0]) };
+const CAP = { bones: 8, vertices: 16, chains: 8, binds: 8, bound: 64, weights: 8, posed: 24 };
 
 function fixture(options) {
   options = options || {};
@@ -27,7 +27,8 @@ function fixture(options) {
       const view = request.payload.view, list = options.lists ? options.lists[view.part] : LISTS[view.part], page = list.slice(view.cursor, view.cursor + view.limit), end = view.cursor + page.length;
       const result = { kind: 'rig', atRevision: PIN.contentRevision, documentSnapshotId: PIN.documentSnapshotId, contextId: 'scene-root', frame: view.frame, workId: view.workId,
         viewGeneration: view.viewGeneration, layerUid: view.layerUid, part: view.part, bind: view.bind, vertex: view.vertex, cursor: view.cursor, total: list.length,
-        nextCursor: end < list.length ? end : null, unavailable: options.unavailable || null, items: options.unavailable ? [] : page };
+        nextCursor: end < list.length ? end : null, unavailable: options.unavailable || null, preview: !!view.preview,
+        matrix: view.cursor === 0 && !options.unavailable && options.matrix ? options.matrix : null, items: options.unavailable ? [] : page };
       if (options.unavailable) Object.assign(result, { total: 0, nextCursor: null });
       return { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId, documentId: request.documentId, contentRevision: PIN.contentRevision, ok: true, result };
     },
@@ -63,9 +64,9 @@ test('the weights of one vertex of one bind are one read with that selector', as
 });
 
 test('a layer reason replaces every list and stops the later parts', async () => {
-  const f = fixture({ unavailable: 'motion' });
+  const f = fixture({ unavailable: 'three_d' });
   const read = await f.reads.readRig(f.selector, PIN, ['bones', 'vertices', 'binds']);
-  assert.equal(read.unavailable, 'motion');
+  assert.equal(read.unavailable, 'three_d');
   assert.deepEqual(read.parts, { bones: [] });
   assert.equal(f.sent.length, 1, 'the next parts are not asked for once the layer is unavailable');
 });
@@ -78,16 +79,16 @@ test('the request and the answer are closed shapes in the shared query contract'
     assert.throws(() => Query.payload(bad(change)), TypeError, JSON.stringify(change));
   assert.throws(() => Query.payload(Object.assign({}, body('bones', 0), { view: Object.assign({}, body('bones', 0).view, { bind: 1 }) })), TypeError, 'a selector on a part that takes none');
   const page = (over) => Object.assign({ kind: 'rig', atRevision: 7, documentSnapshotId: PIN.documentSnapshotId, contextId: 'scene-root', frame: 4, workId: 'native-work-9',
-    viewGeneration: 2, layerUid: 'L1', part: 'weights', bind: 1, vertex: 2, cursor: 0, total: 1, nextCursor: null, unavailable: null, items: LISTS.weights }, over);
+    viewGeneration: 2, layerUid: 'L1', part: 'weights', bind: 1, vertex: 2, cursor: 0, total: 1, nextCursor: null, unavailable: null, preview: false, matrix: null, items: LISTS.weights }, over);
   assert.ok(Query.correlate(payload, page(), null, 'document-A'));
   for (const change of [{ total: 2 }, { nextCursor: 1 }, { cursor: 1 }, { frame: 5 }, { layerUid: 'L2' }, { part: 'bones' }, { bind: 0 }, { workId: 'native-work-8' }, { unavailable: 'guess' },
-    { unavailable: 'motion' }, { items: [{ entry: 0, boneId: 'bone1', ptIndex: 2, offset: 1, w: 0.5 }] }, { items: [{ entry: 0, boneId: 'bone1', ptIndex: null, offset: null, w: 0.5 }] },
+    { unavailable: 'motion' }, { preview: true }, { preview: 1 }, { matrix: [1, 0, 0, 1, 0] }, { cursor: 1, matrix: [1, 0, 0, 1, 0, 0] }, { items: [{ entry: 0, boneId: 'bone1', ptIndex: 2, offset: 1, w: 0.5 }] }, { items: [{ entry: 0, boneId: 'bone1', ptIndex: null, offset: null, w: 0.5 }] },
     { items: [Object.assign({ extra: 1 }, LISTS.weights[0])] }])
     assert.throws(() => Query.correlate(payload, page(change), null, 'document-A'), TypeError, JSON.stringify(change).slice(0, 80));
   assert.throws(() => Query.correlate(payload, page(), null, 'another-document'), TypeError);
   assert.ok(Query.correlate(body('bones', 0), page({ part: 'bones', bind: 0, vertex: 0, total: 0, items: [], unavailable: 'parent' }), null, 'document-A'));
   const shapes = { bones: bone(1), vertices: vertex(0), chains: { endKey: 'bone2:1', root: { boneId: 'bone1', vi: 0 }, joint: { boneId: 'bone1', vi: 1 }, end: { boneId: 'bone2', vi: 1 }, l1: 1, l2: 2, flip: false },
-    binds: LISTS.binds[0], bound: [0, 1, 2, 3] };
+    binds: LISTS.binds[0], bound: [0, 1, 2, 3], posed: [0, 1, 2, 3, 0, 0, 5, 1, 0] };
   for (const [part, item] of Object.entries(shapes)) assert.ok(Query.correlate(body(part, 0), page({ part, bind: 0, vertex: 0, items: [item] }), null, 'document-A'), part);
   assert.throws(() => Query.correlate(body('bones', 0), page({ part: 'bones', bind: 0, vertex: 0, items: [vertex(0)] }), null, 'document-A'), TypeError, 'an item of another part');
   assert.ok(Query.paths.has('result.items.0.boneId') && Query.paths.has('result.items.3.root.boneId') && !Query.paths.has('result.items.3.l1'));
@@ -132,4 +133,20 @@ test('a list that changes between pages, a presentation that changes during the 
         part: 'bones', bind: 0, vertex: 0, cursor: 0, total: 0, nextCursor: null, unavailable: null, items: [] } };
   } });
   assert.equal((await code(reads.readRig(moved.selector, PIN, ['bones']))).code, 'stale_revision');
+});
+
+test('a held pose drag is read as a candidate rig, and the layer map of a layer with Motion rides the first page', async () => {
+  const matrix = [0, 2, -1, 0, 15, -13];
+  const f = fixture({ matrix });
+  const preview = { ik: { boneId: 'bone2', vi: 1, to: [10, -2] } };
+  const read = await f.reads.readRig(f.selector, PIN, ['vertices', 'posed'], preview);
+  assert.deepEqual(f.sent.map((r) => [r.payload.view.part, r.payload.view.cursor, r.payload.view.limit]), [['vertices', 0, 16], ['vertices', 16, 16], ['posed', 0, 24]]);
+  assert.ok(f.sent.every((r) => JSON.stringify(r.payload.view.preview) === JSON.stringify(preview)), 'every page names the same gesture');
+  assert.deepEqual(read.matrix, matrix, 'the map is read from the first page only');
+  assert.equal(read.parts.vertices.length, 17);
+  const plain = fixture();
+  assert.equal((await plain.reads.readRig(plain.selector, PIN, ['bones'])).matrix, null);
+  assert.ok(plain.sent.every((r) => !('preview' in r.payload.view)));
+  assert.throws(() => Query.payload(Object.assign(body('vertices', 0), { view: Object.assign({}, body('vertices', 0).view, { preview: {} }) })), TypeError);
+  assert.throws(() => Query.payload(Object.assign(body('vertices', 0), { view: Object.assign({}, body('vertices', 0).view, { preview: { ik: preview.ik, segment: {} } }) })), TypeError);
 });

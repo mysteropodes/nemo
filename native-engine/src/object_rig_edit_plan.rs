@@ -22,8 +22,8 @@ use crate::object_document::object_rig_record::{
 };
 use crate::object_document::{FrameScopeKind, ObjectDocument, ObjectPoint, ObjectRecord, Presence};
 use crate::object_snapshot::object_rig_edit_read::{
-    auto_radius, ik_lengths, offset_for, weigh_control, weigh_offset, ControlEntry, KernelBone,
-    KernelRef, KernelRefusal, KernelVertex, OffsetEntry,
+    auto_radius, ik_drag, ik_lengths, offset_for, weigh_control, weigh_offset, ControlEntry, IkDrag,
+    KernelBone, KernelRef, KernelRefusal, KernelVertex, OffsetEntry,
 };
 use crate::request_receipts::DispatchErrorCode;
 use crate::commands::object_fill_owner::widget_edit::object_rig_edit::plan_mesh::{
@@ -415,4 +415,15 @@ pub(crate) fn plan_ik(
 ) -> Result<[f64; 2], PlanRefusal> {
     let rig = rig_of(document, layer_uid)?;
     Ok(ik_lengths(&kernel_bones(rig), root, joint, end)?)
+}
+
+/// The Alt-drag of a chain end (`findIKChain`, `rigSetIK`, `rigDragIKEnd`): the chain it files and the vertex writes of the solve.
+pub(crate) fn plan_ik_drag(
+    document: &ObjectDocument,
+    layer_uid: &str,
+    end: &KernelRef,
+    target: [f64; 2],
+) -> Result<IkDrag, PlanRefusal> {
+    let rig = rig_of(document, layer_uid)?;
+    Ok(ik_drag(&kernel_bones(rig), end, target)?)
 }

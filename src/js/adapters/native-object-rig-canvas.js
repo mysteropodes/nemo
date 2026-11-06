@@ -4,9 +4,13 @@
  * Each gesture is a local preview and ONE `object.rig.edit` on release through NemoNativeObjectRig, so it is one history entry:
  * a finished bone is `drawBone`, an anchor or handle drag is `moveSegment` (Alt on a handle breaks the tangent), an influence-rim drag is
  * `setBoneRadius`, and a weight edit is one `setWeight` / `addWeight` / `removeWeight` / `resetWeights` from the popover. What has no
- * native operation (the Alt-drag IK pose, the live deforming pose drag) is the typed `rig_pose_drag_unavailable`; a layer with motion or an
- * expression is the typed `rig_presentation_unavailable`. The pointer listeners stay on `document` in the capture phase (CLAUDE.md
- * section 13) and, with the Rig tool armed on a native project, take every canvas gesture so nothing else draws. */
+ * pose drag of Déplacer holds the gesture as a `preview` of the same read (the engine answers the candidate rig: the solved bones and the
+ * deformed outlines of the bound strokes and meshes, one request per animation frame, nothing published) and ends in ONE `moveSegment`, or,
+ * with Alt on the end of a two-bone chain, ONE `dragIk` that files and solves the chain (#2255). A layer with Motion or a parent carries
+ * the world map of its space in the read (`matrix`): the overlay is drawn through it and every gesture is inverted through it, as the
+ * baseline `toLocalPoint` did; a layer the engine cannot map (3D, mixed content, an expression) is the typed
+ * `rig_presentation_unavailable`. The pointer listeners stay on `document` in the capture phase (CLAUDE.md section 13) and, with the
+ * Rig tool armed on a native project, take every canvas gesture so nothing else draws. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -14,10 +18,19 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   const SVG = 'http://www.w3.org/2000/svg';
-  const BONE = 'rgba(255,200,60,.92)', HANDLE = 'rgba(255,200,60,.7)', INFLUENCE = 'rgba(255,120,220,.78)', WHITE = 'rgba(255,255,255,1)', RUBBER = 'rgba(255,220,130,.6)';
+  const POSED = 'rgba(80,200,255,.85)', BONE = 'rgba(255,200,60,.92)', HANDLE = 'rgba(255,200,60,.7)', INFLUENCE = 'rgba(255,120,220,.78)', WHITE = 'rgba(255,255,255,1)', RUBBER = 'rgba(255,220,130,.6)';
   const PRESENTATION_REASON = 'rig_presentation_unavailable';
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  // The layer-to-world affine [a, b, c, d, e, f] (x' = a x + c y + e); null is the identity.
+  const toWorld = (m, p) => (m ? [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]] : p);
+  const toLocal = (m, p) => {
+    if (!m) return p;
+    const det = m[0] * m[3] - m[1] * m[2], x = p[0] - m[4], y = p[1] - m[5];
+    return det && Number.isFinite(det) ? [(m[3] * x - m[2] * y) / det, (m[0] * y - m[1] * x) / det] : null;
+  };
+  const areaScale = (m) => (m ? Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1 : 1);
+  const MAX_POSED_POINTS = 600; // beyond it the live outline would cost more pages per frame than it shows: bones only
 
   function toast(win, message) { try { if (win.showToast) win.showToast(message, 'warn'); } catch (_) { /* presentation only */ } }
   function failure(win, error) {
@@ -37,7 +50,7 @@
   };
 
   function create(win) {
-    let cached = null, serial = 0, overlay = null, paintQueued = false, watching = false, drag = null, draft = null, busy = false, pointer = null;
+    let cached = null, serial = 0, overlay = null, paintQueued = false, watching = false, drag = null, draft = null, busy = false, pointer = null, previewSeq = 0, previewQueued = false;
     const keyOf = (proof, layerUid, assign) => JSON.stringify([proof.info.instanceId, proof.info.documentId, proof.info.lifecycleGeneration,
       proof.info.contentRevision, proof.info.documentSnapshotId, proof.selector.frame, layerUid, assign]);
     const usable = () => (cached && cached.read && cached.proof.current() ? cached : null);
@@ -70,12 +83,18 @@
       return entry.promise;
     }
     const parts = () => { const entry = usable(); return entry && !entry.read.unavailable ? entry.read.parts : null; };
+    const matrixOf = (entry) => (entry && entry.read && !entry.read.unavailable && entry.read.matrix) || null;
+    const lunit = (map, m) => unit(map) * areaScale(m);
     const vertsOf = (boneId) => ((parts() || {}).vertices || []).filter((v) => v.boneId === boneId).sort((a, b) => a.vi - b.vi);
     const boneOf = (boneId) => ((parts() || {}).bones || []).find((b) => b.boneId === boneId) || null;
     const radiusOf = (bone) => (bone.radius || defaultRadius(win));
 
     // ---- geometry shown (the read, with the gesture's local preview applied) ----
     function shown(boneId) {
+      if (drag && drag.view && drag.view.parts.vertices) { // the engine's candidate rig: the solved bones of an IK drag, the mirrored handles
+        return drag.view.parts.vertices.filter((v) => v.boneId === boneId).sort((a, b) => a.vi - b.vi)
+          .map((v) => ({ vi: v.vi, point: v.point.slice(), hi: v.handleIn.slice(), ho: v.handleOut.slice() }));
+      }
       const list = vertsOf(boneId).map((v) => ({ vi: v.vi, point: v.point.slice(), hi: v.handleIn.slice(), ho: v.handleOut.slice() }));
       if (drag && drag.mode === 'move' && drag.hit.boneId === boneId) {
         const v = list.find((one) => one.vi === drag.hit.vi);
@@ -118,7 +137,8 @@
       while (svg.firstChild) svg.removeChild(svg.firstChild);
       const entry = usable(), map = rigTool(win) && entry && !entry.read.unavailable && mapping(entry);
       if (!map) return;
-      const S = (p) => map.api.screen({ x: p[0], y: p[1] }, map), scale = unit(map);
+      const M = drag && drag.view && !drag.view.unavailable ? drag.view.matrix : matrixOf(entry);
+      const S = (p) => { const w = toWorld(M, p); return map.api.screen({ x: w[0], y: w[1] }, map); }, scale = lunit(map, M);
       const dot = (p, r, fill, stroke) => { const s = S(p); svg.appendChild(node('circle', { cx: s.x, cy: s.y, r, fill, stroke, 'stroke-width': 1.2 })); };
       const handleMark = (p) => { const s = S(p); svg.appendChild(node('rect', { x: s.x - 3, y: s.y - 3, width: 6, height: 6, fill: WHITE, stroke: BONE, 'stroke-width': 1 })); };
       const handles = (v) => [['hi', v.hi], ['ho', v.ho]].forEach((pair) => {
@@ -138,6 +158,10 @@
           svg.appendChild(node('circle', { cx: c.x, cy: c.y, r, fill: 'none', stroke: INFLUENCE, 'stroke-width': 1.6 }));
         }
       });
+      posedOutlines().forEach((verts) => {
+        const closed = verts.closed;
+        svg.appendChild(node('path', { d: pathOf(S, verts, closed), fill: 'none', stroke: POSED, 'stroke-width': 1.6 }));
+      });
       if (draft) {
         const verts = draft.segs.map((s, vi) => ({ vi, point: s.point, hi: s.handleIn, ho: s.handleOut }));
         if (verts.length > 1) svg.appendChild(node('path', { d: pathOf(S, verts, false), fill: 'none', stroke: BONE, 'stroke-width': 2 }));
@@ -146,7 +170,19 @@
       }
     }
 
-    // ---- hit tests, in world units ----
+    // The deformed outlines of the bound strokes and meshes the engine answered for the held pose drag, one list of vertices per bind.
+    function posedOutlines() {
+      const items = drag && drag.view && drag.view.parts.posed;
+      if (!items) return [];
+      const by = new Map();
+      items.forEach((i) => {
+        if (!by.has(i[0])) { const list = []; list.closed = !!i[8]; by.set(i[0], list); }
+        by.get(i[0]).push({ vi: i[1], point: [i[2], i[3]], hi: [i[4], i[5]], ho: [i[6], i[7]] });
+      });
+      return Array.from(by.values()).filter((list) => list.length > 1);
+    }
+
+    // ---- hit tests, in the layer's own units ----
     function hitAnchorOrHandle(pt, tol) {
       let best = null, bestD = tol;
       ((parts() || {}).vertices || []).forEach((v) => {
@@ -226,7 +262,35 @@
     // ---- gestures ----
     const areaOf = (e) => { const area = win.document.getElementById('canvas-area'); return area && e.target && area.contains(e.target) ? area : null; };
     const consume = (e) => { e.stopImmediatePropagation(); e.preventDefault(); };
-    function world(e, map) { try { const w = map.api.point(e, map); return [w.x, w.y]; } catch (_) { return null; } }
+    // The pointer in the layer's own space: the world point through the inverse of the layer map `m` (null: the identity).
+    function world(e, map, m) { try { const w = map.api.point(e, map); return toLocal(m, [w.x, w.y]); } catch (_) { return null; } }
+    // ---- the held pose drag: one preview request per animation frame, the answer drawn as the candidate rig ----
+    const previewOf = (d) => (d.ik ? { ik: { boneId: d.hit.boneId, vi: d.hit.vi, to: d.to } }
+      : { segment: Object.assign({ boneId: d.hit.boneId, vi: d.hit.vi, part: d.hit.kind === 'anchor' ? 'point' : d.hit.kind, to: d.to }, d.hit.kind !== 'anchor' && d.breakTangent ? { breakTangent: true } : {}) });
+    function queuePreview() {
+      if (previewQueued || !drag || drag.mode !== 'move') return;
+      previewQueued = true;
+      (win.requestAnimationFrame || ((fn) => fn()))(() => { previewQueued = false; runPreview(); });
+    }
+    function runPreview() {
+      const d = drag, entry = d && d.entry;
+      if (!d || d.mode !== 'move' || !d.moved || d.inflight || !entry.proof.current()) return;
+      const P = parts(), points = ((P && P.binds) || []).reduce((n, b) => n + b.points, 0);
+      const asked = previewOf(d), key = JSON.stringify(asked), selector = { contextId: 'scene-root', frame: entry.proof.selector.frame, layerUid: entry.layerUid };
+      const wanted = ['vertices'].concat(points > 0 && points <= MAX_POSED_POINTS ? ['posed'] : []);
+      previewSeq++; d.inflight = true;
+      Promise.resolve().then(() => entry.proof.session.readRig(selector, entry.proof.info, wanted, asked)).then((view) => {
+        d.inflight = false;
+        if (drag !== d) return;
+        if (!view.unavailable) { d.view = view; d.viewKey = key; }
+        paint();
+        if (JSON.stringify(previewOf(d)) !== key) queuePreview(); // the pointer moved while the answer was in flight
+      }, (error) => {
+        d.inflight = false;
+        // No two-bone chain ends at that anchor: the Alt-drag is an ordinary anchor move (the baseline `findIKChain` answered null).
+        if (drag === d && d.ik && error && error.code === 'invalid_request') { d.ik = false; d.ikRefused = true; queuePreview(); }
+      });
+    }
     function onDown(e) {
       // Space-drag and the pan hand own the gesture (every other bridge bails out the same way); Alt keeps its own rig meanings below.
       if (!active(win) || !rigTool(win) || win.state.playing || win.state.spaceDown || win.state.isPanning || busy || (e.button !== undefined && e.button !== 0) || !areaOf(e)) return;
@@ -237,22 +301,22 @@
         toast(win, 'Rig editing on the canvas is unavailable (' + PRESENTATION_REASON + (reason ? ': ' + reason : '') + ').');
         return;
       }
-      const pt = world(e, map);
+      const M = matrixOf(entry), pt = world(e, map, M);
       if (!pt) return;
-      const tol = 9 / unit(map), m = mode();
+      const px = lunit(map, M), tol = 9 / px, m = mode();
       if (m === 'move') {
         const hit = hitAnchorOrHandle(pt, tol);
         if (!hit) return;
-        if (hit.kind === 'anchor' && e.altKey) { const api = adapter(); if (api) api.dragIkEnd().catch((error) => failure(win, error)); return; }
-        drag = { mode: 'move', hit, to: hit.at.slice(), pointerId: e.pointerId, map, entry, moved: false, breakTangent: !!e.altKey };
+        // Alt on an ANCHOR is the IK drag (Alt on a handle keeps breaking the tangent): confirmed by the engine on the first preview.
+        drag = { mode: 'move', hit, to: hit.at.slice(), pointerId: e.pointerId, map, entry, moved: false, breakTangent: !!e.altKey, ik: hit.kind === 'anchor' && !!e.altKey, matrix: M, view: null };
       } else if (m === 'assign') {
-        const bone = hitRadius(pt, 10 / unit(map));
-        if (bone) { drag = { mode: 'radius', boneId: bone.boneId, centre: centreOf(bone), radius: radiusOf(bone), pointerId: e.pointerId, map, entry, moved: false }; paint(); return; }
-        const bound = hitBound(pt, 10 / unit(map));
+        const bone = hitRadius(pt, 10 / px);
+        if (bone) { drag = { mode: 'radius', boneId: bone.boneId, centre: centreOf(bone), radius: radiusOf(bone), pointerId: e.pointerId, map, entry, moved: false, matrix: M }; paint(); return; }
+        const bound = hitBound(pt, 10 / px);
         if (bound) openWeights(bound, e);
         return;
       } else {
-        const now = Date.now(), tipTol = 10 / unit(map);
+        const now = Date.now(), tipTol = 10 / px;
         const twice = draft && draft.last && now - draft.last.time < 350 && dist(pt, draft.last.at) < tipTol;
         if (twice) { finishDraft(false); return; }
         if (!draft) {
@@ -274,13 +338,14 @@
       if (!watching) refresh(); // the first pointer over the canvas with the tool armed starts the per-frame check
       const entry = draft || drag ? usable() : null, map = entry && mapping(entry);
       if (!map) { if (drag) { drag = null; paint(); } return; }
-      const pt = world(e, map);
+      const pt = world(e, map, drag ? drag.matrix : matrixOf(entry));
       if (!pt) return;
       pointer = pt;
       if (drag && (e.pointerId === undefined || drag.pointerId === undefined || e.pointerId === drag.pointerId)) {
         consume(e);
         if (drag.mode === 'radius') drag.radius = Math.max(1, dist(pt, drag.centre)); else { drag.to = pt; drag.breakTangent = drag.hit.kind !== 'anchor' && !!e.altKey; }
         drag.moved = true;
+        queuePreview();
       } else if (draft) {
         if (draft.dragging) {
           const seg = draft.segs[draft.segs.length - 1], v = [pt[0] - seg.point[0], pt[1] - seg.point[1]];
@@ -297,7 +362,14 @@
       const done = drag; drag = null; paint();
       if (!done.moved || !done.entry.proof.current()) return;
       if (done.mode === 'radius') send((api, en) => api.setBoneRadius(en.layerUid, done.boneId, done.radius));
-      else send((api, en) => api.moveSegment(en.layerUid, done.hit.boneId, done.hit.vi, done.hit.kind === 'anchor' ? 'point' : done.hit.kind, done.to, done.hit.kind === 'anchor' ? undefined : done.breakTangent));
+      else {
+        const fk = (api, en) => api.moveSegment(en.layerUid, done.hit.boneId, done.hit.vi, done.hit.kind === 'anchor' ? 'point' : done.hit.kind, done.to, done.hit.kind === 'anchor' ? undefined : done.breakTangent);
+        // ONE gesture is ONE native edit: `dragIk` for an Alt-drag of a chain end, else the ordinary anchor/handle move. A release before the engine
+        // answered whether a chain ends there tries the IK first (a refusal publishes nothing) and then moves the anchor.
+        if (!done.ik) send(fk);
+        else send((api, en) => api.dragIk(en.layerUid, { boneId: done.hit.boneId, vi: done.hit.vi }, done.to)
+          .catch((error) => { if (error && error.code === 'invalid_request') return fk(api, en); throw error; }));
+      }
     }
     function onKey(e) { if (draft && e.key === 'Enter' && rigTool(win) && active(win)) { e.preventDefault(); finishDraft(false); } }
     function listeners() {
