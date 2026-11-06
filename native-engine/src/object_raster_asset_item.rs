@@ -305,6 +305,31 @@ impl RasterItem {
         Ok(next)
     }
 
+    /// The same bitmap as a plain image (a component's break apart): optionally at a new centre and size (rotation and the
+    /// brush tags go, as `applyMatrixToStrokeData` builds its new dict), at `opacity` (kept as authored when unchanged).
+    pub(crate) fn baked(
+        &self,
+        rect: Option<((f64, f64), (f64, f64))>,
+        opacity: f64,
+    ) -> Result<Self, RasterItemError> {
+        let mut next = self.clone();
+        if let Some(((x, y), (width, height))) = rect {
+            next.x = number_of(x)?;
+            next.y = number_of(y)?;
+            next.width = number_of(width)?;
+            next.height = number_of(height)?;
+            next.rotation = Presence::Missing;
+        }
+        if !opacity.is_finite() {
+            return Err(RasterItemError::NonFinite);
+        }
+        if opacity != self.opacity() {
+            next.opacity = Presence::Present(number_of(opacity)?);
+        }
+        next.validate()?;
+        Ok(next)
+    }
+
     /// Resolve the reference against the project inventory. A missing asset and
     /// a non-image asset are typed refusals; the result says embedded or linked
     /// without exposing bytes or a locator.

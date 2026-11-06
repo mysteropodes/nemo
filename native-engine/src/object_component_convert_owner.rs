@@ -17,6 +17,9 @@ use crate::commands::object_fill_owner::component_owner::object_component_break_
     plan_break_apart, precheck,
 };
 use crate::commands::object_fill_owner::component_owner::object_component_convert::plan_convert;
+use crate::commands::object_fill_owner::component_owner::object_component_state_edit::{
+    parse as parse_state_edit, plan_state_edit,
+};
 use crate::commands::object_fill_owner::component_owner::object_component_convert_support::{
     SetupError, SetupPlan,
 };
@@ -60,6 +63,7 @@ pub(crate) enum SetupKind {
     DuplicatorConfig,
     InstanceSet,
     BreakApart,
+    StateEdit,
 }
 
 /// A typed refusal: the receipt vocabulary code, a fixed message and, when a
@@ -98,6 +102,8 @@ fn refusal_of(error: SetupError) -> SetupRefusal {
         SetupError::ConfigInvalid => (InvalidRequest, "A duplicator setting is not valid."),
         SetupError::NotAnInstance(_) => (NotFound, "Layer is not a component instance."),
         SetupError::BreakApartUnavailable(why) => (Unavailable, *why),
+        SetupError::StateEditInvalid(why) => (InvalidRequest, *why),
+        SetupError::StateTargetMissing(why) => (NotFound, *why),
         SetupError::PlaybackInvalid => (InvalidRequest, "A component playback setting is not valid."),
         SetupError::V1Document => (Unavailable, "A v1 document cannot hold components."),
         SetupError::NestedContext(_) => (Unavailable, "Close the component first."),
@@ -369,11 +375,15 @@ impl ObjectFillOwner {
                     .bake_component_instance(&payload.layer_uid)
                     .map_err(|why| refusal_of(SetupError::BreakApartUnavailable(why.0)))?;
                 #[cfg(not(feature = "evaluation"))]
-                let baked: Vec<(u32, Vec<crate::object_document::ObjectRecord>)> =
+                let baked: Vec<(u32, Vec<crate::object_document::object_component_record_kernels::object_component_records::Baked>)> =
                     return Err(refusal_of(SetupError::BreakApartUnavailable(
                         "component-break-apart: this build cannot evaluate components.",
                     )));
                 plan_break_apart(document, &payload.layer_uid, &baked)
+            }
+            SetupKind::StateEdit => {
+                let (symbol_id, edit) = parse_state_edit(bytes).ok_or_else(malformed)?;
+                plan_state_edit(document, &symbol_id, &edit)
             }
             SetupKind::DuplicatorConfig => {
                 let payload: DuplicatorConfigPayload = parse(bytes)?;

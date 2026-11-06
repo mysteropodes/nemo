@@ -6,6 +6,8 @@
 
 #[path = "object_component_break_apart.rs"]
 pub(crate) mod object_component_break_apart;
+#[path = "object_component_state_edit.rs"]
+pub(crate) mod object_component_state_edit;
 #[path = "object_component_convert.rs"]
 pub(crate) mod object_component_convert;
 #[path = "object_component_convert_owner.rs"]

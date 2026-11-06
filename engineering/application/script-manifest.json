@@ -447,6 +447,7 @@
     {"src":"js/adapters/native-motion-connector-drag.js"},
     {"src":"js/adapters/native-component-layer-edit.js"},
     {"src":"js/adapters/native-component-range-edit.js"},
-    {"src":"js/adapters/native-component-cell-selection.js"}
+    {"src":"js/adapters/native-component-cell-selection.js"},
+    {"src":"js/adapters/native-component-state-ui.js"}
   ]
 }

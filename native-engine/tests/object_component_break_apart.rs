@@ -275,21 +275,95 @@ fn refusals_publish_nothing() {
     }
 }
 
-#[test]
-fn a_component_with_inner_motion_is_refused_whole_and_typed() {
-    let mut doc = base(json!({}), json!({}));
-    doc["propertyHolders"] = json!([{"target":{"contextId":"sym_x","layerUid":"xi"},"properties":[{"property":"opacity","static":[50]}]}]);
-    let mut owner = NativeObjectHistory::new("break", decode(&doc)).unwrap();
+fn refused_whole(doc: &Value, needle: &str) {
+    let mut owner = NativeObjectHistory::new("break", decode(doc)).unwrap();
     let original = bytes(&owner);
     let refusal = send(&mut owner, &payload("ly_inst")).unwrap_err();
     assert_eq!(refusal.0, DispatchErrorCode::Unavailable);
-    assert!(
-        refusal.1.starts_with("component-break-apart"),
-        "{}",
-        refusal.1
-    );
+    assert!(refusal.1.starts_with("component-break-apart"), "{}", refusal.1);
+    assert!(refusal.1.contains(needle), "{}", refusal.1);
     assert_eq!(bytes(&owner), original);
     assert_eq!(owner.history_depths(), (0, 0));
+}
+
+#[test]
+fn motion_other_than_the_inner_layer_opacity_is_refused_whole_and_typed() {
+    for holder in [
+        json!({"target":{"contextId":"sym_x","layerUid":"xi"},"properties":[{"property":"position","static":[5,5]}]}),
+        json!({"target":{"contextId":"sym_x","layerUid":"xi","strokeId":"s0"},"properties":[{"property":"opacity","static":[50]}]}),
+    ] {
+        let mut doc = base(json!({}), json!({}));
+        doc["propertyHolders"] = json!([holder]);
+        refused_whole(&doc, "Motion other than the layer opacity");
+    }
+}
+
+#[test]
+fn the_inner_layer_opacity_is_folded_into_every_baked_record() {
+    // The paint multiplies the fill by the inner layer opacity; the baked record carries it so the layer paints the same.
+    let mut doc = base(json!({}), json!({}));
+    doc["propertyHolders"] = json!([{"target":{"contextId":"sym_x","layerUid":"xi"},"properties":[{"property":"opacity","static":[50]}]}]);
+    let alpha = |r: &Value| r["fill"]["a"].as_f64().unwrap();
+    let source = alpha(&inner("s0", 0));
+    let mut owner = NativeObjectHistory::new("break", decode(&doc)).unwrap();
+    send(&mut owner, &payload("ly_inst")).unwrap();
+    let baked = records_of(&stored(&owner), "ly_inst");
+    assert_eq!(baked.len(), 2);
+    for record in &baked {
+        assert_eq!(alpha(record), source * 0.5);
+    }
+}
+
+#[test]
+fn inner_groups_and_a_rig_are_not_content_of_the_baked_layer() {
+    // The baseline flattens the strokes only; the component keeps its own groups and rig for every other instance.
+    let groups = json!({"contextId":"sym_x","entries":[{"gid":"g1","combineMode":"unite","order":["s0","s6"]}],
+        "members":[{"strokeId":"s0","groupId":"g1"},{"strokeId":"s6","groupId":"g1"}]});
+    let mut doc = base(json!({}), json!({}));
+    doc["componentTables"]["components"]["components"][0]["layers"][0]["groups"] = groups.clone();
+    let mut owner = NativeObjectHistory::new("break", decode(&doc)).unwrap();
+    send(&mut owner, &payload("ly_inst")).unwrap();
+    let after = stored(&owner);
+    assert_eq!(records_of(&after, "ly_inst").len(), 2);
+    assert_eq!(after["componentTables"]["components"]["components"][0]["layers"][0]["groups"], groups);
+    let host = after["layers"].as_array().unwrap().iter().find(|l| l["layerUid"] == "ly_inst").unwrap();
+    assert!(host.get("groups").is_none(), "the host layer gains no group table");
+}
+
+#[test]
+fn time_remap_names_the_inner_frame_on_every_baked_frame() {
+    // Remap value 6 from frame 0, a hold: every outer frame shows inner key 6, the playback mode is ignored.
+    let remap = json!({"keys":[{"frame":0,"v":[6],"hold":true},{"frame":20,"v":[6]}]});
+    let mut owner = NativeObjectHistory::new("break", decode(&base(json!({"timeRemap":remap}), json!({})))).unwrap();
+    send(&mut owner, &payload("ly_inst")).unwrap();
+    let after = stored(&owner);
+    assert_eq!(keys_of(&after, "ly_inst"), vec![0]);
+    let baked = records_of(&after, "ly_inst");
+    assert_eq!(baked.len(), 1);
+    assert_eq!(baked[0]["target"]["strokeId"], "s6");
+    // A ramp: 0 at frame 0 to 6 at frame 12 (default ease), then held at 6: s0 first, s6 from the frame the value rounds to 6.
+    let ramp = json!({"keys":[{"frame":0,"v":[0]},{"frame":12,"v":[6]}]});
+    let mut owner = NativeObjectHistory::new("break", decode(&base(json!({"timeRemap":ramp}), json!({})))).unwrap();
+    send(&mut owner, &payload("ly_inst")).unwrap();
+    let after = stored(&owner);
+    let keys = keys_of(&after, "ly_inst");
+    assert_eq!(keys.first(), Some(&0));
+    assert!(keys.len() == 2 && keys[1] <= 12, "{keys:?}");
+    let ids: Vec<String> = records_of(&after, "ly_inst")
+        .iter()
+        .map(|r| r["target"]["strokeId"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(ids, vec!["s0".to_owned(), "s6".to_owned()]);
+}
+
+#[test]
+fn text_blocks_inside_the_component_are_refused_whole() {
+    use super::fixture::text_item;
+    let mut doc = base(json!({}), json!({}));
+    let mut text = text_item("xi");
+    text["target"]["contextId"] = json!("sym_x");
+    doc["items"] = json!({"text":[text]});
+    refused_whole(&doc, "text blocks");
 }
 
 #[test]

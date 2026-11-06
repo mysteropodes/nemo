@@ -53,6 +53,18 @@ enum Selector<'a> {
         cursor: u64,
         limit: u64,
     },
+    /// C-comp-owned-state: a page of the markers a component stores (`sym.markers`), in stored order.
+    Markers {
+        id: &'a str,
+        cursor: u64,
+        limit: u64,
+    },
+    /// C-comp-owned-state: a page of the camera keys a component stores (`sym.cameraKeys`), in stored order.
+    CameraKeys {
+        id: &'a str,
+        cursor: u64,
+        limit: u64,
+    },
     /// #2256 Q4: the stored duplicator descriptor of one scene layer, as the inspector panel shows it.
     Duplicator {
         layer_uid: &'a str,
@@ -101,14 +113,15 @@ fn selector(payload: &Value) -> Option<Selector<'_>> {
                 id: context_id(&object["contextId"])?,
             })
         }
-        kind @ ("layers" | "instances") => {
+        kind @ ("layers" | "instances" | "markers" | "cameraKeys") => {
             let object = fields(selector, &["kind", "contextId", "cursor", "limit"])?;
             let (cursor, limit) = page_args(object)?;
             let id = context_id(&object["contextId"])?;
-            Some(if kind == "layers" {
-                Selector::Layers { id, cursor, limit }
-            } else {
-                Selector::Instances { id, cursor, limit }
+            Some(match kind {
+                "layers" => Selector::Layers { id, cursor, limit },
+                "markers" => Selector::Markers { id, cursor, limit },
+                "cameraKeys" => Selector::CameraKeys { id, cursor, limit },
+                _ => Selector::Instances { id, cursor, limit },
             })
         }
         "duplicator" => {
@@ -348,6 +361,40 @@ impl ObjectSnapshot {
                     head["contextId"] = json!(context.id());
                     (head, context.layers().len(), cursor, limit, items)
                 }
+                Selector::Markers { id, cursor, limit } => {
+                    let context = source
+                        .context(id)
+                        .map_err(|_| DispatchErrorCode::NotFound)?;
+                    // The scene's markers belong to the composition owner.
+                    let component = context.component().ok_or(DispatchErrorCode::InvalidRequest)?;
+                    let items: Vec<Value> = component
+                        .markers()
+                        .iter()
+                        .map(|m| json!({"frame":m.frame,"name":m.name,"color":m.color}))
+                        .collect();
+                    let mut head = self.component_head("markers");
+                    head["contextId"] = json!(context.id());
+                    (head, items.len(), cursor, limit, items)
+                }
+                Selector::CameraKeys { id, cursor, limit } => {
+                    let context = source
+                        .context(id)
+                        .map_err(|_| DispatchErrorCode::NotFound)?;
+                    // The scene's camera is read through `query.document.object.project.camera.read`.
+                    let component = context.component().ok_or(DispatchErrorCode::InvalidRequest)?;
+                    let items: Vec<Value> = component
+                        .camera_keys()
+                        .unwrap_or(&[])
+                        .iter()
+                        .map(|k| {
+                            json!({"frame":shown(Some(k.frame), 0),"x":k.x,"y":k.y,"w":k.w,"rot":k.rot.value(),
+                                "hOut":k.h_out.value(),"hIn":k.h_in.value(),"ease":k.ease.value()})
+                        })
+                        .collect();
+                    let mut head = self.component_head("cameraKeys");
+                    head["contextId"] = json!(context.id());
+                    (head, items.len(), cursor, limit, items)
+                }
                 Selector::Instances { id, cursor, limit } => {
                     let context = source
                         .context(id)
@@ -369,6 +416,8 @@ impl ObjectSnapshot {
         let count_key = match page["kind"].as_str() {
             Some("contexts") => "contextCount",
             Some("layers") => "layerCount",
+            Some("markers") => "markerCount",
+            Some("cameraKeys") => "keyCount",
             _ => "instanceCount",
         };
         page[count_key] = json!(count);

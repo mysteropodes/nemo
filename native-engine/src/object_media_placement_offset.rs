@@ -6,6 +6,8 @@ use serde_json::Number;
 #[path = "object_media_video_timing.rs"]
 mod video_timing;
 pub(crate) use video_timing::{RemapIntent, RemapRefusal, VideoTiming, MAX_INTERP_MODE};
+#[cfg(feature = "evaluation")]
+pub(crate) use video_timing::sample_remap_track;
 const MAX: f64 = 9_007_199_254_740_991.;
 
 pub(crate) fn admitted(target: &AssetTarget, value: &Number) -> bool {

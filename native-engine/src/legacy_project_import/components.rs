@@ -19,8 +19,8 @@ pub(crate) const LAYER_MAPPED: &[&str] = &[
     "symMatrix",
     "timeRemap",
 ];
-/// Symbol members with no native owner: content refuses, annotations warn.
-const SYMBOL_REFUSED: &[&str] = &["motionArcs", "tweenOverrides", "tweenEasing"];
+/// Symbol members carried into the document-wide tween store and motion arcs (their keys name the layers inside the component).
+const SYMBOL_TWEEN_TABLES: &[&str] = &["motionArcs", "tweenOverrides", "tweenEasing"];
 
 pub(crate) struct Converted {
     pub(crate) set: Value,
@@ -29,6 +29,12 @@ pub(crate) struct Converted {
     /// Keyframe numbers and generated-frame layers of every component layer, for the tween options.
     pub(crate) keys: std::collections::HashMap<String, Vec<u32>>,
     pub(crate) sampled: HashSet<String>,
+    /// The uid of every layer inside a component.
+    pub(crate) layer_uids: HashSet<String>,
+    /// `sym.tweenOverrides`, `sym.tweenEasing` and `sym.motionArcs`, keyed by the uid of the component layer they name.
+    pub(crate) tween_overrides: Map<String, Value>,
+    pub(crate) tween_easing: Map<String, Value>,
+    pub(crate) motion_arcs: Map<String, Value>,
 }
 
 /// The symbol ids that exist, and so may be instanced.
@@ -54,6 +60,10 @@ pub(crate) fn convert(
         dup: dup::Tables::default(),
         keys: std::collections::HashMap::new(),
         sampled: HashSet::new(),
+        layer_uids: HashSet::new(),
+        tween_overrides: Map::new(),
+        tween_easing: Map::new(),
+        motion_arcs: Map::new(),
     };
     let mut components = Vec::new();
     for (id, symbol) in symbols {
@@ -92,14 +102,6 @@ fn component(
     out: &mut Converted,
     ctx: &mut Ctx,
 ) -> Result<Value, LegacyImportError> {
-    for key in SYMBOL_REFUSED {
-        if members.get(*key).is_some_and(|v| !is_default(v)) {
-            return Err(LegacyImportError::unsupported(
-                format!("{path}.{key}"),
-                "this component content has no native owner in this release",
-            ));
-        }
-    }
     for (key, value) in members {
         let known = [
             "name",
@@ -111,7 +113,7 @@ fn component(
             "cameraKeys",
         ];
         if !known.contains(&key.as_str())
-            && !SYMBOL_REFUSED.contains(&key.as_str())
+            && !SYMBOL_TWEEN_TABLES.contains(&key.as_str())
             && !is_default(value)
         {
             ctx.warn(
@@ -133,6 +135,37 @@ fn component(
             )
         })?;
     migrate::layer_set(&mut layers, ctx);
+    let layer_uids: Vec<String> = layers
+        .iter()
+        .map(|l| l["layerUid"].as_str().unwrap_or("").to_owned())
+        .collect();
+    out.layer_uids
+        .extend(layer_uids.iter().filter(|uid| !uid.is_empty()).cloned());
+    for (member, table) in [
+        ("tweenOverrides", &mut out.tween_overrides),
+        ("tweenEasing", &mut out.tween_easing),
+    ] {
+        let Some(value) = members.get(member).filter(|v| !is_default(v)) else {
+            continue;
+        };
+        let member_path = format!("{path}.{member}");
+        let mut spans = object(value, &member_path)?.clone();
+        migrate::tween_span_keys(&mut spans, &layer_uids);
+        for (key, span) in spans {
+            table.entry(key).or_insert(span);
+        }
+    }
+    if let Some(value) = members.get("motionArcs").filter(|v| !is_default(v)) {
+        let arcs = crate::history::legacy_project_import::assemble::normalize_arcs(
+            value,
+            &format!("{path}.motionArcs"),
+            &layers,
+            ctx,
+        )?;
+        for (key, arc) in arcs {
+            out.motion_arcs.entry(key).or_insert(arc);
+        }
+    }
     let total = members
         .get("totalFrames")
         .and_then(Value::as_f64)

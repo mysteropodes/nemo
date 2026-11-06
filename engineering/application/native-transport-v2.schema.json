@@ -4510,6 +4510,93 @@
         }
       }
     },
+    "ObjectComponentStateEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "kind"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.component.state.edit"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectComponentId"
+        },
+        "kind": {
+          "enum": [
+            "setCameraKey",
+            "removeCameraKey",
+            "setCameraEase",
+            "clearCamera",
+            "addMarker",
+            "updateMarker",
+            "removeMarker",
+            "clearMarkers"
+          ]
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "w": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rot": {
+          "type": "number"
+        },
+        "hOut": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "hIn": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "ease": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "Cubic-bezier handles x1,y1,x2,y2 of the segment leaving the key; x1 and x2 lie in 0..1."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "color": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "newFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      },
+      "description": "One closed edit of the camera keys or the markers a declared component stores (contextId is the component symbol id, never scene-root). setCameraKey needs frame and, for a new key, x, y and w; removeCameraKey, removeMarker need frame; setCameraEase needs frame and ease; addMarker needs frame (name and color optional); updateMarker needs frame and any of newFrame, name, color; clearCamera and clearMarkers take no other member."
+    },
     "ObjectComponentExposePayload": {
       "type": "object",
       "additionalProperties": false,
@@ -7916,6 +8003,23 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectComponentBreakApartPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.component.state.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectComponentStateEditPayload"
                 }
               }
             }
@@ -19978,6 +20082,62 @@
               ],
               "properties": {
                 "kind": {
+                  "const": "markers"
+                },
+                "contextId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "cursor": {
+                  "$ref": "#/$defs/Revision"
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "contextId",
+                "cursor",
+                "limit"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "cameraKeys"
+                },
+                "contextId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "cursor": {
+                  "$ref": "#/$defs/Revision"
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "contextId",
+                "cursor",
+                "limit"
+              ],
+              "properties": {
+                "kind": {
                   "const": "instances"
                 },
                 "contextId": {
@@ -20038,7 +20198,7 @@
           ]
         }
       },
-      "description": "Read-only component model pinned to (atRevision, documentSnapshotId): the contexts of the document, one context's summary, its layers, the scene layers that instance one component, the stored duplicator descriptor of one scene layer, or the playback facts of one component-instance layer at an outer frame. Paged and byte-bounded; no expectedRevision."
+      "description": "Read-only component model pinned to (atRevision, documentSnapshotId): the contexts of the document, one context's summary, its layers, a page of the markers or of the camera keys a component stores, the scene layers that instance one component, the stored duplicator descriptor of one scene layer, or the playback facts of one component-instance layer at an outer frame. Paged and byte-bounded; no expectedRevision."
     },
     "ObjectComponentReadResult": {
       "oneOf": [
@@ -20307,6 +20467,198 @@
                   "$ref": "#/$defs/Revision"
                 }
               ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "contextId",
+            "markerCount",
+            "cursor",
+            "items",
+            "nextCursor"
+          ],
+          "properties": {
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "kind": {
+              "const": "markers"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "cursor": {
+              "$ref": "#/$defs/Revision"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "frame",
+                  "name",
+                  "color"
+                ],
+                "properties": {
+                  "frame": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 256
+                  },
+                  "color": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              }
+            },
+            "nextCursor": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/Revision"
+                }
+              ]
+            },
+            "markerCount": {
+              "$ref": "#/$defs/Revision"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "contextId",
+            "keyCount",
+            "cursor",
+            "items",
+            "nextCursor"
+          ],
+          "properties": {
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "kind": {
+              "const": "cameraKeys"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "cursor": {
+              "$ref": "#/$defs/Revision"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "frame",
+                  "x",
+                  "y",
+                  "w",
+                  "rot",
+                  "hOut",
+                  "hIn",
+                  "ease"
+                ],
+                "properties": {
+                  "frame": {
+                    "type": "number"
+                  },
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "w": {
+                    "type": "number"
+                  },
+                  "rot": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "hOut": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "hIn": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "ease": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 4,
+                    "maxItems": 4
+                  }
+                }
+              }
+            },
+            "nextCursor": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/Revision"
+                }
+              ]
+            },
+            "keyCount": {
+              "$ref": "#/$defs/Revision"
             }
           }
         },

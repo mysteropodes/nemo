@@ -37,6 +37,14 @@ pub(crate) const COMPONENT_SET_FORMAT_VERSION: u32 = 1;
 const EXPOSED_KEY_PREFIX: &str = "ep_";
 const MAX_MARKER_TEXT: usize = 256;
 
+/// One thing a placed component shows on a frame, as a break apart bakes it into the instance layer: a vector record or an
+/// image, geometry already placed. The evaluation half produces them, the plan half writes them.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Baked {
+    Vector(crate::object_document::ObjectRecord),
+    Image(crate::object_document::RasterEntry),
+}
+
 /// Components and the instance layers that place them.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

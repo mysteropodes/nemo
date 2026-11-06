@@ -290,7 +290,7 @@ fn matte_source_uids(layers: &mut [Value]) -> usize {
 }
 
 /// Tween span keys used to start with the layer index (`5:0-10`); they now start with its uid.
-fn tween_span_keys(spans: &mut Map<String, Value>, uids: &[String]) -> usize {
+pub(crate) fn tween_span_keys(spans: &mut Map<String, Value>, uids: &[String]) -> usize {
     let mut moved = 0;
     let old: Vec<String> = spans.keys().cloned().collect();
     let mut out = Map::new();

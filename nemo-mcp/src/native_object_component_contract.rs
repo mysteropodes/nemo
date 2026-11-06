@@ -42,7 +42,28 @@ enum K {
     PlacedAt,
     /// A finite number above zero.
     Speed,
+    /// C-comp-owned-state: one of the closed `object.component.state.edit` kind labels.
+    StateKind,
+    /// An array of two finite numbers (a camera handle).
+    Pair,
+    /// An array of four finite numbers (a camera ease curve; the two x values lie in 0..1).
+    Quad,
+    /// A string of at most 256 bytes without NUL (a marker name).
+    Label,
+    /// A non-empty string of at most 256 bytes without NUL (a marker colour).
+    Colour,
 }
+const STATE_KINDS: [&str; 8] = [
+    "setCameraKey",
+    "removeCameraKey",
+    "setCameraEase",
+    "clearCamera",
+    "addMarker",
+    "updateMarker",
+    "removeMarker",
+    "clearMarkers",
+];
+const MAX_LABEL: usize = 256;
 const INSTANCE_MODES: [&str; 4] = ["loop", "once", "pingpong", "single"];
 const DUP_MODES: [&str; 3] = ["grid", "radial", "path"];
 const DUP_DIRECTIONS: [&str; 4] = ["forward", "backward", "centerOut", "random"];
@@ -60,7 +81,7 @@ enum Receipt {
 }
 
 /// (operation suffix, command, receipt, "member:kind" in wire order; a trailing `?` marks an optional member).
-static SPECS: [(&str, &str, Receipt, &str); 9] = [
+static SPECS: [(&str, &str, Receipt, &str); 10] = [
     (
         "component.convert",
         "object.component.convert",
@@ -118,6 +139,13 @@ static SPECS: [(&str, &str, Receipt, &str); 9] = [
         Receipt::Command,
         "contextId:text layerUid:id",
     ),
+    // C-comp-owned-state: the camera keys and markers a declared component owns, one closed edit per request.
+    (
+        "component.state.edit",
+        "object.component.state.edit",
+        Receipt::Command,
+        "contextId:id kind:stateKind frame:frame? x:number? y:number? w:speed? rot:number? hOut:pair? hIn:pair? ease:quad? name:label? color:colour? newFrame:frame?",
+    ),
 ];
 const PREFIX: &str = "command.document.object.";
 
@@ -172,7 +200,18 @@ fn kind(token: &str) -> Option<K> {
         "frame" => K::Frame,
         "placedAt" => K::PlacedAt,
         "speed" => K::Speed,
+        "stateKind" => K::StateKind,
+        "pair" => K::Pair,
+        "quad" => K::Quad,
+        "label" => K::Label,
+        "colour" => K::Colour,
         _ => return None,
+    })
+}
+
+fn numbers(value: &Value, count: usize) -> bool {
+    value.as_array().is_some_and(|items| {
+        items.len() == count && items.iter().all(|n| n.as_f64().is_some_and(f64::is_finite))
     })
 }
 
@@ -198,6 +237,16 @@ fn check(kind: K, value: &Value) -> bool {
         K::Frame => value.as_u64().is_some_and(|f| f <= u64::from(u32::MAX)),
         K::PlacedAt => value.as_i64().is_some_and(|v| i32::try_from(v).is_ok()),
         K::Speed => value.as_f64().is_some_and(|v| v.is_finite() && v > 0.0),
+        K::StateKind => value.as_str().is_some_and(|k| STATE_KINDS.contains(&k)),
+        K::Pair => numbers(value, 2),
+        K::Quad => numbers(value, 4)
+            && [0usize, 2]
+                .iter()
+                .all(|at| value[*at].as_f64().is_some_and(|x| (0.0..=1.0).contains(&x))),
+        K::Label => value.as_str().is_some_and(|t| t.len() <= MAX_LABEL && !t.contains('\0')),
+        K::Colour => value
+            .as_str()
+            .is_some_and(|t| !t.is_empty() && t.len() <= MAX_LABEL && !t.contains('\0')),
         K::DupMode => value.as_str().is_some_and(|mode| DUP_MODES.contains(&mode)),
         K::DupStagger => value.as_object().is_some_and(|map| {
             map.iter()

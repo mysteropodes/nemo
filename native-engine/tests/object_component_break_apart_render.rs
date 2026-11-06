@@ -183,3 +183,96 @@ fn undo_restores_the_instance_paint() {
         }
     }
 }
+
+#[test]
+fn the_instance_time_remap_drives_the_viewport_and_the_baked_layer_paints_the_same_on_every_frame() {
+    // Frames 0..3 hold inner key 0 ("a", red), frames 4.. inner key 4 ("b", green). The remap ramps the inner frame 0 -> 7 over the
+    // eight outer frames; without it the instance plays once (frame f shows inner f).
+    let ramp = json!({"timeRemap":{"keys":[{"frame":0,"v":[7],"hold":false},{"frame":7,"v":[0]}]}});
+    let mut remapped = owner(drawing(ramp.clone(), json!({})));
+    let plain = owner(drawing(json!({}), json!({})));
+    let shown: Vec<Vec<BezPath>> = (0..TOTAL).map(|f| paths(&remapped, f)).collect();
+    let unmapped: Vec<Vec<BezPath>> = (0..TOTAL).map(|f| paths(&plain, f)).collect();
+    // The reversed ramp shows inner key 4 first and inner key 0 last, which the plain playback does the other way round.
+    assert_eq!(shown[0], unmapped[7]);
+    assert_eq!(shown[7], unmapped[0]);
+    assert_ne!(shown[0], unmapped[0]);
+    bake(&mut remapped);
+    for frame in 0..TOTAL {
+        let after = paths(&remapped, frame);
+        assert_eq!(after.len(), shown[frame as usize].len(), "frame {frame}");
+        for (a, b) in shown[frame as usize].iter().zip(&after) {
+            assert_same(a, b);
+        }
+    }
+}
+
+#[test]
+fn the_inner_layer_opacity_track_is_baked_into_the_colour_of_every_frame() {
+    // A keyed opacity (25 at frame 0, 75 at frame 4) changes the fill of every frame; the paint of the baked layer equals it.
+    let mut doc = drawing(json!({}), json!({}));
+    doc["propertyHolders"] = json!([{"target":{"contextId":"sym_x","layerUid":"xi"},"properties":[{"property":"opacity","track":{"keys":[
+        {"frame":0,"v":[25],"curvePoints":[]},{"frame":4,"v":[75]}]}}]}]);
+    let mut owner = owner(doc);
+    let alpha = |owner: &NativeObjectHistory, frame: u32| -> Vec<f64> {
+        ordered_entries(&plan_at(owner, frame))
+            .map(|entry| match entry {
+                PaintEntry::Component(c) => c.style.fill.solid().unwrap().channels()[3].as_f64().unwrap(),
+                PaintEntry::Contour(c) => c.solid().channels()[3].as_f64().unwrap(),
+                _ => panic!("unexpected paint entry"),
+            })
+            .collect()
+    };
+    let before: Vec<Vec<f64>> = (0..TOTAL).map(|f| alpha(&owner, f)).collect();
+    assert_ne!(before[0], before[3], "the track animates the colour");
+    bake(&mut owner);
+    for frame in 0..TOTAL {
+        let after = alpha(&owner, frame);
+        assert_eq!(after.len(), before[frame as usize].len(), "frame {frame}");
+        for (a, b) in before[frame as usize].iter().zip(&after) {
+            assert!((a - b).abs() < 1e-9, "frame {frame}: {a} vs {b}");
+        }
+    }
+}
+
+#[test]
+fn a_camera_authored_by_the_state_edit_moves_the_instance_exactly_as_the_same_stored_keys_do() {
+    // The same two keys as `camera()`, written through `object.component.state.edit` (one revision and one undo entry each).
+    let mut authored = owner(drawing(json!({}), json!({})));
+    let edit = |owner: &mut NativeObjectHistory, body: Value| {
+        let mut payload = json!({"command":"object.component.state.edit","contextId":"sym_x"});
+        for (k, v) in body.as_object().unwrap() {
+            payload[k] = v.clone();
+        }
+        let request = json!({"apiVersion":2,"requestId":format!("state-edit-{}", owner.content_revision()),"instanceId":owner.instance_id(),"documentId":owner.document_id(),
+            "expectedRevision":owner.content_revision(),"operation":"command.document.object.component.state.edit","payload":payload});
+        let reply = serde_json::to_value(
+            owner.try_dispatch_object_command(&serde_json::from_value(request).unwrap()).unwrap().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(reply["ok"], true, "{reply}");
+    };
+    let still: Vec<Vec<BezPath>> = (0..TOTAL).map(|f| paths(&authored, f)).collect();
+    edit(&mut authored, json!({"kind":"setCameraKey","frame":0,"x":160,"y":90,"w":160,"rot":0,"ease":[0.42,0.0,0.58,1.0]}));
+    edit(&mut authored, json!({"kind":"setCameraKey","frame":6,"x":160,"y":90,"w":320,"rot":0,"ease":[0.42,0.0,0.58,1.0]}));
+    let stored = owner(drawing(
+        json!({}),
+        json!({"cameraKeys":[
+            {"frame":0,"x":160,"y":90,"w":160,"rot":0,"hOut":[0,0],"hIn":[0,0],"ease":[0.42,0,0.58,1]},
+            {"frame":6,"x":160,"y":90,"w":320,"rot":0,"hOut":[0,0],"hIn":[0,0],"ease":[0.42,0,0.58,1]}]}),
+    ));
+    for frame in 0..TOTAL {
+        let (a, b) = (paths(&authored, frame), paths(&stored, frame));
+        assert_eq!(a.len(), b.len(), "frame {frame}");
+        for (x, y) in a.iter().zip(&b) {
+            assert_same(x, y);
+        }
+    }
+    assert_ne!(paths(&authored, 0), still[0], "the authored camera is applied to the instance");
+    // One undo entry per edit: two undos bring the camera-less instance paint back.
+    authored.undo(authored.content_revision()).unwrap();
+    authored.undo(authored.content_revision()).unwrap();
+    for frame in 0..TOTAL {
+        assert_eq!(paths(&authored, frame), still[frame as usize], "frame {frame}");
+    }
+}

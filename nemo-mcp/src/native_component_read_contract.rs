@@ -28,7 +28,7 @@ fn selector(value: &Value) -> bool {
         Some("contexts") => exact(value, &["kind", "cursor", "limit"], &[]).is_some_and(page),
         Some("context") => exact(value, &["kind", "contextId"], &[])
             .is_some_and(|o| context_id(o.get("contextId")).is_some()),
-        Some("layers" | "instances") => {
+        Some("layers" | "instances" | "markers" | "cameraKeys") => {
             exact(value, &["kind", "contextId", "cursor", "limit"], &[])
                 .is_some_and(|o| context_id(o.get("contextId")).is_some() && page(o))
         }
@@ -111,6 +111,32 @@ fn layer_item(value: &Value) -> bool {
                 .iter()
                 .all(|k| o.get(*k).map_or(true, Value::is_boolean))
             && o.get("parentLayerUid").map_or(true, |p| p.is_null() || uid(Some(p)))
+    })
+}
+/// C-comp-owned-state: one stored component marker, `{frame, name, color}`.
+fn marker_item(value: &Value) -> bool {
+    exact(value, &["frame", "name", "color"], &[]).is_some_and(|o| {
+        uint32(o.get("frame"))
+            && o["name"].as_str().is_some_and(|n| n.len() <= 256)
+            && o["color"].as_str().is_some_and(|c| !c.is_empty() && c.len() <= 256)
+    })
+}
+/// C-comp-owned-state: one stored component camera key; a member the key never stored reads `null`.
+fn camera_key_item(value: &Value) -> bool {
+    let numbers = |key: &str, count: usize, o: &Map<String, Value>| {
+        o.get(key).is_some_and(|v| {
+            v.is_null()
+                || v.as_array().is_some_and(|items| {
+                    items.len() == count && items.iter().all(|n| n.as_f64().is_some_and(f64::is_finite))
+                })
+        })
+    };
+    exact(value, &["frame", "x", "y", "w", "rot", "hOut", "hIn", "ease"], &[]).is_some_and(|o| {
+        ["frame", "x", "y", "w"].iter().all(|k| finite(o.get(*k)))
+            && (o["rot"].is_null() || finite(o.get("rot")))
+            && numbers("hOut", 2, o)
+            && numbers("hIn", 2, o)
+            && numbers("ease", 4, o)
     })
 }
 fn instance_item(value: &Value) -> bool {
@@ -212,6 +238,28 @@ pub(crate) fn result(payload: &Value, value: &Value) -> bool {
         )
         .is_some_and(|o| {
             pins(o) && same_context(o) && paged(o, wanted, "layerCount", &|e, _| layer_item(e))
+        }),
+        "markers" => exact(
+            value,
+            &with(&["contextId", "markerCount", "cursor", "items", "nextCursor"]),
+            &[],
+        )
+        .is_some_and(|o| {
+            pins(o)
+                && same_context(o)
+                && wanted.get("contextId").is_some_and(|id| id != SCENE)
+                && paged(o, wanted, "markerCount", &|e, _| marker_item(e))
+        }),
+        "cameraKeys" => exact(
+            value,
+            &with(&["contextId", "keyCount", "cursor", "items", "nextCursor"]),
+            &[],
+        )
+        .is_some_and(|o| {
+            pins(o)
+                && same_context(o)
+                && wanted.get("contextId").is_some_and(|id| id != SCENE)
+                && paged(o, wanted, "keyCount", &|e, _| camera_key_item(e))
         }),
         "instances" => exact(
             value,
