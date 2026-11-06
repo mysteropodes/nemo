@@ -382,10 +382,15 @@ fn old_unavailable_port_contract_is_gone_but_unrelated_providers_still_refuse() 
     // formerly: any declared exposed property refused at the scene join
     let d = doc(one("opacity", Some(100)), &[("host-a", 0)], Value::Null);
     assert!(!refused(&d, 0));
+    // The Time Remap sampler is wired now: an instance with a track draws. A path effect on an inner layer still refuses.
     let mut remap = d.clone();
     remap["componentTables"]["components"]["instances"][0]["timeRemap"] =
         json!({"keys":[{"frame":0,"v":[0]}]});
-    assert!(refused(&remap, 0));
+    assert!(!refused(&remap, 0));
+    let mut effect = d.clone();
+    effect["componentTables"]["components"]["components"][0]["layers"][0]["pathFx"] =
+        json!([{"type":"zigzag","enabled":true,"p1":10.0,"p2":2.0,"p3":0.0}]);
+    assert!(refused(&effect, 0));
 }
 
 #[test]

@@ -245,9 +245,10 @@ fn missing_override_or_nonconsumed_motion_refuses_before_any_partial_scene_is_pu
                 d["componentTables"]["components"]["components"][0]["exposedProps"] = json!([
                 {"key":"ep_alpha","label":"Fill","targetStrokeId":"ink","targetField":"fillColor"}])
             }
+            // The Time Remap sampler is wired now (it draws; see the break apart render test); an inner layer's path effects are still unavailable.
             1 => {
-                d["componentTables"]["components"]["instances"][0]["timeRemap"] =
-                    json!({"keys":[{"frame":0,"v":[0]}]})
+                d["componentTables"]["components"]["components"][0]["layers"][0]["pathFx"] =
+                    json!([{"type":"zigzag","enabled":true,"p1":10.0,"p2":2.0,"p3":0.0}])
             }
             2 => {
                 d["propertyHolders"] = json!([{"target":{"contextId":"comp-a","layerUid":"inner","strokeId":"ink"},
