@@ -117,7 +117,7 @@ fn raster_item(value: &Value) -> bool {
                 .all(|key| members.get(*key).is_none_or(Value::is_number))
             // #2372: the stored mirror and shear of the image (degrees of x-shear, inside a quarter turn).
             && members.get("skew").is_none_or(|d| d.as_f64().is_some_and(|d| d.abs() < 90.0))
-            && pivot(members)
+            && members.iter().filter(|(k, _)| k.starts_with("xformAnchor")).all(|(k, v)| pivot_member(k, v))
             && ["isBitmapBrush", "isBrushTextureCopy", "flipX", "flipY"]
                 .iter()
                 .all(|key| members.get(*key).is_none_or(Value::is_boolean))
@@ -169,9 +169,7 @@ fn text_fields(members: &Map<String, Value>) -> bool {
         // #2372: the stored mirror and shear of a block about its anchor (a patch never carries them either, see `text_patch`).
         "flipX" | "flipY" => value.is_boolean(),
         "skew" => value.as_f64().is_some_and(|d| d.abs() < 90.0),
-        // #2372: the stored Select pivot of a block (a preset, or a custom world point that wins).
-        "xformAnchorKey" => value.as_str().is_some_and(|k| PIVOT_PRESETS.contains(&k)),
-        "xformAnchorCustom" => pivot_point(value),
+        "xformAnchorKey" | "xformAnchorCustom" => pivot_member(key, value),
         "anchorTopLeft" => {
             exact(value, &["x", "y"], &[]).is_some()
                 && value["x"].is_number()
@@ -181,38 +179,18 @@ fn text_fields(members: &Map<String, Value>) -> bool {
     })
 }
 
-/// The nine preset pivots of a selection box (an item's stored `xformAnchorKey`).
-const PIVOT_PRESETS: [&str; 9] = ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"];
-
-/// A custom pivot: a world point of two finite numbers.
-fn pivot_point(value: &Value) -> bool {
-    value.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(|n| n.as_f64().is_some_and(f64::is_finite)))
-}
-
-/// The stored Select pivot of an image (#2372): each member present is well formed.
-fn pivot(members: &Map<String, Value>) -> bool {
-    members.get("xformAnchorKey").is_none_or(|k| k.as_str().is_some_and(|k| PIVOT_PRESETS.contains(&k)))
-        && members.get("xformAnchorCustom").is_none_or(pivot_point)
+/// #2372: the stored Select pivot member `key` (a preset name, or a custom world point of two finite numbers).
+fn pivot_member(key: &str, v: &Value) -> bool {
+    match key {
+        "xformAnchorKey" => v.as_str().is_some_and(|k| ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"].contains(&k)),
+        _ => v.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(|n| n.as_f64().is_some_and(f64::is_finite))),
+    }
 }
 
 const TEXT_OPTIONAL: [&str; 17] = [
-    "fixedWidth",
-    "fixedHeight",
-    "bold",
-    "italic",
-    "underline",
-    "strike",
-    "letterSpacing",
-    "wordSpacing",
-    "lineHeightMult",
-    "textCase",
-    "anchorTopLeft",
-    "rotation",
-    "flipX",
-    "flipY",
-    "skew",
-    "xformAnchorKey",
-    "xformAnchorCustom",
+    "fixedWidth", "fixedHeight", "bold", "italic", "underline", "strike",
+    "letterSpacing", "wordSpacing", "lineHeightMult", "textCase", "anchorTopLeft", "rotation",
+    "flipX", "flipY", "skew", "xformAnchorKey", "xformAnchorCustom",
 ];
 
 fn text_block(value: &Value) -> bool {
