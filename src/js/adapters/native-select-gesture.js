@@ -66,7 +66,11 @@
   }
   // The world affine [a b c d e f] of a drag from `g.start` to the world point `at` (baseline onMove rules).
   function matrixOf(g, at, shift, alt) {
-    if (g.kind === 'move') return [1, 0, 0, 1, at.x - g.start.x, at.y - g.start.y];
+    if (g.kind === 'move') {
+      var dx = at.x - g.start.x, dy = at.y - g.start.y;
+      if (shift && g.motion) { if (Math.abs(dx) >= Math.abs(dy)) dy = 0; else dx = 0; } // baseline #802: Shift locks the TOTAL displacement onto its nearer axis
+      return [1, 0, 0, 1, dx, dy];
+    }
     if (g.kind === 'rotate') {
       var c = g.box.center, delta = Math.atan2(at.y - c.y, at.x - c.x) * 180 / Math.PI - g.startAngle;
       if (shift) delta = Math.round(delta / 15) * 15;
@@ -152,12 +156,12 @@
     return 'applied';
   }
   function begin(root, e, abort) {
-    var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, st = root.state, shown = I && st && st.tool === 'select' && st.appMode !== 'motion' && I.presentedState(root);
+    var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, st = root.state, shown = I && st && st.tool === 'select' && I.presentedState(root), motion = !!st && st.appMode === 'motion'; // Motion (#2520/#2525): pick, marquee and the ELEMENT move only - no handles, no copy
     if (!shown) return null;
     var world = function (x, y) { return I.worldPoint(root, x, y, shown.pin, shown.presentation); };
     var Matrix = root.Matrix || root.paper.Matrix, origin = world(e.clientX, e.clientY), next = world(e.clientX + 1, e.clientY);
     var wpp = Math.hypot(next.x - origin.x, next.y - origin.y) || origin.perPixel;
-    var g = { kind: null, active: false, cancelled: false, start: origin, shift: !!e.shiftKey, alt: !!e.altKey, dup: false, last: e, pin: shown.pin, frame: shown.presentation.frame,
+    var g = { motion: motion, kind: null, active: false, cancelled: false, start: origin, shift: !!e.shiftKey, alt: !!e.altKey, dup: false, last: e, pin: shown.pin, frame: shown.presentation.frame,
       sel: [], box: null, angle: 0, ctx: null, matrix: [1, 0, 0, 1, 0, 0], previewed: false };
     var picked = null, pickDone = null;
     var current = (root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; });
@@ -167,13 +171,13 @@
       root.selectedPaths = []; if (st.selectedStrokeIndices) st.selectedStrokeIndices = []; current = [];
       if (O) O.show(root);
     }
-    var box = O && current.length ? O.boxOf(root, current) : null, handle = box && hitHandle(box, origin, wpp);
+    var box = O && current.length ? O.boxOf(root, current) : null, handle = !motion && box && hitHandle(box, origin, wpp);
     if (handle) {
       g.kind = handle.type; g.sel = current; g.box = box; g.dir = handle.dir; g.index = handle.index; g.ctx = I.pickContext(root);
       // The box's own axes. A dynamic shape keeps the world-axis resize its engine kernel (and the baseline) applies: it refuses a skewed one.
       g.axis = current.some(function (p) { return p.data.nativeRole === 'shape'; }) ? 0 : box.angle || 0;
       g.startAngle = Math.atan2(origin.y - box.center.y, origin.x - box.center.x) * 180 / Math.PI;
-    } else if (g.alt && current.length && box && inBox(box, origin)) {
+    } else if (g.alt && !motion && current.length && box && inBox(box, origin)) {
       // Alt+press inside the selection: the drag moves a copy of it (baseline), whatever lies under the pointer.
       g.kind = 'move'; g.dup = true; g.sel = current; g.ctx = I.pickContext(root);
     } else {
@@ -204,7 +208,10 @@
       if (item === null) { I.applyPick(root, null, g.shift); g.kind = 'marquee'; g.ctx = I.pickContext(root); return; }
       var held = selected.some(function (p) { return p && p.data && p.data.strokeId === item.data.strokeId; });
       if (!held) I.applyPick(root, item, g.shift);
-      g.kind = 'move'; g.dup = g.alt && held; g.sel = (root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; }); g.ctx = I.pickContext(root);
+      // Motion: only a shape of the layer whose group was entered (double-click) is dragged as an element; any other press just selects it.
+      var M = root.NemoNativeMotionElement;
+      if (motion && !(M && M.isolated(root))) { g.kind = 'none'; return; }
+      g.kind = 'move'; g.dup = g.alt && held && !motion; g.sel = (root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; }); g.ctx = I.pickContext(root);
     }
     // The drag's live preview: the selection's transformed copies (box, handles and ring follow) or the marquee rectangle.
     function update() {
@@ -269,6 +276,11 @@
         var D = root.NemoNativeSelectAltDuplicate;
         if (!D) { notice(root, 'Duplicating is not available right now.'); return Promise.resolve('refused'); }
         return D.commit(root, g.sel, g.matrix, { pin: g.pin, stale: stale, cancelled: function () { return g.cancelled; }, release: function () { listen(false); } });
+      }
+      if (g.motion) { // an ELEMENT move is a Motion edit of its Position (one object.property.edit), never a geometry batch
+        var M = root.NemoNativeMotionElement;
+        if (!M) { notice(root, 'Moving an element is not available right now.'); return Promise.resolve('refused'); }
+        return M.commitMove(root, g.sel, g.matrix, { pin: g.pin, stale: stale, cancelled: function () { return g.cancelled; }, release: function () { listen(false); } });
       }
       return commitMatrix(root, g.sel, g.matrix, { pin: g.pin, stale: stale, cancelled: function () { return g.cancelled; }, release: function () { listen(false); }, angle: g.kind === 'rotate' ? g.angle : 0 });
     }

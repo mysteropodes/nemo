@@ -130,11 +130,12 @@
       var box = orientedBox(root, shown), r = HANDLE * c.pin.canvasW / c.bounds.width;
       if (box) {
         // The rotate ring (baseline buildTransformBoxItems): centred on the box, 36 screen px at most, 30% of the box otherwise.
-        var mid = at(c.V, box.center.x, box.center.y);
-        svg.appendChild(node(root, 'circle', line(root, { cx: mid[0], cy: mid[1], stroke: BLUE, 'stroke-opacity': '0.63', 'stroke-width': '1',
+        // Motion (#2520/#2525): the shape's box alone - its scale and rotate belong to its Motion properties, not to the geometry handles.
+        var motion = !!root.state && root.state.appMode === 'motion', mid = at(c.V, box.center.x, box.center.y);
+        if (!motion) svg.appendChild(node(root, 'circle', line(root, { cx: mid[0], cy: mid[1], stroke: BLUE, 'stroke-opacity': '0.63', 'stroke-width': '1',
           r: Math.min(36 * c.pin.canvasW / c.bounds.width, Math.max(box.width, box.height) * 0.3 * Math.hypot(c.V[0], c.V[1])) })));
         svg.appendChild(polygon(root, c.V, box, { stroke: BLUE, 'stroke-opacity': '0.8', 'stroke-width': '1' }));
-        box.handles.forEach(function (h) {
+        (motion ? [] : box.handles).forEach(function (h) {
           var p = at(c.V, h[0], h[1]);
           svg.appendChild(node(root, 'rect', line(root, { x: p[0] - r, y: p[1] - r, width: 2 * r, height: 2 * r, fill: '#ffffff', stroke: BLUE, 'stroke-width': '1.2' })));
         });
@@ -191,7 +192,7 @@
   // and a read whose context changed before it returned is discarded.
   function hoverAt(root, e) {
     var s = state(root), I = root.NemoSelectCanvasIntent, st = root.state;
-    if (!e || e.buttons || !I || !st || st.tool !== 'select' || st.appMode === 'motion' || !I.objectProject(root)) { s.next = null; hover(root, null); return; }
+    if (!e || e.buttons || !I || !st || st.tool !== 'select' || !I.objectProject(root)) { s.next = null; hover(root, null); return; }
     s.next = { x: e.clientX, y: e.clientY };
     if (s.busy) return;
     s.busy = true;
