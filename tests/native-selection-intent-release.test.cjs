@@ -138,7 +138,7 @@ test('a native object project picks at pointer-up from the presented geometry an
   f.send('pointerdown', 100, 60); f.send('pointermove', 140, 60); f.send('pointerup', 140, 60);
   assert.equal(picks.length, 2, 'a drag still denies at threshold');
   f.state.appMode = 'motion'; f.send('pointerdown', 100, 60); f.send('pointerup', 100, 60);
-  assert.equal(picks.length, 2, 'Motion keeps its own canvas intent');
+  assert.equal(picks.length, 3, 'Motion picks natively too (#2520/#2525): the click becomes a pick, the shape box and the group entry follow');
   assert.deepEqual(writes(f), []);
 });
 
