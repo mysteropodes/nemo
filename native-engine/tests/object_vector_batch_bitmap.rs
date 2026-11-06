@@ -495,3 +495,5 @@ fn a_move_that_changes_nothing_or_a_refused_bake_writes_nothing() {
 mod dabs;
 #[path = "object_vector_batch_bitmap_component.rs"]
 mod component;
+#[path = "object_vector_batch_bitmap_delete.rs"]
+mod companion_delete;

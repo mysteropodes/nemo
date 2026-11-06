@@ -357,10 +357,10 @@ fn vertex_offsets_move_anchor_points_only_before_the_layer_pose_and_stay_drawabl
     assert!(evaluate_vector(&s, 0, 0).is_err());
 }
 
-/// Baseline `propsFor`: a dynamic shape's element lists its own rows after the Transform rows, by kind; the engine renders them from the
-/// keyed tracks (`run_param_shape`), so a keyed corner radius moves the painted anchors.
+/// Baseline `propsFor`: a dynamic shape's element lists its own rows after the Transform rows, by kind (the join already renders
+/// their keyed tracks through `run_param_shape`).
 #[test]
-fn a_dynamic_shapes_element_lists_its_parametric_rows_and_the_keyed_corner_reshapes_the_paint() {
+fn a_dynamic_shapes_element_lists_its_parametric_rows_by_kind() {
     let names = |v: &Value, element: bool| {
         let s = snap(v);
         let mut target = json!({"contextId":"scene-root","layerUid":"r08_curve_layer"});

@@ -169,6 +169,8 @@ impl ObjectCompositionWitness {
                 filled: hit_test.then(|| r.solid_fill().is_some() || r.fill_gradient().is_some()),
                 stroke_width: hit_test.then(|| record::painted_stroke_width(r)),
                 box_angle: if hit_test { record::stored_box_angle(r) } else { None },
+                xform_anchor_key: if hit_test { record::stored_pivot_key(r) } else { None },
+                xform_anchor_custom: if hit_test { record::stored_pivot_custom(r) } else { None },
                 owner: (hit_test && record::hit_role(r) == "fill")
                     .then(|| record::linked_fill(r))
                     .flatten()
@@ -231,6 +233,8 @@ fn mask_item(r: &crate::object_frame_packet::ObjectRecord, matrix: [f64; 6], fea
         filled: Some(r.geometry.closed),
         stroke_width: Some(0.0),
         box_angle: None,
+        xform_anchor_key: None,
+        xform_anchor_custom: None,
         owner: None,
         brush: None,
         group: None,
@@ -376,6 +380,8 @@ fn hit_item(
         filled: Some(true),
         stroke_width: None,
         box_angle: None,
+        xform_anchor_key: None,
+        xform_anchor_custom: None,
         owner: None,
         brush: None,
         group: None,

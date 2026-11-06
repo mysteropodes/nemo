@@ -34,6 +34,12 @@ pub(crate) struct SubselectReadItem {
     /// an undo or a reload.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) box_angle: Option<f64>,
+    /// Hit-test listing only (#2372): the Select rotate/scale pivot stored on the record (baseline `serP` `xformAnchorKey` / `xformAnchorCustom`): one of the
+    /// nine preset points of the selection box, or a custom world point `[x, y]` that wins over the preset. Absent when the artist never moved it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) xform_anchor_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) xform_anchor_custom: Option<[f64; 2]>,
     /// Hit-test listing only: a linked fill's ribbon (same cell, same linkedFillId); Select resolves a fill to it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) owner: Option<String>,

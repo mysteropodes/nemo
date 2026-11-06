@@ -272,6 +272,8 @@ pub(crate) fn island_record(
                 linked_fill_id: Presence::Missing,
                 is_linked_fill_companion: Presence::Missing,
                 point_types: Presence::Missing,
+                xform_anchor_key: Presence::Missing,
+                xform_anchor_custom: Presence::Missing,
             })
         }
         _ => Presence::Missing,

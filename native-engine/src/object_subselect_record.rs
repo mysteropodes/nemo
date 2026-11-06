@@ -321,6 +321,18 @@ pub(crate) fn stored_box_angle(record: &ObjectRecord) -> Option<f64> {
         .and_then(serde_json::Number::as_f64)
         .filter(|a| a.is_finite() && *a != 0.0)
 }
+/// #2372 hit-test listing: the stored Select pivot preset (`xformAnchorKey`), if the record has one.
+pub(crate) fn stored_pivot_key(record: &ObjectRecord) -> Option<String> {
+    record.vector_ext.value().and_then(|e| e.xform_anchor_key.value()).cloned()
+}
+/// #2372 hit-test listing: the stored custom pivot (`xformAnchorCustom`, a world point), if the record has one.
+pub(crate) fn stored_pivot_custom(record: &ObjectRecord) -> Option<[f64; 2]> {
+    let point = record.vector_ext.value()?.xform_anchor_custom.value()?;
+    match point.as_slice() {
+        [x, y] => Some([x.as_f64()?, y.as_f64()?]),
+        _ => None,
+    }
+}
 /// #2372 hit-test listing: the record's `paramShape` (the declared intent of a dynamic rectangle, ellipse or star) without its generator `box`,
 /// which is the body `object.parametric.set` takes back; None for a record that has none.
 pub(crate) fn param_shape(record: &ObjectRecord) -> Option<serde_json::Value> {

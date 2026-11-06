@@ -4,7 +4,8 @@
 // sync-folder open-cancel/check) and `observe` returns the raw accessibility facts the oracle judges.
 // A person performs only what the helper cannot reach:
 //   * File > New (the helper's entry.* commands need an entry mode the installed batch does not set),
-//   * the colour swatch and its alpha (no colour command; judged from the helper's own window capture),
+//   * the colour swatch and its alpha (no colour command; judged from the helper's own window captures, with the swatch
+//     rectangle taken from the helper's accessibility frame, never from the person),
 //   * rebinding a shortcut and "Reset all" (no key capture, `shortcuts.reset` is denied by the helper).
 //   * the sync-owner clause (settings-sync-owner.cjs): choosing a shared folder in the native picker, Publish,
 //     Check, a Merge row and the failing Publish. The helper reaches only the empty-folder cancel/check, so a
@@ -33,6 +34,22 @@ const GUARD_TOAST = 'Profil "Producteur" : lecture seule + commentaires';
 const BRUSH = /^(Brush|Pinceau|ブラシ|Pincel)/, HAND = /^(Hand|Main|手のひら|Mano)/;
 const CAPTURES = { baseline: 'capture-11.png', opaque: 'capture-12.png', alpha: 'capture-13.png', restored: 'capture-14.png' };
 const OPAQUE = [0x33, 0x66, 0x99];
+const WELL = 'profile-color-well';
+// The element only one Settings pane renders (hidden panes are not in the accessibility tree): its presence names the pane.
+const ANCHOR = { General: 'profile-name', Updates: 'app-check-update', Collaboration: 'sync-folder-path', Feedback: 'fb-pull',
+  Figma: 'figma-token', Shortcuts: 'shortcuts-reset', Labs: 'labs-tools-list', About: 'app-version-txt-about' };
+// The baseline's completion text for an update check that finds no other profile (a hard-coded French string).
+const NONE = require('./settings-sync-owner.cjs').NONE;
+const textsOf = nodes => nodes.flatMap(n => [...(Array.isArray(n.labels) ? n.labels.map(String) : []), ...(typeof n.value === 'string' ? [n.value] : [])]);
+// The ground behind the swatch: four samples just outside its rectangle, which must agree (a plain panel), else unknown.
+function groundAround(image, well) {
+  const d = Math.max(3, Math.round(image.width / 200)), cx = well.x + (well.w >> 1), cy = well.y + (well.h >> 1);
+  const points = [[well.x - d, cy], [well.x + well.w + d, cy], [cx, well.y - d], [cx, well.y + well.h + d]];
+  if (points.some(([x, y]) => x < 0 || y < 0 || x >= image.width || y >= image.height)) return null;
+  const colours = points.map(([x, y]) => kit.meanColour(image, x, y));
+  const mean = [0, 1, 2].map(i => colours.reduce((t, c) => t + c[i], 0) / colours.length);
+  return colours.every(c => near(c, mean, 10)) ? mean : null;
+}
 
 const idOf = n => n?.identifiers?.resolved || n?.identifier || '';
 const byId = (nodes, id) => nodes.filter(n => idOf(n) === id);
@@ -100,14 +117,20 @@ function createWorkflow({ reportDirectory, sleep = ms => new Promise(resolve => 
       await openMenu();
       let n = await stable();
       if (!isOpen(n)) return fail('settings-entries-tabs', 'app menu Settings entry did not open the modal');
-      const panes = [];
+      const panes = [], unreadPanes = [];
       for (const tab of TABS) {
         await session.input('settings.tab', tab);
         n = await stable();
         if (!n.some(x => x.role === 'AXButton' && Array.isArray(x.labels) && x.labels.includes(tab))) return fail('settings-entries-tabs', 'tab button ' + tab + ' not observed');
         panes.push(labelsOf(n));
         if (panes.length > 1 && same(panes.at(-1), panes.at(-2))) return fail('settings-entries-tabs', 'tab ' + tab + ' did not change the pane');
+        // The pane itself, not just a changed label set: this tab's own element is there and no other tab's element is.
+        const shown = TABS.filter(t => byId(n, ANCHOR[t]).length > 0);
+        const other = shown.find(t => t !== tab);
+        if (other) return fail('settings-entries-tabs', 'tab ' + tab + ' showed the pane of ' + other);
+        if (!shown.includes(tab)) unreadPanes.push(tab);
       }
+      if (unreadPanes.length) reasons['settings-entries-tabs'] = 'the pane element of ' + unreadPanes.join(', ') + ' was not in the accessibility read';
       if (isOpen(await close())) return fail('settings-entries-tabs', 'close left the modal open');
       await openGear();
       if (!isOpen(await stable())) return fail('settings-entries-tabs', 'gear entry did not open the modal');
@@ -196,13 +219,29 @@ function createWorkflow({ reportDirectory, sleep = ms => new Promise(resolve => 
       await session.input('sync.complete');
       n = await stable();
       if (valueOf(n, 'sync-folder-path') !== '' || !isOpen(n)) return fail('sync-empty-folder', 'cancelling the folder picker changed the folder or closed Settings');
+      const noneBefore = textsOf(await observe()).some(t => t.includes(NONE));
       await session.input('sync.check-empty');
-      n = await stable();
-      if (valueOf(n, 'sync-folder-path') !== '' || labelsOf(n).some(l => LOADING.test(l))) return fail('sync-empty-folder', 'empty-folder check left a stale folder or a stuck search');
-      outcome['sync-empty-folder'] = 'pass';
+      // The check completes when the baseline's "no update from another profile" text appears and the search text is gone.
+      let loading = true, none = false;
+      for (let i = 0; i < 6; i++) {
+        n = await observe();
+        loading = labelsOf(n).some(l => LOADING.test(l)); none = textsOf(n).some(t => t.includes(NONE));
+        if (!loading && none) break;
+        if (!loading && i >= 2) break;
+        await sleep(1500);
+      }
+      if (valueOf(n, 'sync-folder-path') !== '' || loading) return fail('sync-empty-folder', 'empty-folder check left a stale folder or a stuck search');
+      if (none && !noneBefore) outcome['sync-empty-folder'] = 'pass';
+      else reasons['sync-empty-folder'] = none ? 'the completion text was already shown before the check, so it is not fresh' :
+        'the completion text of the empty-folder check was not read, so the check cannot be shown to have run';
 
       // 5 shortcuts-reset: label sets before rebind, after the person rebinds, after "Reset all"
+      // The baseline is taken AFTER a Reset all, never from whatever the tab held: an earlier row (frame-edit-ui binds
+      // Duplicate keyframe) may have left a binding, and Reset all restores the true defaults.
       await session.input('settings.tab', 'Shortcuts');
+      const first = await ask('shortcut-reset-first', 'In Settings > Shortcuts press "Reset all" (confirm if asked) so the tab shows the true defaults, whatever an earlier ' +
+        'step bound. Do not close Settings. Reply with {observation, productFailure}.');
+      if (first.productFailure) return fail('shortcuts-reset', 'the first Reset all reported failing');
       const defaults = labelsOf(await stable());
       const rebind = await ask('shortcut-rebind', 'In Settings > Shortcuts click the key box of "Insert frame" and press F8 so its binding changes. Do not close Settings. ' +
         'Reply with {observation, productFailure}.');
@@ -214,40 +253,56 @@ function createWorkflow({ reportDirectory, sleep = ms => new Promise(resolve => 
       if (!same(labelsOf(await stable()), defaults)) return fail('shortcuts-reset', 'reset did not return the Shortcuts tab to its defaults');
       outcome['shortcuts-reset'] = 'pass';
 
-      // 4 profile-color-alpha: three owned-window captures against the swatch the person located in the first
+      // 4 profile-color-alpha: owned-window captures the harness takes, against the swatch's own accessibility frame
       n = await general();
+      const wellOf = shot => { const m = byId(shot.nodes, WELL); return m.length === 1 ? kit.frameOf(m[0]) : null; };
       const shoot = async name => {
-        const r = await session.input('capture', name);
-        if (!plain(r) || r.capture !== name) throw malformed(ROW, name);
-        const image = kit.loadPng(kit.readInside(reportDirectory, name));
-        if (!image) throw malformed(ROW, name);
-        return image;
+        const r = await kit.shot(session, reportDirectory, name);
+        if (!r) throw malformed(ROW, name);
+        kit.privateEvidence(dir, 'shot-' + name.replace(/\.png$/, ''), { schema: 'nemo.settings-profile-private/1', sha256: r.sha256, bytes: r.bytes, stable: r.stable, window: r.window, well: wellOf(r) });
+        return r;
       };
-      const base = await shoot(CAPTURES.baseline);
-      const measure = await ask('profile-color-measure', 'Open the saved capture details.capturePath (the General tab with the profile colour swatch next to Name) and ' +
-        'measure, in pixels of that image, the swatch rectangle well {x,y,w,h} and one plain panel pixel backdrop {x,y} just outside it. Reply with ' +
-        '{observation, productFailure, rects: {well, backdrop}}.', { capturePath: path.join(reportDirectory, CAPTURES.baseline) });
-      const well = measure.rects?.well, back = measure.rects?.backdrop;
-      if (!kit.rectOk(base, well, 6, 6) || !plain(back) || !kit.int(back.x) || !kit.int(back.y) || back.x >= base.width || back.y >= base.height) throw malformed(ROW, 'profile-color-measure');
-      const centre = image => kit.meanColour(image, well.x + (well.w >> 1), well.y + (well.h >> 1));
-      const original = centre(base);
-      const setColour = async (phase, instruction, name) => {
-        const ev = await ask(phase, instruction + ' Leave Settings open on the General tab. Reply with {observation, productFailure}.');
-        if (ev.productFailure) return null;
-        return shoot(name);
-      };
-      const opaque = await setColour('profile-color-opaque', 'Click the colour swatch next to Name, set the colour to hex 336699 with alpha 100%, then close the picker.', CAPTURES.opaque);
-      if (!opaque) return fail('profile-color-alpha', 'setting the colour reported failing');
-      if (!near(centre(opaque), OPAQUE, 16)) return fail('profile-color-alpha', 'swatch is not the chosen opaque colour');
-      const translucent = await setColour('profile-color-alpha', 'Open the colour picker again and set the SAME hex 336699 but alpha 50%, then close the picker.', CAPTURES.alpha);
-      if (!translucent) return fail('profile-color-alpha', 'setting the alpha reported failing');
-      const solid = centre(opaque), half = centre(translucent), ground = kit.meanColour(translucent, back.x, back.y);
-      const blended = solid.map((v, i) => (v + ground[i]) / 2);
-      if (!near(half, blended, 16) || near(half, solid, 12)) return fail('profile-color-alpha', 'swatch does not show the half-transparent colour');
-      const restored = await setColour('profile-color-restore', 'Restore the swatch to its ORIGINAL colour and alpha (the one in the first capture), then close the picker.', CAPTURES.restored);
-      if (!restored) return fail('profile-color-alpha', 'restoring the colour reported failing');
-      if (!near(centre(restored), original, 10)) return fail('profile-color-alpha', 'original colour not restored');
-      outcome['profile-color-alpha'] = 'pass';
+      const base = await shoot(CAPTURES.baseline), wellFrame = base.stable && base.window ? wellOf(base) : null;
+      const well = wellFrame && kit.toPixels(base.image, base.window, wellFrame), ground0 = well && groundAround(base.image, well);
+      if (!well || !kit.rectOk(base.image, well, 6, 6) || !ground0) {
+        reasons['profile-color-alpha'] = !wellFrame ? 'the swatch has no accessibility frame in the helper read (or the capture was not stable)' :
+          'the swatch rectangle is too small or the panel around it is not plain, so its colour cannot be measured';
+      } else {
+        const sameWell = shot => shot.stable && shot.window && Math.abs(shot.window.w - base.window.w) < 1 && Math.abs(shot.window.h - base.window.h) < 1 &&
+          shot.image.width === base.image.width && shot.image.height === base.image.height && (() => { const f = wellOf(shot); return !!f && ['x', 'y', 'w', 'h'].every(k => Math.abs(f[k] - wellFrame[k]) <= 1); })();
+        const centre = image => kit.meanColour(image, well.x + (well.w >> 1), well.y + (well.h >> 1));
+        const original = centre(base.image);
+        const setColour = async (phase, instruction, name) => {
+          const ev = await ask(phase, instruction + ' Leave Settings open on the General tab. Reply with {observation, productFailure}.');
+          if (ev.productFailure) return { failed: true };
+          const r = await shoot(name);
+          return sameWell(r) ? { image: r.image } : { moved: true };
+        };
+        const colourSteps = [];
+        const run = async (phase, instruction, name) => { const r = await setColour(phase, instruction, name); colourSteps.push(r); return r; };
+        const opaque = await run('profile-color-opaque', 'Click the colour swatch next to Name, set the colour to hex 336699 with alpha 100%, then close the picker.', CAPTURES.opaque);
+        if (opaque.failed) return fail('profile-color-alpha', 'setting the colour reported failing');
+        if (opaque.moved) reasons['profile-color-alpha'] = 'the swatch moved or the capture was unstable after setting the colour';
+        else {
+          if (!near(centre(opaque.image), OPAQUE, 16)) return fail('profile-color-alpha', 'swatch is not the chosen opaque colour');
+          const translucent = await run('profile-color-alpha', 'Open the colour picker again and set the SAME hex 336699 but alpha 50%, then close the picker.', CAPTURES.alpha);
+          if (translucent.failed) return fail('profile-color-alpha', 'setting the alpha reported failing');
+          if (translucent.moved) reasons['profile-color-alpha'] = 'the swatch moved or the capture was unstable after setting the alpha';
+          else {
+            const solid = centre(opaque.image), half = centre(translucent.image), ground = groundAround(translucent.image, well);
+            if (!ground) reasons['profile-color-alpha'] = 'the panel around the swatch is not plain in the alpha capture';
+            else {
+              const blended = solid.map((v, i) => (v + ground[i]) / 2);
+              if (!near(half, blended, 16) || near(half, solid, 12)) return fail('profile-color-alpha', 'swatch does not show the half-transparent colour');
+              const restored = await run('profile-color-restore', 'Restore the swatch to its ORIGINAL colour and alpha (the one in the first capture), then close the picker.', CAPTURES.restored);
+              if (restored.failed) return fail('profile-color-alpha', 'restoring the colour reported failing');
+              if (restored.moved) reasons['profile-color-alpha'] = 'the swatch moved or the capture was unstable after the restore';
+              else if (!near(centre(restored.image), original, 10)) return fail('profile-color-alpha', 'original colour not restored');
+              else outcome['profile-color-alpha'] = 'pass';
+            }
+          }
+        }
+      }
 
       // 7 sync-owner-paths: the folder picker, Publish, Check, Merge and the failing Publish. A person clicks; the
       // oracle judges the disposable shared folder, the accessibility read and the document reads the harness makes itself.
@@ -268,7 +323,7 @@ function createWorkflow({ reportDirectory, sleep = ms => new Promise(resolve => 
         return finish(true);
       }
       if (isOpen(await stable())) return fail('settings-entries-tabs', 'backdrop did not dismiss Settings');
-      outcome['settings-entries-tabs'] = 'pass';
+      if (!unreadPanes.length) outcome['settings-entries-tabs'] = 'pass';
       return finish(failed);
     } catch (error) {
       // Keep what was established before an input refusal or unusable evidence; the batch still stops.

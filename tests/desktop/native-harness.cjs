@@ -8,9 +8,16 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { isDeepStrictEqual } = require('node:util');
 
+// A refusal raised by a check carries a fixed, reviewed message. The marker (not the message shape) is what lets a
+// caller quote it; any other error, even a plain Error with a short message, must not be echoed.
+const CHECK_REFUSAL = Symbol.for('nemo.desktop.requireCheck');
 function requireCheck(condition, message) {
-  if (!condition) throw new Error(message);
+  if (condition) return;
+  const error = new Error(message);
+  Object.defineProperty(error, CHECK_REFUSAL, { value: true });
+  throw error;
 }
+const isCheckRefusal = error => !!error && typeof error === 'object' && error[CHECK_REFUSAL] === true;
 
 function alive(pid, group = false) {
   if (!Number.isSafeInteger(pid) || pid <= 0) return false;
@@ -388,5 +395,5 @@ function finalizePlayObserver(instance) {
   return receipt;
 }
 
-module.exports = { requireCheck, alive, until, hash, packagedApp, createController, validateSnapshot, disjoint,
+module.exports = { requireCheck, isCheckRefusal, alive, until, hash, packagedApp, createController, validateSnapshot, disjoint,
   collectPlayObserver, finalizePlayObserver };

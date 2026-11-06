@@ -200,6 +200,19 @@
     return { status: 'applied', revision: out.revision };
   }
 
+  // The combine mode of the group the selection IS (baseline SMGroup.setGroupCombineMode from the group row of the right-click menu or a panel mode button).
+  async function doMode(host, mode) {
+    var c = await prepare(host, 1, '');
+    if (c.failed) return c;
+    var gid = activeGroup(c.info, c.ids);
+    if (!gid || ['unite', 'subtract', 'intersect', 'exclude'].indexOf(mode) < 0) return { status: 'noop' };
+    if (c.info.modes[gid] === mode) return { status: 'noop' };
+    var out = await commit(host, function () { return c.intent.setMode({ layerUid: c.layers.layerUid, contextId: c.context, groupId: gid, mode: mode }); }, 'Combine mode');
+    if (out.failed) return out;
+    reselect(host, c.original, await again(host, c));
+    return { status: 'applied', revision: out.revision };
+  }
+
   // One edit at a time: a second gesture waits for the first and reads the selection it left.
   function run(host, job) {
     if (!jobs.has(host)) jobs.set(host, Promise.resolve());
@@ -289,6 +302,6 @@
   }
   return Object.freeze({ members: members, adopt: adopt, widen: widen,
     native: native, group: function (host) { return run(host, doGroup); }, ungroup: function (host) { return run(host, doUngroup); },
-    removeMember: function (host) { return run(host, doRemove); }, flatten: function (host) { return run(host, doFlatten); },
+    removeMember: function (host) { return run(host, doRemove); }, setMode: function (host, mode) { return run(host, function (h) { return doMode(h, mode); }); }, flatten: function (host) { return run(host, doFlatten); },
     syncPanel: syncPanel, groupsInfo: groupsInfo, unitCount: unitCount, activeGroup: activeGroup });
 }));

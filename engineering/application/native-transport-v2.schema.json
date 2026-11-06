@@ -875,6 +875,29 @@
             ]
           },
           "description": "Optional per-vertex point-type hint aligned with geometry.segments; absent means inferred from the handles. Never on a pressure ribbon."
+        },
+        "xformAnchorKey": {
+          "enum": [
+            "tl",
+            "tc",
+            "tr",
+            "ml",
+            "mc",
+            "mr",
+            "bl",
+            "bc",
+            "br"
+          ],
+          "description": "The Select rotate/scale pivot preset the artist last chose for this stroke; a stored xformAnchorCustom wins over it."
+        },
+        "xformAnchorCustom": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/ObjectFiniteNumber"
+          },
+          "description": "The Select rotate/scale pivot as a custom world point [x, y]."
         }
       },
       "minProperties": 1,
@@ -22367,6 +22390,29 @@
             ]
           },
           "description": "Optional per-vertex point-type hint aligned with geometry.segments; absent means inferred from the handles. Never on a pressure ribbon."
+        },
+        "xformAnchorKey": {
+          "enum": [
+            "tl",
+            "tc",
+            "tr",
+            "ml",
+            "mc",
+            "mr",
+            "bl",
+            "bc",
+            "br"
+          ],
+          "description": "The Select rotate/scale pivot preset the artist last chose for this stroke; a stored xformAnchorCustom wins over it."
+        },
+        "xformAnchorCustom": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/ObjectFiniteNumber"
+          },
+          "description": "The Select rotate/scale pivot as a custom world point [x, y]."
         }
       },
       "minProperties": 1,
@@ -22592,6 +22638,29 @@
             ]
           },
           "description": "Optional per-vertex point-type hint aligned with geometry.segments; absent means inferred from the handles. Never on a pressure ribbon."
+        },
+        "xformAnchorKey": {
+          "enum": [
+            "tl",
+            "tc",
+            "tr",
+            "ml",
+            "mc",
+            "mr",
+            "bl",
+            "bc",
+            "br"
+          ],
+          "description": "The Select rotate/scale pivot preset the artist last chose for this stroke; a stored xformAnchorCustom wins over it."
+        },
+        "xformAnchorCustom": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/ObjectFiniteNumber"
+          },
+          "description": "The Select rotate/scale pivot as a custom world point [x, y]."
         }
       },
       "minProperties": 1,

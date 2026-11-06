@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { main, cli, refusalReason, EXIT_SUBSET_PASS } = require('../cs7-run.cjs');
+const { requireCheck } = require('../native-harness.cjs');
 const { DECLARATION_SCHEMA, selectRows, readyRows } = require('../cs7-runner.cjs');
 const identity = { sourceSha: 'a'.repeat(40), tree: 'b'.repeat(40), driverSha: 'c'.repeat(40),
   executableSha256: 'd'.repeat(64), sessionId: 'one-lifetime', pid: 123, dirty: false };
@@ -155,12 +156,16 @@ test('a refusal prints its check message and the no-acceptance sentence without 
 
 test('refusal reasons from non-check errors are reduced to class and code', async t => {
   const f = fixture(t), secret = 'SECRET-EVIDENCE-TOKEN';
-  assert.equal(refusalReason(new Error('clean frozen source required')), 'clean frozen source required');
+  const checked = message => { try { requireCheck(false, message); } catch (error) { return error; } };
+  assert.equal(refusalReason(checked('clean frozen source required')), 'clean frozen source required');
+  // Only an error raised by requireCheck is quoted: a plain Error with a short message (a scenario's prepare() or run code) is not.
+  assert.equal(refusalReason(new Error('clean frozen source required')), 'Error');
+  assert.equal(refusalReason(new Error(secret)), 'Error');
   const fsError = Object.assign(new Error("ENOENT: no such file or directory, open '/Users/example/" + secret + "'"), { code: 'ENOENT' });
   assert.equal(refusalReason(fsError), 'Error ENOENT');
   assert.equal(refusalReason(new SyntaxError('Unexpected token ' + secret)), 'SyntaxError');
-  assert.equal(refusalReason(new Error('path /private/' + secret)), 'Error');
-  assert.equal(refusalReason(new Error(secret.repeat(40))), 'Error');
+  assert.equal(refusalReason(checked('path /private/' + secret)), 'Error');
+  assert.equal(refusalReason(checked(secret.repeat(40))), 'Error');
   assert.equal(refusalReason(undefined), 'Error');
   const config = path.join(f.root, 'config.json'), err = [];
   fs.writeFileSync(config, '{"token": "' + secret + '", ');

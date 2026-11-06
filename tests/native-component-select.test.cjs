@@ -164,10 +164,19 @@ test('Delete leaves the key to other selections at the scene root and refuses wh
   w.root._sel = { frames: [] };
   assert.equal(take({ target: { tagName: 'INPUT' } }), null, 'typing in a field is not a delete');
   w.root.state.appMode = 'motion'; assert.equal(take(), null, 'Motion deletes keys'); w.root.state.appMode = 'anim2d';
-  w.root.selectedPaths[0].data.nativeBrush = 'copy';
-  assert.equal(await take(), 'refused');
-  assert.match(w.toasts.at(-1), /not available/);
-  assert.deepEqual(w.sent, []);
+  assert.deepEqual(w.sent, [], 'nothing was written by the keys that were left alone');
+});
+
+test('Delete of a texture anchor or a bitmap-brush anchor is one batch like any other: the engine takes the dabs and the companion image with it', async () => {
+  for (const brush of ['anchor', 'bitmap']) {
+    const w = world({ scene: true, items: [quad('scene-root', 'L1', 's', 10, 10, 30, 30)] });
+    const hit = await Intent.pick(w.root, 20, 20); Intent.applyPick(w.root, hit, false);
+    w.root.selectedPaths[0].data.nativeBrush = brush;
+    const outcome = await Delete.key(w.root, { key: 'Backspace', target: { tagName: 'DIV' }, preventDefault() {}, stopImmediatePropagation() {} });
+    assert.equal(outcome, 'applied', brush + ': ' + w.toasts.join('|'));
+    assert.deepEqual(w.sent.map((m) => m.request.payload.ops.map((o) => [o.op, o.stableTarget.strokeId])), [[['delete', 's']]], brush + ': one batch, one delete step');
+    assert.deepEqual(w.toasts, [], brush + ': no refusal');
+  }
 });
 
 test('Delete with nothing Select-picked INSIDE a component is refused with a notice: the legacy timeline Delete (placeholder rows) never sees the key', async () => {

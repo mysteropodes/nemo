@@ -185,4 +185,23 @@ fn a_record_with_vertex_offsets_lists_its_painted_bounds_and_the_offsets() {
     assert_ne!(before, after, "the bounds follow the moved vertex");
     // A sibling without vertex Motion is listed exactly as before.
     assert!(items.iter().filter(|i| i["role"] == "mask").all(|m| m.get("vertexOffsets").is_none()));
+=======
+#[test]
+fn the_listing_reads_back_the_stored_select_pivot_of_a_vector_record() {
+    let mut doc = masked_content();
+    let content = doc["objects"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|r| r["target"]["layerUid"] == "L0" && r["target"]["strokeId"] == "a")
+        .unwrap();
+    content["vectorExt"] = json!({"xformAnchorKey":"br","xformAnchorCustom":[12.5, -3]});
+    let items = listing(&doc).unwrap();
+    let item = items.iter().find(|i| i["stableTarget"]["strokeId"] == "a").unwrap();
+    assert_eq!(item["xformAnchorKey"], "br");
+    assert_eq!(item["xformAnchorCustom"], json!([12.5, -3.0]));
+    let plain = listing(&masked_content()).unwrap();
+    let item = plain.iter().find(|i| i["stableTarget"]["strokeId"] == "a").unwrap();
+    assert!(item.get("xformAnchorKey").is_none() && item.get("xformAnchorCustom").is_none(), "{item}");
+>>>>>>> origin/codex/native-remediation
 }
