@@ -409,6 +409,47 @@
             },
             "hasTimeLink": {
               "type": "boolean"
+            },
+            "markers": {
+              "description": "The layer's own markers in frame order, as printed while they fit the read (the baseline snap targets); absent without any.",
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "frame"
+                ],
+                "properties": {
+                  "frame": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32
+                  }
+                }
+              }
+            },
+            "effectKeys": {
+              "description": "Every frame with a key on the layer's effect stack, ascending and unique, as printed while they fit the read; absent without any.",
+              "type": "array",
+              "maxItems": 512,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "keyFrames": {
+              "description": "The frame of every key on the layer's own property holders (the layer and its elements), ascending, one entry per key and so repeated where keys share a frame, as printed while they fit the read; absent without any.",
+              "type": "array",
+              "maxItems": 512,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
             }
           }
         }
@@ -546,6 +587,15 @@
                                   },
                                   "value": {
                                     "type": "number"
+                                  },
+                                  "color": {
+                                    "description": "The key tint (#rrggbb or #rrggbbaa) when the key carries one.",
+                                    "type": "string",
+                                    "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                                  },
+                                  "hold": {
+                                    "description": "True when the key holds its value to the next key; absent otherwise.",
+                                    "const": true
                                   }
                                 }
                               }

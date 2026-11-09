@@ -101,8 +101,11 @@ impl ObjectCompositionWitness {
                     continue;
                 }
                 PaintEntry::Text(source) => {
-                    let style = self.plan().packet().text_records().find(|r| r.source_index() == source.source_index).and_then(|r| record::style::text(r.entry().block.color()));
-                    items.extend(self.text_hit_item(index, source).map(|item| SubselectReadItem { style, ..item }));
+                    let stored = self.plan().packet().text_records().find(|r| r.source_index() == source.source_index);
+                    let style = stored.as_ref().and_then(|r| record::style::text(r.entry().block.color()));
+                    // #2372: the stored Select pivot of the block.
+                    let (key, custom) = stored.as_ref().map_or((None, None), |r| (r.entry().block.pivot_key(), r.entry().block.pivot_custom()));
+                    items.extend(self.text_hit_item(index, source).map(|item| SubselectReadItem { style, xform_anchor_key: key, xform_anchor_custom: custom, ..item }));
                     continue;
                 }
                 _ => continue,
@@ -120,6 +123,20 @@ impl ObjectCompositionWitness {
             // #2356: the editable listing omits a record that has no editable points (a brush, textured or pressure stroke
             // whose anchors are refused) instead of failing the whole layer, so one such record never blocks vertex editing
             // of its neighbours; its per-item geometry read stays refused.
+            // The record as painted: the `vtxN` offsets of its element holder are in its bounds and matrix (and listed for the points).
+            let posed = if hit_test {
+                crate::evaluation::object_vector_kernels::render_vector_eval::vertex::vertex_posed(
+                    packet.snapshot(),
+                    r,
+                    packet.frame(),
+                )
+            } else {
+                None
+            };
+            let (r, vertex_offsets) = match &posed {
+                Some((posed, dense)) => (posed, Some(dense.clone())),
+                None => (r, None),
+            };
             let count = if hit_test {
                 r.geometry.segments.len()
             } else {
@@ -155,6 +172,8 @@ impl ObjectCompositionWitness {
                 filled: hit_test.then(|| r.solid_fill().is_some() || r.fill_gradient().is_some()),
                 stroke_width: hit_test.then(|| record::painted_stroke_width(r)),
                 box_angle: if hit_test { record::stored_box_angle(r) } else { None },
+                xform_anchor_key: if hit_test { record::stored_pivot_key(r) } else { None },
+                xform_anchor_custom: if hit_test { record::stored_pivot_custom(r) } else { None },
                 owner: (hit_test && record::hit_role(r) == "fill")
                     .then(|| record::linked_fill(r))
                     .flatten()
@@ -175,6 +194,7 @@ impl ObjectCompositionWitness {
                 style: if hit_test { record::style::listed(r) } else { None },
                 param_shape: if hit_test { record::param_shape(r) } else { None },
                 group_path: None,
+                vertex_offsets,
             });
         }
         flush(&mut items, usize::MAX);
@@ -216,12 +236,15 @@ fn mask_item(r: &crate::object_frame_packet::ObjectRecord, matrix: [f64; 6], fea
         filled: Some(r.geometry.closed),
         stroke_width: Some(0.0),
         box_angle: None,
+        xform_anchor_key: None,
+        xform_anchor_custom: None,
         owner: None,
         brush: None,
         group: None,
         style: record::style::mask(r.mask_mode(), feather),
         param_shape: None,
         group_path: None,
+        vertex_offsets: None,
     }
 }
 
@@ -248,11 +271,20 @@ impl ObjectCompositionWitness {
         let (sin, cos) = rect.rotation.to_radians().sin_cos();
         let (kx, ky) = (rect.width / w, rect.height / h);
         let (a, b, c, d) = (cos * kx, sin * kx, -sin * ky, cos * ky);
-        let matrix = [a, b, c, d, fx - (a * cx + c * cy), fy - (b * cx + d * cy)];
+        let mut matrix = [a, b, c, d, fx - (a * cx + c * cy), fy - (b * cx + d * cy)];
+        // #2372: a stored mirror / shear is part of the item's own frame: the world affine the scene applies about the final centre.
+        if let Some(g) = record.entry().item.local_form().world([fx, fy], rect.rotation) {
+            matrix = after(g, matrix);
+        }
         let bounds = [cx - w / 2.0, cy - h / 2.0, cx + w / 2.0, cy + h / 2.0];
         (bounds.iter().chain(&matrix).all(|v| v.is_finite()) && w > 0.0 && h > 0.0 && rect.width > 0.0 && rect.height > 0.0)
             .then(|| hit_item(target, bounds, matrix, "raster"))
-            .map(|item| SubselectReadItem { style: record::style::raster(record.entry().item.opacity()), ..item })
+            .map(|item| SubselectReadItem {
+                style: record::style::raster(record.entry().item.opacity()),
+                xform_anchor_key: record.entry().item.pivot_key(),
+                xform_anchor_custom: record.entry().item.pivot_custom(),
+                ..item
+            })
     }
     fn text_hit_item(
         &self,
@@ -269,6 +301,7 @@ impl ObjectCompositionWitness {
             .find(|r| r.source_index() == source.source_index)?;
         let target = record.entry().target.clone();
         let turn = record.entry().block.rotation();
+        let form = record.entry().block.local_form();
         // The block's painted glyph and decoration contours are already in world space; its record space is the stored anchor's
         // own frame, which the layer's parent chain carries to the world. An unposed layer keeps the identity (and the world box).
         let b = source.item.scene().contours().iter().fold(
@@ -276,10 +309,11 @@ impl ObjectCompositionWitness {
             |b, c| [b[0].min(c.envelope[0]), b[1].min(c.envelope[1]), b[2].max(c.envelope[2]), b[3].max(c.envelope[3])],
         );
         let chain = subselect::layer_chain(&self.plan().native_parent_chains(), layer).ok();
-        if turn != 0.0 {
+        if turn != 0.0 || !form.is_identity() {
             // #2267: a turned block's record space is its stored (unturned) frame about the anchor; the matrix is the turn then the layer's
             // chain, and the bounds are the contours' extent in that frame, so a client's conjugated gesture is what the batch applies.
-            return turned_text_item(target, source.item.scene().contours(), record.entry().block.anchor(), turn, chain.unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
+            // #2372: the stored mirror and shear are part of the same map about the anchor.
+            return turned_text_item(target, source.item.scene().contours(), record.entry().block.anchor(), crate::evaluation::object_item_local_form::mul(crate::evaluation::object_item_local_form::turn(turn), form.linear()), chain.unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
         }
         let (bounds, matrix) = match chain {
             Some(m) if m != [1.0, 0.0, 0.0, 1.0, 0.0, 0.0] => {
@@ -320,11 +354,10 @@ fn turned_text_item(
     target: crate::object_frame_packet::text::ObjectTarget,
     contours: &[crate::object_render_scene::text_glyph_scene_kernels::text_glyph_scene::SceneContour],
     anchor: [f64; 2],
-    degrees: f64,
+    lin: [f64; 4],
     layer: [f64; 6],
 ) -> Option<SubselectReadItem> {
-    let (sin, cos) = degrees.to_radians().sin_cos();
-    let turn = [cos, sin, -sin, cos, anchor[0] - cos * anchor[0] + sin * anchor[1], anchor[1] - sin * anchor[0] - cos * anchor[1]];
+    let turn = [lin[0], lin[1], lin[2], lin[3], anchor[0] - (lin[0] * anchor[0] + lin[2] * anchor[1]), anchor[1] - (lin[1] * anchor[0] + lin[3] * anchor[1])];
     let m = after(layer, turn);
     let det = m[0] * m[3] - m[1] * m[2];
     if !det.is_finite() || det.abs() < 1e-12 {
@@ -355,12 +388,15 @@ fn hit_item(
         filled: Some(true),
         stroke_width: None,
         box_angle: None,
+        xform_anchor_key: None,
+        xform_anchor_custom: None,
         owner: None,
         brush: None,
         group: None,
         style: None,
         param_shape: None,
         group_path: None,
+        vertex_offsets: None,
     }
 }
 

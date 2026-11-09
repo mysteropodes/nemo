@@ -8,7 +8,7 @@
  * a spatial key handle (hIn / hOut) on any frame (`setKeyHandle`). A parented layer is drawn and dragged through its ancestors' `parentAffine`; the
  * Position path is sampled once per frame through each key's easing. Inside an entered component the gizmo follows the component's own layer (the held context id on every read and on the edit); several selected layers draw nothing and take no
  * gesture, except that the effector handles of a duplicator layer (a crosshair and a falloff ring each, grabbed last, even on the layer the duplicator
- * locks) move one effector anchor through ONE `object.duplicator.config` `effectorPos` edit, a static setting and never a key; a layer the native read cannot box (text, effect, rig, 3D, expression) says so once in a notice instead of staying silent. The pointer listeners stay on `document` in the capture phase (CLAUDE.md section 13). This file never reads or writes a JS layer record. */
+ * locks) move one effector anchor through ONE `object.duplicator.config` `effectorPos` edit, a static setting and never a key; a layer the native read cannot box (a text layer) says so once in a notice instead of staying silent. The pointer listeners stay on `document` in the capture phase (CLAUDE.md section 13). This file never reads or writes a JS layer record. */
 (function (root, factory) {
   const CJS = typeof module === 'object' && module.exports;
   const api = factory(CJS ? require('./native-motion-canvas-math.js') : root.NemoNativeMotionCanvasMath, CJS ? require('./native-motion-effector.js') : root.NemoNativeMotionEffector,
@@ -23,7 +23,7 @@
   const SVG = 'http://www.w3.org/2000/svg', PIN = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   const HANDLE = 'rgba(255,184,108,.9)', BLUE = 'rgba(74,158,255,.86)', RING = 'rgba(74,158,255,.67)', PATH = 'rgba(120,170,255,.8)', WHITE = 'rgba(255,255,255,1)', ACCENT = 'rgba(255,184,108,1)', DOT = 'rgba(230,230,230,1)', CUR = 'rgba(255,170,40,1)';
   const THRESHOLD = 3, MAX_KEY_PAGES = 4, MAX_FRAME_DOTS = 120, round = (v) => Math.round(v * 1e6) / 1e6;
-  const UNBOXED = 'The Motion box is not available for this layer on a native project (text, effect, rig and expression-driven layers have none yet). Use the property fields.';
+  const UNBOXED = 'The Motion box is not available for this layer on a native project (text layers have none yet). Use the property fields.';
 
   function create(win) {
     let cached = null, noticed = '', serial = 0, drag = null, busy = false, overlay = null, queued = false, watching = false, signature = '';
@@ -43,6 +43,8 @@
     function targetOf(proof) {
       const st = win.state, sel = win._layerSel, held = heldNow();
       if (!motion() || (st.activeSymbolId && !held) || (Array.isArray(sel) && sel.length > 1)) return null;
+      const E = win.NemoNativeMotionElement; // a shape targeted inside its entered group (double-click) has its own box (the select overlay), not the layer's gizmo
+      if (E && E.isolated(win)) return null;
       const layers = held ? held.rows : proof.info.layers, layer = layers && layers[st.activeLayerIdx];
       return layer && layer.visible !== false && typeof layer.layerUid === 'string' ? layer : null;
     }
@@ -62,11 +64,17 @@
       const one = (view) => s.readProperty(selector(proof.info, view));
       const raw = (property) => one({ kind: 'rawSample', target, property, frame }).then((r) => r.value);
       const effectors = effectorsOf(proof, layer).catch(() => []);
-      let geo;
+      let geo, refusal;
       try { geo = await one({ kind: 'layerBounds', target, frame }); } catch (error) {
+        refusal = error;
+        // A text layer: the native read refuses it, the glyph-run bounds come from the hit-test listing (native-motion-text-bounds.js).
+        const T = win.NemoNativeMotionTextBounds, text = error && error.code === 'unavailable' && T ? await T.read(win, proof, layer).catch(() => null) : null;
+        if (text) geo = { bounds: text.bounds, parentAffine: text.parentAffine };
+      }
+      if (!geo) {
         // A duplicator host with no geometry of its own (and no parent whose map it would need) still offers its effector handles.
-        const list = error && error.code === 'unavailable' && layer.hasDuplicator === true && !layer.parentLayerUid ? await effectors : [];
-        if (!list.length) throw error;
+        const list = refusal && refusal.code === 'unavailable' && layer.hasDuplicator === true && !layer.parentLayerUid ? await effectors : [];
+        if (!list.length) throw refusal;
         return { layerUid: layer.layerUid, locked: layer.locked === true, outer: Eff.IDENTITY.slice(), bounds: null, keys: [], effectors: list };
       }
       const [position, anchor, rotation, scale] = await Promise.all([raw('position'), raw('anchor'), raw('rotation'), raw('scale')]);

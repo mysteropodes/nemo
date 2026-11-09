@@ -180,25 +180,28 @@
       }
     }
     // #2255: the rig of one layer at the presented frame, read part by part in the bounded pages of the one rig view. `parts` names the
-    // lists wanted (bones, vertices, chains, binds, bound); `weights` is one vertex of one bind and has its own call. A reason (`unavailable`)
-    // replaces every list: nothing is guessed.
-    const RIG_CAPS = { bones: 8, vertices: 16, chains: 8, binds: 8, bound: 64, weights: 8 };
-    async function pageRig(o, selector, part, bind, vertex) {
-      let cursor = 0, total = null, items = [], unavailable = null;
+    // lists wanted (bones, vertices, chains, binds, bound, posed); `weights` is one vertex of one bind and has its own call. A reason (`unavailable`)
+    // replaces every list: nothing is guessed. `matrix` is the layer-to-world affine of a layer with Motion (null: the identity); a `preview` (a
+    // held pose drag) answers every part from the candidate rig it names, publishing nothing.
+    const RIG_CAPS = { bones: 8, vertices: 16, chains: 8, binds: 8, bound: 64, weights: 8, posed: 24 };
+    async function pageRig(o, selector, part, bind, vertex, preview) {
+      let cursor = 0, total = null, items = [], unavailable = null, matrix = null;
       for (;;) {
         const view = { kind: 'rig', contextId: selector.contextId, frame: selector.frame, workId: o.workId, viewGeneration: o.viewGeneration,
           layerUid: selector.layerUid, part: part, bind: bind, vertex: vertex, cursor: cursor, limit: RIG_CAPS[part] };
+        if (preview) view.preview = preview;
         const r = await queryBody(o, { atRevision: o.info.contentRevision, documentSnapshotId: o.info.documentSnapshotId, view: view });
         if (total !== null && total !== r.total) throw fault('uncorrelated', 'Rig list changed between pages', 'rig_page_total');
         total = r.total; items = items.concat(r.items); unavailable = r.unavailable;
+        if (cursor === 0) matrix = r.matrix;
         if (r.nextCursor === null) break;
         if (r.nextCursor <= cursor) throw fault('uncorrelated', 'Rig page cursor made no progress', 'rig_page_stale');
         cursor = r.nextCursor;
       }
       if (items.length !== total) throw fault('uncorrelated', 'Rig list is incomplete', 'rig_page_incomplete');
-      return { items: items, unavailable: unavailable };
+      return { items: items, unavailable: unavailable, matrix: matrix };
     }
-    async function readRigParts(selector, pin, parts, bind, vertex) {
+    async function readRigParts(selector, pin, parts, bind, vertex, preview) {
       if (!exact(selector, ['contextId', 'frame', 'layerUid'], []) || selector.contextId !== 'scene-root' || !integer(selector.frame, 0, 4294967295) ||
         typeof selector.layerUid !== 'string' || !selector.layerUid || !pins(pin) || !Array.isArray(parts) || !parts.length || !parts.every((p) => own(RIG_CAPS, p)))
         throw fault('invalid_request', 'Rig selector is invalid', 'local_validation');
@@ -206,16 +209,17 @@
       if (!o) throw fault('unavailable', 'No matching presented native rig view', 'rig_view_unavailable');
       await settle(o);
       const out = {};
-      let unavailable = null;
+      let unavailable = null, matrix = null;
       for (const part of parts) {
-        const page = await pageRig(o, selector, part, bind, vertex);
+        const page = await pageRig(o, selector, part, bind, vertex, preview);
         out[part] = page.items;
+        if (page.matrix) matrix = page.matrix;
         if (page.unavailable) { unavailable = page.unavailable; break; }
       }
       requireCurrent(o);
-      return freeze({ info: copyPins(o.info), presentation: o.presentation, layerUid: selector.layerUid, unavailable: unavailable, parts: freeze(out) });
+      return freeze({ info: copyPins(o.info), presentation: o.presentation, layerUid: selector.layerUid, unavailable: unavailable, matrix: matrix, parts: freeze(out) });
     }
-    const readRig = (selector, pin, parts) => readRigParts(selector, pin, parts, 0, 0);
+    const readRig = (selector, pin, parts, preview) => readRigParts(selector, pin, parts, 0, 0, preview);
     const readRigWeights = (selector, pin, bind, vertex) => (integer(bind, 0, 4294967295) && integer(vertex, 0, 4294967295)
       ? readRigParts(selector, pin, ['weights'], bind, vertex) : Promise.reject(fault('invalid_request', 'Rig weight selector is invalid', 'local_validation')));
     // #2255: every widget layer of the presented frame (pad, puck, rest, axes), read in bounded pages of the one widget view.
@@ -361,7 +365,8 @@
         if(typeof wanted==='function'&&!wanted(item))continue;
         const geometry=await geometryOf(item,false);
         if(geometry.closed!==item.closed||geometry.segments.length!==item.count)throw fault('uncorrelated','Presented geometry differs from its listing');
-        item.segments=geometry.segments;
+        // The record as PAINTED: its `vtxN` Motion offsets (listed by the engine) move the anchor points, never the handles.
+        item.segments=Array.isArray(item.vertexOffsets)&&item.vertexOffsets.length===geometry.segments.length?geometry.segments.map((a,i)=>({point:[a.point[0]+item.vertexOffsets[i][0],a.point[1]+item.vertexOffsets[i][1]],handleIn:a.handleIn,handleOut:a.handleOut})):geometry.segments;
         if(centres&&item.role==='ribbon'){const c=await geometryOf(item,true);
           item.center=c.segments.map((a,i)=>({point:a.point,handleIn:a.handleIn,handleOut:a.handleOut,width:c.widths[i]}));}
       }
@@ -411,7 +416,10 @@
           r.cells.runs.length && r.cells.runs[0][0] === frame)) return null;
         if (view === 'range') {
           const range = r.range, fields = ['rawInPoint', 'rawOutPoint', 'inPoint', 'outPoint', 'hasCustomRange', 'hasTimeLink'];
-          if (r.kind !== 'layerRange' || !object(range) || Object.keys(range).length !== 6 || !fields.every((k) => own(range, k)) ||
+          if (r.kind !== 'layerRange' || !object(range) || !Object.keys(range).every((k) => fields.includes(k) || k === 'markers' || k === 'effectKeys' || k === 'keyFrames') || !fields.every((k) => own(range, k)) ||
+            !(!own(range, 'markers') || Array.isArray(range.markers) && range.markers.length <= 64 && range.markers.every((m) => object(m) && Number.isSafeInteger(m.frame) && m.frame >= 0 && Object.keys(m).every((k) => k === 'frame' || k === 'name') && (!own(m, 'name') || typeof m.name === 'string' && m.name.length >= 1 && m.name.length <= 32))) ||
+            !(!own(range, 'keyFrames') || Array.isArray(range.keyFrames) && range.keyFrames.length <= 512 && range.keyFrames.every((f) => Number.isSafeInteger(f) && f >= 0)) ||
+            !(!own(range, 'effectKeys') || Array.isArray(range.effectKeys) && range.effectKeys.length <= 512 && range.effectKeys.every((f) => Number.isSafeInteger(f) && f >= 0)) ||
             !fields.slice(0, 4).every((k) => finite(range[k])) || typeof range.hasCustomRange !== 'boolean' || typeof range.hasTimeLink !== 'boolean') return null;
         }
         return freeze(view ? JSON.parse(JSON.stringify(r)) : Object.assign({}, r));

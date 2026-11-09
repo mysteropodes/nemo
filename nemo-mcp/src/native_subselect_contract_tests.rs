@@ -225,6 +225,17 @@ fn a_hit_test_listing_and_geometry_carry_bounds_and_role_without_preview() {
         item["items"][0]["boxAngle"] = bad.clone();
         assert!(!public_read(&q, &item), "boxAngle {bad} is refused");
     }
+    // #2372: the stored Select pivot is an optional preset name and/or a finite world point.
+    for (key, good, bad) in [("xformAnchorKey", json!("br"), vec![json!("zz"), json!(3), json!(null)]), ("xformAnchorCustom", json!([12.5, -3]), vec![json!([1]), json!("1,2"), json!([1, null]), json!(null)])] {
+        let mut item = r.clone();
+        item["items"][0][key] = good.clone();
+        assert!(public_read(&q, &item), "{key} {good} is legal in a hit-test listing");
+        for bad in bad {
+            let mut item = r.clone();
+            item["items"][0][key] = bad.clone();
+            assert!(!public_read(&q, &item), "{key} {bad} is refused");
+        }
+    }
     // #2372 insp-parametric: a dynamic shape lists its kind and the members that kind owns (finite), never the generator box.
     for good in [json!({"kind":"rect","tl":4,"tr":4.5,"br":0,"bl":0}), json!({"kind":"ellipse","startAngle":10,"sweep":359.9,"innerRadius":0.25}),
         json!({"kind":"star","pointCount":5,"innerRatio":0.5,"cornerRadius":0}), json!({"kind":"rect"})] {

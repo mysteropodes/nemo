@@ -33,6 +33,11 @@ fn raster(value: &Value) -> bool {
         &[
             "opacity",
             "rotation",
+            "flipX",
+            "flipY",
+            "skew",
+            "xformAnchorKey",
+            "xformAnchorCustom",
             "isBitmapBrush",
             "brushGroupId",
             "isBrushTextureCopy",
@@ -46,11 +51,18 @@ fn raster(value: &Value) -> bool {
             && positive(o.get("width"))
             && positive(o.get("height"))
             && o.get("rotation").is_none_or(|n| finite(Some(n)))
+            && o.get("skew").is_none_or(|n| finite(Some(n)) && n.as_f64().is_some_and(|d| d.abs() < 90.0))
             && o.get("opacity").is_none_or(|n| {
                 n.as_f64()
                     .is_some_and(|n| n.is_finite() && (0.0..=1.0).contains(&n))
             })
-            && ["isBitmapBrush", "isBrushTextureCopy"]
+            && o.get("xformAnchorKey").is_none_or(|k| {
+                k.as_str().is_some_and(|k| ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"].contains(&k))
+            })
+            && o.get("xformAnchorCustom").is_none_or(|p| {
+                p.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(|n| n.as_f64().is_some_and(f64::is_finite)))
+            })
+            && ["isBitmapBrush", "isBrushTextureCopy", "flipX", "flipY"]
                 .iter()
                 .all(|k| o.get(*k).is_none_or(Value::is_boolean))
             && ["brushGroupId", "meshId"]

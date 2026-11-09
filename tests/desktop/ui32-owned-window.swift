@@ -246,6 +246,11 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
         if let enabled=attr(node,kAXEnabledAttribute) as? Bool { fact["enabled"]=enabled }
         if let selected=attr(node,kAXSelectedAttribute) as? Bool { fact["selected"]=selected }
         if let focused=attr(node,kAXFocusedAttribute) as? Bool { fact["focused"]=focused }
+        // Window-relative frame (points) and DOM classes: the harness takes rectangles and control state from these, never from a person.
+        if let at=xy(node), let size=wh(node), let base=xy(main), size.width > 0, size.height > 0 {
+          fact["frame"]=["x":Double(at.x-base.x),"y":Double(at.y-base.y),"w":Double(size.width),"h":Double(size.height)]
+        }
+        if let classes=attr(node,"AXDOMClassList") as? [String] { fact["classes"]=classes.prefix(12).map {String($0.prefix(40))} }
         facts.append(fact)
       }
       try identity()
@@ -258,6 +263,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
              "reportedParentRole":certificate.roles[certificate.reported[i]!],"insideContent":false]
           },"wholeWindowReciprocity":"not claimed; outside mismatches retained"]
       }
+      if let extent=wh(main) { result["windowSize"]=["w":Double(extent.width),"h":Double(extent.height)] }
       observed=true; result["nodes"]=facts; result["baselineObserved"]=true; try emit(result); continue
     }
     if command == "capture" {

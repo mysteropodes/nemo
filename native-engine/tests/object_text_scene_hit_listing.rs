@@ -400,12 +400,15 @@ fn worst_case_items(count: usize, id_len: usize) -> Vec<crate::object_snapshot::
                 filled: Some(true),
                 stroke_width: Some(t * 3.0),
                 box_angle: Some(t * 17.0),
+                xform_anchor_key: None,
+                xform_anchor_custom: None,
                 owner: None,
                 brush: None,
                 group: None,
                 style: None,
                 param_shape: None,
                 group_path: None,
+                vertex_offsets: None,
             }
         })
         .collect()

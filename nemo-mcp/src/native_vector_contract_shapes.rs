@@ -213,6 +213,8 @@ fn extension(value: &Value, has_stroke: bool) -> bool {
             "brushTexture",
             "shadow",
             "isFillShape",
+            "xformAnchorKey",
+            "xformAnchorCustom",
         ],
     )
     .is_some_and(|object| {
@@ -225,6 +227,8 @@ fn extension(value: &Value, has_stroke: bool) -> bool {
                 .is_none_or(|v| pressure(v) && !has_stroke)
             && object.get("paramShape").is_none_or(|v| shape(v, false))
             && object.get("boxAngle").is_none_or(finite)
+            && object.get("xformAnchorKey").is_none_or(|k| k.as_str().is_some_and(|k| ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"].contains(&k)))
+            && object.get("xformAnchorCustom").is_none_or(|p| p.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(finite)))
             && object.get("linkedFillId").is_none_or(|value| {
                 value.as_str().is_some_and(|id| {
                     !id.is_empty() && id.len() <= 128 && !id.chars().any(char::is_control)

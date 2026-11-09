@@ -301,17 +301,7 @@ fn a_transform_an_item_cannot_store_refuses_the_whole_batch() {
     let mut owner = owner_of(&with_items());
     let before = state(&owner);
     for (name, ops) in [
-        ("shear", vec![reshape("img", [1., 0., 0.5, 1., 0., 0.])]),
-        ("mirror", vec![reshape("img", [-1., 0., 0., 1., 0., 0.])]),
         ("singular", vec![reshape("img", [1., 2., 2., 4., 0., 0.])]),
-        (
-            "sheared-text",
-            vec![reshape("txt", [1., 0., 0.5, 1., 0., 0.])],
-        ),
-        (
-            "mirrored-text",
-            vec![reshape("txt", [-1., 0., 0., 1., 0., 0.])],
-        ),
         (
             "twice",
             vec![
@@ -323,7 +313,7 @@ fn a_transform_an_item_cannot_store_refuses_the_whole_batch() {
             "good-then-bad",
             vec![
                 reshape("s-a", [1., 0., 0., 1., 1., 0.]),
-                reshape("txt", [1., 0., 0.5, 1., 0., 0.]),
+                reshape("txt", [1., 2., 2., 4., 0., 0.]),
             ],
         ),
         ("absent", vec![reshape("nope", [1., 0., 0., 1., 1., 0.])]),

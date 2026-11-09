@@ -5,6 +5,9 @@
  * groupSelection / ungroupSelection / removeMemberFromGroup / flattenGroup) are decided by the engine owner - units not shapes, the outermost
  * level dissolves, a group left below two entries dissolves, a flatten bakes the combined outline and drops the subtree - so no Paper / ld.groups
  * writer is reached from here. The group state of the selection is READ from the native listing (the groupPath of each listed record).
+ * A click on any member of a vector group selects the whole group (baseline select-bridge.js :1655 SMGroup.membersOf of the clicked item; a Shift click on a
+ * selected member removes the whole group): `members` reads the root group's members from the layer listing, `adopt` applies the rule to the pick that
+ * just happened, and `widen` does both for a click. A press that becomes a drag widens before the drag starts (native-select-gesture.js).
  * This module holds no document state: the selection is read again at the presented revision before every request, and a refusal, a stale
  * selection or an absent owner is a notice and a resolved status, never a throw. */
 (function (root, factory) {
@@ -197,6 +200,19 @@
     return { status: 'applied', revision: out.revision };
   }
 
+  // The combine mode of the group the selection IS (baseline SMGroup.setGroupCombineMode from the group row of the right-click menu or a panel mode button).
+  async function doMode(host, mode) {
+    var c = await prepare(host, 1, '');
+    if (c.failed) return c;
+    var gid = activeGroup(c.info, c.ids);
+    if (!gid || ['unite', 'subtract', 'intersect', 'exclude'].indexOf(mode) < 0) return { status: 'noop' };
+    if (c.info.modes[gid] === mode) return { status: 'noop' };
+    var out = await commit(host, function () { return c.intent.setMode({ layerUid: c.layers.layerUid, contextId: c.context, groupId: gid, mode: mode }); }, 'Combine mode');
+    if (out.failed) return out;
+    reselect(host, c.original, await again(host, c));
+    return { status: 'applied', revision: out.revision };
+  }
+
   // One edit at a time: a second gesture waits for the first and reads the selection it left.
   function run(host, job) {
     if (!jobs.has(host)) jobs.set(host, Promise.resolve());
@@ -252,8 +268,40 @@
     }, function () { if (token === st.token) st.key = null; });
   }
 
-  return Object.freeze({
+  // ---- a click on a member selects the whole group (baseline membersOf) ----------------------------------------------------------------------
+  // The members of the OUTERMOST group `item` sits in (the layer's own listing, paint order), as fresh presented paths; null when it is in no group or the read failed.
+  async function members(host, item) {
+    var I = host.NemoSelectCanvasIntent, top = item && item.data && Array.isArray(item.data.nativeGroupPath) && item.data.nativeGroupPath[0];
+    if (!I || !top || !Number.isInteger(item.data.nativeLayerIndex)) return null;
+    var found = null;
+    try {
+      found = await I.layerPaths(host, function (it) {
+        var gp = it.groupPath; return !(it.role === 'fill' && it.owner) && it.brush !== 'copy' && Array.isArray(gp) && !!gp[0] && gp[0].id === top.id;
+      }, false, item.data.nativeLayerIndex);
+    } catch (_) { found = null; }
+    return found && found.paths.length > 1 ? found.paths : null;
+  }
+  // The pick of `item` (already applied by applyPick) widened to its group: a pick that selected it brings its siblings, a Shift pick that removed it takes them away.
+  function adopt(host, item, shift, group) {
+    var ids = group.map(function (p) { return p.data.strokeId; }), now = host.selectedPaths || [], kept = shift ? now.filter(function (p) { return ids.indexOf(p.data.strokeId) < 0; }) : [];
+    var held = now.some(function (p) { return p.data.strokeId === item.data.strokeId; });
+    if (shift && !held) host.selectedPaths = kept; // the Shift pick removed the member: the whole group goes
+    else host.selectedPaths = kept.concat(group);
+    host.state.selectedStrokeIndices = [];
+    if (host.NemoNativeSelectOverlay) host.NemoNativeSelectOverlay.show(host);
+    if (typeof host.updateUI === 'function') host.updateUI();
+    if (host.SMEngineBridge && typeof host.SMEngineBridge.renderNow === 'function') host.SMEngineBridge.renderNow();
+  }
+  // A click: read the group, and adopt it only while the pick it belongs to still holds (the tool, frame, layer and revision did not move on, the selection is still that pick's).
+  async function widen(host, item, shift) {
+    var I = host.NemoSelectCanvasIntent, ctx = I && I.pickContext(host), stamp = host.selectedPaths;
+    var group = await members(host, item);
+    if (!group || !I || I.pickContext(host) !== ctx || host.selectedPaths !== stamp) return false;
+    adopt(host, item, shift, group);
+    return true;
+  }
+  return Object.freeze({ members: members, adopt: adopt, widen: widen,
     native: native, group: function (host) { return run(host, doGroup); }, ungroup: function (host) { return run(host, doUngroup); },
-    removeMember: function (host) { return run(host, doRemove); }, flatten: function (host) { return run(host, doFlatten); },
+    removeMember: function (host) { return run(host, doRemove); }, setMode: function (host, mode) { return run(host, function (h) { return doMode(h, mode); }); }, flatten: function (host) { return run(host, doFlatten); },
     syncPanel: syncPanel, groupsInfo: groupsInfo, unitCount: unitCount, activeGroup: activeGroup });
 }));

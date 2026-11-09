@@ -39,7 +39,7 @@
     candidates.forEach((c) => { const dist = Math.abs(c.frame - frame); if (dist <= reach && (!best || dist < best.dist)) best = { frame: c.frame, label: c.label, dist }; });
     return best;
   }
-  /* The frames a drag may snap to, first label wins per frame: playhead, work area, composition markers, then the keys that stay. */
+  /* The frames a drag may snap to, first label wins per frame: playhead, work area, composition markers, then the keys that stay, then view.extra. */
   function snapCandidates(host, view, total) {
     const byFrame = new Map();
     const add = (frame, label) => { const f = Math.round(Number(frame)); if (Number.isFinite(f) && f >= 0 && f < total && !byFrame.has(f)) byFrame.set(f, label); };
@@ -47,6 +47,8 @@
     add(state.currentFrame, 'Tête de lecture'); add(state.waIn, 'Début zone'); add(state.waOut, 'Fin zone');
     try { const list = host.SM && host.SM.markers && typeof host.SM.markers.list === 'function' ? host.SM.markers.list() : []; (Array.isArray(list) ? list : []).forEach((m) => add(m && m.frame, (m && m.name) || 'Repère')); } catch (_) { /* a marker list that cannot be read adds no candidates */ }
     ((view && view.tracks) || []).forEach((track) => track.items.forEach((key) => { if (!key.selected) add(key.frame, 'Clé'); }));
+    // Frames the key read cannot show (view.extra: the layers' own markers and effect-stack keys), already labelled by their owner.
+    ((view && view.extra) || []).forEach((e) => add(e && e.frame, e && e.label));
     return Array.from(byFrame, ([frame, label]) => ({ frame, label }));
   }
   /* The one guide line of a snap, in #fg-wrap like the baseline (id motion-snap-guide, label '<name> · <frame + 1>'). */
@@ -69,7 +71,7 @@
     return PALETTE.map((p) => ({ label: tr(host, p[1], p[2]), action: () => ctx.edit({ kind: 'color', color: p[0] }) }))
       .concat([{ sep: true }, { label: tr(host, 'ctxRemoveColor', 'Remove the color'), action: () => ctx.edit({ kind: 'color', color: null }) }]);
   }
-  /* The key context menu. ctx: {view, edit(action), showMenu(items) (optional: a nested menu at the same spot), selectOnly(), hold (bool: the right-clicked key holds), toast(msg), prompt(msg, def), refresh()}. */
+  /* The key context menu. ctx: {view, remap (bool: the keys are Time Remap keys), edit(action), showMenu(items) (optional: a nested menu at the same spot), selectOnly(), hold (bool: the right-clicked key holds), toast(msg), prompt(msg, def), refresh()}. */
   function menuItems(host, ctx) {
     const t = (key, fallback) => tr(host, key, fallback);
     const count = chosen(ctx.view).length;
@@ -88,7 +90,7 @@
       items.push({ sep: true },
         { label: t('ctxDistributeEvenly', 'Distribute evenly'), action: act({ kind: 'distribute' }) },
         { label: t('ctxFlipOrder', 'Flip order'), action: act({ kind: 'flip' }) },
-        { label: t('ctxSubdivideMidpoint', 'Subdivide (key at midpoint)'), action: act({ kind: 'subdivide' }) },
+        ...(ctx.remap ? [] : [{ label: t('ctxSubdivideMidpoint', 'Subdivide (key at midpoint)'), action: act({ kind: 'subdivide' }) }]),
         { label: t('ctxColorKeysEllipsis', 'Color the keys…'), action() { return ctx.showMenu && ctx.showMenu(colorItems(host, ctx)); } },
         { label: t('ctxSelectEvery2nd', 'Select every other one'), action: run(() => selectEveryNth(ctx.view, 2)) },
         { label: t('ctxSelectEveryNthEllipsis', 'Select 1 in N…'), action: run(() => {
@@ -102,7 +104,8 @@
     }
     if (count >= 1) items.push({ label: t('ctxInvertSelection', 'Invert the selection'), action: run(() => invert(ctx.view)) });
     // Per-key standing lock of the selected keys only (baseline buildKeySelectionLockMenuItems): a pick on the active mode clears it.
-    if (count >= 1 && LockMenu) {
+    // A Time Remap key has no standing lock (ctx.remap): the lock rows and subdivide are not offered.
+    if (count >= 1 && LockMenu && !ctx.remap) {
       const picked = chosen(ctx.view);
       items.push({ sep: true }, ...LockMenu.items(host, (mode) => picked.every((e) => e.key.lockTo === mode), (next) => ctx.edit({ kind: 'lockTo', mode: next })));
     }

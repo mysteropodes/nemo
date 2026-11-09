@@ -148,3 +148,83 @@ fn a_dab_without_its_anchor_is_an_ordinary_record_and_one_with_its_anchor_is_not
         (before, (0, 0))
     );
 }
+
+fn anchor_of(owner: &NativeObjectHistory) -> Value {
+    bare_state(owner)["objects"][0].clone()
+}
+fn reopened(owner: &NativeObjectHistory) -> Value {
+    let doc = bare_state(owner);
+    bare_state(&owner_of(&doc))
+}
+
+#[test]
+fn the_opacity_of_an_unfilled_texture_anchor_is_the_one_it_remembers_and_the_stroke_switch_is_its_ink() {
+    // Opacity: the anchor stays hidden (item opacity untouched), the remembered opacity changes, the dabs stay.
+    let mut owner = owner_of(&textured(Value::Null));
+    let before = bare_state(&owner);
+    let r = send(&mut owner, "opacity", batch(vec![rs("anchor", json!({"opacity":0.5}))]));
+    assert_eq!(r["ok"], true, "{r}");
+    let a = anchor_of(&owner);
+    assert_eq!(a["vectorExt"]["brushTexture"]["preTextureOpacity"], 0.5);
+    assert_eq!(a["vector"]["opacity"], before["objects"][0]["vector"]["opacity"], "the outline stays hidden: {a}");
+    assert_eq!(ids(&owner), ["anchor", "dab-1", "dab-2"], "an opacity does not stamp the dabs again");
+    assert_eq!(owner.history_depths(), (1, 0));
+    assert_eq!(reopened(&owner), bare_state(&owner), "save and reload");
+    owner.undo(owner.content_revision()).unwrap();
+    assert_eq!(bare_state(&owner), before);
+    owner.redo(owner.content_revision()).unwrap();
+    assert_eq!(anchor_of(&owner)["vectorExt"]["brushTexture"]["preTextureOpacity"], 0.5);
+
+    // Stroke switch off then on: the ink goes and comes back, the stored dabs are stamped again from the seeded anchor in the same revision.
+    let mut owner = owner_of(&textured(Value::Null));
+    let before = bare_state(&owner);
+    let r = send(&mut owner, "off", batch(vec![rs("anchor", json!({"strokeEnabled":false}))]));
+    assert_eq!(r["ok"], true, "{r}");
+    let a = anchor_of(&owner);
+    assert_eq!(a["vector"]["stroke"], Value::Null);
+    assert_eq!(a["vector"]["hasRealStroke"], false);
+    assert!(a["vectorExt"]["brushTexture"]["strokeSeed"].is_u64(), "{a}");
+    assert_eq!(ids(&owner), ["anchor"]);
+    assert_eq!(owner.history_depths(), (1, 0));
+    let r = send(&mut owner, "on", batch(vec![rs("anchor", json!({"strokeEnabled":true,"stroke":"#ff0000"}))]));
+    assert_eq!(r["ok"], true, "{r}");
+    let a = anchor_of(&owner);
+    assert_eq!(a["vector"]["stroke"]["r"], 1);
+    assert_eq!(a["vector"]["hasRealStroke"], true);
+    assert_eq!(owner.history_depths(), (2, 0));
+    assert_eq!(reopened(&owner), bare_state(&owner), "save and reload");
+    owner.undo(owner.content_revision()).unwrap();
+    owner.undo(owner.content_revision()).unwrap();
+    assert_eq!(bare_state(&owner), before, "undo brings the stroke and the stored dabs back");
+}
+
+#[test]
+fn a_filled_texture_anchor_keeps_its_hidden_stroke_and_remembers_a_new_ink() {
+    let mut doc = textured(Value::Null);
+    doc["objects"][0]["fill"] = json!({"kind":"solid","r":0,"g":0,"b":1,"a":1});
+    let mut owner = owner_of(&doc);
+    let r = send(&mut owner, "ink", batch(vec![rs("anchor", json!({"strokeEnabled":true,"stroke":"#00ff00"}))]));
+    assert_eq!(r["ok"], true, "{r}");
+    let a = anchor_of(&owner);
+    assert_eq!(a["vectorExt"]["brushTexture"]["preTextureStroke"], "#00ff00ff");
+    assert_eq!(ids(&owner), ["anchor"], "the dabs are stamped again in the new ink");
+    assert_eq!(reopened(&owner), bare_state(&owner));
+}
+
+#[test]
+fn deleting_a_texture_anchor_takes_its_stored_dabs_in_one_entry_and_a_named_dab_is_not_deleted_twice() {
+    for named in [vec!["anchor"], vec!["anchor", "dab-1"], vec!["dab-2", "anchor"]] {
+        let mut owner = owner_of(&textured(Value::Null));
+        let before = bare_state(&owner);
+        let ops = named.iter().map(|id| json!({"op":"delete","stableTarget":target("L1", 0, id)})).collect();
+        let r = send(&mut owner, "delete", batch(ops));
+        assert_eq!(r["ok"], true, "{named:?}: {r}");
+        assert!(ids(&owner).is_empty(), "{named:?}: the dabs are deleted with their anchor");
+        assert_eq!(owner.history_depths(), (1, 0), "{named:?}");
+        assert_eq!(reopened(&owner), bare_state(&owner), "{named:?}: save and reload");
+        owner.undo(owner.content_revision()).unwrap();
+        assert_eq!(bare_state(&owner), before, "{named:?}: undo brings the anchor and its dabs back");
+        owner.redo(owner.content_revision()).unwrap();
+        assert!(ids(&owner).is_empty());
+    }
+}

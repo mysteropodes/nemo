@@ -35,6 +35,24 @@ fn placement_selector_is_exact_and_routed_by_the_timing_contract() {
     assert!(!request(&range));
 }
 #[test]
+fn a_listed_remap_key_may_carry_a_tint_and_a_hold_and_nothing_else() {
+    let q = query();
+    let mut tinted = video();
+    tinted["timeRemap"]["keys"] = json!([{"frame":0,"value":0,"color":"#4ea9ff","hold":true},{"frame":24,"value":47,"color":"#4ea9ff80"}]);
+    assert!(result("document", &q, &output(tinted)));
+    for key in [
+        json!({"frame":0,"value":0,"color":"blue"}),
+        json!({"frame":0,"value":0,"color":5}),
+        json!({"frame":0,"value":0,"hold":false}),
+        json!({"frame":0,"value":0,"hold":"yes"}),
+        json!({"frame":0,"value":0,"lockTo":"in"}),
+    ] {
+        let mut bad = video();
+        bad["timeRemap"]["keys"] = json!([key, {"frame":24,"value":47}]);
+        assert!(!result("document", &q, &output(bad)));
+    }
+}
+#[test]
 fn result_facts_are_bounded_and_belong_to_the_requested_snapshot() {
     let q = query();
     let mut plain = video();
@@ -74,7 +92,7 @@ fn result_facts_are_bounded_and_belong_to_the_requested_snapshot() {
         (
             "timeRemap",
             json!({"keyCount":1,"keyAtFrame":false,"value":3,
-                "keys":[{"frame":0,"value":3,"hold":true}]}),
+                "keys":[{"frame":0,"value":3,"lockTo":"in"}]}),
         ),
         ("extra", json!(1)),
     ] {

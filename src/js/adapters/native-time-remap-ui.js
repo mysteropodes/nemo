@@ -13,7 +13,7 @@
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   var entries=['toggleTimeRemap','isTimeRemapped','footageInterpMode','setFootageInterpMode'];
   // Native-only reads/intents the legacy owner does not define.
-  var optional=['timeRemapKeyFacts','timeRemapKeyIntent','nativeVideoPlacement'];
+  var optional=['timeRemapKeyFacts','timeRemapKeyIntent','timeRemapKeysIntent','nativeVideoPlacement'];
   function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});}
   function usable(ports,session){
     return !!session&&ports.currentSession()===session&&session.isActive()===true&&session.blocksLegacy()===true&&
@@ -185,6 +185,23 @@
         toast('toastTimeRemapDisabled');return true;
       });
     }
+    // The selected Time Remap keys of the layer under one key action (native-time-remap-keys.js): ONE placement edit, one revision. Deleting
+    // every key turns the remap off, as the Time Remap row's stopwatch does with its last key.
+    function timeRemapKeysIntent(li,selections,action){
+      return serialized(async function(){
+        var ctx=context(li);if(!ctx)return false;
+        var p=await read(ctx);
+        if(!p||!remapped(p)||!context(li))return false;
+        var keys=Array.isArray(p.timeRemap.keys)?p.timeRemap.keys:null,chosen=0;
+        (Array.isArray(selections)?selections:[]).forEach(function(s){
+          if(s&&s.frame!==undefined)chosen++;
+          else if(s&&Array.isArray(s.ranges)&&keys)keys.forEach(function(k){if(s.ranges.some(function(r){return k.frame>=r[0]&&k.frame<=r[1];}))chosen++;});
+        });
+        if(!await edit(ctx,{kind:'editTimeRemapKeys',placementId:p.placementId,selections:selections,action:action}))return false;
+        if(action&&action.kind==='delete'&&chosen>0&&chosen>=p.timeRemap.keyCount)toast('toastTimeRemapDisabled');
+        return true;
+      });
+    }
     var own={
       timeRemapKeyFacts:function(li){
         var ctx=context(li);if(!ctx)return null;
@@ -194,6 +211,7 @@
         return r;
       },
       timeRemapKeyIntent:timeRemapKeyIntent,
+      timeRemapKeysIntent:timeRemapKeysIntent,
       // The Footage inspector's source facts: the layer's video placement at the playhead, or null.
       nativeVideoPlacement:function(li){return known(li,function(p){return p||null;},null);},
       toggleTimeRemap:toggleTimeRemap,

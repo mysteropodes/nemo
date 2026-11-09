@@ -29,6 +29,39 @@ fn target(value: &Value) -> bool {
         _ => false,
     }
 }
+fn finite(value: Option<&Value>) -> bool {
+    value.and_then(Value::as_f64).is_some_and(f64::is_finite)
+}
+fn curve_points(value: &Value) -> bool {
+    value.as_array().is_some_and(|points| {
+        points.iter().all(|p| {
+            exact(p, &["x", "y"], &["tx", "ty"]).is_some_and(|p| {
+                ["x", "y", "tx", "ty"]
+                    .iter()
+                    .all(|k| p.get(*k).is_none() || finite(p.get(*k)))
+            })
+        })
+    })
+}
+/// One key (`frame`) or inclusive runs of frames (`ranges`), never both.
+fn remap_selection(value: &Value) -> bool {
+    exact(value, &[], &["frame", "ranges"]).is_some_and(|s| {
+        s.contains_key("frame") != s.contains_key("ranges")
+            && (!s.contains_key("frame") || finite(s.get("frame")))
+            && (!s.contains_key("ranges")
+                || s["ranges"].as_array().is_some_and(|runs| {
+                    (1..=512).contains(&runs.len())
+                        && runs.iter().all(|r| {
+                            r.as_array().is_some_and(|pair| {
+                                pair.len() == 2
+                                    && finite(pair.first())
+                                    && finite(pair.get(1))
+                                    && pair[0].as_f64() <= pair[1].as_f64()
+                            })
+                        })
+                }))
+    })
+}
 pub(super) fn request(value: &Value) -> bool {
     match value.get("kind").and_then(Value::as_str) {
         Some("place") => exact(value, &["kind", "placement"], &[]).is_some_and(|v| {
@@ -49,8 +82,56 @@ pub(super) fn request(value: &Value) -> bool {
             .is_some_and(|v| source_id(v.get("placementId")) && offset(v.get("offsetFrames"))),
         Some("shiftOffset") => exact(value, &["kind", "placementId", "deltaFrames"], &[])
             .is_some_and(|v| source_id(v.get("placementId")) && offset(v.get("deltaFrames"))),
-        Some("remove") => exact(value, &["kind", "placementId"], &[])
+        Some("remove" | "disableTimeRemap") => exact(value, &["kind", "placementId"], &[])
             .is_some_and(|v| source_id(v.get("placementId"))),
+        // T12 video timing: bounded remap intents; the native owner admits the values.
+        Some("enableTimeRemap") => exact(
+            value,
+            &[
+                "kind",
+                "placementId",
+                "inFrame",
+                "outFrame",
+                "lastSourceFrame",
+            ],
+            &[],
+        )
+        .is_some_and(|v| {
+            source_id(v.get("placementId"))
+                && ["inFrame", "outFrame", "lastSourceFrame"]
+                    .iter()
+                    .all(|k| finite(v.get(*k)))
+        }),
+        Some("removeTimeRemapKey") => exact(value, &["kind", "placementId", "frame"], &[])
+            .is_some_and(|v| source_id(v.get("placementId")) && finite(v.get("frame"))),
+        Some("setTimeRemapKey") => exact(
+            value,
+            &["kind", "placementId", "frame", "value"],
+            &["curvePoints"],
+        )
+        .is_some_and(|v| {
+            source_id(v.get("placementId"))
+                && finite(v.get("frame"))
+                && finite(v.get("value"))
+                && v.get("curvePoints").is_none_or(curve_points)
+        }),
+        Some("setInterpMode") => exact(value, &["kind", "placementId", "interpMode"], &[])
+            .is_some_and(|v| {
+                source_id(v.get("placementId"))
+                    && v["interpMode"]
+                        .as_str()
+                        .is_some_and(|m| !m.is_empty() && m.len() <= 32 && !m.contains('\0'))
+            }),
+        // The selected Time Remap keys under one property key action (shift, delete, tint, curve...).
+        Some("editTimeRemapKeys") => {
+            exact(value, &["kind", "placementId", "selections", "action"], &[]).is_some_and(|v| {
+                source_id(v.get("placementId"))
+                    && v["selections"].as_array().is_some_and(|list| {
+                        (1..=128).contains(&list.len()) && list.iter().all(remap_selection)
+                    })
+                    && crate::native_contract::property_track::action(&v["action"])
+            })
+        }
         _ => false,
     }
 }

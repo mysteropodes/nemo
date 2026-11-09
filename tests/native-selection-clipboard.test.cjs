@@ -488,7 +488,7 @@ test('a grouped shape offers Dissocier; a combine group offers Sortir du groupe 
   assert.deepEqual(grouped.labels(), ['Copier', 'Couper', 'Coller', 'Dupliquer', 'Supprimer', '---', 'Dissocier']);
   const combined = menuHarness([quad('L1', 'a', 10, 10, 40, 40, IN('G', 'unite')), quad('L1', 'b', 30, 30, 70, 70, IN('G', 'unite'))]);
   await Menu.open(combined.root, { clientX: 20, clientY: 20 });
-  assert.deepEqual(combined.labels().slice(6), ['Dissocier', 'Sortir du groupe', 'Aplatir']);
+  assert.deepEqual(combined.labels().slice(6), ['Dissocier', '✓ Union', 'Soustraction', 'Intersection', 'Exclusion', '---', 'Sortir du groupe', 'Aplatir']);
 });
 
 test('the menu belongs to the Select tool on a native project only: any other tool, a running playback or a legacy project is not taken', () => {

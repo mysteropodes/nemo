@@ -14,15 +14,23 @@
   var MAX_SELECTED=4096; // a guard against a runaway selection; the edit request names runs of keys, so the count never sizes it
   var shortcuts={p:'position',a:'anchor',r:'rotation',s:'scale',t:'opacity'};
   // Baseline propsFor() order (motion.js PROPS / PROPS_WITH_3D); anything else keeps its native order after these.
-  var baselineOrder=['position','positionZ','anchor','rotation','rotationX','rotationY','scale','opacity','order'];
+  var baselineOrder=['position','positionZ','anchor','rotation','rotationX','rotationY','scale','opacity','order',
+    // PROPS_DUP_EXTRA: the rows of a duplicator host, right after the Transform rows (the last three are the 3D per-copy offsets).
+    'dupOffsetPos','dupOffsetRot','dupOffsetScale','dupOffsetOpacity','dupOffsetHue','dupOffsetPosZ','dupOffsetRotX','dupOffsetRotY'];
+  // Rows the baseline registers when its propsFor lists them (SMEffectorLayer.propKeysFor): the label table of the legacy Motion module only knows
+  // the rest. [i18n key, English text]; the channel offsets carry no i18n key in the baseline either.
+  var rowNames={effRadius:['propEffRadius','Radius'],effStrength:['propEffStrength','Strength'],effAngle:['propEffAngle','Angle'],effOffPosition:[null,'Offset Position'],
+    effOffRotation:[null,'Offset Rotation'],effOffScale:[null,'Offset Scale'],effOffOpacity:[null,'Offset Opacity'],effOffPositionZ:[null,'Offset Z'],effOffRotationX:[null,'Offset Rot X'],effOffRotationY:[null,'Offset Rot Y'],
+    // Dynamic-shape rows of an element (baseline propsFor: a rect's corner radii, an ellipse's arc, a star's radii).
+    cornerTL:['propCornerTL','Corner \u2196'],cornerTR:['propCornerTR','Corner \u2197'],cornerBR:['propCornerBR','Corner \u2198'],cornerBL:['propCornerBL','Corner \u2199'],arcStart:['propArcStart','Arc start'],arcSweep:['propArcSweep','Arc sweep'],arcInner:['propArcInner','Inner radius'],starInner:['propStarInner','Inner radius'],starCorner:['propStarCorner','Corners']};
   var modes=['all','animated','modified','expressions','errors','effects','mattes'];
   function key(t){return JSON.stringify([t.contextId,t.layerUid,t.strokeId===undefined?null:t.strokeId]);}
   function create(container,ports){
     if(!View||!container||!ports||!ports.document||typeof ports.query!=='function'||typeof ports.readContext!=='function'||typeof ports.readSelection!=='function')throw new TypeError('Native Motion panel ports are unavailable');
     var doc=ports.document,retired=false,serial=0,client=View.createConsumer(ports),accepted=null;
-    var propertySet=null,mode='all',contentOnly=false,collapsed=false,search='',scope='inspector',rowBindings=[],valueEditors=[],loading=false;
+    var pathOpen=new Set(),propertySet=null,mode='all',contentOnly=false,collapsed=false,search='',scope='inspector',rowBindings=[],valueEditors=[],loading=false;
     var expressionRows=[],expressionFlight=null,expressionWanted=false,expressionScope=null,linkRows=[];
-    var maxPages=ports.pageBudget===undefined?Infinity:ports.pageBudget;
+    var VERTEX_PAGES=16,maxPages=ports.pageBudget===undefined?Infinity:ports.pageBudget;
     if(maxPages!==Infinity&&(!Number.isSafeInteger(maxPages)||maxPages<1))throw new TypeError('Invalid explicit native Motion read budget');
     var section=make('section',''),toolbar=make('div',''),status=make('div',''),body=make('div',''),controls=[];
     section.className='native-motion-property-panel';section.setAttribute('aria-label','Motion properties');
@@ -169,6 +177,11 @@
       // The strict public predicate still requires a currently presented view, including ready(false) refusals.
       Object.defineProperties(value,{isCurrent:{value:view.isCurrent},isSelectionCurrent:{value:isSelectionCurrent}});return Object.freeze(value);
     }
+    function rowLabel(property){
+      var vertex=/^vtx([0-9]+)$/.exec(property);if(vertex)return tr('propVertex','Vertex')+' '+(Number(vertex[1])+1);
+      var named=ports.labelProperty&&ports.labelProperty(property),fallback=rowNames[property];
+      return fallback&&(!named||named===property)?(fallback[0]?tr(fallback[0],fallback[1]):fallback[1]):named||property;
+    }
     function make(tag,text){var node=doc.createElement(tag);node.textContent=text;return node;}
     function notify(message){if(retired)return;status.textContent=message||'';status.hidden=!message;}
     function setLoading(value){loading=value;toolbar.hidden=!value;}
@@ -215,7 +228,7 @@
         if(propertySet&&propertySet.indexOf(row.property)<0)return;
         var result=View.filterRow(row,mode);if(!result.available){unknown=true;return;}if(!result.matches)return;
         if(contentOnly){result=View.filterRow(row,'modified');if(!result.available){unknown=true;return;}if(!result.matches)return;}
-        var name=row.controlName||(ports.labelProperty&&ports.labelProperty(row.property))||row.property;
+        var name=row.controlName||rowLabel(row.property);
         if(!search||String(name).toLowerCase().indexOf(search)>=0||String(labelTarget(group.target,accepted.token)).toLowerCase().indexOf(search)>=0)rows.push({row:row,label:name});
       });
       var rank=function(entry){var at=baselineOrder.indexOf(entry.row.property);return at<0?baselineOrder.length:at;};
@@ -319,7 +332,7 @@
         funnel.innerHTML='<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>';
         var onFunnel=function(event){if(event&&event.stopPropagation)event.stopPropagation();if(!current(fToken,fTicket,fSignature))return false;return setFilter(mode==='animated'?'all':'animated');};
         funnel.addEventListener('click',onFunnel);nextBindings.push([funnel,onFunnel]);title.appendChild(funnel);fragment.appendChild(title);
-        filtered.rows.forEach(function(entry){var row=entry.row,line=make('div',''),name=make('div',''),nameText=make('span',entry.label);line.className='lrow motion-prop-row';line.dataset.property=row.property;line.dataset.targetKey=key(group.target);
+        var renderRow=function(entry){var row=entry.row,line=make('div',''),name=make('div',''),nameText=make('span',entry.label);line.className='lrow motion-prop-row';line.dataset.property=row.property;line.dataset.targetKey=key(group.target);
           var f=row.authored;
           var token=accepted.token,ticket=serial,signature=accepted.selection.signature;
           if(f.availability==='available'&&(typeof ports.editProperty==='function'||typeof ports.readProperty==='function')){
@@ -360,7 +373,19 @@
             nextExpressions.push({node:diagnostic,line:line,target:group.target,property:row.property,fx:typeof fxItem==='object'?fxItem:null});
           }
           line._nemoPick=Object.freeze({target:group.target,property:row.property,controlType:row.controlType===undefined?null:row.controlType,controlName:row.controlName===undefined?null:row.controlName});
-          fragment.appendChild(line);fragment.appendChild(drawerSlot);});
+          fragment.appendChild(line);fragment.appendChild(drawerSlot);};
+        var isVertex=function(entry){return /^vtx[0-9]+$/.test(entry.row.property);};
+        filtered.rows.filter(function(entry){return !isVertex(entry);}).forEach(renderRow);
+        if(group.hasVertices){
+          // Baseline "Path" accordion header: ONE open Path group at a time; the dots of its element appear on the canvas while it is open.
+          var open=pathOpen.has(key(group.target)),grp=make('div',''),arrow=make('span',open?'\u25BE':'\u25B8');
+          grp.className='lrow motion-group-row motion-path-group';grp.dataset.targetKey=key(group.target);arrow.className='lico larrow';grp.appendChild(arrow);grp.appendChild(make('span',tr('hdrPath','Path')));
+          var gToken=accepted.token,gTicket=serial,gSignature=accepted.selection.signature,gTarget=group.target;
+          var onPath=function(event){if(event&&event.stopPropagation)event.stopPropagation();if(!current(gToken,gTicket,gSignature))return false;var k=key(gTarget),was=pathOpen.has(k);pathOpen.clear();if(!was)pathOpen.add(k);if(ports.pathOpened)try{ports.pathOpened(was?null:gTarget);}catch(_){}return refresh(true);};
+          grp.addEventListener('click',onPath);nextBindings.push([grp,onPath]);fragment.appendChild(grp);
+          if(open)filtered.rows.filter(isVertex).forEach(renderRow);
+          if(open&&group.moreVertices){var cap=make('div',tr('pathMoreVertices','More vertices than shown — use Select to move the rest.'));cap.className='motion-props-layername';fragment.appendChild(cap);}
+        }
       });
       // Unsupported native families do not become an empty global-U result.
       if(appendRevealLimits(fragment))unknown=true;
@@ -385,13 +410,13 @@
     function onKey(event){if(retired||event.defaultPrevented||event.altKey||event.ctrlKey||event.metaKey||editable(event.target))return;
       var k=String(event.key||'').toLowerCase();if(shortcuts[k]){event.preventDefault();return reveal(shortcuts[k],!!event.shiftKey);}if(k==='u'){event.preventDefault();return revealContent();}if(k==='e'||k==='m'){event.preventDefault();notify('This Motion reveal is unavailable.');}}
     async function yieldControl(){if(ports.yieldControl)await ports.yieldControl();else await new Promise(function(resolve){setTimeout(resolve,0);});}
-    async function collect(view,token,ticket,signature){var items=[],seen=new Set(),categories=new Map();
+    async function collect(view,token,ticket,signature,cap){var items=[],seen=new Set(),categories=new Map();
       for(var pageNumber=0;pageNumber<maxPages;pageNumber++){
         if(!current(token,ticket,signature))throw new Error('Native UI read cancelled');
         var page=await client.load(view);if(!current(token,ticket,signature)||!page.available)throw new Error('Native property read is unavailable');
         page.items.forEach(function(item){var id=page.kind==='targets'?item.kind==='context'?'context:'+item.contextId:item.kind+':'+key(item.target):item.property;if(seen.has(id))throw new Error('Duplicate native page identity');seen.add(id);items.push(item);});
         page.unavailableCategories.forEach(function(c){var old=categories.get(c.category);if(old&&old.reason!==c.reason)throw new Error('Conflicting native category');categories.set(c.category,c);});
-        var next=View.continuation(page);if(!next)return Object.freeze({items:Object.freeze(items),categories:Object.freeze(Array.from(categories.values()))});view=next;
+        var next=View.continuation(page);if(!next||cap&&pageNumber+1>=cap)return Object.freeze({items:Object.freeze(items),categories:Object.freeze(Array.from(categories.values())),more:!!next});view=next;
         await yieldControl();
       }throw new Error('Explicit native read budget reached');
     }
@@ -404,7 +429,11 @@
       ticket=++serial;setLoading(true);accepted=null;clearBody();notify('Loading properties…');
       try{
         var discovery=await collect({kind:'targets',offset:0,limit:8},token,ticket,selection.signature),targets=discovery.items,wanted=wantedTargets(targets,selection),groups=[],categories=new Map(discovery.categories.map(function(c){return [c.category,c];}));
-        for(var t of wanted){var page=await collect({kind:'properties',target:t,offset:0,limit:8},token,ticket,selection.signature);groups.push(Object.freeze({target:t,rows:page.items}));page.categories.forEach(function(c){categories.set(c.category,c);});}
+        for(var t of wanted){var page=await collect({kind:'properties',target:t,offset:0,limit:8},token,ticket,selection.signature),rows=page.items,hasVertices=false,more=false;
+          // An element's Path group (baseline renderPathVertexGroup): the probe is one row past the standard ones; the rows load only while the group is open.
+          if(t.strokeId!==undefined){var probe=await collect({kind:'properties',target:t,offset:page.items.length,limit:8,includeVertices:true},token,ticket,selection.signature,pathOpen.has(key(t))?VERTEX_PAGES:1);
+            hasVertices=probe.items.length>0;more=probe.more;if(pathOpen.has(key(t)))rows=page.items.concat(probe.items);}
+          groups.push(Object.freeze({target:t,rows:rows,hasVertices:hasVertices,moreVertices:more}));page.categories.forEach(function(c){categories.set(c.category,c);});}
         if(!current(token,ticket,selection.signature))throw new Error('Native selection changed');
         accepted=Object.freeze({token:token,targets:targets,groups:Object.freeze(groups),selection:selection,groupKey:groupKey(wanted),categories:Object.freeze(Array.from(categories.values()))});setLoading(false);return paint();
       }catch(_){if(!retired&&ticket===serial&&section.parentNode===container){setLoading(false);accepted=null;clearBody();notify('Native properties are unavailable.');}return false;}

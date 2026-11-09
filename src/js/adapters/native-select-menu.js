@@ -6,10 +6,13 @@
  *   Grouper / Dissocier                    -> NemoNativeSelectGroup (the group intent)
  *   Combiner (Union), Sortir du groupe, Aplatir -> NemoNativeSelectionBoolean / NemoNativeSelectGroup
  *   Premier plan / Arrière-plan            -> NemoNativeSelectionOrder (native-selection-order.js)
+ *   Centrer le point d'ancrage             -> NemoNativeSelectPivot.center (the pivot back to the centre; a tool preference, no write)
  * Right-click rule (baseline): an item that is already part of the selection keeps the whole selection; any other item replaces it, exactly as a
  * plain click does (the native pick, then applyPick); an empty spot keeps the selection and offers Coller alone when a clip is held (otherwise the
- * menu does not open). open() resolves to the rows it showed. The rows the baseline has that still lack a native route (pivot reset, image mesh, tween opt-in,
- * tracked roles, revision actions, stroke profiles) are added with their own routes; none is shown as a dead entry. */
+ * menu does not open). open() resolves to the rows it showed. A combine group the selection IS also gets its four modes (Union / Soustraction /
+ * Intersection / Exclusion, the current one ticked) -> NemoNativeSelectGroup.setMode. The rows the baseline has that still lack a native route (image
+ * mesh, tween opt-in, tracked roles, revision actions, stroke profiles) belong to the gaps that build those features and are added with their own
+ * routes; none is shown as a dead entry. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -31,7 +34,8 @@
       var layers = await I.layerPaths(host, function () { return false; }, false, paths[0].data.nativeLayerIndex);
       if (!layers) return null;
       var info = G.groupsInfo(layers.items), ids = paths.map(function (p) { return p.data.strokeId; });
-      return { grouped: ids.some(function (id) { return (info.pathOf[id] || []).length > 0; }), active: G.activeGroup(info, ids) };
+      var active = G.activeGroup(info, ids);
+      return { grouped: ids.some(function (id) { return (info.pathOf[id] || []).length > 0; }), active: active, mode: active ? info.modes[active] : null };
     } catch (_) { return null; }
   }
   function pasteRow(host, enabled) { return { label: 'Coller', shortcut: '⌘V', disabled: !enabled, action: function () { host.NemoNativeSelectionClipboard.paste(host); } }; }
@@ -54,6 +58,10 @@
       else if (multi) extra.push({ label: 'Grouper', shortcut: '⌘G', action: function () { G.group(host); } });
       if (multi && !state.active && B) extra.push({ label: 'Combiner (Union) — non destructif', action: function () { B.combine(host, 'unite'); } });
       if (state.active) {
+        // Baseline: the four combine modes of the group the selection is, the current one ticked, before the group's own rows.
+        var modeNames = { unite: 'Union', subtract: 'Soustraction', intersect: 'Intersection', exclude: 'Exclusion' };
+        Object.keys(modeNames).forEach(function (m) { extra.push({ label: (m === state.mode ? '✓ ' : '') + modeNames[m], action: function () { G.setMode(host, m); } }); });
+        extra.push({ sep: true });
         if (!multi) extra.push({ label: 'Sortir du groupe', action: function () { G.removeMember(host); } });
         extra.push({ label: 'Aplatir', action: function () { G.flatten(host); } });
       }
@@ -62,6 +70,9 @@
     // Premier plan / Arriere-plan (baseline order: after the group rows, before the pivot rows): one batch of order steps (native-selection-order.js).
     var O = host.NemoNativeSelectionOrder;
     if (O) items.push({ sep: true }, { label: 'Premier plan', action: function () { O.front(host); } }, { label: 'Arrière-plan', action: function () { O.back(host); } });
+    // Centrer le point d'ancrage (baseline :3112, right after the order rows): the pivot back to the selection's centre; no document write.
+    var P = host.NemoNativeSelectPivot;
+    if (P) items.push({ sep: true }, { label: 'Centrer le point d\'ancrage', action: function () { P.center(host); } });
     return items;
   }
   async function build(host, x, y) {

@@ -15,8 +15,9 @@
 //! - a texture anchor whose dabs are stored records re-stamps them from its preset (the stored dabs are deleted, the seeded anchor paints
 //!   natively) after a width, a stroke colour or a preset edit; a filled anchor's stroke colour is the stroke it remembers;
 //! - a stored dab whose anchor is gone is an ordinary record; one with an anchor follows its anchor and is refused (`Unavailable`) alone.
-//! A texture anchor's opacity without a fill and a stroke switch on a brush anchor are refused (`Unavailable`): the first would bring the
-//! hidden outline back, the second has no stroke to switch.
+//! A texture anchor's opacity without a fill is stored as the opacity it remembers (`preTextureOpacity`; the anchor stays hidden, so the
+//! outline never comes back), and its stroke switch sets or clears the ink its dabs are stamped in (the stroke, else `preTextureStroke`): the
+//! stored dabs are stamped again from the seeded anchor. A bitmap anchor's switch only decides whether a new ink reaches its spec.
 use crate::commands::object_fill_owner::vector_edit::batch_ops::detail::{self, Detail};
 use crate::commands::object_fill_owner::vector_edit::batch_ops::gradient;
 use crate::commands::object_fill_owner::vector_edit::batch_ops::ribbon;
@@ -31,6 +32,8 @@ use serde_json::Number;
 
 #[path = "object_vector_batch_style_dabs.rs"]
 pub(super) mod dabs;
+#[path = "object_vector_batch_style_pivot.rs"]
+pub(super) mod pivot;
 
 /// The wire members of a restyle step; each absent member leaves that style alone.
 #[derive(Debug, Default)]
@@ -52,6 +55,8 @@ pub(super) struct Style {
     pub(super) mask_mode: Presence<String>,
     pub(super) unmask: Presence<bool>,
     pub(super) fill_gradient: Presence<Option<StoredGradient>>,
+    pub(super) xform_anchor_key: Presence<Option<String>>,
+    pub(super) xform_anchor_custom: Presence<Option<Vec<Number>>>,
 }
 object_deserialize!(Style {
     #[serde(default)] fill: Presence<String>,
@@ -70,7 +75,9 @@ object_deserialize!(Style {
     #[serde(default)] mask_feather: Presence<Number>,
     #[serde(default)] mask_mode: Presence<String>,
     #[serde(default)] unmask: Presence<bool>,
-    #[serde(default)] fill_gradient: Presence<Option<StoredGradient>>
+    #[serde(default)] fill_gradient: Presence<Option<StoredGradient>>,
+    #[serde(default)] xform_anchor_key: Presence<Option<String>>,
+    #[serde(default)] xform_anchor_custom: Presence<Option<Vec<Number>>>
 });
 
 /// A validated style: parsed colours and finite numbers in range.
@@ -81,6 +88,7 @@ pub(super) struct Checked {
     pub(super) width: Option<f64>,
     pub(super) opacity: Option<f64>,
     pub(super) detail: Detail,
+    pub(super) pivot: Option<pivot::Pivot>,
 }
 
 /// A number the way a hand-edited record spells it: an exact integer stays an integer.
@@ -129,6 +137,7 @@ impl Style {
             width: number(&self.width)?,
             opacity: number(&self.opacity)?,
             detail: Detail::of(self)?,
+            pivot: pivot::checked(self)?,
         };
         let sound = checked.width.is_none_or(|w| w > 0.0 && w <= 10_000.0)
             && checked.opacity.is_none_or(|o| (0.0..=1.0).contains(&o));
@@ -141,7 +150,9 @@ impl Style {
             || (checked.detail.stroke_enabled == Some(true) && checked.stroke.is_none())
             || (checked.detail.exclusive() && (own || checked.detail.has_plain()))
             || checked.detail.both_exclusive();
-        if !sound || switches || !(own || checked.detail.has_plain() || checked.detail.exclusive()) {
+        // The pivot (#2372) is an edit of its own: it combines with no other member.
+        let alone = checked.pivot.is_some() && (own || checked.detail.has_plain() || checked.detail.exclusive());
+        if !sound || switches || alone || !(own || checked.pivot.is_some() || checked.detail.has_plain() || checked.detail.exclusive()) {
             return Err(InvalidRequest);
         }
         Ok(checked)
@@ -233,6 +244,9 @@ pub(super) fn restyle(
     if !is_vector_record(existing) {
         return Err(InvalidRequest);
     }
+    if let Some(edit) = &style.pivot {
+        return pivot::apply(existing, edit);
+    }
     if let Some(feather) = style.detail.mask_feather() {
         return detail::feather(source, existing, feather);
     }
@@ -262,13 +276,6 @@ pub(super) fn restyle(
         }
         return Ok(out);
     }
-    // An anchor hides its own outline (an opacity of 0, or no stroke) while its dabs show: an opacity that is not a fill alpha would bring
-    // the outline back (a bitmap anchor's is the stamp opacity), and a stroke switch has no stroke to switch.
-    if (anchor || bitmap)
-        && (style.detail.touches_stroke() || (style.opacity.is_some() && existing.solid_fill().is_none() && !bitmap))
-    {
-        return Err(Unavailable);
-    }
     let ribbon_ink = ext.is_some_and(|e| !e.pressure.missing());
     let mut out = Vec::new();
     let mut record = existing.clone();
@@ -292,6 +299,13 @@ pub(super) fn restyle(
     }
     // The switches first: an off paint ignores the colour named beside it; a ribbon's stroke switch decides its ink.
     let decided = detail::toggles(&mut record, style, ribbon_ink)?;
+    if bitmap {
+        // A bitmap anchor's stroke stays camouflaged (its ink is the spec colour below); the switch only decides whether a new colour reaches it.
+        if let (Some(kept), Some(body)) = (existing.vector(), record.vector.value_mut()) {
+            body.stroke = kept.stroke.clone();
+            body.has_real_stroke = kept.has_real_stroke;
+        }
+    }
     let fill_colour = style.fill.as_ref().filter(|_| ribbon_ink || style.detail.fill_enabled != Some(false));
     let stroke_colour = style.stroke.as_ref().filter(|_| style.detail.stroke_enabled != Some(false));
     let ink = stroke_colour
@@ -317,6 +331,8 @@ pub(super) fn restyle(
             Some(paint) => record.fill = Presence::Present(Some(with_alpha(paint, opacity)?)),
             // A bitmap anchor's opacity is its stamp opacity (below), never the item opacity that hides it.
             None if bitmap => {}
+            // A texture anchor with no fill stays hidden (an item opacity of 0): its opacity is the one it remembers and gives back when stripped.
+            None if anchor => dabs::remember_opacity(&mut record, opacity)?,
             None => {
                 if let Some(body) = record.vector.value_mut() {
                     body.opacity = num(opacity)?;
@@ -331,7 +347,7 @@ pub(super) fn restyle(
         dabs::remember_stroke(&mut record, paint);
     }
     // Stored dabs keep the look they were stamped with: a new width or ink stamps them again from the anchor.
-    if anchor && !stored.is_empty() && (style.width.is_some() || stroke_colour.is_some()) && dabs::seed(&mut record) {
+    if anchor && !stored.is_empty() && (style.width.is_some() || stroke_colour.is_some() || style.detail.touches_stroke()) && dabs::seed(&mut record) {
         deleted.extend(stored);
     }
     let stroke_width = style

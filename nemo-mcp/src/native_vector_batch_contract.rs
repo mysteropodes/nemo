@@ -87,7 +87,9 @@ fn style(v: &Value) -> bool {
     let range = |k: &str, lo: f64, hi: f64| v.get(k).is_none_or(|n| n.as_f64().is_some_and(|n| (lo..=hi).contains(&n)));
     let flag = |k: &str| v.get(k).is_none_or(Value::is_boolean);
     let alone = ["brushPreset", "maskFeather", "maskMode", "unmask", "fillGradient"].iter().filter(|k| v.get(**k).is_some()).count();
-    exact(v, &[], &["fill", "stroke", "width", "opacity", "fillEnabled", "strokeEnabled", "cap", "join", "miter", "dashOffset", "paintOrder", "strokeStyle", "brushPreset", "maskFeather", "maskMode", "unmask", "fillGradient"]).is_some_and(|o| !o.is_empty() && (alone == 0 || o.len() == 1))
+    // The Select pivot (#2372): `xformAnchorKey` and/or `xformAnchorCustom` (null clears), an edit of its own that combines with no other member.
+    let pivot = ["xformAnchorKey", "xformAnchorCustom"].iter().filter(|k| v.get(**k).is_some()).count();
+    exact(v, &[], &["fill", "stroke", "width", "opacity", "fillEnabled", "strokeEnabled", "cap", "join", "miter", "dashOffset", "paintOrder", "strokeStyle", "brushPreset", "maskFeather", "maskMode", "unmask", "fillGradient", "xformAnchorKey", "xformAnchorCustom"]).is_some_and(|o| !o.is_empty() && (alone == 0 || o.len() == 1) && (pivot == 0 || pivot == o.len()))
         && v.get("fill").is_none_or(hex)
         && v.get("stroke").is_none_or(hex)
         && v.get("width").is_none_or(|w| w.as_f64().is_some_and(|w| w > 0.0 && w <= 10_000.0))
@@ -106,6 +108,8 @@ fn style(v: &Value) -> bool {
         && range("maskFeather", 0.0, 500.0)
         && one_of("maskMode", &["add", "subtract", "intersect"])
         && v.get("unmask").is_none_or(|u| u == true)
+        && v.get("xformAnchorKey").is_none_or(|k| k.is_null() || k.as_str().is_some_and(|k| ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"].contains(&k)))
+        && v.get("xformAnchorCustom").is_none_or(|p| p.is_null() || p.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(|n| n.as_f64().is_some_and(|n| n.is_finite() && n.abs() <= 1.0e7))))
         && v.get("fillGradient").is_none_or(|g| g.is_null() || (gradient(g) && g["stops"].as_array().is_some_and(|s| s.iter().all(|s| s["color"].as_str().is_some_and(|c| [7, 9].contains(&c.len()))))))
 }
 

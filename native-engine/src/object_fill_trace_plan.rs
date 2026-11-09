@@ -89,6 +89,8 @@ pub(crate) fn fill_record(
             linked_fill_id: Presence::Missing,
             is_linked_fill_companion: Presence::Missing,
             point_types: Presence::Missing,
+            xform_anchor_key: Presence::Missing,
+            xform_anchor_custom: Presence::Missing,
             is_mask: Presence::Missing,
             mask_mode: Presence::Missing,
             mask_feather: Presence::Missing,
@@ -137,6 +139,8 @@ fn recolor(
             && ext.param_shape.missing()
             && ext.box_angle.missing()
             && ext.fill_trace.missing()
+            && ext.xform_anchor_key.missing()
+            && ext.xform_anchor_custom.missing()
         {
             r.vector_ext = Presence::Missing;
         }

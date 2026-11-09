@@ -13,16 +13,21 @@
  * the selection. An image and a text block go in the same batch as a record-space matrix in their own frame (the listing's bounds and
  * matrix): the engine moves the image's stored centre, scales its size and turns its rotation (a mesh bound to it follows) and re-anchors
  * a text block and scales its size, fixed width and spacing as the baseline resize did. An image or a text block takes a move, a scale
- * along its own axes and a turn (#2267: the text block stores a rotation about its anchor); a mirror of either and a shear of either have
- * no stored form. A bitmap brush goes in the same batch: the engine maps its anchor and bakes its companion image again. Not carried over: skew zones,
- * a custom anchor, the Alt lasso, ruler snapping. Still refused with a notice: those transforms. */
+ * along its own axes and a turn (#2267: the text block stores a rotation about its anchor); a mirror or a shear of either is stored as its
+ * `flipX` / `flipY` / `skew` (A-image-text-flip-skew, owner ruling 2026-11-05: baseline images and text blocks flip and shear). A bitmap brush goes in
+ * the same batch: the engine maps its anchor and bakes its companion image again.
+ * Skew zones (native-select-skew.js): a drag from a zone flanking an edge midpoint shears the box about the opposite edge (baseline xform-skew), Ctrl
+ * shears both axes. The pivot (native-select-pivot.js): a rotation turns about the selection's pivot (a preset point or an Alt+clicked custom point),
+ * and Alt+press outside the selection's box places it (Alt over the crosshair grabs it, Shift snaps to a preset); no document write. The Alt lasso
+ * (native-select-lasso.js): Alt+drag on empty canvas, with nothing selected, draws a freehand path and selects what it takes, through the marquee's path.
+ * Not carried over: ruler snapping. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeSelectGesture = api;
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
-  var DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], DRAG = 3, MAX_STEPS = 64, MAX_BYTES = 60000; // under the 65536-byte vector request cap
+  var DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'], DRAG = 3, DRAGS = ['move', 'scale', 'rotate', 'skew'], MAX_STEPS = 64, MAX_BYTES = 60000; // under the 65536-byte vector request cap
   var PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   // A mask (MASK-NATIVE-REST) is a record like any other: it takes the record-space matrix, keeps its mask tags and its listed mode.
   var MAPPED = ['plain', 'ribbon', 'fill', 'shape', 'brush', 'raster', 'text', 'mask'];
@@ -39,36 +44,37 @@
     });
     return found.length ? found.join(', ') : null;
   }
-  // The transform an image or a text block has no stored form for, as a label (null when every one can take `m`, the world affine): the
-  // matrix is read in each item's own frame (the presented matrix conjugated), where an image takes a move, a scale along its axes and a
-  // turn (text the same, #2267).
   // `m` is one world affine for every item, or (align / distribute, #2372) a function giving each item its own, or null to leave it out.
   function matrixFor(m, p) { return typeof m === 'function' ? m(p) : m; }
+  // The transform an image or a text block cannot take, as a label (null when every one can: since A-image-text-flip-skew the record stores a move, a
+  // scale along its own axes, a turn, a mirror and a shear, so only a transform that would flatten it is refused, and the engine refuses that too).
   function unstorable(root, paths, m) {
-    var conj = root.NemoSelectCanvasIntent && root.NemoSelectCanvasIntent.inRecordSpace, found = [];
+    var found = [];
     paths.forEach(function (p) {
-      var role = p.data && p.data.nativeRole, own = matrixFor(m, p), r = own && (role === 'raster' || role === 'text') && conj ? conj(p.data.nativeMatrix, own) : null;
-      if (!r) return;
-      var det = r[0] * r[3] - r[1] * r[2];
-      if (det < 0) found.push(role === 'text' ? 'Flipping text' : 'Flipping images');
-      else if (Math.abs(r[0] * r[2] + r[1] * r[3]) > 1e-9 * Math.hypot(r[0], r[1]) * Math.hypot(r[2], r[3])) found.push(role === 'text' ? 'Skewing text (scale along its own axes)' : 'Skewing images (scale along their own axes)');
+      var role = p.data && p.data.nativeRole, own = matrixFor(m, p);
+      if (!own || (role !== 'raster' && role !== 'text')) return;
+      if (!own.every(Number.isFinite) || Math.abs(own[0] * own[3] - own[1] * own[2]) < 1e-12) found.push(role === 'text' ? 'Flattening text' : 'Flattening images');
     });
     return found.length ? found.filter(function (l, i) { return found.indexOf(l) === i; }).join(', ') : null;
   }
   // Which handle of the oriented box a world point grabs: the rotate ring first (a band of 7 screen px), then the 8 scale handles
   // (9 px), as the baseline hitHandles did. `wpp` is world units per screen pixel.
-  function hitHandle(box, p, wpp) {
-    var ring = Math.min(36 * wpp, Math.max(box.width, box.height) * 0.3);
-    if (Math.abs(Math.hypot(p.x - box.center.x, p.y - box.center.y) - ring) < 7 * wpp) return { type: 'rotate' };
+  function hitHandle(box, p, wpp, pivot) {
+    var ring = Math.min(36 * wpp, Math.max(box.width, box.height) * 0.3), c = pivot || box.center;
+    if (Math.abs(Math.hypot(p.x - c.x, p.y - c.y) - ring) < 7 * wpp) return { type: 'rotate' };
     var best = null, bestD = 9 * wpp;
     box.handles.forEach(function (h, i) { var d = Math.hypot(p.x - h[0], p.y - h[1]); if (d < bestD) { bestD = d; best = { type: 'scale', dir: DIRS[i], index: i }; } });
     return best;
   }
   // The world affine [a b c d e f] of a drag from `g.start` to the world point `at` (baseline onMove rules).
   function matrixOf(g, at, shift, alt) {
-    if (g.kind === 'move') return [1, 0, 0, 1, at.x - g.start.x, at.y - g.start.y];
+    if (g.kind === 'move') {
+      var dx = at.x - g.start.x, dy = at.y - g.start.y;
+      if (shift && g.motion) { if (Math.abs(dx) >= Math.abs(dy)) dy = 0; else dx = 0; } // baseline #802: Shift locks the TOTAL displacement onto its nearer axis
+      return [1, 0, 0, 1, dx, dy];
+    }
     if (g.kind === 'rotate') {
-      var c = g.box.center, delta = Math.atan2(at.y - c.y, at.x - c.x) * 180 / Math.PI - g.startAngle;
+      var c = g.pivot || g.box.center, delta = Math.atan2(at.y - c.y, at.x - c.x) * 180 / Math.PI - g.startAngle;
       if (shift) delta = Math.round(delta / 15) * 15;
       var r = delta * Math.PI / 180, cos = Math.cos(r), sin = Math.sin(r);
       g.angle = delta;
@@ -152,12 +158,12 @@
     return 'applied';
   }
   function begin(root, e, abort) {
-    var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, st = root.state, shown = I && st && st.tool === 'select' && st.appMode !== 'motion' && I.presentedState(root);
+    var I = root.NemoSelectCanvasIntent, O = root.NemoNativeSelectOverlay, st = root.state, shown = I && st && st.tool === 'select' && I.presentedState(root), motion = !!st && st.appMode === 'motion'; // Motion (#2520/#2525): pick, marquee and the ELEMENT move only - no handles, no copy
     if (!shown) return null;
     var world = function (x, y) { return I.worldPoint(root, x, y, shown.pin, shown.presentation); };
     var Matrix = root.Matrix || root.paper.Matrix, origin = world(e.clientX, e.clientY), next = world(e.clientX + 1, e.clientY);
     var wpp = Math.hypot(next.x - origin.x, next.y - origin.y) || origin.perPixel;
-    var g = { kind: null, active: false, cancelled: false, start: origin, shift: !!e.shiftKey, alt: !!e.altKey, dup: false, last: e, pin: shown.pin, frame: shown.presentation.frame,
+    var g = { motion: motion, kind: null, active: false, cancelled: false, start: origin, shift: !!e.shiftKey, alt: !!e.altKey, dup: false, last: e, pin: shown.pin, frame: shown.presentation.frame,
       sel: [], box: null, angle: 0, ctx: null, matrix: [1, 0, 0, 1, 0, 0], previewed: false };
     var picked = null, pickDone = null;
     var current = (root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; });
@@ -167,17 +173,31 @@
       root.selectedPaths = []; if (st.selectedStrokeIndices) st.selectedStrokeIndices = []; current = [];
       if (O) O.show(root);
     }
-    var box = O && current.length ? O.boxOf(root, current) : null, handle = box && hitHandle(box, origin, wpp);
-    if (handle) {
+    var box = O && current.length ? O.boxOf(root, current) : null, P = root.NemoNativeSelectPivot, S = root.NemoNativeSelectSkew, L = root.NemoNativeSelectLasso;
+    var pivot = box && P ? P.pointOf(root, box) : null, grabbing = !motion && !!(g.alt && box && P && P.grabs(root, box, origin, wpp));
+    var handle = !motion && box && !grabbing && (hitHandle(box, origin, wpp, pivot) || (S && S.hit(box, origin, wpp)));
+    g.wpp = wpp;
+    if (grabbing) {
+      g.kind = 'pivot'; g.sel = current; g.box = box; g.ctx = I.pickContext(root); // Alt over the crosshair: it follows the pointer from the first move
+    } else if (handle) {
       g.kind = handle.type; g.sel = current; g.box = box; g.dir = handle.dir; g.index = handle.index; g.ctx = I.pickContext(root);
+      if (handle.type === 'skew') Object.assign(g, S.start(box, handle.edge), { edge: handle.edge });
+      g.pivot = pivot;
       // The box's own axes. A dynamic shape keeps the world-axis resize its engine kernel (and the baseline) applies: it refuses a skewed one.
       g.axis = current.some(function (p) { return p.data.nativeRole === 'shape'; }) ? 0 : box.angle || 0;
-      g.startAngle = Math.atan2(origin.y - box.center.y, origin.x - box.center.x) * 180 / Math.PI;
-    } else if (g.alt && current.length && box && inBox(box, origin)) {
+      g.startAngle = Math.atan2(origin.y - (pivot || box.center).y, origin.x - (pivot || box.center).x) * 180 / Math.PI;
+    } else if (g.alt && !motion && current.length && box && inBox(box, origin)) {
       // Alt+press inside the selection: the drag moves a copy of it (baseline), whatever lies under the pointer.
       g.kind = 'move'; g.dup = true; g.sel = current; g.ctx = I.pickContext(root);
+    } else if (g.alt && !motion && current.length && box && P) {
+      // Alt+press anywhere else with a selection (baseline :1209): the pivot goes there now and follows the pointer while it is held.
+      g.kind = 'pivot'; g.sel = current; g.box = box; g.ctx = I.pickContext(root);
+      P.place(root, origin, g.shift, box); if (O) O.show(root);
     } else {
-      pickDone = I.pick(root, e.clientX, e.clientY).then(function (item) { picked = { item: item }; }, function () { picked = { item: undefined }; }).then(function () {
+      pickDone = I.pick(root, e.clientX, e.clientY).then(function (item) {
+        picked = { item: item }; // a member of a group brings its whole group to the drag (baseline membersOf), read before the drag starts
+        return item && root.NemoNativeSelectGroup ? root.NemoNativeSelectGroup.members(root, item).then(function (m) { picked.members = m; }) : null;
+      }, function () { picked = { item: undefined }; }).then(function () {
         if (g.active && !g.kind && !g.cancelled) { classify(); if (g.kind) update(); } // the drag outran the read: it starts now
       });
     }
@@ -201,20 +221,31 @@
       if (g.kind || !picked) return;
       var item = picked.item, selected = root.selectedPaths || [];
       if (item === undefined) { g.kind = 'none'; notice(root, 'Could not read the canvas just now — try again.'); return; }
-      if (item === null) { I.applyPick(root, null, g.shift); g.kind = 'marquee'; g.ctx = I.pickContext(root); return; }
+      if (item === null) {
+        I.applyPick(root, null, g.shift); g.ctx = I.pickContext(root);
+        g.kind = g.alt && !motion && root.NemoNativeSelectLasso ? 'lasso' : 'marquee'; // Alt+drag on empty canvas is a freehand lasso (baseline :1773)
+        if (g.kind === 'lasso') g.poly = g.trail || [[g.start.x, g.start.y]];
+        return;
+      }
       var held = selected.some(function (p) { return p && p.data && p.data.strokeId === item.data.strokeId; });
-      if (!held) I.applyPick(root, item, g.shift);
-      g.kind = 'move'; g.dup = g.alt && held; g.sel = (root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; }); g.ctx = I.pickContext(root);
+      if (!held) { I.applyPick(root, item, g.shift); if (picked.members) root.NemoNativeSelectGroup.adopt(root, item, g.shift, picked.members); }
+      // Motion: only a shape of the layer whose group was entered (double-click) is dragged as an element; any other press just selects it.
+      var M = root.NemoNativeMotionElement;
+      if (motion && !(M && M.isolated(root))) { g.kind = 'none'; return; }
+      g.kind = 'move'; g.dup = g.alt && held && !motion; g.sel = (root.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; }); g.ctx = I.pickContext(root);
     }
     // The drag's live preview: the selection's transformed copies (box, handles and ring follow) or the marquee rectangle.
     function update() {
       if (g.cancelled || !O) return;
       var at = world(g.last.clientX, g.last.clientY);
       if (g.kind === 'marquee') { g.rect = [Math.min(g.start.x, at.x), Math.min(g.start.y, at.y), Math.max(g.start.x, at.x), Math.max(g.start.y, at.y)]; O.preview(root, { marquee: g.rect }); g.previewed = true; return; }
-      if (g.kind !== 'move' && g.kind !== 'scale' && g.kind !== 'rotate') return;
+      if (g.kind === 'lasso') {
+        O.preview(root, { lasso: g.poly }); g.previewed = true; return; // g.poly is g.trail, extended by move()
+      }
+      if (DRAGS.indexOf(g.kind) < 0) return;
       var bad = unsupported(g.sel, g.dup);
       if (bad) { g.kind = 'none'; notice(root, 'Transforming ' + bad + ' is not available on native projects yet.'); return; }
-      g.matrix = matrixOf(g, at, !!g.last.shiftKey, !!g.last.altKey);
+      g.matrix = g.kind === 'skew' ? root.NemoNativeSelectSkew.matrix(g, at, !!g.last.ctrlKey) : matrixOf(g, at, !!g.last.shiftKey, !!g.last.altKey);
       var cannot = unstorable(root, g.sel, g.matrix);
       if (cannot) { g.kind = 'none'; if (g.previewed) { O.preview(root, null); g.previewed = false; } notice(root, cannot + ' is not available on native projects yet.'); return; }
       var m = new Matrix(g.matrix[0], g.matrix[1], g.matrix[2], g.matrix[3], g.matrix[4], g.matrix[5]);
@@ -244,17 +275,38 @@
     function move(ev) {
       if (g.cancelled) return;
       g.last = ev;
+      if (g.kind === 'pivot') { // the pivot follows the pointer from the first move; Shift snaps it to the nearest of the 9 presets
+        g.active = true; if (stale()) return abandon();
+        root.NemoNativeSelectPivot.place(root, world(ev.clientX, ev.clientY), !!ev.shiftKey, g.box); if (O) O.show(root);
+        return;
+      }
       if (!g.active) {
         if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) <= DRAG) return;
         g.active = true; listen(true);
       }
+      // An Alt drag whose pick has not been read yet may turn out to be a lasso: its path keeps every point from the first move, not only the last.
+      if (g.alt && (!g.kind || g.kind === 'lasso') && root.NemoNativeSelectLasso) {
+        g.trail = g.trail || [[g.start.x, g.start.y]];
+        var more = root.NemoNativeSelectLasso.extend(g.trail, world(ev.clientX, ev.clientY), g.wpp); if (more) g.trail.push(more);
+      }
       if (!g.kind) classify();
-      if ((g.kind === 'move' || g.kind === 'scale' || g.kind === 'rotate') && stale()) return abandon();
+      if (DRAGS.indexOf(g.kind) >= 0 && stale()) return abandon();
       if (g.kind) update();
     }
     async function marqueeEnd() {
       if (I.pickContext(root) !== g.ctx || !g.rect) return;
       var found = await I.marquee(root, g.rect);
+      if (!found) return notice(root, 'Could not read the canvas just now — try again.');
+      if (I.pickContext(root) !== g.ctx) return;
+      var held = g.shift ? (root.selectedPaths || []) : [];
+      root.selectedPaths = held.concat(found.filter(function (p) { return !held.some(function (q) { return q.data.strokeId === p.data.strokeId; }); }));
+      root.state.selectedStrokeIndices = [];
+      if (O) O.show(root);
+      if (typeof root.updateUI === 'function') root.updateUI();
+    }
+    async function lassoEnd() {
+      if (I.pickContext(root) !== g.ctx) return;
+      var found = await root.NemoNativeSelectLasso.select(root, g.poly);
       if (!found) return notice(root, 'Could not read the canvas just now — try again.');
       if (I.pickContext(root) !== g.ctx) return;
       var held = g.shift ? (root.selectedPaths || []) : [];
@@ -270,16 +322,30 @@
         if (!D) { notice(root, 'Duplicating is not available right now.'); return Promise.resolve('refused'); }
         return D.commit(root, g.sel, g.matrix, { pin: g.pin, stale: stale, cancelled: function () { return g.cancelled; }, release: function () { listen(false); } });
       }
+      if (g.motion) { // an ELEMENT move is a Motion edit of its Position (one object.property.edit), never a geometry batch
+        var M = root.NemoNativeMotionElement;
+        if (!M) { notice(root, 'Moving an element is not available right now.'); return Promise.resolve('refused'); }
+        return M.commitMove(root, g.sel, g.matrix, { pin: g.pin, stale: stale, cancelled: function () { return g.cancelled; }, release: function () { listen(false); } });
+      }
       return commitMatrix(root, g.sel, g.matrix, { pin: g.pin, stale: stale, cancelled: function () { return g.cancelled; }, release: function () { listen(false); }, angle: g.kind === 'rotate' ? g.angle : 0 });
     }
     async function end(ev) {
       // A press that never became a drag ends here, except Alt+click inside the selection: the baseline cloned it in place at the press, so the copy stays (selected).
+      // The pivot gesture ends by writing the pivot onto the picked records (one restyle batch), whether it was a click or a drag.
+      if (g.kind === 'pivot' && !g.cancelled) {
+        g.cancelled = true; listen(false);
+        try { if (!stale()) await root.NemoNativeSelectPivot.persist(root, g.sel); } catch (_) { /* the pivot stays a session choice */ }
+        if (O) O.show(root);
+        if (typeof root.updateUI === 'function') root.updateUI();
+        return;
+      }
       if (g.cancelled || (!g.active && !(g.dup && g.kind === 'move'))) return cancel();
       g.last = ev;
       try {
         if (!g.kind && pickDone) { await pickDone; if (g.cancelled) return; classify(); }
         if (g.kind === 'marquee') { update(); await marqueeEnd(); }
-        else if (g.kind === 'move' || g.kind === 'scale' || g.kind === 'rotate') {
+        else if (g.kind === 'lasso') { update(); await lassoEnd(); }
+        else if (DRAGS.indexOf(g.kind) >= 0) {
           if (g.active) update(); else g.matrix = [1, 0, 0, 1, 0, 0]; // below the drag threshold the copy sits exactly where the original is
           if (g.kind && (g.dup || !identity(g.matrix)) && !g.cancelled) await commit(); // a copy dragged back to where it started is still a copy
         }
@@ -292,8 +358,10 @@
         if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
       }
     }
-    return { move: move, end: end, cancel: cancel, owns: function () { return !!handle; },
-      altClick: function (ev) { if (g.cancelled || !g.dup || g.kind !== 'move' || g.active) return false; end(ev); return true; } };
+    return { move: move, end: end, cancel: cancel, owns: function () { return !!handle || g.kind === 'pivot'; },
+      altClick: function (ev) {
+        if (g.kind === 'pivot' && !g.cancelled && !g.active) { end(ev); return true; } // an Alt+click that placed the pivot writes it onto the picked records
+        if (g.cancelled || !g.dup || g.kind !== 'move' || g.active) return false; end(ev); return true; } };
   }
   // Cmd/Ctrl+A (baseline 1065e9d8 timeline.js onKeyDown): every selectable item of the ACTIVE layer, Select and Direct Select only. A native object
   // project builds no Paper children, so the items come from the same presented listing the marquee reads (a texture dab and a linked fill companion
@@ -322,6 +390,6 @@
       return true;
     }());
   }
-  function bind(root) { return Object.freeze({ begin: function (e, abort) { return begin(root, e, abort); }, selectAll: function () { return selectAll(root); } }); }
+  function bind(root) { return Object.freeze({ begin: function (e, abort) { return begin(root, e, abort); }, selectAll: function () { return selectAll(root); }, hitHandle: hitHandle }); }
   return Object.freeze({ bind: bind, begin: begin, selectAll: selectAll, hitHandle: hitHandle, matrixOf: matrixOf, commitMatrix: commitMatrix, unsupported: unsupported, unstorable: unstorable });
 }));

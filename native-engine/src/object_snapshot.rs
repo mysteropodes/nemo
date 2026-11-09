@@ -45,6 +45,10 @@ mod project_metadata_dispatch;
 mod property_metadata_dispatch_tests;
 #[path = "object_property_metadata_read.rs"]
 mod property_metadata_read;
+#[path = "object_property_conditional_rows.rs"]
+mod property_conditional_rows;
+#[path = "object_property_shape_rows.rs"]
+mod property_shape_rows;
 #[cfg(all(test, feature = "test-commands"))]
 #[path = "../tests/object_property_metadata_read.rs"]
 mod property_metadata_tests;
@@ -93,6 +97,11 @@ mod ghost_view;
 mod rig_presentation;
 #[path = "object_rig_view.rs"]
 mod rig_view;
+// #2255: the candidate rig of a held pose drag and the world map of a rig layer with Motion (presentation only).
+#[path = "object_rig_preview.rs"]
+mod rig_preview;
+#[path = "object_rig_placement.rs"]
+mod rig_placement;
 use serde::{Deserialize, Serialize};
 pub use timing::LayerTimingReadResponse;
 const MAX_MESSAGE_BYTES: usize = 4096;

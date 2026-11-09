@@ -14,8 +14,8 @@ use serde_json::{json, Value};
 
 impl ObjectSnapshot {
     /// The `layerBounds` result for a layer holder at `frame`; a stroke holder, a fractional or negative frame and a layer
-    /// that shows no geometry the box can follow (text, effect, rig, expression-driven document) are typed refusals. A 3D layer is answered:
-    /// its gizmo pivots about the same bounds.
+    /// that shows no geometry the box can follow (text) are typed refusals; a rigged layer is boxed on its posed strokes, an effect layer at the origin. A 3D layer is answered:
+    /// its gizmo pivots about the same bounds, or about the zero bounds at the origin when it shows no geometry at `frame`.
     pub(crate) fn layer_bounds_read(
         &self,
         target: &PropertyHolderTarget,
@@ -43,17 +43,22 @@ impl ObjectSnapshot {
                 .ok_or(NotFound)?
                 .layers()
         };
-        let parent = layers
-            .iter()
-            .find(|l| l.layer_uid() == uid)
-            .ok_or(NotFound)?
+        let layer = layers.iter().find(|l| l.layer_uid() == uid).ok_or(NotFound)?;
+        let three_d = layer.three_d.value() == Some(&true);
+        let parent = layer
             .parent_layer_uid
             .value()
             .and_then(Option::as_deref)
             .filter(|p| !p.is_empty())
             .map(str::to_owned);
         let pivot = crate::object_snapshot::object_parent_pivot_read::layer_gizmo_bounds;
-        let bounds = pivot(self, target.context_id(), uid, frame as u32).map_err(|_| Unavailable)?;
+        // #2520/#2525: the baseline draws a 3D layer that shows nothing at the playhead at the zero-bounds centre of an empty
+        // Paper layer (the origin), so its gizmo is still there to key; a flat layer with no geometry stays a typed refusal.
+        let bounds = match pivot(self, target.context_id(), uid, frame as u32) {
+            Ok(bounds) => bounds,
+            Err(_) if three_d => [0.0; 4],
+            Err(_) => return Err(Unavailable),
+        };
         let affine = crate::object_snapshot::object_parent_pivot_read::layer_ancestor_affine(
             self,
             target.context_id(),

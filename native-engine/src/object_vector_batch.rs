@@ -38,6 +38,8 @@ mod gradient;
 mod order_step;
 #[path = "object_vector_batch_rebake.rs"]
 pub(super) mod rebake;
+#[path = "object_vector_batch_delete.rs"]
+mod delete;
 
 /// One batch is a bounded gesture, never a document rewrite; the encoded request stays under the vector budget.
 pub(crate) const MAX_BATCH_OPS: usize = 64;
@@ -160,6 +162,7 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
     // panel: the baseline skipped a texture anchor the edit would unhide) restyles what it can; each skipped step stays in the receipt
     // as a no-op naming its target, and a batch where every step is skipped is still refused.
     let mut skipped = 0u32;
+    let taken = delete::dabs_taken(base, &ops); // the stored dabs of the texture anchors this batch deletes go with their anchor
     for (requested, mut op) in ops.into_iter().enumerate() {
         starts.push(out.len());
         if op.op == "copy" {
@@ -236,6 +239,13 @@ fn expand_transforms(origin: &ObjectSnapshot, base: &ObjectDocument, ops: Vec<Ba
                 return Err(InvalidRequest);
             }
             continue;
+        }
+        match delete::expand(base, &taken, op) { // #2372 Select Delete: a texture anchor takes its stored dabs with it
+            Ok(steps) => {
+                (companion.extend((0..steps.len()).map(|at| at > 0)), swaps.extend(steps.iter().map(|_| None)), out.extend(steps));
+                if out.len() > MAX_EXPANDED_OPS { return Err(InvalidRequest); } else { continue; }
+            }
+            Err(back) => op = back,
         }
         let Some(matrix) = op.matrix.value().copied() else {
             out.push(op);
@@ -464,6 +474,7 @@ pub(super) fn batch(origin: &ObjectSnapshot, base: &ObjectDocument, context: &st
                 replace_in(&document, record)?
             }
             ("delete", Presence::Missing, Presence::Present(target)) if op.placement.missing() => {
+                delete::note_companion(&document, &target, &mut rebakes); // a bitmap brush anchor takes its baked companion image with it
                 delete_in(&document, target)?
             }
             _ => return Err(InvalidRequest),

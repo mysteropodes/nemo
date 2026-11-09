@@ -9,7 +9,9 @@
 //! `strike`, `letterSpacing`, `wordSpacing`, `lineHeightMult` (positive),
 //! `textCase` (`none` | `upper` | `lower` | `capitalize`) and `anchorTopLeft`
 //! (`{x, y}`, the point the glyphs were placed FROM) and `rotation` (#2267, degrees, the turn of the whole block about
-//! its `anchorTopLeft`, absent = 0; only a Select turn writes it, the baseline turned the glyph paths instead).
+//! its `anchorTopLeft`, absent = 0; only a Select turn writes it, the baseline turned the glyph paths instead) and the optional
+//! `flipX` / `flipY` / `skew` (#2372: a mirror and an x-shear in degrees about the same anchor, absent = none) and the optional
+//! Select pivot `xformAnchorKey` (nine presets) / `xformAnchorCustom` (a world point `[x, y]`, which wins), absent = the centre.
 //! `text`, `font`, `size`, `color`, `align` and `anchorTopLeft` are required; every other member may be
 //! absent, and absent, default and explicit stay distinct on a round trip
 //! (`fixedWidth` absent is not `null`; an explicit `0` letter spacing and an
@@ -38,6 +40,7 @@
 
 use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::flow::is_js_trim_whitespace;
 use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::MAX_TEXT_UNITS;
+use crate::object_document::object_raster_asset_kernels::object_item_local_form::{pivot_custom, pivot_key, pivot_valid, MAX_SKEW_DEGREES};
 use crate::object_document::{object_deserialize, Presence};
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
@@ -126,6 +129,16 @@ pub(crate) struct TextBlockRecord {
     anchor_top_left: TextAnchor,
     #[serde(skip_serializing_if = "Presence::missing")]
     rotation: Presence<Number>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    flip_x: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    flip_y: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    skew: Presence<Number>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    xform_anchor_key: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    xform_anchor_custom: Presence<Vec<Number>>,
 }
 
 struct TextBlockWire {
@@ -146,6 +159,11 @@ struct TextBlockWire {
     text_case: Presence<String>,
     anchor_top_left: TextAnchor,
     rotation: Presence<Number>,
+    flip_x: Presence<bool>,
+    flip_y: Presence<bool>,
+    skew: Presence<Number>,
+    xform_anchor_key: Presence<String>,
+    xform_anchor_custom: Presence<Vec<Number>>,
 }
 object_deserialize!(TextBlockWire {
     text: String, font: FontRefWire, size: Number, color: String, align: String,
@@ -160,7 +178,12 @@ object_deserialize!(TextBlockWire {
     #[serde(default)] line_height_mult: Presence<Number>,
     #[serde(default)] text_case: Presence<String>,
     anchor_top_left: TextAnchor,
-    #[serde(default)] rotation: Presence<Number>
+    #[serde(default)] rotation: Presence<Number>,
+    #[serde(default)] flip_x: Presence<bool>,
+    #[serde(default)] flip_y: Presence<bool>,
+    #[serde(default)] skew: Presence<Number>,
+    #[serde(default)] xform_anchor_key: Presence<String>,
+    #[serde(default)] xform_anchor_custom: Presence<Vec<Number>>
 });
 
 impl<'de> Deserialize<'de> for TextBlockRecord {
@@ -233,6 +256,11 @@ impl TextBlockRecord {
             text_case: wire.text_case,
             anchor_top_left: wire.anchor_top_left,
             rotation: wire.rotation,
+            flip_x: wire.flip_x,
+            flip_y: wire.flip_y,
+            skew: wire.skew,
+            xform_anchor_key: wire.xform_anchor_key,
+            xform_anchor_custom: wire.xform_anchor_custom,
         };
         record.validate()?;
         Ok(record)
@@ -276,7 +304,24 @@ impl TextBlockRecord {
                 return Err(TextRecordError::Rotation);
             }
         }
+        if let Some(skew) = self.skew.value() {
+            if !f64_of(skew).is_finite() || f64_of(skew).abs() > MAX_SKEW_DEGREES {
+                return Err(TextRecordError::Rotation);
+            }
+        }
+        if !pivot_valid(&self.xform_anchor_key, &self.xform_anchor_custom) {
+            return Err(TextRecordError::Malformed);
+        }
         Ok(())
+    }
+
+    /// #2372: the stored Select pivot preset, if any.
+    pub(crate) fn pivot_key(&self) -> Option<String> {
+        pivot_key(&self.xform_anchor_key)
+    }
+    /// #2372: the stored custom Select pivot (a world point), if any.
+    pub(crate) fn pivot_custom(&self) -> Option<[f64; 2]> {
+        pivot_custom(&self.xform_anchor_custom)
     }
 
     /// Strict decode of one record's JSON text (see the module notes).

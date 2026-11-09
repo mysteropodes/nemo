@@ -219,12 +219,13 @@
       // baseline did a filled Paper item); an unfilled plain stroke only on its line.
       path.strokeColor = [0, 0, 0]; path.strokeWidth = Math.max(1, worldStrokeWidth(item)); if (item.closed && (item.role !== 'plain' || item.filled === true)) path.fillColor = [0, 0, 0];
       path.data = { strokeId: item.stableTarget.strokeId, nativeStableTarget: item.stableTarget, nativeRole: item.role, nativeRibbon: item.role === 'ribbon', nativeMatrix: item.matrix,
-        nativeOwner: item.owner, nativeBrush: item.brush, nativeGroup: item.group, nativeStyle: item.style, nativeBounds: item.bounds };
+        nativeOwner: item.owner, nativeBrush: item.brush, nativeGroup: item.group, nativeStyle: item.style, nativeBounds: item.bounds, nativeGroupPath: item.groupPath };
       // The record's stored boxAngle (baseline serP/desP data.boxAngle) turned by the presented matrix when that is a pure similarity, so the
       // oriented box is drawn in world space after a frame change, an undo or a reload.
       // #2372 SEL-MASK: a listed mask is the selection the Mask panel edits (the baseline mask Path carried data.isMask / maskMode / maskFeather).
       // #2372 insp-parametric: a dynamic rectangle / ellipse / star carries its listed parameters as the baseline Paper item's data.paramShape, which the Rounded corners, Ellipse arc and Star panels show.
       if (item.paramShape) path.data.paramShape = JSON.parse(JSON.stringify(item.paramShape));
+      if (item.xformAnchorKey) path.data.xformAnchorKey = item.xformAnchorKey; if (item.xformAnchorCustom) path.data.xformAnchorCustom = item.xformAnchorCustom.slice(); // the stored Select pivot (serP)
       if (item.role === 'mask') { path.data.isMask = true; path.data.maskMode = item.style && item.style.maskMode || 'add'; path.data.maskFeather = item.style && item.style.maskFeather || 0; }
       var mx = item.matrix, sim = mx[0] * mx[3] - mx[1] * mx[2] > 0 && Math.abs(mx[0] - mx[3]) < 1e-6 * (Math.abs(mx[0]) + 1) && Math.abs(mx[1] + mx[2]) < 1e-6 * (Math.abs(mx[1]) + 1);
       if (item.boxAngle) path.data.boxAngle = (item.boxAngle + (sim ? Math.atan2(mx[1], mx[0]) * 180 / Math.PI : 0)) % 360;
@@ -458,7 +459,7 @@
   function resolvePick(root, I, intent, shift, ctx) {
     var W = root.NemoNativePresentationWait, text = 'Could not read the canvas just now \u2014 click again.';
     var unavailable = function () { if (typeof root.showToast === 'function') root.showToast(text); };
-    var apply = function (item) { try { I.applyPick(root, item, shift); } catch (_) {} };
+    var apply = function (item) { try { I.applyPick(root, item, shift); if (item && root.NemoNativeSelectGroup) root.NemoNativeSelectGroup.widen(root, item, shift); } catch (_) {} };
     var read = function () { return I.pick(root, intent.x, intent.y); };
     if (!W) return read().then(function (item) { if (item !== undefined && I.pickContext(root) === ctx) apply(item); }, unavailable);
     return W.await(root, { read: read, ready: function (v) { return v !== undefined; }, holds: function () { return I.pickContext(root) === ctx; }, notice: text }, { tries: 17 })

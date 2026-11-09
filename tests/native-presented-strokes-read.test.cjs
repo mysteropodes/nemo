@@ -19,6 +19,7 @@ function fixture(mode){
         result={...view,atRevision:rev,documentSnapshotId:state.info.documentSnapshotId,total:items.length,nextCursor:end===items.length?null:end,preview:false,items:items.slice(view.cursor,end).map(i=>({...i}))};}
       else result={...view,atRevision:rev,documentSnapshotId:state.info.documentSnapshotId,total:2,nextCursor:null,preview:false,items:items.map(i=>({...i}))};
       if(mode==='unmarked')delete result.hitTest;
+      if(mode==='offsets')result.items[0].vertexOffsets=[[5,-2],[0,0]];
       if(mode==='pose'||mode==='bytes-pose')result.layerMatrix=[1,0,0,1,7,-3];
     }else{
       const page=p.subselect,ribbon=p.stableTarget.strokeId==='ribbon',source=page.center?outline.slice(0,18):ribbon?outline:outline.slice(0,2),total=mode==='count'&&ribbon?19:source.length;
@@ -85,4 +86,12 @@ test('the layer\'s pose rides the hit-test listing to the reader, whichever page
   const f=fixture('pose');await f.read(()=>false);const again=await f.read(()=>false);
   assert.deepEqual(again.layerMatrix,[1,0,0,1,7,-3],'a cached listing keeps its pose');
   assert.equal(f.sent.filter(q=>q.payload.view).length,1);
+});
+test('a listed vertexOffsets moves the anchor POINTS of its record only, once per read, and leaves the handles alone (C-motion-canvas-4)',async()=>{
+  const f=fixture('offsets');
+  for(const again of [false,true]){
+    const r=await f.read(item=>item.role==='plain');
+    assert.deepEqual(r.items[0].segments,[{point:[5,8],handleIn:[0,0],handleOut:[0,0]},{point:[1,10],handleIn:[0,0],handleOut:[0,0]}],again?'a cached geometry page is not offset twice':'first read');
+  }
+  assert.equal(f.outline[0].point[0],0,'the stored geometry is never mutated');
 });

@@ -22,6 +22,7 @@ pub(super) fn request_limit(operation: &str) -> usize {
         || operation.starts_with("command.document.object.tween.")
         || operation == "command.document.object.property.preset.apply"
         || operation == "command.document.object.property.keys.paste"
+        || operation == "command.document.object.property.batch"
         // The shape clipboard paste carries its detached clip inline (the engine's own clip bound).
         || operation == "command.document.object.clipboard.paste"
     {

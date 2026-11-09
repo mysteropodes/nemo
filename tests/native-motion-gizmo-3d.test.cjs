@@ -163,6 +163,18 @@ test('a 3D layer reads Position Z and both rotations and draws arrows and rings 
   assert.deepEqual([arrow.attrs.x1, arrow.attrs.y1, arrow.attrs.x2, arrow.attrs.y2], [200, 150, 380, 150], 'the X arrow is 180 canvas units long at depth 0');
   assert.equal(arrow.attrs.stroke, 'rgba(235,70,70,1)');
 });
+test('a 3D layer with no geometry at the playhead keeps its gizmo at the zero-bounds centre', async () => {
+  // The engine answers an empty 3D layer with zero bounds at the origin (the baseline draws it at an empty Paper layer's centre, (0, 0)).
+  const h = three({ values: { bounds: [0, 0, 0, 0] } });
+  await h.ready();
+  const kinds = h.overlay().children.map((c) => c.name);
+  assert.equal(kinds.filter((k) => k === 'line').length, 3 + 2, 'three arrows and the pivot crosshair, drawn though the layer shows nothing');
+  assert.equal(kinds.filter((k) => k === 'polygon').length, 3 + 3);
+  assert.equal(h.toasts.length, 0, 'no unboxed notice: the layer has a gizmo');
+  const origin = Giz.pose({ bounds: [0, 0, 0, 0], position: [0, 0], anchor: [0, 0], rotation: 0, positionZ: 0, rotationX: 0, rotationY: 0, canvasW: 960, canvasH: 540 });
+  const arrow = h.overlay().children.find((c) => c.name === 'line' && c.attrs.stroke === 'rgba(235,70,70,1)');
+  assert.deepEqual([arrow.attrs.x1, arrow.attrs.y1], [origin.originWX + 480, origin.originWY + 270], 'the arrows start at the canvas point of the origin');
+});
 test('a flat layer keeps its box and reads none of the 3D values', async () => {
   const h = harness();
   await h.ready();

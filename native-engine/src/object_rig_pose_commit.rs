@@ -24,8 +24,10 @@
 //! - the baseline commit with binds that all fail to relink still promotes the keyframe and reports
 //!   success; here no stroke would be posed, so it is the typed `no_rigged_stroke` refusal and nothing is
 //!   published (a promotion with no pose is not what the button promises);
-//! - a mesh bind needs the image-mesh store and the raster rect (L03-J/L06 providers): a commit that meets
-//!   one is the typed `pose_unavailable`; a reset needs only the store (it writes zeros);
+//! - a mesh bind needs the image-mesh store and the raster rect of its mesh at the exposed frame (#2255, the
+//!   snapshot provider of `object_rig_pose_read.rs`): its posed offsets are written into the store with the
+//!   stroke segments; a commit whose mesh has no rect is the typed `pose_unavailable`; a reset needs only
+//!   the store (it writes zeros);
 //! - the baseline reset re-deforms the live objects and may throw midway; the record edit is complete
 //!   before any evaluation, so the native reset has no such failure;
 //! - locked layers and layers with an active path effect are refused (`canEditActiveLayer` ->
@@ -159,6 +161,8 @@ pub(crate) struct PoseReport {
     pub(crate) posed_strokes: u32,
     /// Binds the baseline `relinkRigBinds` would have dropped (kept in the record, never rewritten).
     pub(crate) unlinked_binds: u32,
+    /// Mesh offset arrays a commit rewrote with the posed offsets.
+    pub(crate) posed_meshes: u32,
     /// Mesh offset arrays a reset recomputed to zero.
     pub(crate) meshes_zeroed: u32,
     /// Mesh binds a reset could not reach (store absent, mesh absent or another vertex count).
@@ -296,7 +300,7 @@ fn plan_commit(
     if pose.binds.contains(&PoseBind::Unavailable) {
         return Err(PoseRefusal::PoseUnavailable);
     }
-    if pose.strokes.is_empty() {
+    if pose.strokes.is_empty() && pose.meshes.is_empty() {
         return Err(PoseRefusal::NoRiggedStroke);
     }
     report.unlinked_binds = pose
@@ -305,9 +309,11 @@ fn plan_commit(
         .filter(|bind| **bind == PoseBind::Unlinked)
         .count() as u32;
     report.posed_strokes = pose.strokes.len() as u32;
-    // Phase 3: saveActiveLayerFrame -- the posed segments replace the stored ones of the promoted key.
+    // Phase 3: saveActiveLayerFrame -- the posed segments replace the stored ones of the promoted key, and the posed
+    // mesh offsets land in the mesh store (`applyRigDeform` wrote them live).
     let mut candidate = promoted_document;
     rules::replace_segments(&mut candidate, uid, pose.source_frame, &pose.strokes)?;
+    report.posed_meshes = meshes::write_pose_offsets(&mut candidate, &pose.meshes)?;
     admit(document, candidate, report)
 }
 

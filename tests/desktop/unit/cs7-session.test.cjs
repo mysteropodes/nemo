@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { createInput } = require('../cs7-session.cjs');
+const { createInput, requireMcpPinned, validGrant } = require('../cs7-session.cjs');
 
 // Real helper subprocess/pipe/exit lifecycle. It deliberately has no AX or Nemo access.
 function fixture(t, mode) {
@@ -59,4 +59,30 @@ test('concurrent input and oversized requests are refused before another write',
     await assert.rejects(input.command('observe'), /unavailable/);
     assert.equal((await first).ordinal, 1);
   } finally { await input.close(); }
+});
+test('a grant must be a booking in the current log, not a comment in the full #1062', () => {
+  assert.equal(validGrant('2804/6680336217'), true);
+  for (const grant of ['1062/6357169384', '2804/', '/1', '2804/1/2', '2804/1\n', 'x2804/1', '', undefined, null]) {
+    assert.equal(validGrant(grant), false, String(grant));
+  }
+  // The Swift helper repeats this rule, and its source sits at the helper's size limit.
+  const helper = fs.readFileSync(path.join(__dirname, '..', 'ui32-owned-policy.swift'), 'utf8');
+  assert.ok(helper.includes('grant.range(of:"^2804/[0-9]+$",options:.regularExpression)'));
+  assert.ok(!helper.includes('^1062/'));
+});
+
+test('the read client must be listed in the package proof and match its hash', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-cs7-mcp-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const binary = path.join(root, 'nemo-mcp');
+  fs.writeFileSync(binary, 'client bytes');
+  const sha = require('node:crypto').createHash('sha256').update('client bytes').digest('hex');
+  const entry = hash => ({ path: 'x/Nemo.app/Contents/MacOS/nemo-mcp', sha256: hash });
+  requireMcpPinned({ artifacts: [entry(sha)] }, binary);
+  assert.throws(() => requireMcpPinned({ artifacts: [] }, binary), /does not pin/);
+  assert.throws(() => requireMcpPinned({}, binary), /does not pin/);
+  assert.throws(() => requireMcpPinned({ artifacts: [{ path: 'x/Nemo.app/Contents/MacOS/nemo-mcp', present: false }] }, binary), /does not pin/);
+  assert.throws(() => requireMcpPinned({ artifacts: [entry('0'.repeat(64))] }, binary), /differs from the package proof/);
+  fs.writeFileSync(binary, 'substituted');
+  assert.throws(() => requireMcpPinned({ artifacts: [entry(sha)] }, binary), /differs from the package proof/);
 });

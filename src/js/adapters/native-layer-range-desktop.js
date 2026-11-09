@@ -67,7 +67,17 @@
     value.items.forEach(function(k){if(!k||!Number.isFinite(k.frame)||k.frame<=previous||typeof k.selected!=='boolean')throw Error('Invalid native key projection');previous=k.frame;});
     return value;
   }
+  // #2377: the property key read with the Time Remap lanes of the video placements added (native-time-remap-keys.js).
   function keyViews(root,w){
+    var real=propertyViews(root,w),Remap=root.NemoNativeTimeRemapKeys;
+    return Remap&&root.state.appMode==='motion'?Remap.merge(root,w.info,real):real;
+  }
+  // The key route: the selected Time Remap keys when they are the selection, else the property key editor.
+  function editRoute(root,w){
+    var Remap=root.NemoNativeTimeRemapKeys,real=w.ports&&w.ports.editSelectedKeys;
+    return typeof real!=='function'?real:Remap?Remap.route(root,real):real;
+  }
+  function propertyViews(root,w){
     var plural=w&&w.ports&&w.ports.readMotionKeyTimelines;
     if(typeof plural!=='function'){
       var one=keyView(root,w);if(!one)return null;
@@ -99,12 +109,40 @@
       row.style.height=((1+extra)*22)+'px';var bar=row.querySelector('.layer-inout-bar');if(bar){bar.style.bottom=extra?'auto':'2px';bar.style.height=extra?'18px':'';}
     });
   }
-  // T12: a native video placement's Time Remap keys (its placement read) as one inert lane: no atomic move-key op exists.
-  function remapTracks(root,w){var f=root.SM&&root.SM.timeRemapKeyFacts;if(typeof f!=='function')return [];
-    return w.info.layers.map(function(l,i){var r=f(i),keys=r&&Array.isArray(r.keys)?r.keys:[];
-      return keys.length?{target:{contextId:'scene-root',layerUid:l.layerUid},property:'timeRemap',inert:true,items:keys.map(function(k){return {frame:k.frame,selected:false};})}:null;}).filter(Boolean);}
-  // #2377: the keys a drag may snap to are every open key track and, as in the baseline snapMotionFrame (addTrack(ld.timeRemap)), each Time Remap lane.
-  function snapView(root,w){var v=keyViews(root,w),remap=remapTracks(root,w);return v||remap.length?{tracks:(v?v.tracks:[]).concat(remap)}:null;}
+  // #2377: the frames a drag may snap to beyond the playhead, work area and composition markers (the baseline snapMotionFrame): every key track in the
+  // key read (open drawers and Time Remap lanes), the markers of each layer ('Repère calque'), the keys of each layer's effect stack, the keys of every
+  // layer's own property holders (the dragged keys left out) and the BPM beats while the grid is shown.
+  function snapLists(range){
+    var own=function(o,k){return Object.prototype.hasOwnProperty.call(o,k);},frames=function(k){return !own(range,k)||Array.isArray(range[k])&&range[k].length<=512&&range[k].every(function(f){return Number.isSafeInteger(f)&&f>=0;});};
+    return (!own(range,'markers')||Array.isArray(range.markers)&&range.markers.length<=64&&range.markers.every(function(m){return !!m&&typeof m==='object'&&Number.isSafeInteger(m.frame)&&m.frame>=0&&
+      Object.keys(m).every(function(k){return k==='frame'||k==='name';})&&(!own(m,'name')||typeof m.name==='string'&&m.name.length>=1&&m.name.length<=32);}))&&frames('effectKeys')&&frames('keyFrames');
+  }
+  // The selected property keys of the key read per layer and frame: the keys a drag is moving, which must not be a snap target of themselves.
+  function draggedKeys(v){
+    var out=new Map();
+    ((v&&v.tracks)||[]).forEach(function(t){if(t.remap)return;t.items.forEach(function(k){if(!k.selected)return;
+      var m=out.get(t.target.layerUid)||new Map();m.set(k.frame,(m.get(k.frame)||0)+1);out.set(t.target.layerUid,m);});});
+    return out;
+  }
+  // Baseline collectMotionSnapCandidates: state.bpmShow beats ('Temps BPM'), read from the native composition projection through SMBpm.
+  function beatCandidates(root){
+    try{
+      var bpm=root.SMBpm,ctl=root.NemoNativeCompositionController,p=ctl&&typeof ctl.read==='function'?ctl.read():null,c=p&&p.composition;
+      if(!bpm||typeof bpm.beatFrames!=='function'||!c||c.effectiveBpmShow!==true||!(c.effectiveBpm>0)||!(root.state.fps>0))return [];
+      return bpm.beatFrames().map(function(b){return {frame:b.frame,label:'Temps BPM'};});
+    }catch(_){return [];}
+  }
+  function snapView(root,w){
+    var v=keyViews(root,w),extra=[],dragged=draggedKeys(v);
+    w.rows.forEach(function(row,i){var r=row.nativeRange&&same(row.nativeRange.pin,w.info)?row.nativeRange.range:null;if(!r)return;
+      (r.markers||[]).forEach(function(m){extra.push({frame:m.frame,label:m.name||'Repère calque'});});
+      (r.effectKeys||[]).forEach(function(f){extra.push({frame:f,label:'Clé'});});
+      var mine=dragged.get(w.info.layers[i].layerUid),skipped=new Map();
+      (r.keyFrames||[]).forEach(function(f){var out=mine&&mine.get(f)||0,seen=skipped.get(f)||0;
+        if(seen<out){skipped.set(f,seen+1);return;}extra.push({frame:f,label:'Clé'});});});
+    beatCandidates(root).forEach(function(b){extra.push(b);});
+    return v||extra.length?{tracks:v?v.tracks:[],extra:extra}:null;
+  }
   function resetKeys(root,w){clearKeys(w);keyRows(root,w,[]);}
   // The key buttons depend on the key frames, selection, lanes and zoom, not on which frame is shown: a playback tick whose projection prints the same
   // signature keeps its buttons (#2371) and only swaps the live value their handlers read.
@@ -114,10 +152,10 @@
   function refreshKeys(root){
     var w=works.get(root);if(!w)return;
     try{
-      var live=w.node&&root.state.appMode==='motion'&&ready(root,session(root),w.info),value=live?keyViews(root,w):null,remap=live?remapTracks(root,w):[],fc=root.FC;
-      if((!value&&!remap.length)||!Number.isFinite(fc)||fc<=0){resetKeys(root,w);return;}
+      var live=w.node&&root.state.appMode==='motion'&&ready(root,session(root),w.info),value=live?keyViews(root,w):null,fc=root.FC;
+      if(!value||!Number.isFinite(fc)||fc<=0){resetKeys(root,w);return;}
       var groups=new Map(),layout=[],positions=[];
-      (value?value.tracks:[]).concat(remap).forEach(function(track){
+      value.tracks.forEach(function(track){
         var index=w.info.layers.findIndex(function(l){return l.layerUid===track.target.layerUid;});if(index<0)throw Error('Foreign native key layer');
         var group=groups.get(index)||[];group.push(track);groups.set(index,group);
       });
@@ -146,7 +184,6 @@
         node.dataset.frame=String(key.frame);node.dataset.keyTrack=trackIdentity(track);node.dataset.selected=String(key.selected);node.classList.toggle('sel',key.selected);
         if(key.color){node.classList.add('tinted');if(typeof node.style.setProperty==='function')node.style.setProperty('--key-color',key.color);else node.style['--key-color']=key.color;}
         node.setAttribute('aria-label',track.property+' key at frame '+String(key.frame));node.setAttribute('aria-pressed',String(key.selected));
-        if(track.inert){node.disabled=true;node.style.pointerEvents='none';row.appendChild(node);w.keyNodes.push(node);return;}
         function choose(event){
           event.preventDefault();event.stopPropagation();if(event.button!==undefined&&event.button!==0)return;
           try{
@@ -189,7 +226,7 @@
     if(!gesture||!drag||!w.ports||typeof w.ports.editSelectedKeys!=='function'||w.keyDrag)return;
     var id=trackIdentity(track);
     w.keyDrag=drag.start({gesture:gesture,doc:root.document,event:event,fc:root.FC,total:w.info.totalFrames,track:track,a:a,b:b,address:keyAddress,
-      view:function(){try{return keyViews(root,w);}catch(_){return null;}},edit:w.ports.editSelectedKeys,refresh:function(){refreshKeys(root);},
+      view:function(){try{return keyViews(root,w);}catch(_){return null;}},edit:editRoute(root,w),refresh:function(){refreshKeys(root);},
       nodes:function(frames){return (w.keyNodes||[]).filter(function(n){return n.dataset.keyTrack===id&&frames.indexOf(Number(n.dataset.frame))>=0;});},
       snap:{first:event.altKey?b.frame:a.frame,on:function(){try{return root.localStorage.getItem('nemo-motion-snap')!=='0';}catch(_){return true;}},
         frames:function(){try{return gesture.snapCandidates(root,snapView(root,w),w.info.totalFrames);}catch(_){return [];}}},
@@ -201,7 +238,7 @@
     // Alt + drag of a selected key skews like the bottom edge of the selection box (baseline), when the keys sit on 2+ rows.
     if(event.altKey&&w.box&&w.box.update()){w.box.start(event,'bottom');return;}
     var snapFirst=Number(node&&node.dataset&&node.dataset.frame);
-    w.keyDrag=gesture.beginDrag({doc:root.document,startX:event.clientX,fc:fc,total:w.info.totalFrames,edit:w.ports.editSelectedKeys,
+    w.keyDrag=gesture.beginDrag({doc:root.document,startX:event.clientX,fc:fc,total:w.info.totalFrames,edit:editRoute(root,w),
       nodes:function(){return (w.keyNodes||[]).filter(function(n){return n.dataset.selected==='true';});},
       snap:Number.isFinite(snapFirst)?{first:snapFirst,on:function(){try{return root.localStorage.getItem('nemo-motion-snap')!=='0';}catch(_){return true;}},
         frames:function(){try{return gesture.snapCandidates(root,snapView(root,w),w.info.totalFrames);}catch(_){return [];}}}:null,
@@ -214,20 +251,20 @@
       nodes:function(){return (w.keyNodes||[]).filter(function(n){return n.parentNode&&!n.parentNode.hidden;}).map(function(n){return {node:n,id:n.dataset.keyTrack,frame:Number(n.dataset.frame),selected:n.dataset.selected==='true',rect:typeof n.getBoundingClientRect==='function'?n.getBoundingClientRect():null};});},
       view:function(){try{return keyViews(root,w);}catch(_){return null;}},fc:function(){return root.FC;},last:function(){return w.info.totalFrames-1;},
       rank:function(track){var id=trackIdentity(track),n=(w.keyNodes||[]).find(function(k){return k.dataset.keyTrack===id;}),r=n&&typeof n.getBoundingClientRect==='function'?n.getBoundingClientRect():null;return r?r.top:0;},
-      edit:w.ports.editSelectedKeys,toast:function(m){notice(root,m);}});
+      edit:editRoute(root,w),toast:function(m){notice(root,m);}});
     w.box.update();
   }
   // The key menu acts on a selection read when it opened; a click after the selection changed commits nothing.
   function keyMenu(root,w,track,key,event){
     event.preventDefault();event.stopPropagation();
     try{
-      var gesture=root.NemoNativeMotionKeyGesture,live=keyViews(root,w),edit=w.ports&&w.ports.editSelectedKeys;
+      var gesture=root.NemoNativeMotionKeyGesture,live=keyViews(root,w),edit=editRoute(root,w);
       if(!gesture||typeof root.showContextMenu!=='function'||typeof edit!=='function'||!live||!ready(root,session(root),w.info))throw Error('Native key menu unavailable');
       var address=keyAddress(track,key.frame);
       if(!key.selected){if(live.selectKeys([address])!==true)throw Error('Native key selection refused');refreshKeys(root);live=keyViews(root,w);}
       var opened=JSON.stringify(selectedAddresses(live));
       function same_(){var now=keyViews(root,w);return !!now&&JSON.stringify(selectedAddresses(now))===opened&&now.isCurrent()===true;}
-      var ctx={view:live,hold:key.hold===true,showMenu:function(items){root.showContextMenu(event.clientX+8,event.clientY+8,items);},toast:function(m){notice(root,m);},refresh:function(){refreshKeys(root);},
+      var ctx={view:live,remap:track.remap===true,hold:key.hold===true,showMenu:function(items){root.showContextMenu(event.clientX+8,event.clientY+8,items);},toast:function(m){notice(root,m);},refresh:function(){refreshKeys(root);},
         prompt:function(m,d){return typeof root.prompt==='function'?root.prompt(m,d):null;},
         edit:function(action){if(!same_()){notice(root,'Native key selection changed; open the key menu again.');return false;}return edit(action);},
         selectOnly:function(){if(!same_()||live.selectKeys([address])!==true)return false;var now=keyViews(root,w);opened=JSON.stringify(selectedAddresses(now));return true;}};
@@ -360,6 +397,8 @@
     var ui=ports&&ports.barUi,barUiReady=!!ui&&['getBarSelection','setBarSelection','marqueeSelect','onDown','buildBar'].every(function(k){return typeof ui[k]==='function';});
     if(!w){w={serial:0,rows:[],capture:null,down:false};works.set(root,w);
       root.document.addEventListener('mousemove',function(e){move(root,e);});root.document.addEventListener('mouseup',function(e){up(root,e);});
+      // #2377: Delete / Alt+arrows / F9 over selected Time Remap keys (the property key editor owns them for property keys).
+      if(root.NemoNativeTimeRemapKeys)root.NemoNativeTimeRemapKeys.install(root,function(){var x=works.get(root);return !!x&&!!x.node&&!!x.node.parentNode&&root.state.appMode==='motion'&&ready(root,session(root),x.info);});
       if(root.addEventListener){root.addEventListener('blur',function(){cancel(root);});root.addEventListener('pagehide',function(){cancel(root);});}}
     // #2371: a frame-only change (same revision pin, same rows) keeps the painted rows and bars; rebuilding them per playback tick
     // reset every bar and re-read every range, which is the timeline flicker. Only a row whose range never arrived asks again.
@@ -386,7 +425,7 @@
         result.instanceId!==info.instanceId||result.documentId!==info.documentId||result.atRevision!==info.contentRevision||result.documentSnapshotId!==info.documentSnapshotId||
         result.contextId!=='scene-root'||result.layerUid!==info.layers[li].layerUid||result.frame!==frame)return;
       var range=result.range,fields=['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'];
-      if(!range||Object.keys(range).length!==6||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||
+      if(!range||!Object.keys(range).every(function(k){return fields.includes(k)||k==='markers'||k==='effectKeys'||k==='keyFrames';})||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||!snapLists(range)||
         !fields.slice(0,4).every(function(k){return Number.isFinite(range[k]);})||typeof range.hasCustomRange!=='boolean'||typeof range.hasTimeLink!=='boolean')return;
       row.nativeRange=freeze({pin:Object.assign({},info),range:JSON.parse(JSON.stringify(range))});paint(root,row,li);
     }).catch(function(){});

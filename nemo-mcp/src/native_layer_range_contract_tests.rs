@@ -52,6 +52,44 @@ fn range_selector_is_exact_and_result_carries_only_same_snapshot_requested_edges
     assert!(!result("document", &q, &bad));
 }
 #[test]
+fn the_optional_snap_lists_are_closed_and_a_plain_range_keeps_its_six_fields() {
+    let q = query();
+    let mut with = output();
+    with["range"]["markers"] = json!([{"frame":3,"name":"Cut"},{"frame":9}]);
+    with["range"]["effectKeys"] = json!([0, 4, 12]);
+    with["range"]["keyFrames"] = json!([0, 4, 4, 9]);
+    assert!(result("document", &q, &with));
+    assert!(super::super::timing_result("document", &q, &with));
+    for (field, bad) in [
+        ("markers", json!([{"frame":-1}])),
+        ("markers", json!([{"frame":1.5}])),
+        ("markers", json!([{"frame":1,"name":""}])),
+        ("markers", json!([{"frame":1,"name":"x".repeat(33)}])),
+        ("markers", json!([{"frame":1,"color":"#fff"}])),
+        ("markers", json!([{"name":"Cut"}])),
+        (
+            "markers",
+            json!((0..65).map(|f| json!({"frame":f})).collect::<Vec<_>>()),
+        ),
+        ("markers", json!("Cut")),
+        ("effectKeys", json!([-1])),
+        ("effectKeys", json!([1.5])),
+        ("effectKeys", json!((0..513).collect::<Vec<_>>())),
+        ("effectKeys", Value::Null),
+        ("keyFrames", json!([-1])),
+        ("keyFrames", json!([1.5])),
+        ("keyFrames", json!((0..513).collect::<Vec<_>>())),
+        ("keyFrames", Value::Null),
+    ] {
+        let mut broken = with.clone();
+        broken["range"][field] = bad;
+        assert!(!result("document", &q, &broken), "{field}");
+    }
+    let mut extra = with;
+    extra["range"]["snap"] = json!([]);
+    assert!(!result("document", &q, &extra));
+}
+#[test]
 fn full_range_schema_examples_and_original_cell_examples_remain_shipped_and_disjoint() {
     let schema: Value = serde_json::from_str(include_str!(
         "../../engineering/application/native-layer-timing-v1.schema.json"

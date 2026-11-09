@@ -188,7 +188,9 @@ fn a_restyle_names_its_target_and_valid_style_members_and_its_receipt_id_is_the_
         json!({"brushPreset":"charcoal-pencil"}), json!({"brushPreset":"none"}), json!({"maskFeather":12.5}),
         json!({"maskMode":"add"}), json!({"maskMode":"subtract"}), json!({"maskMode":"intersect"}), json!({"unmask":true}),
         json!({"fillGradient":null}), json!({"fillGradient":{"kind":"linear","from":[0,5],"to":[10.5,5],"stops":[{"offset":0,"color":"#ff000080"},{"offset":1,"color":"#0000ff"}]}}),
-        json!({"fillGradient":{"kind":"radial","from":[1,2],"to":[3,4],"stops":[{"offset":1,"color":"#00ff00"},{"offset":0.25,"color":"#0000ff"}]}})] {
+        json!({"fillGradient":{"kind":"radial","from":[1,2],"to":[3,4],"stops":[{"offset":1,"color":"#00ff00"},{"offset":0.25,"color":"#0000ff"}]}}),
+        // #2372 the Select pivot: a preset and/or a custom world point, null clears, an edit of its own.
+        json!({"xformAnchorKey":"tl"}), json!({"xformAnchorKey":"mc","xformAnchorCustom":null}), json!({"xformAnchorCustom":[12.5,-3]}), json!({"xformAnchorKey":null})] {
         assert!(vector_request(VECTOR, &batch(vec![step(ok.clone())])), "{ok}");
     }
     for bad in [json!({"fillEnabled":true}), json!({"strokeEnabled":true}), json!({"fillEnabled":"yes","fill":"#ff0000"}), json!({"cap":"flat"}),
@@ -204,7 +206,9 @@ fn a_restyle_names_its_target_and_valid_style_members_and_its_receipt_id_is_the_
         json!({"fillGradient":{"kind":"linear","from":[0,0],"to":[1,0],"stops":[{"offset":0,"color":"#f00"},{"offset":1,"color":"#0000ff"}]}}),
         json!({"fillGradient":{"kind":"linear","from":[0],"to":[1,0],"stops":[{"offset":0,"color":"#ff0000"},{"offset":1,"color":"#0000ff"}]}}),
         json!({"fillGradient":{"kind":"linear","from":[0,0],"to":[1,0],"stops":[{"offset":0,"color":"#ff0000"},{"offset":1,"color":"#0000ff"}]},"fill":"#ff0000"}),
-        json!({"fillGradient":null,"unmask":true})] {
+        json!({"fillGradient":null,"unmask":true}),
+        json!({"xformAnchorKey":"zz"}), json!({"xformAnchorKey":7}), json!({"xformAnchorCustom":[1]}), json!({"xformAnchorCustom":[1,"2"]}), json!({"xformAnchorCustom":[1.0e9,0]}),
+        json!({"xformAnchorKey":"tl","fill":"#ff0000"}), json!({"xformAnchorKey":"tl","brushPreset":"chalk-round"})] {
         assert!(!vector_request(VECTOR, &batch(vec![step(bad.clone())])), "{bad}");
     }
     let mut no_style = good.clone();

@@ -12,7 +12,11 @@
       id(value.instanceId,'instanceId');id(value.documentId,'documentId');revision(value.atRevision,'atRevision');
       objectUid(value.documentSnapshotId);objectUid(value.layerUid);frame(value.frame);
       if(typeof value.contextId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId))throw new TypeError('invalid range context'); // #2256: the scene root or a component context id
-      exact(value.range,['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'],[],'resolved range');
+      exact(value.range,['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'],['markers','effectKeys','keyFrames'],'resolved range');
+      const rg=value.range,lists=(!has(rg,'markers')||Array.isArray(rg.markers)&&rg.markers.length<=64&&rg.markers.every(m=>plain(m)&&Number.isSafeInteger(m.frame)&&m.frame>=0&&Object.keys(m).every(k=>k==='frame'||k==='name')&&(!has(m,'name')||typeof m.name==='string'&&m.name.length>=1&&m.name.length<=32)))&&
+        (!has(rg,'effectKeys')||Array.isArray(rg.effectKeys)&&rg.effectKeys.length<=512&&rg.effectKeys.every(f=>Number.isSafeInteger(f)&&f>=0))&&
+        (!has(rg,'keyFrames')||Array.isArray(rg.keyFrames)&&rg.keyFrames.length<=512&&rg.keyFrames.every(f=>Number.isSafeInteger(f)&&f>=0));
+      if(!lists)throw new TypeError('invalid range snap lists');
       if(!['rawInPoint','rawOutPoint','inPoint','outPoint'].every(k=>Number.isFinite(value.range[k]))||
          typeof value.range.hasCustomRange!=='boolean'||typeof value.range.hasTimeLink!=='boolean')throw new TypeError('invalid resolved range');
       return;
@@ -28,10 +32,10 @@
       objectUid(p.placementId);objectUid(p.assetId);
       const r=p.timeRemap;if(r!==null)exact(r,['keyCount','keyAtFrame','value','keys'],[],'time remap facts');
       // The key list is null when it does not fit the read; a listed key is one finite frame and value.
-      if(r!==null&&Array.isArray(r.keys))r.keys.forEach(k=>exact(k,['frame','value'],[],'time remap key'));
+      if(r!==null&&Array.isArray(r.keys))r.keys.forEach(k=>exact(k,['frame','value'],['color','hold'],'time remap key'));
       if(p.assetKind!=='video'||!Number.isFinite(p.offsetFrames)||
          r!==null&&(!Number.isSafeInteger(r.keyCount)||r.keyCount<0||typeof r.keyAtFrame!=='boolean'||r.value!==null&&!Number.isFinite(r.value)||
-           r.keys!==null&&(!Array.isArray(r.keys)||r.keys.length!==r.keyCount||!r.keys.every(k=>Number.isFinite(k.frame)&&Number.isFinite(k.value))))||
+           r.keys!==null&&(!Array.isArray(r.keys)||r.keys.length!==r.keyCount||!r.keys.every(k=>Number.isFinite(k.frame)&&Number.isFinite(k.value)&&(!Object.prototype.hasOwnProperty.call(k,'color')||typeof k.color==='string'&&/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(k.color))&&(!Object.prototype.hasOwnProperty.call(k,'hold')||k.hold===true))))||
          p.interpMode!==null&&(typeof p.interpMode!=='string'||!p.interpMode||p.interpMode.length>32)||
          p.frameBlend!==null&&typeof p.frameBlend!=='boolean'||p.sourceFrameCount!==null&&(!Number.isSafeInteger(p.sourceFrameCount)||p.sourceFrameCount<1||p.sourceFrameCount>4294967295))throw new TypeError('invalid video placement facts');
     }
