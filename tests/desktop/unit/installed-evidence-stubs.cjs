@@ -117,6 +117,7 @@ function createStubApp(options = {}) {
 
   function v1(request) {
     const p = request.payload;
+    if (request.operation === 'project.new' && flags.unconfirmed) return refuse(1, request, 'unavailable', 'The new project was not created. App notice: Native project state is unconfirmed. Reopen Nemo before continuing.');
     if (request.operation === 'project.new') {
       if (state.dirty) return refuse(1, request, 'unsaved_changes', 'The open project has unsaved changes; save it first.');
       state.doc = newDoc(p.canvasW, p.canvasH); state.dirty = false; state.generation++; state.brushes = {};

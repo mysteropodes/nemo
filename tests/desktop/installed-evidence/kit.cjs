@@ -231,6 +231,12 @@ async function fresh(ctx, { w = 640, h = 360, fps = 24 } = {}) {
     ctx.book.ok('reply', released ? 'setup: no project open, nothing to save aside' : 'setup: previous project saved aside', scratch.ok === true || released, scratch.ok ? 'ok' : scratch.error);
   }
   const res = await ctx.wire.v1('project.new', { canvasW: w, canvasH: h, fps });
+  // After a command whose consumer synchronization stayed indeterminate the app refuses every new project until it is reopened
+  // (observed: "Native project state is unconfirmed. Reopen Nemo before continuing."). The row can not run: it is unrun with that reason,
+  // not failed for something it did; the row that caused it carries the failure.
+  if (res.ok === false && res.error && res.error.code === 'unavailable' && /Native project state is unconfirmed/.test(String(res.error.message))) {
+    throw new EvidenceError('unavailable', 'blocked: the app asks to be reopened after an earlier row left its project state unconfirmed');
+  }
   ctx.book.ok('reply', 'setup: project.new accepted', res.ok === true, res.ok ? 'ok' : res.error);
   const layers = res.result.layers;
   ctx.book.ok('read', 'setup: new project has a layer', Array.isArray(layers) && layers.length >= 1 && typeof layers[0].layerUid === 'string', layers);

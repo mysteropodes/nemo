@@ -287,3 +287,9 @@ test('a row marked last runs after every other selected row', async t => {
   assert.deepEqual(order, ['second', 'third', 'first-last']);
   assert.deepEqual(results.map(r => r.id), order);
 });
+
+test('an app that asks to be reopened leaves the row unrun with that reason, not failed', async t => {
+  const result = await verdict(t, { unconfirmed: true }, mini('blocked', async ctx => { await K.fresh(ctx); }));
+  assert.equal(result.verdict, 'unrun');
+  assert.match(result.reason, /blocked: the app asks to be reopened/);
+});
