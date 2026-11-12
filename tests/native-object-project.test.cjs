@@ -1033,3 +1033,21 @@ test('native onion receipts must echo exactly the selection asked for and nothin
  const g=navigationFixture();await g.open();g.ghosts=ONION;g.tamper(r=>({...r,ghosts:{selected:ONION,status:'unavailable',frames:0,reason:'layer_not_found'}}));
  await g.s.presentPreview(0);assert.equal(g.s.readPresentedObjectSession().presentation.ghosts.reason,'layer_not_found');
 });
+test('a recorded script run undoes and redoes as ONE native move carrying its entry count, and a later write falls back to one entry (#2354 I33)',async()=>{
+  const Groups=require('../src/js/application/script-native-groups.js'),groups=Groups.create();
+  const h=host(),s=Project.create({invoke:h.invoke,historyGroups:groups,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
+    physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});
+  await s.openPath('/project.json');await s.reference({kind:'attach',id:'ref',sourcePath:'/image.png'});
+  const pin=s.info();assert.equal(pin.contentRevision,1);
+  groups.record(pin,{start:0,end:1,steps:2});
+  const moves=()=>h.calls.filter(c=>c.command==='nemo_native_object_dispatch').map(c=>[c.r.operation.replace('command.document.object.',''),c.r.payload.steps||1]);
+  await s.historyFromUi('undo');await s.historyFromUi('redo');await s.historyFromUi('undo');
+  assert.deepEqual(moves(),[['undo',2],['redo',2],['undo',2]]);
+  await s.reference({kind:'attach',id:'ref',sourcePath:'/image.png'});
+  await s.historyFromUi('undo');
+  assert.deepEqual(moves().slice(3),[['undo',1]],'a write after the run drops the group');
+  assert.equal(groups.depth(),0);
+  const before=h.calls.length;h.fail('refused');groups.record(s.info(),{start:s.info().contentRevision-1,end:s.info().contentRevision,steps:2});
+  await assert.rejects(s.historyFromUi('undo'));assert.equal(groups.plan('undo',s.info()),2,'a refused move leaves the group in place');
+  assert.ok(h.calls.length>before);
+});

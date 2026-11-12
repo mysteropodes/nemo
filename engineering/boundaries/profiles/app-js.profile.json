@@ -2025,6 +2025,8 @@
       "files": [
         "script-native-api.js",
         "script-native-drain.js",
+        "script-native-groups.js",
+        "script-native-plugin.js",
         "script-native-reads.js",
         "script-native-run.js",
         "script-native-writes.js"
@@ -2033,6 +2035,8 @@
       "publicApi": [
         "script-native-api.js",
         "script-native-drain.js",
+        "script-native-groups.js",
+        "script-native-plugin.js",
         "script-native-reads.js",
         "script-native-run.js",
         "script-native-writes.js"

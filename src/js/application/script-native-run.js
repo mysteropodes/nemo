@@ -5,6 +5,7 @@
  * runs in rounds over a pinned read cache - quiet passes collect the reads, the declared queries fetch them, the last pass
  * is the real one - and returns a Promise of the same result shape. A script therefore runs more than once before it takes
  * effect; its reads are deterministic and its writes and presentation calls happen only in the last pass.
+ * A script that returns a thenable is awaited before the drain (its late writes join the run; a rejection sends nothing); the result is then a Promise.
  * make(ports, opts) is script-native-api.js createRun, injected so the runner does not depend on the API module.
  */
 (function (root, factory) {
@@ -49,7 +50,15 @@
       var i = info(), l = i && i.layers[index], v = solo();
       return l && v && typeof v.toggle === 'function' ? v.toggle(root, l.layerUid) : false;
     };
-    return { info: info, reads: reads,
+    // I33: the undo depth around a drain and the group it recorded (script-native-groups.js); absent when the session cannot read its history.
+    var groups = root.NemoScriptNativeGroups && root.NemoScriptNativeGroups.shared;
+    var history = groups && typeof s.readHistory === 'function' ? {
+      depth: function () { return s.readHistory().then(function (r) { return Object.assign({}, r.info, { undoDepth: r.undoDepth }); }); },
+      group: function (before, after) {
+        var same = ['instanceId', 'documentId', 'lifecycleGeneration'].every(function (k) { return before[k] === after[k]; });
+        if (same) groups.record(before, { start: before.contentRevision, end: after.contentRevision, steps: after.undoDepth - before.undoDepth });
+      } } : undefined;
+    return { info: info, reads: reads, history: history,
       write: { visible: entry('toggleLayerVis'), locked: entry('toggleLayerLock'), shy: entry('toggleLayerShy'), solo: toggleSolo },
       ops: root.NemoScriptNativeWrites ? root.NemoScriptNativeWrites.create(root, s) : {},
       goToFrame: function (f) { if (typeof root.goToFrame === 'function') root.goToFrame(f); },
@@ -72,10 +81,20 @@
         return { ok: false, error: (e2 instanceof SyntaxError ? 'Erreur de syntaxe : ' : '') + e2.message, code: e2.code, log: run.log() };
       }
     }
-    if (quiet) { run.discard(); return { ok: true, value: value, log: run.log() }; }
+    var late = value && typeof value.then === 'function';
+    if (quiet) { run.discard(); if (late) value.then(null, function () {}); return { ok: true, value: value, log: run.log() }; }
     // A failing script sends nothing; a successful one commits its queued writes in order.
-    var committed = run.commit().then(function (c) { if (!c.ok) ports.toast('Script writes stopped: ' + c.error); return c; });
-    return { ok: true, value: value, log: run.log(), committed: committed };
+    function commit(result) {
+      var committed = run.commit().then(function (c) { if (!c.ok) ports.toast('Script writes stopped: ' + c.error); return c; });
+      return { ok: true, value: result, log: run.log(), committed: committed };
+    }
+    if (!late) return commit(value);
+    // An async script: its writes join the run until the promise settles, then the drain checks the pin it started from, so a document
+    // that was closed or replaced meanwhile gets no write. A rejection sends nothing.
+    return Promise.resolve(value).then(commit, function (e) {
+      run.discard();
+      return { ok: false, error: e && e.message !== undefined ? e.message : String(e), code: e && e.code, log: run.log() };
+    });
   }
   async function settle(make, ports, source) {
     var cache = Reads.cache(), rounds = 0;
@@ -91,5 +110,7 @@
     var s = session(root);
     return s ? execute(make, portsFor(root, s), source) : { ok: false, error: REFUSED, log: [] };
   }
-  return Object.freeze({ owns: owns, runOnDesktop: runOnDesktop, execute: execute });
+  // The ports of the active native session (null without one): the plugin host builds its per-event runs over the same ports a script run uses.
+  function portsOf(root) { var s = session(root); return s ? portsFor(root, s) : null; }
+  return Object.freeze({ owns: owns, runOnDesktop: runOnDesktop, execute: execute, portsOf: portsOf });
 }));
