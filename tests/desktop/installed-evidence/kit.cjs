@@ -24,9 +24,11 @@ const short = value => { const text = canonical(value) ?? 'undefined'; return te
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const KINDS = new Set(['reply', 'read', 'pixel', 'file']);
 
+// One counter for the whole run: every row writes into the same work directory, and the app refuses to save over an existing file
+// (a second row's `scratch-1.json` was refused as "publication-response-unavailable"), so file names must never repeat across rows.
+let counter = 0;
 function createContext({ wire, work, rowId }) {
   const assertions = [];
-  let counter = 0;
   function record(kind, id, observed, expected, pass, note, bookkeeping) {
     if (!KINDS.has(kind)) throw new Error('unknown assertion kind ' + kind);
     assertions.push({ id: rowId + ': ' + id, kind, ...(bookkeeping ? { bookkeeping: true } : {}), observed: short(observed), expected: short(expected), verdict: pass ? 'pass' : 'fail', ...(note ? { note } : {}) });

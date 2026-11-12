@@ -264,3 +264,9 @@ test('a save refused once as unavailable right after a change is retried and the
   const refused = ctx.assertions.filter(a => /save attempt 1 refused as unavailable \(pin-changed-before-picker\)/.test(a.id));
   assert.equal(refused.length, 1);
 });
+
+test('file names never repeat across rows: two contexts of one run do not share a counter', () => {
+  const a = K.createContext({ wire: null, work: '/w', rowId: 'a' }), b = K.createContext({ wire: null, work: '/w', rowId: 'b' });
+  const seen = new Set([a.next(), a.next(), b.next(), b.next()]);
+  assert.equal(seen.size, 4);
+});
