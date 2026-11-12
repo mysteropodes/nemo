@@ -1,0 +1,26 @@
+{
+  "capability": "native.object.asset",
+  "definitions": {},
+  "requests": [
+    {
+      "order": 109,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.asset.attach"
+              },
+              "payload": {
+                "$ref": "native-object-item-v1.schema.json#/$defs/AssetAttach"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

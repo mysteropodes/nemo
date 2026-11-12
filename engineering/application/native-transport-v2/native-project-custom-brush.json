@@ -1,0 +1,361 @@
+{
+  "capability": "native.project-custom-brush",
+  "definitions": {
+    "ObjectProjectCustomBrushPresetRecord": {
+      "order": 323,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {
+          "bristleCount": {
+            "type": "number"
+          },
+          "dashGap": {
+            "type": "number"
+          },
+          "edgeNoise": {
+            "type": "number"
+          },
+          "fixedAngle": {
+            "type": "number"
+          },
+          "grain": {
+            "type": "number"
+          },
+          "nibSize": {
+            "type": "number"
+          },
+          "noise": {
+            "type": "number"
+          },
+          "opacity": {
+            "type": "number"
+          },
+          "opacityJitter": {
+            "type": "number"
+          },
+          "polySides": {
+            "type": "number"
+          },
+          "pressureEnd": {
+            "type": "number"
+          },
+          "pressureMid": {
+            "type": "number"
+          },
+          "pressureStart": {
+            "type": "number"
+          },
+          "rotationJitter": {
+            "type": "number"
+          },
+          "roughness": {
+            "type": "number"
+          },
+          "roundness": {
+            "type": "number"
+          },
+          "scatter": {
+            "type": "number"
+          },
+          "scribbleAngleSpread": {
+            "type": "number"
+          },
+          "scribbleCount": {
+            "type": "number"
+          },
+          "scribbleLen": {
+            "type": "number"
+          },
+          "scribbleLenJitter": {
+            "type": "number"
+          },
+          "scribbleSpread": {
+            "type": "number"
+          },
+          "scribbleWidth": {
+            "type": "number"
+          },
+          "sharpness": {
+            "type": "number"
+          },
+          "sizeJitter": {
+            "type": "number"
+          },
+          "spaceJitter": {
+            "type": "number"
+          },
+          "spacing": {
+            "type": "number"
+          },
+          "tipCorner": {
+            "type": "number"
+          },
+          "valueJitter": {
+            "type": "number"
+          },
+          "savedBrushSize": {
+            "type": "number"
+          },
+          "rotationMode": {
+            "type": "string"
+          },
+          "scatterDistribution": {
+            "type": "string"
+          },
+          "tipShape": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "markerTip": {
+            "type": "boolean"
+          },
+          "customStamp": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "segments"
+            ],
+            "properties": {
+              "segments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "point"
+                  ],
+                  "properties": {
+                    "point": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "handleIn": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "handleOut": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  }
+                }
+              },
+              "closed": {
+                "type": "boolean"
+              },
+              "pointCount": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ObjectProjectCustomBrushPresetSelector": {
+      "order": 324,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "settings"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "catalogPage"
+              },
+              "cursor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "id"
+            ],
+            "properties": {
+              "kind": {
+                "const": "record"
+              },
+              "id": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectCustomBrushPresetEditAction": {
+      "order": 325,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "id",
+              "preset"
+            ],
+            "properties": {
+              "kind": {
+                "const": "upsert"
+              },
+              "id": {
+                "type": "string"
+              },
+              "preset": {
+                "$ref": "#/$defs/ObjectProjectCustomBrushPresetRecord"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "id"
+            ],
+            "properties": {
+              "kind": {
+                "const": "delete"
+              },
+              "id": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectCustomBrushPresetEditPayload": {
+      "order": 326,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "action"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.project.customBrushPreset.edit"
+          },
+          "action": {
+            "$ref": "#/$defs/ObjectProjectCustomBrushPresetEditAction"
+          }
+        }
+      }
+    },
+    "ObjectProjectCustomBrushPresetReadPayload": {
+      "order": 327,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "contextId",
+          "selector"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "contextId": {
+            "const": "scene-root"
+          },
+          "selector": {
+            "$ref": "#/$defs/ObjectProjectCustomBrushPresetSelector"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 141,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.project.customBrushPreset.read"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectCustomBrushPresetReadPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 142,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.project.customBrushPreset.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectCustomBrushPresetEditPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

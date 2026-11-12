@@ -1,0 +1,232 @@
+{
+  "capability": "native.project-guide",
+  "definitions": {
+    "ObjectProjectGuideEditAction": {
+      "order": 281,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "axis",
+              "position"
+            ],
+            "properties": {
+              "kind": {
+                "const": "add"
+              },
+              "axis": {
+                "type": "string",
+                "enum": [
+                  "h",
+                  "v"
+                ]
+              },
+              "position": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "axis",
+              "ordinal",
+              "position"
+            ],
+            "properties": {
+              "kind": {
+                "const": "move"
+              },
+              "axis": {
+                "type": "string",
+                "enum": [
+                  "h",
+                  "v"
+                ]
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "position": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "axis",
+              "ordinal"
+            ],
+            "properties": {
+              "kind": {
+                "const": "remove"
+              },
+              "axis": {
+                "type": "string",
+                "enum": [
+                  "h",
+                  "v"
+                ]
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectGuideSelector": {
+      "order": 282,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "settings"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "axis",
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "axisPage"
+              },
+              "axis": {
+                "type": "string",
+                "enum": [
+                  "h",
+                  "v"
+                ]
+              },
+              "cursor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectGuideEditPayload": {
+      "order": 283,
+      "schema": {
+        "type": "object",
+        "required": [
+          "command",
+          "action"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.project.guide.edit"
+          },
+          "action": {
+            "$ref": "#/$defs/ObjectProjectGuideEditAction"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "ObjectProjectGuideReadPayload": {
+      "order": 284,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "contextId",
+          "selector"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "selector": {
+            "$ref": "#/$defs/ObjectProjectGuideSelector"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 130,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.project.guide.read"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectGuideReadPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 131,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.project.guide.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectGuideEditPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

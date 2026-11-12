@@ -1,0 +1,297 @@
+{
+  "capability": "native.object.duplicator",
+  "definitions": {
+    "ObjectDuplicatorSetPayload": {
+      "order": 121,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "enabled"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.duplicator.set"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectComponentId"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        }
+      }
+    },
+    "ObjectDuplicatorObjectsPayload": {
+      "order": 122,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUids",
+          "seed"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.duplicator.objects"
+          },
+          "layerUids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "items": {
+              "$ref": "#/$defs/ObjectComponentId"
+            }
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        }
+      }
+    },
+    "ObjectDuplicatorPathPayload": {
+      "order": 123,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "pathLayerUid"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.duplicator.path"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectComponentId"
+          },
+          "pathLayerUid": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ObjectDuplicatorConfigPayload": {
+      "order": 124,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.duplicator.config"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectComponentId"
+          },
+          "mode": {
+            "enum": [
+              "grid",
+              "radial",
+              "path"
+            ]
+          },
+          "rows": {
+            "type": "number"
+          },
+          "cols": {
+            "type": "number"
+          },
+          "spacingX": {
+            "type": "number"
+          },
+          "spacingY": {
+            "type": "number"
+          },
+          "count": {
+            "type": "number"
+          },
+          "radius": {
+            "type": "number"
+          },
+          "startAngle": {
+            "type": "number"
+          },
+          "radialOrient": {
+            "type": "boolean"
+          },
+          "pathAlignTangent": {
+            "type": "boolean"
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "staggerRandom": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "position": {
+                "type": "boolean"
+              },
+              "rotation": {
+                "type": "boolean"
+              },
+              "scale": {
+                "type": "boolean"
+              },
+              "opacity": {
+                "type": "boolean"
+              },
+              "hue": {
+                "type": "boolean"
+              }
+            }
+          },
+          "timeOffset": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "offsetFrames": {
+                "type": "number"
+              },
+              "direction": {
+                "enum": [
+                  "forward",
+                  "backward",
+                  "centerOut",
+                  "random"
+                ]
+              }
+            }
+          },
+          "effectorPos": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "index",
+              "x",
+              "y"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 26,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.duplicator.set"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectDuplicatorSetPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 27,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.duplicator.objects"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectDuplicatorObjectsPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 28,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.duplicator.path"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectDuplicatorPathPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 29,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.duplicator.config"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectDuplicatorConfigPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

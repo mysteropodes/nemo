@@ -1,0 +1,186 @@
+{
+  "capability": "native.project-shadow",
+  "definitions": {
+    "ObjectProjectShadowEditAction": {
+      "order": 288,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "id",
+              "color"
+            ],
+            "properties": {
+              "kind": {
+                "const": "add"
+              },
+              "id": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$",
+                "description": "Valid Unicode, at most1024 UTF8 bytes, no NUL; runtime enforces the byte bound."
+              },
+              "color": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$",
+                "description": "Valid Unicode, at most1024 UTF8 bytes, no NUL; runtime enforces the byte bound."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "ordinal"
+            ],
+            "properties": {
+              "kind": {
+                "const": "select"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectShadowSelector": {
+      "order": 289,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "settings"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "palettePage"
+              },
+              "cursor": {
+                "$ref": "#/$defs/Revision"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectShadowEditPayload": {
+      "order": 290,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "action"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.project.shadow.edit"
+          },
+          "action": {
+            "$ref": "#/$defs/ObjectProjectShadowEditAction"
+          }
+        }
+      }
+    },
+    "ObjectProjectShadowReadPayload": {
+      "order": 291,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "contextId",
+          "selector"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "selector": {
+            "$ref": "#/$defs/ObjectProjectShadowSelector"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 132,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.project.shadow.read"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectShadowReadPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 134,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.project.shadow.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectShadowEditPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

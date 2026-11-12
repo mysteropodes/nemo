@@ -1,0 +1,50 @@
+{
+  "capability": "native.object.layer-create",
+  "definitions": {
+    "ObjectLayerCreatePayload": {
+      "order": 66,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "name"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.create"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 49,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.create"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerCreatePayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

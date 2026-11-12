@@ -115,7 +115,8 @@
       "files": [
         "capability-drift.cjs",
         "capability-raw-client.cjs",
-        "capability-schema.cjs"
+        "capability-schema.cjs",
+        "native-transport-schema.cjs"
       ],
       "publicApi": [
         "capability-drift.cjs"

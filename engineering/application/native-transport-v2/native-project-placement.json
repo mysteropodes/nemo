@@ -1,0 +1,464 @@
+{
+  "capability": "native.project-placement",
+  "definitions": {
+    "ObjectProjectPlacementPayload": {
+      "order": 64,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "placement"
+            ],
+            "properties": {
+              "kind": {
+                "const": "place"
+              },
+              "placement": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "assetId",
+                  "target",
+                  "offsetFrames"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                  },
+                  "assetId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                  },
+                  "target": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "contextId",
+                      "layerUid"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "drawing"
+                      },
+                      "contextId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255,
+                        "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                      },
+                      "layerUid": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255,
+                        "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                      },
+                      "strokeId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255,
+                        "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                      }
+                    }
+                  },
+                  "offsetFrames": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "placement"
+            ],
+            "properties": {
+              "kind": {
+                "const": "place"
+              },
+              "placement": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "assetId",
+                  "target",
+                  "offsetFrames"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                  },
+                  "assetId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                  },
+                  "target": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "trackUid"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "audioTrack"
+                      },
+                      "trackUid": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255,
+                        "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                      }
+                    }
+                  },
+                  "offsetFrames": {
+                    "type": "number",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "placementId",
+              "offsetFrames"
+            ],
+            "properties": {
+              "kind": {
+                "const": "setOffset"
+              },
+              "placementId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+              },
+              "offsetFrames": {
+                "type": "number",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "placementId",
+              "deltaFrames"
+            ],
+            "properties": {
+              "kind": {
+                "const": "shiftOffset"
+              },
+              "placementId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+              },
+              "deltaFrames": {
+                "type": "number",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "placementId"
+            ],
+            "properties": {
+              "kind": {
+                "const": "remove"
+              },
+              "placementId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "placementId",
+              "inFrame",
+              "outFrame",
+              "lastSourceFrame"
+            ],
+            "properties": {
+              "kind": {
+                "const": "enableTimeRemap"
+              },
+              "placementId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+              },
+              "inFrame": {
+                "type": "number"
+              },
+              "outFrame": {
+                "type": "number"
+              },
+              "lastSourceFrame": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "placementId",
+              "frame"
+            ],
+            "properties": {
+              "kind": {
+                "const": "removeTimeRemapKey"
+              },
+              "placementId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+              },
+              "frame": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "placementId"
+            ],
+            "properties": {
+              "kind": {
+                "const": "disableTimeRemap"
+              },
+              "placementId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "placementId",
+              "frame",
+              "value"
+            ],
+            "properties": {
+              "kind": {
+                "const": "setTimeRemapKey"
+              },
+              "placementId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+              },
+              "frame": {
+                "type": "number"
+              },
+              "value": {
+                "type": "number"
+              },
+              "curvePoints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "x",
+                    "y"
+                  ],
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    },
+                    "tx": {
+                      "type": "number"
+                    },
+                    "ty": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "One property key action over the selected keys of the placement's Time Remap track (the object.property.track.edit actions): one revision and one history entry. Every key deleted turns the remap off. Refused when the placement has no remap; subdivide is refused as unavailable.",
+            "required": [
+              "kind",
+              "placementId",
+              "selections",
+              "action"
+            ],
+            "properties": {
+              "kind": {
+                "const": "editTimeRemapKeys"
+              },
+              "placementId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+              },
+              "selections": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 128,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "One key (frame) or the keys inside inclusive runs of frames (ranges): exactly one of the two.",
+                  "oneOf": [
+                    {
+                      "required": [
+                        "frame"
+                      ],
+                      "not": {
+                        "required": [
+                          "ranges"
+                        ]
+                      }
+                    },
+                    {
+                      "required": [
+                        "ranges"
+                      ],
+                      "not": {
+                        "required": [
+                          "frame"
+                        ]
+                      }
+                    }
+                  ],
+                  "properties": {
+                    "frame": {
+                      "type": "number"
+                    },
+                    "ranges": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 512,
+                      "items": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "action": {
+                "$ref": "#/$defs/ObjectPropertyTrackPayload/properties/action"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "placementId",
+              "interpMode"
+            ],
+            "properties": {
+              "kind": {
+                "const": "setInterpMode"
+              },
+              "placementId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+              },
+              "interpMode": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32,
+                "pattern": "^[^\\u0000]+$"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 2,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.project.placement.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectPlacementPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

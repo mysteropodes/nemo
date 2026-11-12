@@ -1,0 +1,302 @@
+{
+  "capability": "native.object.widget",
+  "definitions": {
+    "ObjectWidgetWriteTo": {
+      "order": 70,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "point"
+            ],
+            "properties": {
+              "kind": {
+                "const": "local"
+              },
+              "point": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000000,
+                  "maximum": 1000000000
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "point",
+              "anchor",
+              "angleDegrees"
+            ],
+            "properties": {
+              "kind": {
+                "const": "world"
+              },
+              "point": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000000,
+                  "maximum": 1000000000
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "anchor": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000000,
+                  "maximum": 1000000000
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "angleDegrees": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "rest"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectWidgetAxisSet": {
+      "order": 71,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "min": {
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "max": {
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "rest": {
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "minProperties": 1
+      }
+    },
+    "ObjectWidgetSettingsSet": {
+      "order": 72,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pos": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "size": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "x": {
+            "$ref": "#/$defs/ObjectWidgetAxisSet"
+          },
+          "y": {
+            "$ref": "#/$defs/ObjectWidgetAxisSet"
+          }
+        },
+        "minProperties": 1
+      }
+    },
+    "ObjectWidgetCreatePayload": {
+      "order": 84,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "kind",
+          "name",
+          "pos"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.widget.create"
+          },
+          "kind": {
+            "enum": [
+              "joystick",
+              "slider"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "pos": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
+    },
+    "ObjectWidgetWritePayload": {
+      "order": 85,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "frame",
+          "to"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.widget.write"
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1
+          },
+          "frame": {
+            "type": "number"
+          },
+          "to": {
+            "$ref": "#/$defs/ObjectWidgetWriteTo"
+          }
+        }
+      }
+    },
+    "ObjectWidgetSettingsPayload": {
+      "order": 86,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "set"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.widget.settings"
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1
+          },
+          "set": {
+            "$ref": "#/$defs/ObjectWidgetSettingsSet"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 52,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.widget.create"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectWidgetCreatePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 53,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.widget.write"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectWidgetWritePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 54,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.widget.settings"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectWidgetSettingsPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

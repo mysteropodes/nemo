@@ -1,0 +1,46 @@
+{
+  "capability": "native.object.font-assets",
+  "definitions": {},
+  "requests": [
+    {
+      "order": 106,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.asset.font.import"
+              },
+              "payload": {
+                "$ref": "native-font-assets-v1.schema.json#/$defs/Import"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 107,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.asset.font"
+              },
+              "payload": {
+                "$ref": "native-font-assets-v1.schema.json#/$defs/Query"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

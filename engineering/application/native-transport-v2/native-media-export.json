@@ -1,0 +1,257 @@
+{
+  "capability": "native.media.export",
+  "definitions": {
+    "ExportMediaRange": {
+      "order": 196,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "start": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "end": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ExportMediaOutputSpec": {
+      "order": 197,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "format",
+          "width",
+          "height",
+          "colorInterpretation",
+          "alphaMode"
+        ],
+        "properties": {
+          "kind": {
+            "const": "frame"
+          },
+          "format": {
+            "const": "rgba8"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "colorInterpretation": {
+            "const": "srgb"
+          },
+          "alphaMode": {
+            "const": "straight"
+          }
+        }
+      }
+    },
+    "ExportMediaVideo": {
+      "order": 198,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fps": {
+            "type": "number",
+            "minimum": 0
+          },
+          "quality": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{0,32}$"
+          }
+        }
+      }
+    },
+    "ExportMediaBeginPayload": {
+      "order": 199,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "documentSnapshotId",
+          "contextId",
+          "outputHandle",
+          "output",
+          "range"
+        ],
+        "properties": {
+          "documentSnapshotId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "contextId": {
+            "const": "scene-root"
+          },
+          "outputHandle": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "output": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "frameFormat"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "still",
+                  "sequence",
+                  "video"
+                ]
+              },
+              "frameFormat": {
+                "enum": [
+                  "png",
+                  "svg"
+                ]
+              }
+            }
+          },
+          "range": {
+            "$ref": "#/$defs/ExportMediaRange"
+          },
+          "outputSpec": {
+            "$ref": "#/$defs/ExportMediaOutputSpec"
+          },
+          "video": {
+            "$ref": "#/$defs/ExportMediaVideo"
+          },
+          "soloLayers": {
+            "$ref": "#/$defs/ExportSoloLayers"
+          }
+        },
+        "description": "Three exclusive shapes: PNG still or sequence (outputSpec, no video), SVG still or sequence (neither outputSpec nor video), video of PNG frames (outputSpec, video optional). A still names its frame (start === end), range.end never precedes range.start, a sequence receipt lists at most 120 frames, absent range members mean the project work area: contract rules the JSON Schema cannot express.",
+        "oneOf": [
+          {
+            "properties": {
+              "output": {
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "still",
+                      "sequence"
+                    ]
+                  },
+                  "frameFormat": {
+                    "const": "png"
+                  }
+                }
+              }
+            },
+            "required": [
+              "outputSpec"
+            ],
+            "not": {
+              "required": [
+                "video"
+              ]
+            }
+          },
+          {
+            "properties": {
+              "output": {
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "still",
+                      "sequence"
+                    ]
+                  },
+                  "frameFormat": {
+                    "const": "svg"
+                  }
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "outputSpec"
+                  ]
+                },
+                {
+                  "required": [
+                    "video"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "properties": {
+              "output": {
+                "properties": {
+                  "kind": {
+                    "const": "video"
+                  },
+                  "frameFormat": {
+                    "const": "png"
+                  }
+                }
+              }
+            },
+            "required": [
+              "outputSpec"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 102,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "job.export.media.begin"
+              },
+              "payload": {
+                "$ref": "#/$defs/ExportMediaBeginPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 103,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "enum": [
+                  "job.export.media.status",
+                  "job.export.media.cancel"
+                ]
+              },
+              "payload": {
+                "$ref": "#/$defs/JobIdPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

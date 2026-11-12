@@ -5,7 +5,7 @@
   "build": {
     "frontendDist": "../src",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "python3 scripts/assert-no-private-labs.py && node scripts/build-mcp-sidecar.cjs"
+    "beforeBuildCommand": "python3 scripts/assert-no-private-labs.py && node scripts/nemo/lib/native-transport-schema.cjs --check && node scripts/build-mcp-sidecar.cjs"
   },
   "app": {
     "macOSPrivateApi": true,

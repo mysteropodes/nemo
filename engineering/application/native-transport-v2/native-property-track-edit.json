@@ -1,0 +1,316 @@
+{
+  "capability": "native.property-track-edit",
+  "definitions": {
+    "ObjectPropertyTrackPayload": {
+      "order": 222,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "selections",
+          "action"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.property.track.edit"
+          },
+          "selections": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "One key (frame) or the keys of one track inside inclusive runs of frames (ranges): exactly one of the two. At most 32 single-key entries; the request bytes bound everything else.",
+              "oneOf": [
+                {
+                  "required": [
+                    "frame"
+                  ],
+                  "not": {
+                    "required": [
+                      "ranges"
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "ranges"
+                  ],
+                  "not": {
+                    "required": [
+                      "frame"
+                    ]
+                  }
+                }
+              ],
+              "required": [
+                "target",
+                "property"
+              ],
+              "properties": {
+                "target": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "contextId",
+                    "layerUid"
+                  ],
+                  "properties": {
+                    "contextId": {
+                      "$ref": "#/$defs/ObjectOpaqueId"
+                    },
+                    "layerUid": {
+                      "$ref": "#/$defs/ObjectOpaqueId"
+                    },
+                    "strokeId": {
+                      "$ref": "#/$defs/ObjectOpaqueId"
+                    }
+                  }
+                },
+                "property": {
+                  "$ref": "#/$defs/ObjectOpaqueId"
+                },
+                "frame": {
+                  "type": "number"
+                },
+                "ranges": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 512,
+                  "items": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "action": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "preset"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "preset"
+                  },
+                  "preset": {
+                    "enum": [
+                      "linear",
+                      "ease",
+                      "easeIn",
+                      "easeOut",
+                      "hold"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "side",
+                  "percent"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "influence"
+                  },
+                  "side": {
+                    "enum": [
+                      "in",
+                      "out"
+                    ]
+                  },
+                  "percent": {
+                    "type": "number",
+                    "description": "Finite native input; the authority applies the retained baseline clamp to 0..100."
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "subdivide"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "mode"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "lockTo"
+                  },
+                  "mode": {
+                    "description": "Per-key standing lock applied to every selected key; null clears it. Same-effective-value keys keep their authored presence.",
+                    "enum": [
+                      "in",
+                      "out",
+                      "layer",
+                      null
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "delta"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "shift"
+                  },
+                  "delta": {
+                    "description": "Whole frames to move every selected key (nudge or drag release); zero changes nothing. All selected keys move together or none does: a key may not land before frame 0, past the last frame or on a key that stays.",
+                    "type": "integer",
+                    "minimum": -1000000,
+                    "maximum": 1000000
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "delete"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "flip"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "distribute"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "mode",
+                  "total"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "warp"
+                  },
+                  "mode": {
+                    "description": "The key selection box gesture: top/bottom skew the selected rows (the dragged edge's row moves the whole distance, the opposite row stays, rows between interpolate in the order the selections first name each track), left/right space the selection along time (the opposite edge of the selected frames stays), liquify moves keys by a Gaussian falloff around grab.",
+                    "enum": [
+                      "top",
+                      "bottom",
+                      "left",
+                      "right",
+                      "liquify"
+                    ]
+                  },
+                  "total": {
+                    "description": "The drag in frames, fractional allowed. Every selected key moves round(total x its share) frames from where it was; all keys land inside the composition and on no key that stays, or the whole gesture is refused.",
+                    "type": "number",
+                    "minimum": -1000000,
+                    "maximum": 1000000
+                  },
+                  "grab": {
+                    "description": "The frame a liquify is centred on; required for liquify and refused for every other mode.",
+                    "type": "number",
+                    "minimum": -1000000,
+                    "maximum": 1000000
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "color"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "color"
+                  },
+                  "color": {
+                    "description": "The timeline tint written on every selected key (#rrggbb or #rrggbbaa, stored lowercase), or null to remove it.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 116,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.property.track.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectPropertyTrackPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

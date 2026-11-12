@@ -1,0 +1,1266 @@
+{
+  "capability": "native.property-read",
+  "definitions": {
+    "ObjectPropertyReadPayload": {
+      "order": 225,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "view"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "view": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "target",
+                  "property",
+                  "frame"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "rawSample"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/ObjectPropertyReadTarget"
+                  },
+                  "property": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "frame": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "target",
+                  "property",
+                  "offset",
+                  "limit"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "authoredKeys"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/ObjectPropertyReadTarget"
+                  },
+                  "property": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "target",
+                  "property",
+                  "frame"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "expressionContext"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/ObjectPropertyReadTarget"
+                  },
+                  "property": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "frame": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "target",
+                  "property",
+                  "frame"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "expressionState"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/ObjectPropertyReadTarget"
+                  },
+                  "property": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "frame": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "target",
+                  "property"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "expressionSource"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/ObjectPropertyReadTarget"
+                  },
+                  "property": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "target",
+                  "frame"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "layerBounds"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/ObjectPropertyReadTarget"
+                  },
+                  "frame": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ObjectPropertyReadKey": {
+      "order": 226,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "frame",
+          "v"
+        ],
+        "properties": {
+          "frame": {
+            "type": "number",
+            "minimum": -1.7976931348623157e+308,
+            "maximum": 1.7976931348623157e+308
+          },
+          "v": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            }
+          },
+          "hold": {
+            "type": "boolean"
+          },
+          "curvePoints": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "x",
+                    "y"
+                  ],
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    "tx": {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    "ty": {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "hIn": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            }
+          },
+          "hOut": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            }
+          },
+          "lockTo": {
+            "enum": [
+              null,
+              "in",
+              "out",
+              "layer"
+            ]
+          },
+          "color": {
+            "description": "The key's timeline tint (baseline key.color): #rrggbb or #rrggbbaa. Presentation only; absent when the key is untinted.",
+            "type": "string",
+            "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          }
+        }
+      }
+    },
+    "ObjectPropertyReadResult": {
+      "order": 227,
+      "schema": {
+        "description": "Exact authored storage DTO or raw native sample. Native/shared runtime validators additionally correlate owner, revision, snapshot, target, property, frame and cursor; enforce increasing key/curve coordinates and actual native curve endpoints. Missing/null/empty curve distinctions are preserved. Provider result limit3072 and full envelope limit4096 are encoded UTF8 byte bounds, not JSON string lengths. Oversized pages refuse unavailable; no dynamic truncation. The expressionSource view returns the exact authored code (null when no expression is authored); an oversized source refuses unavailable. The layerBounds view returns the layer's own tight bounds before its Motion (a Null is its rest point) at an integer frame, plus its parent layer uid or null.",
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "instanceId",
+              "documentId",
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "target",
+              "property",
+              "dimension",
+              "frame",
+              "value"
+            ],
+            "properties": {
+              "instanceId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "documentId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "const": "rawSample"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectPropertyReadTarget"
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dimension": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4
+              },
+              "frame": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              },
+              "value": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 4,
+                "items": {
+                  "type": "number",
+                  "minimum": -1.7976931348623157e+308,
+                  "maximum": 1.7976931348623157e+308
+                }
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "dimension": {
+                      "const": 1
+                    }
+                  },
+                  "required": [
+                    "dimension"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "minItems": 1,
+                      "maxItems": 1
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "dimension": {
+                      "const": 2
+                    }
+                  },
+                  "required": [
+                    "dimension"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "dimension": {
+                      "const": 3
+                    }
+                  },
+                  "required": [
+                    "dimension"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "minItems": 3,
+                      "maxItems": 3
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "dimension": {
+                      "const": 4
+                    }
+                  },
+                  "required": [
+                    "dimension"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "minItems": 4,
+                      "maxItems": 4
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "instanceId",
+              "documentId",
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "target",
+              "property",
+              "dimension",
+              "trackPresent",
+              "items",
+              "nextOffset"
+            ],
+            "properties": {
+              "instanceId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "documentId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "const": "authoredKeys"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectPropertyReadTarget"
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dimension": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4
+              },
+              "trackPresent": {
+                "type": "boolean"
+              },
+              "items": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {
+                  "$ref": "#/$defs/ObjectPropertyReadKey"
+                }
+              },
+              "nextOffset": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  }
+                ]
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "dimension": {
+                      "const": 1
+                    }
+                  },
+                  "required": [
+                    "dimension"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "v": {
+                            "minItems": 1,
+                            "maxItems": 1
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "dimension": {
+                      "const": 2
+                    }
+                  },
+                  "required": [
+                    "dimension"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "v": {
+                            "minItems": 2,
+                            "maxItems": 2
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "dimension": {
+                      "const": 3
+                    }
+                  },
+                  "required": [
+                    "dimension"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "v": {
+                            "minItems": 3,
+                            "maxItems": 3
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "dimension": {
+                      "const": 4
+                    }
+                  },
+                  "required": [
+                    "dimension"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "v": {
+                            "minItems": 4,
+                            "maxItems": 4
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "trackPresent": {
+                      "const": false
+                    }
+                  },
+                  "required": [
+                    "trackPresent"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "items": {
+                      "maxItems": 0
+                    },
+                    "nextOffset": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "instanceId",
+              "documentId",
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "target",
+              "property",
+              "dimension",
+              "frame",
+              "self",
+              "comp",
+              "keyCount",
+              "compUnavailable"
+            ],
+            "properties": {
+              "instanceId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "documentId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "const": "expressionContext"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectPropertyReadTarget"
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dimension": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4
+              },
+              "frame": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              },
+              "self": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "name",
+                      "index",
+                      "isShape",
+                      "hasParent",
+                      "property",
+                      "parent"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4294967295
+                      },
+                      "isShape": {
+                        "type": "boolean"
+                      },
+                      "hasParent": {
+                        "type": "boolean"
+                      },
+                      "property": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "parent": {
+                        "oneOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "name",
+                              "index"
+                            ],
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "index": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 4294967295
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              "comp": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "width",
+                      "height",
+                      "fps",
+                      "frames",
+                      "layers",
+                      "name",
+                      "frameDuration",
+                      "duration",
+                      "numLayers"
+                    ],
+                    "properties": {
+                      "width": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 4294967295
+                      },
+                      "height": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 4294967295
+                      },
+                      "frames": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4294967295
+                      },
+                      "layers": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4294967295
+                      },
+                      "numLayers": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4294967295
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "fps": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "frameDuration": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "duration": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              "keyCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65536
+              },
+              "compUnavailable": {
+                "enum": [
+                  null,
+                  "projectMetadata"
+                ]
+              },
+              "mesh": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "meshId",
+                  "vertexIndex",
+                  "vertexCount",
+                  "outlineVertexCount",
+                  "vertexUV",
+                  "isOutlineVertex"
+                ],
+                "properties": {
+                  "meshId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "vertexIndex": {
+                    "type": "integer",
+                    "minimum": -1,
+                    "maximum": 4294967295
+                  },
+                  "vertexCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  },
+                  "outlineVertexCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  },
+                  "vertexUV": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    }
+                  },
+                  "isOutlineVertex": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "comp": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "compUnavailable": {
+                      "const": "projectMetadata"
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "compUnavailable": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "instanceId",
+              "documentId",
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "target",
+              "property",
+              "dimension",
+              "frame",
+              "expression",
+              "evaluation"
+            ],
+            "properties": {
+              "instanceId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "documentId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "const": "expressionState"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectPropertyReadTarget"
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dimension": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4
+              },
+              "frame": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              },
+              "expression": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "present",
+                  "enabled"
+                ],
+                "properties": {
+                  "present": {
+                    "type": "boolean"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "present": {
+                          "const": false
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "enabled": {
+                          "const": false
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "evaluation": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "state",
+                      "reason"
+                    ],
+                    "properties": {
+                      "state": {
+                        "const": "unavailable"
+                      },
+                      "reason": {
+                        "const": "not-evaluated"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "state",
+                      "diagnostic"
+                    ],
+                    "properties": {
+                      "state": {
+                        "const": "evaluated"
+                      },
+                      "diagnostic": {
+                        "oneOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "kind"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "enum": [
+                                  "mustReturnNumber",
+                                  "mustReturnNumberOrXY",
+                                  "tooDeep",
+                                  "timeout"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "kind",
+                              "message",
+                              "line"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "enum": [
+                                  "runtime",
+                                  "syntax"
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "line": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "minimum": 0,
+                                "maximum": 4294967295
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "evaluation": {
+                      "properties": {
+                        "state": {
+                          "const": "evaluated"
+                        }
+                      }
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "expression": {
+                      "properties": {
+                        "present": {
+                          "const": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "instanceId",
+              "documentId",
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "target",
+              "property",
+              "dimension",
+              "expression"
+            ],
+            "properties": {
+              "instanceId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "documentId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "const": "expressionSource"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectPropertyReadTarget"
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dimension": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4
+              },
+              "expression": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "enabled",
+                      "code"
+                    ],
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "code": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "instanceId",
+              "documentId",
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "target",
+              "frame",
+              "bounds",
+              "parentLayerUid",
+              "parentAffine"
+            ],
+            "properties": {
+              "instanceId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "documentId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "const": "layerBounds"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectPropertyReadTarget"
+              },
+              "frame": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "bounds": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "number",
+                  "minimum": -1.7976931348623157e+308,
+                  "maximum": 1.7976931348623157e+308
+                }
+              },
+              "parentLayerUid": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                ]
+              },
+              "parentAffine": {
+                "type": "array",
+                "minItems": 6,
+                "maxItems": 6,
+                "items": {
+                  "type": "number",
+                  "minimum": -1.7976931348623157e+308,
+                  "maximum": 1.7976931348623157e+308
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 115,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.property.read"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectPropertyReadPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

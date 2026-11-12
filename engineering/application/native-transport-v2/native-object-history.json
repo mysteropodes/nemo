@@ -1,0 +1,112 @@
+{
+  "capability": "native.object-history",
+  "definitions": {
+    "ObjectHistoryReadPayload": {
+      "order": 346,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "offset": {
+            "$ref": "#/$defs/Revision",
+            "description": "Optional first entry index of the page; absent = a window that starts up to 20 entries before the cursor."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32,
+            "description": "Optional page size (default 32)."
+          }
+        }
+      }
+    },
+    "ObjectHistoryReadResult": {
+      "order": 347,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "undoDepth",
+          "redoDepth",
+          "offset",
+          "entries"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "undoDepth": {
+            "$ref": "#/$defs/Revision"
+          },
+          "redoDepth": {
+            "$ref": "#/$defs/Revision"
+          },
+          "offset": {
+            "$ref": "#/$defs/Revision"
+          },
+          "entries": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "index",
+                "label"
+              ],
+              "properties": {
+                "index": {
+                  "$ref": "#/$defs/Revision"
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32
+                }
+              }
+            },
+            "description": "One page of the chronological entry list: the done entries oldest first (index below undoDepth), then the redoable ones nearest first. The cursor is undoDepth."
+          }
+        },
+        "description": "Live current-owner stack depths and one labelled page of entries; atRevision and documentSnapshotId must equal the request and current owner. No retained-snapshot stack semantics."
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 145,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.history"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectHistoryReadPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

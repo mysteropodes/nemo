@@ -1,0 +1,509 @@
+{
+  "capability": "native.object.layer-parent",
+  "definitions": {
+    "ObjectLayerParentSetPayload": {
+      "order": 379,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "contextId",
+          "layerUid",
+          "parentLayerUid",
+          "frame"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.layer.parent.set"
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "parentLayerUid": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "const": null
+              }
+            ]
+          },
+          "frame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        }
+      }
+    },
+    "ObjectLayerTimeLinkSetPayload": {
+      "order": 380,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "contextId",
+          "layerUid",
+          "sourceLayerUid",
+          "frame"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.layer.timeLink.set"
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "sourceLayerUid": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "const": null
+              }
+            ]
+          },
+          "mode": {
+            "enum": [
+              "both",
+              "in",
+              "out"
+            ]
+          },
+          "srcAnchor": {
+            "enum": [
+              "in",
+              "out"
+            ]
+          },
+          "frame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        }
+      }
+    },
+    "ObjectLayerFollowPathSetPayload": {
+      "order": 381,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "contextId",
+          "layerUid",
+          "targetLayerUid"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.layer.followPath.set"
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetLayerUid": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "const": null
+              }
+            ]
+          },
+          "align": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "ObjectLayerColorSetPayload": {
+      "order": 382,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "color"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.layer.color.set"
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "selected": {
+            "type": "array",
+            "maxItems": 128,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        }
+      }
+    },
+    "ObjectLayerKindCreatePayload": {
+      "order": 383,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "kind",
+          "name",
+          "frame"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.layer.kind.create"
+          },
+          "kind": {
+            "enum": [
+              "null",
+              "effect",
+              "guide",
+              "folder",
+              "effector"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "frame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "pos": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "children": {
+            "type": "array",
+            "maxItems": 128,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "ObjectLayerFolderReparentPayload": {
+      "order": 384,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUids",
+          "folderUid",
+          "frame"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.layer.folder.reparent"
+          },
+          "layerUids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "folderUid": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "const": null
+              }
+            ]
+          },
+          "frame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "reorder": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gap",
+              "selection"
+            ],
+            "properties": {
+              "gap": {
+                "type": "number"
+              },
+              "selection": {
+                "$ref": "#/$defs/ObjectLayerSelection"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ObjectLayerRangeArrangePayload": {
+      "order": 385,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "contextId",
+          "layerUids",
+          "action",
+          "frame"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.layer.range.arrange"
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "layerUids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "action": {
+            "enum": [
+              "reset",
+              "alignLeft",
+              "alignCenter",
+              "alignRight",
+              "distribute",
+              "flip",
+              "stagger"
+            ]
+          },
+          "step": {
+            "type": "integer",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "frame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 71,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.parent.set"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerParentSetPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 72,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.timeLink.set"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerTimeLinkSetPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 73,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.followPath.set"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerFollowPathSetPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 74,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.color.set"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerColorSetPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 75,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.kind.create"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerKindCreatePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 76,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.folder.reparent"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerFolderReparentPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 77,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.range.arrange"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerRangeArrangePayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

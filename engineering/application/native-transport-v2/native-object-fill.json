@@ -1,0 +1,233 @@
+{
+  "capability": "native.object.fill",
+  "definitions": {
+    "ObjectFillTracePayload": {
+      "order": 258,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "contextId",
+          "frame",
+          "point",
+          "color",
+          "opacity",
+          "remove"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.fill.trace"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "frame": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "point": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": -1000000000000,
+              "maximum": 1000000000000
+            }
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{8}$"
+          },
+          "opacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "remove": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "ObjectFillBrushPayload": {
+      "order": 259,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "contextId",
+          "frame",
+          "outline",
+          "color",
+          "opacity",
+          "placement",
+          "mask",
+          "copies",
+          "stamps"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.fill.brush"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "frame": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "outline": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 256,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "point",
+                "handleIn",
+                "handleOut"
+              ],
+              "properties": {
+                "point": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number",
+                    "minimum": -1000000000000,
+                    "maximum": 1000000000000
+                  }
+                },
+                "handleIn": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number",
+                    "minimum": -1000000000000,
+                    "maximum": 1000000000000
+                  }
+                },
+                "handleOut": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number",
+                    "minimum": -1000000000000,
+                    "maximum": 1000000000000
+                  }
+                }
+              }
+            }
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{8}$"
+          },
+          "opacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "placement": {
+            "enum": [
+              "above",
+              "below",
+              "merge"
+            ]
+          },
+          "mask": {
+            "anyOf": [
+              {
+                "const": false
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            ]
+          },
+          "copies": {
+            "type": "array",
+            "maxItems": 23,
+            "items": {
+              "type": "array",
+              "minItems": 6,
+              "maxItems": 6,
+              "items": {
+                "type": "number",
+                "minimum": -1000000000000,
+                "maximum": 1000000000000
+              }
+            }
+          },
+          "stamps": {
+            "type": "array",
+            "maxItems": 256,
+            "uniqueItems": true,
+            "description": "Labs multi-frame draw: the other selected frames of the layer the committed shape is also stamped on.",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 123,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.fill.trace"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFillTracePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 124,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.fill.brush"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFillBrushPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

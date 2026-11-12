@@ -1,0 +1,371 @@
+{
+  "capability": "native.project-palette",
+  "definitions": {
+    "ObjectProjectPaletteSelector": {
+      "order": 271,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "settings"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "palettePage"
+              },
+              "cursor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "ordinal",
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "colorPage"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "cursor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "ObjectProjectPaletteEditAction": {
+      "order": 272,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "id",
+              "name"
+            ],
+            "properties": {
+              "kind": {
+                "const": "create"
+              },
+              "id": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$"
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$"
+              },
+              "color": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "ordinal",
+              "name"
+            ],
+            "properties": {
+              "kind": {
+                "const": "rename"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "ordinal",
+              "id",
+              "name"
+            ],
+            "properties": {
+              "kind": {
+                "const": "duplicate"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "id": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$"
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "ordinal"
+            ],
+            "properties": {
+              "kind": {
+                "const": "remove"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "ordinal"
+            ],
+            "properties": {
+              "kind": {
+                "const": "select"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "ordinal",
+              "color"
+            ],
+            "properties": {
+              "kind": {
+                "const": "appendColor"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "color": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "ordinal",
+              "index"
+            ],
+            "properties": {
+              "kind": {
+                "const": "removeColor"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "ordinal",
+              "from",
+              "to"
+            ],
+            "properties": {
+              "kind": {
+                "const": "moveColor"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "from": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "to": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "ObjectProjectPaletteReadPayload": {
+      "order": 273,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "contextId",
+          "selector"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "selector": {
+            "$ref": "#/$defs/ObjectProjectPaletteSelector"
+          }
+        }
+      }
+    },
+    "ObjectProjectPaletteEditPayload": {
+      "order": 274,
+      "schema": {
+        "type": "object",
+        "required": [
+          "command",
+          "action"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.project.palette.edit"
+          },
+          "action": {
+            "$ref": "#/$defs/ObjectProjectPaletteEditAction"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 128,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.project.palette.read"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectPaletteReadPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 129,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.project.palette.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectPaletteEditPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
