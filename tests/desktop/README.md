@@ -353,3 +353,30 @@ operation, plus one injected fault per kit guard (`installed-evidence-defects.te
 refusal, an edit disguised as a publication, a host that keeps the in-memory document on open, a flatten that only bumps the
 revision, an export file changed on disk). The stub follows the published reply shapes; it is not what is being proved. No
 installed run has been made with this runner.
+
+## Real client workflow, Codex and Claude Code (`installed-evidence/f03-clients.cjs`, #1049)
+
+Runs the issue's original opacity workflow (static 25, set 40 then 60, save, undo, an out-of-date write, save, reopen, replace the
+project by the keyed fixture, a write against the replaced project, read keyed frames 0 and 20) twice against an already built
+package: through the real Codex CLI (`codex exec`) and through the real Claude Code CLI (`claude -p`). Each half has its own fresh
+isolated session, bound to the candidate by `candidate.cjs` exactly like `run.cjs`, and a per-invocation MCP configuration naming the
+package's own `nemo-mcp` and that session's registry; no user or project client configuration is touched and no input is sent.
+The identification rule is in `engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md`.
+
+```sh
+lockf -k /tmp/nemo-heavy-job.lock node tests/desktop/installed-evidence/f03-clients.cjs \
+  --app /abs/Nemo.app --build-proof /abs/build-proof.json --report-dir /abs/empty-dir [--client codex,claude] [--timeout-min 20] [--task ID]
+```
+
+The prompt names goals and file paths only (no tool or operation names), so the client derives requests from the advertised schema.
+The harness stages the fixed fixture (`tests/animation/fixtures/curve-workflow.json`, pinned by hash, as the static and keyed shells of
+N21), opens the static shell itself, runs the client, and after it exits judges only from its own reads: `saved-60.json` holds 60
+and `saved.json` holds 40 (written by the application), the fixtures are unchanged, the open project is a different document at
+revision 0 evaluating 20, 50, 80 at frames 0, 10, 20, reopening `saved.json` reads 40, and the harness itself shows that a write
+naming the previous revision is refused (`stale_revision`) and one naming the replaced project is refused (`wrong_document`).
+A client that is not installed, not authenticated, over quota or that rejects the command line leaves its half `unrun` with the
+reason; the client's last message and tool trace are in the receipt as information and never decide a verdict. The receipt
+`f03-clients-receipt.json` (plus `<client>.stream.jsonl`, `<client>.stderr.txt`, `<client>.wire.jsonl`, private) records the candidate
+identity, per client name, version, binary SHA-256, exact prompt and command line, every assertion and the limitations. Exit status as
+`run.cjs`: 0 both passed, 5 one client was selected and passed, 1 a half failed, 2 refused, 4 a half unrun. Unit tests (`node --test tests/desktop/unit/f03-clients.test.cjs`)
+use stubs only; no client or app has been run with this harness.
