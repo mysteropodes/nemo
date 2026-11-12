@@ -264,24 +264,29 @@ test('the duplicate select-bridge rotate writer is retired while scale, skew, la
   assert.match(bridge, /mode = 'layer-multi-' \+ mlHit\.type/);
   assert.match(bridge, /mode = 'nv-rotate'/);
   assert.match(bridge, /NemoNativeSelectGesture\.bind\(window\)/, 'native Select remains the engine-on rotation owner');
-  assert.match(bridge, /Selection rotation requires the native gesture owner; this fallback cannot rotate selections\./, 'the ring press has an explicit unavailable-authority notice');
+  assert.match(bridge, /Selection rotation requires the native gesture owner; this fallback cannot rotate selections\./, 'the legacy ring press has an explicit unavailable-authority notice');
+  assert.doesNotMatch(bridge.slice(bridge.indexOf('function nativePointerEvent'), bridge.indexOf('// Same handle-position math')), /hitTestHandles|screenToWorld|selectedPaths/, 'native owner handling never probes Paper selection state');
   assert.match(bridge, /if \(mode && !allowLegacySelectionEdit\(e, 'select'\)\) return;/);
   assert.match(bridge, /if \(\(mode \|\| draggingArc \|\| motionGesture\) && !allowLegacySelectionEdit\(e, 'select'\)\) return;/);
   assert.match(bridge, /if \(shouldIntercept\(\) && !allowLegacySelectionEdit\(e, 'select'\)\) return;/);
 });
 
 function bootSelect(cutover, opts = {}) {
-  const handlers = {}, target = { addEventListener(type, fn) { handlers[type] = fn; } }, calls = { world: 0, undo: 0, key: 0, suspend: 0, notices: [] };
+  const handlers = {}, target = { addEventListener(type, fn) { handlers[type] = fn; } }, calls = { world: 0, handles: 0, undo: 0, key: 0, suspend: 0, notices: [] };
   const context = { console, Object, state: { tool: 'select', playing: false, appMode: 'anim2d', layers: [{ locked: false }], activeLayerIdx: 0, selectedStrokeIndices: [] },
     document: { readyState: 'complete', addEventListener() {}, getElementById: () => target }, Point: function Point(x, y) { this.x = x; this.y = y; }, window: null };
+  context.calls = calls;
   context.window = context; context.addEventListener = () => {}; context.selectedPaths = opts.selected ? [{}] : [];
+  context.multiLayerSelectionBox = () => null; context.multiLayerHit = () => null;
+  context.paramShapeSelectionSingle = () => null; context.hitTestArc = () => opts.arc ? {} : null;
   context.showToast = (message) => calls.notices.push(message);
   context.SMEngineBridge = { isEnabled: () => true, screenToWorld: () => { calls.world++; return [0, 0]; }, suspend() { calls.suspend++; } };
   context.pushUndo = () => { calls.undo++; };
   context.ensureKeyframe = () => { calls.key++; };
   if (cutover !== undefined) context.NemoNativeOpacityCutover = cutover;
   let source = src('src/js/select-bridge.js');
-  if (opts.rotateHit) source = source.replace('return window.NemoSelectCanvasIntent.hitHandles(computeHandles(), pt, altHeld, view.zoom);', 'return { type: \'rotate\' };');
+  if (opts.rotateHit) source = source.replace('return window.NemoSelectCanvasIntent.hitHandles(computeHandles(), pt, altHeld, view.zoom);', 'calls.handles++; return { type: \'rotate\' };');
+  if (opts.arc) source = source.replace('var ah = hitTestArc(pt);', 'var ah = {};');
   vm.runInNewContext(source, context, { filename: 'select-bridge.js' });
   return { handlers, calls };
 }
@@ -289,17 +294,18 @@ const pointer = (type) => { const e = { type, button: 0, pointerId: 1, buttons: 
 
 test('runtime: with the native cutover owning the canvas (or throwing) a Select press / drag / release is consumed and the legacy writer never reads the canvas', () => {
   for (const cutover of [{ blocksLegacy: () => true }, { blocksLegacy() { throw new Error('boom'); } }, null]) {
-    const { handlers, calls } = bootSelect(cutover);
+    const { handlers, calls } = bootSelect(cutover, { selected: true, rotateHit: true });
     for (const type of ['pointerdown', 'pointermove', 'pointerup']) { const e = pointer(type); try { handlers[type](e); } catch (_) { /* a missing native intent port is a consumed gesture */ } assert.ok(e.stopped >= 1, `${type} consumed`); }
     assert.equal(calls.world, 0, 'screenToWorld (the first thing the legacy writer does) was never called');
+    assert.equal(calls.handles, 0, 'stale Paper selection and handle state were never read');
   }
   const { handlers, calls } = bootSelect(undefined); // no cutover at all: the legacy path is the owner, so the control is live
   try { handlers.pointerdown(pointer('pointerdown')); } catch (_) {}
   assert.ok(calls.world > 0, 'control: without the native cutover the legacy writer does run');
 });
 
-test('runtime: a rotation ring press without a usable native gesture is visibly refused before suspension or mutation', () => {
-  for (const cutover of [undefined, { blocksLegacy: () => false }, { blocksLegacy: () => true }]) {
+test('runtime: a legacy fallback rotation ring press is visibly refused before suspension or mutation', () => {
+  for (const cutover of [undefined, { blocksLegacy: () => false }]) {
     const { handlers, calls } = bootSelect(cutover, { selected: true, rotateHit: true });
     const e = pointer('pointerdown'); handlers.pointerdown(e);
     assert.equal(calls.notices.length, 1, 'one explicit notice per press');
@@ -308,5 +314,16 @@ test('runtime: a rotation ring press without a usable native gesture is visibly 
     assert.equal(calls.suspend, 0, 'engine was not paused');
     assert.equal(calls.undo, 0, 'no undo was created');
     assert.equal(calls.key, 0, 'no held key was created');
+    assert.equal(calls.world, 1, 'legacy path reuses the ordinary pointerdown conversion');
+    assert.equal(calls.handles, 1, 'legacy path reuses its one handle hit-test');
   }
+});
+
+test('runtime: higher-priority legacy arc hits still win over the retired rotation ring', () => {
+  const { handlers, calls } = bootSelect(undefined, { selected: true, rotateHit: true, arc: true });
+  try { handlers.pointerdown(pointer('pointerdown')); } catch (_) { /* arc cache is outside this narrow source harness */ }
+  assert.equal(calls.notices.length, 0, 'the rotation refusal did not preempt the earlier arc hit');
+  assert.equal(calls.suspend, 1, 'the arc gesture still pauses the engine');
+  assert.equal(calls.undo, 1, 'the arc gesture still records its undo');
+  assert.equal(calls.handles, 0, 'the higher-priority arc path returns before handle testing');
 });

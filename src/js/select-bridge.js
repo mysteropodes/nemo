@@ -532,15 +532,6 @@
     });
     return nativePointerIntent;
   }
-  function refusesLegacyRotate(e) {
-    if (!e || e.button !== 0 || state.appMode === 'motion' || !shouldIntercept() || !selectedPaths.length) return false;
-    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    var hit = hitTestHandles(new Point(w[0], w[1]), e.altKey);
-    if (!hit || hit.type !== 'rotate') return false;
-    if (window.showToast) showToast('Selection rotation requires the native gesture owner; this fallback cannot rotate selections.');
-    e.stopImmediatePropagation(); e.preventDefault();
-    return true;
-  }
   function nativePointerEvent(method, e) {
     if(window.NemoNativeCommentsUI&&NemoNativeCommentsUI.handle(window,method,e,nativePointerIntent&&nativePointerIntent.cancel))return true;
     if(window.NemoNativeTextToolDesktop&&window.NemoNativeTextToolDesktop.handle(window,method,e,nativePointerIntent&&nativePointerIntent.cancel))return true;
@@ -549,15 +540,14 @@
         nativePointerIntent.cancel(); e.stopImmediatePropagation(); e.preventDefault(); return true;
       } } catch (_) { nativePointerIntent.cancel(); e.stopImmediatePropagation(); e.preventDefault(); return true; }
     }
-    if (!Object.prototype.hasOwnProperty.call(window, 'NemoNativeOpacityCutover')) return method === 'down' && refusesLegacyRotate(e) ? true : false;
+    if (!Object.prototype.hasOwnProperty.call(window, 'NemoNativeOpacityCutover')) return false;
     try {
       var c = window.NemoNativeOpacityCutover;
-      if (c && typeof c.blocksLegacy === 'function' && c.blocksLegacy() === false) return method === 'down' && refusesLegacyRotate(e) ? true : false;
+      if (c && typeof c.blocksLegacy === 'function' && c.blocksLegacy() === false) return false;
       if (state.tool === 'subselect') return true; // Direct Select owns its native controller (subselect-bridge, document capture): never consume its gesture
-      if (method === 'down' && !window.NemoNativeSelectGesture && refusesLegacyRotate(e)) return true;
       nativePointer()[method](e);
     } catch (_) {
-      if (method === 'down') { try { if (refusesLegacyRotate(e)) return true; } catch (_) {} }
+      if (method === 'down' && window.showToast) showToast('Native Select gestures are unavailable.');
       e.stopImmediatePropagation(); e.preventDefault();
     }
     return true;
@@ -999,11 +989,11 @@
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
     lastPt = pt;
-    window.SMEngineBridge.suspend();
 
     var mlBox = multiLayerSelectionBox();
     var mlHit = multiLayerHit(mlBox, pt);
     if (mlBox && mlHit) {
+      window.SMEngineBridge.suspend();
       // Materialize held frames for every participating layer before taking
       // object references; _insertKeyframeCore/loadFrame rebuilds all Paper
       // items and would otherwise leave the snapshot stale.
@@ -1034,6 +1024,7 @@
       var HIT_R0 = 10 / view.zoom, hitCorner0 = null;
       window.SMParamShapeHandles.handleNamesFor(pshp0).forEach(function (c) { if (!hitCorner0 && pt.getDistance(hp0[c]) < HIT_R0) hitCorner0 = c; });
       if (hitCorner0) {
+        window.SMEngineBridge.suspend();
         mode = 'cornerRadius';
         pushUndo();
         _cornerDrag = { path: pshp0, corner: hitCorner0 };
@@ -1042,6 +1033,7 @@
     }
     var ah = hitTestArc(pt);
     if (ah) {
+      window.SMEngineBridge.suspend();
       mode = 'arc';
       // One undo entry per arc-handle GESTURE (2026-09 QA sweep): dragging
       // a motion-arc handle rewrote state.motionArcs with no snapshot at
@@ -1070,6 +1062,7 @@
     // down (this block's own 2026-08-21 fix comment).
     var hh = (state.appMode === 'motion') ? null : hitTestHandles(pt, e.altKey);
     if (hh && hh.type === 'anchor') {
+      window.SMEngineBridge.suspend();
       // Direct drag of the anchor crosshair — same UI-preference-not-
       // document-edit reasoning as the Alt+click path a bit further down
       // (no pushUndo, no ensureKeyframe): only state.xformAnchorCustom
@@ -1077,11 +1070,15 @@
       mode = 'xform-anchor-drag';
       return;
     }
+    if (hh && hh.type === 'rotate') {
+      if (window.showToast) showToast('Selection rotation requires the native gesture owner; this fallback cannot rotate selections.');
+      return;
+    }
+    window.SMEngineBridge.suspend();
     if (hh && e.ctrlKey && hh.type === 'scale' && (hh.dir === 'nw' || hh.dir === 'ne' || hh.dir === 'sw' || hh.dir === 'se') && distortEligibleCornerAt(pt) === hh.dir) {
       // If beginDistort() fails (computeHandles() returned null), `mode`
       // stays null — onUp()'s `if (!mode) return;` would then skip the
-      // resume() at its tail entirely, leaving the engine suspended forever
-      // (suspend() already ran a few lines above, unconditionally).
+      // resume() at its tail entirely, leaving the engine suspended forever.
       if (!beginDistort(hh.dir)) window.SMEngineBridge.resume();
       return;
     }
