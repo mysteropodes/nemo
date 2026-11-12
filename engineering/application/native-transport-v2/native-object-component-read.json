@@ -1,0 +1,1038 @@
+{
+  "capability": "native.object-component-read",
+  "definitions": {
+    "ObjectComponentReadPayload": {
+      "order": 348,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "selector"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "selector": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "cursor",
+                  "limit"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "contexts"
+                  },
+                  "cursor": {
+                    "$ref": "#/$defs/Revision"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "contextId"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "context"
+                  },
+                  "contextId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "contextId",
+                  "cursor",
+                  "limit"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "layers"
+                  },
+                  "contextId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "cursor": {
+                    "$ref": "#/$defs/Revision"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "contextId",
+                  "cursor",
+                  "limit"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "markers"
+                  },
+                  "contextId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "cursor": {
+                    "$ref": "#/$defs/Revision"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "contextId",
+                  "cursor",
+                  "limit"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "cameraKeys"
+                  },
+                  "contextId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "cursor": {
+                    "$ref": "#/$defs/Revision"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "contextId",
+                  "cursor",
+                  "limit"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "instances"
+                  },
+                  "contextId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "cursor": {
+                    "$ref": "#/$defs/Revision"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "layerUid"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "duplicator"
+                  },
+                  "layerUid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "layerUid",
+                  "frame"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "instance"
+                  },
+                  "layerUid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "frame": {
+                    "$ref": "#/$defs/Revision"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "Read-only component model pinned to (atRevision, documentSnapshotId): the contexts of the document, one context's summary, its layers, a page of the markers or of the camera keys a component stores, the scene layers that instance one component, the stored duplicator descriptor of one scene layer, or the playback facts of one component-instance layer at an outer frame. Paged and byte-bounded; no expectedRevision."
+      }
+    },
+    "ObjectComponentReadResult": {
+      "order": 349,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "contextCount",
+              "cursor",
+              "items",
+              "nextCursor"
+            ],
+            "properties": {
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "kind": {
+                "const": "contexts"
+              },
+              "contextCount": {
+                "$ref": "#/$defs/Revision"
+              },
+              "cursor": {
+                "$ref": "#/$defs/Revision"
+              },
+              "items": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "contextId",
+                    "contextKind",
+                    "name",
+                    "totalFrames",
+                    "layerCount"
+                  ],
+                  "properties": {
+                    "contextId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "contextKind": {
+                      "enum": [
+                        "scene",
+                        "component"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "totalFrames": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "layerCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "nameTruncated": {
+                      "const": true,
+                      "description": "Present only when the owner cut an oversized component name to fit the page."
+                    }
+                  }
+                }
+              },
+              "nextCursor": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/$defs/Revision"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "contextId",
+              "contextKind",
+              "name",
+              "totalFrames",
+              "layerCount",
+              "fps",
+              "instanceCount",
+              "exposedPropertyCount",
+              "hasCameraKeys"
+            ],
+            "properties": {
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "kind": {
+                "const": "context"
+              },
+              "contextId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "contextKind": {
+                "enum": [
+                  "scene",
+                  "component"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "totalFrames": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "layerCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "fps": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "instanceCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "exposedPropertyCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "hasCameraKeys": {
+                "type": "boolean"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "contextId",
+              "layerCount",
+              "cursor",
+              "items",
+              "nextCursor"
+            ],
+            "properties": {
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "kind": {
+                "const": "layers"
+              },
+              "contextId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "layerCount": {
+                "$ref": "#/$defs/Revision"
+              },
+              "cursor": {
+                "$ref": "#/$defs/Revision"
+              },
+              "items": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "layerUid",
+                    "name",
+                    "layerKind"
+                  ],
+                  "properties": {
+                    "layerUid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "layerKind": {
+                      "enum": [
+                        "drawing",
+                        "folder",
+                        "effect",
+                        "widget",
+                        "null",
+                        "instance"
+                      ]
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    },
+                    "locked": {
+                      "type": "boolean"
+                    },
+                    "parentLayerUid": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 128
+                    },
+                    "threeD": {
+                      "type": "boolean"
+                    },
+                    "hasMotion": {
+                      "type": "boolean"
+                    },
+                    "shy": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "nextCursor": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/$defs/Revision"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "contextId",
+              "markerCount",
+              "cursor",
+              "items",
+              "nextCursor"
+            ],
+            "properties": {
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "kind": {
+                "const": "markers"
+              },
+              "contextId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "cursor": {
+                "$ref": "#/$defs/Revision"
+              },
+              "items": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "frame",
+                    "name",
+                    "color"
+                  ],
+                  "properties": {
+                    "frame": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "name": {
+                      "type": "string",
+                      "maxLength": 256
+                    },
+                    "color": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    }
+                  }
+                }
+              },
+              "nextCursor": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/$defs/Revision"
+                  }
+                ]
+              },
+              "markerCount": {
+                "$ref": "#/$defs/Revision"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "contextId",
+              "keyCount",
+              "cursor",
+              "items",
+              "nextCursor"
+            ],
+            "properties": {
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "kind": {
+                "const": "cameraKeys"
+              },
+              "contextId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "cursor": {
+                "$ref": "#/$defs/Revision"
+              },
+              "items": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "frame",
+                    "x",
+                    "y",
+                    "w",
+                    "rot",
+                    "hOut",
+                    "hIn",
+                    "ease"
+                  ],
+                  "properties": {
+                    "frame": {
+                      "type": "number"
+                    },
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    },
+                    "w": {
+                      "type": "number"
+                    },
+                    "rot": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "hOut": {
+                      "type": [
+                        "array",
+                        "null"
+                      ],
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "hIn": {
+                      "type": [
+                        "array",
+                        "null"
+                      ],
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "ease": {
+                      "type": [
+                        "array",
+                        "null"
+                      ],
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 4,
+                      "maxItems": 4
+                    }
+                  }
+                }
+              },
+              "nextCursor": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/$defs/Revision"
+                  }
+                ]
+              },
+              "keyCount": {
+                "$ref": "#/$defs/Revision"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "contextId",
+              "instanceCount",
+              "cursor",
+              "items",
+              "nextCursor"
+            ],
+            "properties": {
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "kind": {
+                "const": "instances"
+              },
+              "contextId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "instanceCount": {
+                "$ref": "#/$defs/Revision"
+              },
+              "cursor": {
+                "$ref": "#/$defs/Revision"
+              },
+              "items": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "layerUid"
+                  ],
+                  "properties": {
+                    "layerUid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  }
+                }
+              },
+              "nextCursor": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/$defs/Revision"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "layerUid",
+              "mode",
+              "rows",
+              "cols",
+              "spacingX",
+              "spacingY",
+              "count",
+              "radius",
+              "startAngle",
+              "radialOrient",
+              "pathAlignTangent",
+              "pathLayerUid",
+              "seed",
+              "sourceMode",
+              "staggerRandom",
+              "effectors",
+              "timeOffset"
+            ],
+            "properties": {
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "kind": {
+                "const": "duplicator"
+              },
+              "layerUid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "mode": {
+                "enum": [
+                  "grid",
+                  "radial",
+                  "path"
+                ]
+              },
+              "rows": {
+                "type": "number"
+              },
+              "cols": {
+                "type": "number"
+              },
+              "spacingX": {
+                "type": "number"
+              },
+              "spacingY": {
+                "type": "number"
+              },
+              "count": {
+                "type": "number"
+              },
+              "radius": {
+                "type": "number"
+              },
+              "startAngle": {
+                "type": "number"
+              },
+              "radialOrient": {
+                "type": "boolean"
+              },
+              "pathAlignTangent": {
+                "type": "boolean"
+              },
+              "pathLayerUid": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "sourceMode": {
+                "enum": [
+                  "shape",
+                  "objects"
+                ]
+              },
+              "staggerRandom": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "position",
+                  "rotation",
+                  "scale",
+                  "opacity",
+                  "hue"
+                ],
+                "properties": {
+                  "position": {
+                    "type": "boolean"
+                  },
+                  "rotation": {
+                    "type": "boolean"
+                  },
+                  "scale": {
+                    "type": "boolean"
+                  },
+                  "opacity": {
+                    "type": "boolean"
+                  },
+                  "hue": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "effectors": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "pos",
+                    "radius"
+                  ],
+                  "properties": {
+                    "pos": {
+                      "oneOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "radius": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              "timeOffset": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "enabled",
+                  "offsetFrames",
+                  "direction"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "offsetFrames": {
+                    "type": "number"
+                  },
+                  "direction": {
+                    "enum": [
+                      "forward",
+                      "backward",
+                      "centerOut",
+                      "random"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "atRevision",
+              "documentSnapshotId",
+              "kind",
+              "layerUid",
+              "componentId",
+              "mode",
+              "singleFrame",
+              "speed",
+              "placedAt",
+              "totalFrames",
+              "resolvedFrame",
+              "explicit"
+            ],
+            "properties": {
+              "atRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "documentSnapshotId": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "kind": {
+                "const": "instance"
+              },
+              "layerUid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "componentId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "mode": {
+                "enum": [
+                  "loop",
+                  "once",
+                  "pingpong",
+                  "single"
+                ]
+              },
+              "singleFrame": {
+                "type": "number",
+                "minimum": 0
+              },
+              "speed": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "placedAt": {
+                "type": "number"
+              },
+              "totalFrames": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "resolvedFrame": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "explicit": {
+                "type": "boolean"
+              }
+            }
+          }
+        ],
+        "description": "One answer of the component read, pinned to the request: atRevision and documentSnapshotId equal the request and the response contentRevision. nextCursor is the first unread index, null at the end."
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 146,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.component.read"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectComponentReadPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

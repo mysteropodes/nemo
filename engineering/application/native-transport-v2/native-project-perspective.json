@@ -1,0 +1,253 @@
+{
+  "capability": "native.project-perspective",
+  "definitions": {
+    "ObjectProjectPerspectiveEditAction": {
+      "order": 300,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "enabled"
+            ],
+            "properties": {
+              "kind": {
+                "const": "setEnabled"
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "mode"
+            ],
+            "properties": {
+              "kind": {
+                "const": "setMode"
+              },
+              "mode": {
+                "enum": [
+                  "1pt",
+                  "2pt",
+                  "3pt",
+                  "fisheye"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "reset"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "locked"
+            ],
+            "properties": {
+              "kind": {
+                "const": "lockAll"
+              },
+              "locked": {
+                "type": "boolean"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "ordinal",
+              "x",
+              "y"
+            ],
+            "properties": {
+              "kind": {
+                "const": "move"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "dx",
+              "dy"
+            ],
+            "properties": {
+              "kind": {
+                "const": "translate"
+              },
+              "dx": {
+                "type": "number"
+              },
+              "dy": {
+                "type": "number"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectPerspectiveSelector": {
+      "order": 301,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "settings"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "vpPage"
+              },
+              "cursor": {
+                "$ref": "#/$defs/Revision"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectPerspectiveEditPayload": {
+      "order": 302,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "action"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.project.perspective.edit"
+          },
+          "action": {
+            "$ref": "#/$defs/ObjectProjectPerspectiveEditAction"
+          }
+        }
+      }
+    },
+    "ObjectProjectPerspectiveReadPayload": {
+      "order": 303,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "contextId",
+          "selector"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "selector": {
+            "$ref": "#/$defs/ObjectProjectPerspectiveSelector"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 135,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.project.perspective.read"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectPerspectiveReadPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 136,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.project.perspective.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectPerspectiveEditPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

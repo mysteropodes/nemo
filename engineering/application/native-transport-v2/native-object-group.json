@@ -1,0 +1,344 @@
+{
+  "capability": "native.object.group",
+  "definitions": {
+    "ObjectGroupCreatePayload": {
+      "order": 132,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "contextId",
+          "groupId",
+          "name",
+          "strokeIds"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.group.create"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "groupId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "strokeIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1024,
+            "items": {
+              "$ref": "#/$defs/ObjectEditId"
+            }
+          }
+        }
+      }
+    },
+    "ObjectGroupUngroupPayload": {
+      "order": 133,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "contextId",
+          "strokeIds"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.group.ungroup"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "strokeIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1024,
+            "items": {
+              "$ref": "#/$defs/ObjectEditId"
+            }
+          }
+        }
+      }
+    },
+    "ObjectGroupCombinePayload": {
+      "order": 134,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "contextId",
+          "groupId",
+          "mode",
+          "strokeIds"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.group.combine"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "groupId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "mode": {
+            "enum": [
+              "none",
+              "unite",
+              "subtract",
+              "intersect",
+              "exclude"
+            ]
+          },
+          "strokeIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1024,
+            "items": {
+              "$ref": "#/$defs/ObjectEditId"
+            }
+          }
+        }
+      }
+    },
+    "ObjectGroupModeSetPayload": {
+      "order": 135,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "contextId",
+          "groupId",
+          "mode"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.group.mode.set"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "groupId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "mode": {
+            "enum": [
+              "none",
+              "unite",
+              "subtract",
+              "intersect",
+              "exclude"
+            ]
+          }
+        }
+      }
+    },
+    "ObjectGroupRenamePayload": {
+      "order": 136,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "contextId",
+          "groupId",
+          "name"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.group.rename"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "groupId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    },
+    "ObjectGroupMemberRemovePayload": {
+      "order": 137,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "contextId",
+          "strokeId"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.group.member.remove"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "strokeId": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 34,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.group.create"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectGroupCreatePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 35,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.group.ungroup"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectGroupUngroupPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 36,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.group.combine"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectGroupCombinePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 37,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.group.mode.set"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectGroupModeSetPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 38,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.group.rename"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectGroupRenamePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 39,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.group.member.remove"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectGroupMemberRemovePayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,309 @@
+{
+  "capability": "native.project-composition",
+  "definitions": {
+    "ObjectProjectCompositionSelector": {
+      "order": 262,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "settings"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "index"
+            ],
+            "properties": {
+              "kind": {
+                "const": "markerAt"
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "name"
+            ],
+            "properties": {
+              "kind": {
+                "const": "markerNamed"
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$",
+                "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "frame"
+            ],
+            "properties": {
+              "kind": {
+                "const": "markerNearest"
+              },
+              "frame": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "markerPage"
+              },
+              "cursor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4096
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectCompositionEditAction": {
+      "order": 263,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "frame"
+            ],
+            "properties": {
+              "kind": {
+                "const": "addMarker"
+              },
+              "frame": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$",
+                "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+              },
+              "color": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$",
+                "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "ordinal"
+            ],
+            "properties": {
+              "kind": {
+                "const": "updateMarker"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4096
+              },
+              "frame": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$",
+                "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+              },
+              "color": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$",
+                "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "ordinal"
+            ],
+            "properties": {
+              "kind": {
+                "const": "removeMarker"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4096
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "clearMarkers"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "setBpm"
+              },
+              "bpm": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              "bpmOffset": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              "bpmShow": {
+                "type": "boolean"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectCompositionReadPayload": {
+      "order": 264,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "contextId",
+          "selector"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "selector": {
+            "$ref": "#/$defs/ObjectProjectCompositionSelector"
+          }
+        }
+      }
+    },
+    "ObjectProjectCompositionEditPayload": {
+      "order": 265,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "action"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.project.composition.edit"
+          },
+          "action": {
+            "$ref": "#/$defs/ObjectProjectCompositionEditAction"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 126,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.project.composition.read"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectCompositionReadPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 127,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.project.composition.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectCompositionEditPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "capability": "native.object.subselect",
+  "definitions": {
+    "ObjectSubselectPayload": {
+      "order": 367,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "stableTarget",
+          "intent"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.subselect.edit"
+          },
+          "stableTarget": {
+            "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+          },
+          "intent": {
+            "$ref": "#/$defs/ObjectSubselectIntent"
+          },
+          "atFrame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 150,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.subselect.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectSubselectPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

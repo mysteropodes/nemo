@@ -1,0 +1,85 @@
+{
+  "capability": "native.vector.export",
+  "definitions": {
+    "ExportSvgBeginPayload": {
+      "order": 194,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "documentSnapshotId",
+          "contextId",
+          "outputHandle",
+          "frames"
+        ],
+        "properties": {
+          "documentSnapshotId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "contextId": {
+            "const": "scene-root"
+          },
+          "outputHandle": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "frames": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/$defs/ObjectFrame"
+            }
+          },
+          "soloLayers": {
+            "$ref": "#/$defs/ExportSoloLayers"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 100,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "job.export.svg.begin"
+              },
+              "payload": {
+                "$ref": "#/$defs/ExportSvgBeginPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 101,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "enum": [
+                  "job.export.svg.status",
+                  "job.export.svg.cancel"
+                ]
+              },
+              "payload": {
+                "$ref": "#/$defs/JobIdPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

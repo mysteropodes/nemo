@@ -1,0 +1,1150 @@
+{
+  "capability": "native.frame-edit",
+  "definitions": {
+    "ObjectFrameEditCell": {
+      "order": 145,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "layerUid",
+          "frame"
+        ],
+        "properties": {
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "frame": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ObjectFramesInsertPayload": {
+      "order": 146,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "cell"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.frames.insert"
+          },
+          "cell": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "layerUids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/ObjectOpaqueId"
+            }
+          }
+        }
+      }
+    },
+    "ObjectFramesExtendPayload": {
+      "order": 147,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "cell",
+          "count"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.frames.extend"
+          },
+          "cell": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          }
+        }
+      }
+    },
+    "ObjectFramesDuplicatePayload": {
+      "order": 148,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "cell"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.frames.duplicate"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "cell": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ObjectFramesRemovePayload": {
+      "order": 149,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.frames.remove"
+          },
+          "from": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "to": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ObjectLayerKeyPromotePayload": {
+      "order": 150,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "cells"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.key.promote"
+          },
+          "cells": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/ObjectFrame"
+            }
+          },
+          "layerUids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/ObjectOpaqueId"
+            }
+          }
+        }
+      }
+    },
+    "ObjectLayerKeyBlankPayload": {
+      "order": 151,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "cell"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.key.blank"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "cell": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ObjectLayerKeyClearPayload": {
+      "order": 152,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "cell"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.key.clear"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "cell": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ObjectLayerKeyClearCellsPayload": {
+      "order": 153,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "targets"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.key.clear_cells"
+          },
+          "targets": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/ObjectFrameEditCell"
+            }
+          }
+        }
+      }
+    },
+    "ObjectLayerTweenRemovePayload": {
+      "order": 154,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.tween.remove"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "from": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "to": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ObjectLayerKeyMovePayload": {
+      "order": 155,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.key.move"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "from": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "to": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "activeLayerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "Captured active layer for the original motionArc prefix default; may differ from dragged layerUid. Required by native when a changed edit has stored Arc entries."
+          }
+        }
+      }
+    },
+    "ObjectFramesClipboardDuplicatePayload": {
+      "order": 156,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "selection"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.frames.clipboard.duplicate"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "selection": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/ObjectFrameEditCell"
+            }
+          }
+        }
+      }
+    },
+    "ObjectFramesRepeatPayload": {
+      "order": 157,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "fromLayerUid",
+          "toLayerUid",
+          "fromFrame",
+          "toFrame",
+          "times"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.frames.repeat"
+          },
+          "fromLayerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "toLayerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "fromFrame": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "toFrame": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "times": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    "ObjectFrameClipboardCell": {
+      "order": 235,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "relLayer",
+          "relFrame",
+          "keyframe",
+          "records"
+        ],
+        "properties": {
+          "relLayer": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "relFrame": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "keyframe": {
+            "type": "boolean"
+          },
+          "records": {
+            "type": "array",
+            "maxItems": 131072,
+            "items": {
+              "type": "object"
+            }
+          },
+          "orderElements": {
+            "type": "array",
+            "maxItems": 131072,
+            "items": {
+              "type": "object"
+            }
+          },
+          "rasterItems": {
+            "type": "array",
+            "maxItems": 131072,
+            "items": {
+              "type": "object"
+            }
+          },
+          "textItems": {
+            "type": "array",
+            "maxItems": 131072,
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "description": "Bounded structural DTO shell only. Optional rasterItems/textItems carry the cell's raster images and text blocks (entries target+item / target+block, strict native decoding, asset and mesh references stay valid only in the source document; a paste into another document or with an unresolved reference refuses typed). They count toward the same 4MiB data bound. Native strict decoding validates full record/order grammar, offsets, key/record and version/order relationships atomically; no record/order data is dropped. Records/order arrays use nativeDataBytes/32=131072 entries to avoid rejecting native-valid packets above4096 objects; cell/selection counts stay4096 and aggregate native data bytes remain4MiB."
+      }
+    },
+    "ObjectFramesClipboardCopyPayload": {
+      "order": 237,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "selection"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.frames.clipboard.copy"
+          },
+          "selection": {
+            "type": "array",
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/ObjectFrameEditCell"
+            }
+          }
+        },
+        "description": "Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+        "x-maxEncodedRequestBytes": 5246976
+      }
+    },
+    "ObjectFramesClipboardCutPayload": {
+      "order": 238,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "selection"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.frames.clipboard.cut"
+          },
+          "selection": {
+            "type": "array",
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/ObjectFrameEditCell"
+            }
+          }
+        },
+        "description": "Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+        "x-maxEncodedRequestBytes": 5246976
+      }
+    },
+    "ObjectFramesClipboardPastePayload": {
+      "order": 239,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "instanceId",
+          "documentId",
+          "layerUid",
+          "frame",
+          "cells"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.frames.clipboard.paste"
+          },
+          "instanceId": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "documentId": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "frame": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "cells": {
+            "type": "array",
+            "maxItems": 4096,
+            "items": {
+              "$ref": "#/$defs/ObjectFrameClipboardCell"
+            }
+          }
+        },
+        "description": "Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+        "x-maxEncodedRequestBytes": 5246976
+      }
+    },
+    "ObjectFramesMovePayload": {
+      "order": 244,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "selection",
+          "layerUid",
+          "frame"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.frames.move"
+          },
+          "selection": {
+            "type": "array",
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/ObjectFrameEditCell"
+            }
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "frame": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ObjectLayerShiftTrackTarget": {
+      "order": 246,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "target",
+              "property"
+            ],
+            "properties": {
+              "kind": {
+                "const": "property"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectPropertyReadTarget"
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "contextId",
+              "layerUid"
+            ],
+            "properties": {
+              "kind": {
+                "const": "layerOrder"
+              },
+              "contextId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "layerUid": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "contextId",
+              "layerUid"
+            ],
+            "properties": {
+              "kind": {
+                "const": "timeRemap"
+              },
+              "contextId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "layerUid": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "contextId",
+              "layerUid",
+              "frameScope",
+              "strokeId"
+            ],
+            "properties": {
+              "kind": {
+                "const": "elementOrder"
+              },
+              "contextId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "layerUid": {
+                "type": "string",
+                "minLength": 1
+              },
+              "frameScope": {
+                "$ref": "#/$defs/ObjectFrameScope"
+              },
+              "strokeId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectLayerRangeDragPayload": {
+      "order": 247,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "contextId",
+          "layerUid",
+          "activeLayerUid",
+          "part",
+          "barSelection",
+          "samples",
+          "plainClick",
+          "alt",
+          "frame",
+          "selectedKeys"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.layer.range.drag"
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1
+          },
+          "activeLayerUid": {
+            "type": "string",
+            "minLength": 1
+          },
+          "part": {
+            "enum": [
+              "in",
+              "out",
+              "both"
+            ]
+          },
+          "barSelection": {
+            "type": "array",
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "layerUid",
+                "part"
+              ],
+              "properties": {
+                "layerUid": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "part": {
+                  "enum": [
+                    "in",
+                    "out",
+                    "both"
+                  ]
+                }
+              }
+            }
+          },
+          "samples": {
+            "type": "array",
+            "maxItems": 4096,
+            "items": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "plainClick": {
+            "type": "boolean"
+          },
+          "alt": {
+            "type": "boolean"
+          },
+          "frame": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "selectedKeys": {
+            "type": "array",
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "target",
+                "frame"
+              ],
+              "properties": {
+                "target": {
+                  "$ref": "#/$defs/ObjectLayerShiftTrackTarget"
+                },
+                "frame": {
+                  "type": "number",
+                  "minimum": -1.7976931348623157e+308,
+                  "maximum": 1.7976931348623157e+308
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 5,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.frames.insert"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFramesInsertPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 6,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.frames.extend"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFramesExtendPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 7,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.frames.duplicate"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFramesDuplicatePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 8,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.frames.remove"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFramesRemovePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 9,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.key.promote"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerKeyPromotePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 10,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.key.blank"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerKeyBlankPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 11,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.key.clear"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerKeyClearPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 12,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.key.clear_cells"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerKeyClearCellsPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 13,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.tween.remove"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerTweenRemovePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 14,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.key.move"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerKeyMovePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 15,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.frames.clipboard.duplicate"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFramesClipboardDuplicatePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 16,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.frames.clipboard.copy"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFramesClipboardCopyPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 17,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.frames.clipboard.cut"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFramesClipboardCutPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 18,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.frames.clipboard.paste"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFramesClipboardPastePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 19,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.frames.repeat"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFramesRepeatPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 119,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.frames.move"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectFramesMovePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 120,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.range.drag"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerRangeDragPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

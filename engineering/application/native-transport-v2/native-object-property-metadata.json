@@ -1,0 +1,33 @@
+{
+  "capability": "native.object.property-metadata",
+  "definitions": {
+    "ObjectPropertyMetadataPayload": {
+      "order": 51,
+      "schema": {
+        "$ref": "./native-property-metadata-v1.schema.json#/$defs/Selector"
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 48,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.property.metadata"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectPropertyMetadataPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
