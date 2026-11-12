@@ -123,7 +123,7 @@ pub(crate) fn admit_layer_for(
                 && h.target.stroke_id.value() == Some(&record.target.stroke_id)
                 && h.properties.iter().any(|p| {
                     (!hit && p.property.starts_with("vtx"))
-                        || (record
+                        || (!hit && record
                             .vector_ext
                             .value()
                             .is_some_and(|e| !e.param_shape.missing())

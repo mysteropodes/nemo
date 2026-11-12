@@ -5897,20 +5897,50 @@
                   ]
                 },
                 "description": "The point type each listed vertex shows: its stored hint, else the one its handles show. Only on the plain editable read."
+              },
+              "hitTest": {
+                "const": true
+              },
+              "center": {
+                "const": true
+              },
+              "widths": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "atFrame": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
               }
             },
             "allOf": [
               {
                 "if": {
                   "required": [
-                    "paint"
+                    "atFrame"
                   ]
                 },
                 "then": {
-                  "properties": {
-                    "closed": {
-                      "const": true
-                    }
+                  "required": [
+                    "hitTest"
+                  ],
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "center"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "paint"
+                        ]
+                      }
+                    ]
                   }
                 }
               }

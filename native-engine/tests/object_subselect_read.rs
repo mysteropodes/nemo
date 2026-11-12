@@ -68,7 +68,13 @@ fn a_hit_test_read_pages_painted_geometry_outside_the_editable_scope() {
     assert_eq!((s["total"].as_u64(), s["hitTest"].as_bool()), (Some(stored as u64), Some(true)));
     let first = &snapshot.document().objects[0].geometry.segments[0];
     assert_eq!((s["segments"][0]["point"][0].as_f64(), s["segments"][0]["point"][1].as_f64()), (first.point.x.as_f64(), first.point.y.as_f64()));
-    for bad in [json!({"cursor":0,"limit":4,"hitTest":false}), json!({"cursor":0,"limit":4,"hitTest":true,"paint":true}),
+    let evaluated = read(json!({"cursor":0,"limit":16,"hitTest":true,"atFrame":0}));
+    assert_eq!(evaluated["ok"],true,"{evaluated}");
+    assert_eq!(evaluated["result"]["subselect"]["atFrame"],0);
+    for bad in [json!({"cursor":0,"limit":4,"atFrame":0}),
+        json!({"cursor":0,"limit":4,"hitTest":true,"center":true,"atFrame":0}),
+        json!({"cursor":0,"limit":4,"hitTest":true,"atFrame":4294967295u32}),
+        json!({"cursor":0,"limit":4,"hitTest":false}), json!({"cursor":0,"limit":4,"hitTest":true,"paint":true}),
         json!({"cursor":0,"limit":4,"hitTest":true,"preview":{"kind":"move","indices":[0],"delta":[1,1]}})] {
         assert_eq!(read(bad.clone())["ok"], false, "{bad}");
     }

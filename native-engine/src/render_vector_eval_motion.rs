@@ -24,11 +24,14 @@ pub(crate) fn apply_element_motion(
     frame: u32,
     segments: Vec<EvalSegment>,
 ) -> Result<Vec<EvalSegment>, VectorEvalError> {
-    let segments = crate::evaluation::object_vector_kernels::render_vector_eval::vertex::apply_vertex_offsets(snapshot, record, frame, segments)?;
+    let anchors: Vec<_> = segments.iter().map(|s| crate::evaluation::object_vector_kernels::object_path_effects_kernel::PathSegment {
+        point: s.point, handle_in: Some(s.handle_in), handle_out: Some(s.handle_out),
+    }).collect();
+    let segments = crate::evaluation::object_vector_kernels::render_vector_eval::vertex::vertex_then_param(snapshot, record, &anchors, frame)?;
     apply_element_pose(snapshot, record, frame, segments)
 }
 
-fn apply_element_pose(
+pub(crate) fn apply_element_pose(
     snapshot: &ObjectSnapshot,
     record: &ObjectRecord,
     frame: u32,

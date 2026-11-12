@@ -315,8 +315,52 @@
               },
               "paint": {
                 "const": true
+              },
+              "hitTest": {
+                "const": true
+              },
+              "center": {
+                "const": true
+              },
+              "atFrame": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "atFrame"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "hitTest"
+                  ],
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "center"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "paint"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "preview"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
           }
         }
       }

@@ -26,8 +26,9 @@ struct Page {
     paint: Presence<bool>,
     hit_test: Presence<bool>,
     center: Presence<bool>,
+    at_frame: Presence<u32>,
 }
-object_deserialize!(Page {cursor:usize,limit:usize,#[serde(default)] preview:Presence<Intent>,#[serde(default)] paint:Presence<bool>,#[serde(default)] hit_test:Presence<bool>,#[serde(default)] center:Presence<bool>});
+object_deserialize!(Page {cursor:usize,limit:usize,#[serde(default)] preview:Presence<Intent>,#[serde(default)] paint:Presence<bool>,#[serde(default)] hit_test:Presence<bool>,#[serde(default)] center:Presence<bool>,#[serde(default)] at_frame:Presence<u32>});
 impl ObjectSnapshot {
     pub(super) fn dispatch_subselect_read(
         &self,
@@ -73,6 +74,9 @@ impl ObjectSnapshot {
         {
             return refused(DispatchErrorCode::InvalidRequest, "Invalid subselect hit-test selector.");
         }
+        if !payload.subselect.at_frame.missing() && (!hit_test || center) {
+            return refused(DispatchErrorCode::InvalidRequest, "Evaluated contour requires hitTest without center.");
+        }
         // #2256: a component's records live in its own context: Select's hit-test read and Direct Select's editable and preview reads of an
         // entered component resolve the record there (the baseline edited the symbol's shapes while `state.activeSymbolId` was set).
         use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
@@ -99,6 +103,16 @@ impl ObjectSnapshot {
                 return Ok((false, anchors));
             }
             if hit_test {
+                let r = if let Some(frame) = payload.subselect.at_frame.value() {
+                    let context = ContextSource::of_document(self.document()).context(&r.target.context_id)
+                        .map_err(|_| Refusal::Unsupported)?;
+                    if *frame >= context.total_frames() { return Err(Refusal::Invalid); }
+                    let layer = context.layers().iter().find(|l| l.layer_uid() == r.target.layer_uid)
+                        .ok_or(Refusal::Unsupported)?;
+                    crate::evaluation::object_vector_kernels::render_vector_eval::painted_record(self, &r, layer, *frame)
+                        .map_err(|_| Refusal::Unsupported)?
+                } else { r };
+                if r.geometry.segments.len() > 256 { return Err(Refusal::Limit); }
                 return Ok((r.geometry.closed, record::paint_anchors(&r)?));
             }
             let anchors = record::anchors(&r)?;
@@ -160,6 +174,9 @@ impl ObjectSnapshot {
         }
         if hit_test {
             response.result.as_mut().unwrap()["subselect"]["hitTest"] = json!(true);
+        }
+        if let Some(frame) = payload.subselect.at_frame.value() {
+            response.result.as_mut().unwrap()["subselect"]["atFrame"] = json!(frame);
         }
         if center {
             response.result.as_mut().unwrap()["subselect"]["center"] = json!(true);

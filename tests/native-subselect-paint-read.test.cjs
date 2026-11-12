@@ -50,3 +50,26 @@ test('#2356: the plain read carries the type each vertex shows onto the listed i
   const typed=await fixture('types').read();assert.deepEqual(typed.items[0].pointTypes,['corner','smooth']);assert.equal(Object.hasOwn(typed.items[0],'paint'),false);
   const plain=await fixture('plain').read();assert.equal(Object.hasOwn(plain.items[0],'pointTypes'),false);
 });
+
+test('presented strokes page evaluated contours at the held presentation frame without adding source offsets',async()=>{
+  const pin={instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'native-object:d:0'};
+  const presentation={...pin,owner:'native',status:'presented',contextId:'scene-root',frame:10,workId:'work-1',viewGeneration:1};
+  const state={active:true,opening:false,pending:0,synchronizing:false,projectionReady:true,ticket:1,info:pin,presented:{...pin,available:true,presentation}};
+  const target={contextId:'scene-root',layerUid:'L',strokeId:'s',frameScope:{kind:'authored',frame:0}};
+  const painted=Array.from({length:5},(_,i)=>({point:[15+i,60],handleIn:[-2,0],handleOut:[0,3]}));
+  for(const mismatch of [false,true]){
+    const sent=[];let serial=0;
+    const reads=Reads.create({state:()=>state,settled:async()=>{},requestId:()=>`hit-${++serial}`,dispatch:async q=>{
+      const p=q.payload;sent.push(p);let result;
+      if(p.view){const {limit,...view}=p.view;result={...view,atRevision:0,documentSnapshotId:pin.documentSnapshotId,total:1,nextCursor:null,preview:false,items:[{
+        stableTarget:target,closed:true,count:5,matrix:[1,0,0,1,0,0],bounds:[10,60,40,90],role:'fill',filled:true,
+        // Legacy offset metadata is intentionally ignored for an evaluated contour.
+        vertexOffsets:Array.from({length:5},()=>[99,99])}]};}
+      else{assert.equal(p.subselect.atFrame,10);assert.equal(p.subselect.hitTest,true);result={atRevision:0,documentSnapshotId:pin.documentSnapshotId,subselect:{stableTarget:target,closed:true,total:5,cursor:0,nextCursor:null,preview:false,segments:painted,hitTest:true,atFrame:mismatch?0:10}};}
+      return {apiVersion:2,requestId:q.requestId,instanceId:'i',documentId:'d',contentRevision:0,ok:true,result};
+    }});
+    const read=()=>reads.readPresentedStrokes({contextId:'scene-root',layerUid:'L',frame:10},pin);
+    if(mismatch)await assert.rejects(read());else assert.deepEqual((await read()).items[0].segments,painted);
+    assert.equal(sent.length,2);
+  }
+});
