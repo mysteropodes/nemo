@@ -378,5 +378,5 @@ A client that is not installed, not authenticated, over quota or that rejects th
 reason; the client's last message and tool trace are in the receipt as information and never decide a verdict. The receipt
 `f03-clients-receipt.json` (plus `<client>.stream.jsonl`, `<client>.stderr.txt`, `<client>.wire.jsonl`, private) records the candidate
 identity, per client name, version, binary SHA-256, exact prompt and command line, every assertion and the limitations. Exit status as
-`run.cjs`: 0 both passed, 1 a half failed, 2 refused, 4 a half unrun. Unit tests (`node --test tests/desktop/unit/f03-clients.test.cjs`)
+`run.cjs`: 0 both passed, 5 one client was selected and passed, 1 a half failed, 2 refused, 4 a half unrun. Unit tests (`node --test tests/desktop/unit/f03-clients.test.cjs`)
 use stubs only; no client or app has been run with this harness.
