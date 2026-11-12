@@ -7,7 +7,7 @@ const ROOT = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const nonblank = (text) => text.split('\n').filter((line) => line.trim()).length;
 const OPERATIONS = ['command.document.object.vector.edit', 'command.document.object.parametric.edit', 'command.document.object.path.effects.edit'];
-const RUST = ['src/native_vector_contract.rs', 'src/native_vector_contract_shapes.rs', 'src/native_vector_contract_tests.rs'];
+const RUST = ['src/native_vector_contract.rs', 'src/native_vector_contract_shapes.rs', 'src/native_vector_contract_tests.rs', 'src/native_vector_contract_record_tests.rs'];
 const MODULES = [
   ['app.native.object.vector.contract', 'domain', 'native-object-vector-contract.js', 'Domain/application'],
   ['app.native.object.vector.stroke', 'domain', 'native-object-vector-stroke.js', 'Domain/application'],

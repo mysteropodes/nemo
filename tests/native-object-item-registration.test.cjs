@@ -58,7 +58,7 @@ test('the SDK seam composes the contract without growing the file and the sessio
 test('the MCP crate registers the validators, the descriptors and the shared response check', () => {
   const profile = JSON.parse(read('engineering/boundaries/profiles/mcp-rust.profile.json'));
   const files = profile.modules.flatMap((m) => m.files || []);
-  for (const file of ['src/native_item_contract.rs', 'src/native_item_contract_tests.rs']) {
+  for (const file of ['src/native_item_contract.rs', 'src/native_item_contract_tests.rs', 'src/native_item_contract_result_tests.rs']) {
     assert.equal(files.filter((f) => f === file).length, 1, file);
     assert.ok(nonblank('nemo-mcp/' + file) <= 500, file);
   }
@@ -67,7 +67,7 @@ test('the MCP crate registers the validators, the descriptors and the shared res
   assert.equal(whole.length, 1);
   const wholeFiles = whole[0].files;
   for (const file of files.filter((f) => f.startsWith('src/'))) assert.ok(wholeFiles.includes(file), 'rust.profile.json rust.mcp.transport lists ' + file);
-  for (const file of ['src/native_item_contract.rs', 'src/native_item_contract_tests.rs']) assert.equal(wholeFiles.filter((f) => f === file).length, 1, file);
+  for (const file of ['src/native_item_contract.rs', 'src/native_item_contract_tests.rs', 'src/native_item_contract_result_tests.rs']) assert.equal(wholeFiles.filter((f) => f === file).length, 1, file);
   assert.match(read('nemo-mcp/src/native_contract.rs'), /#\[path = "native_item_contract\.rs"\]\npub\(crate\) mod item;/);
   assert.match(read('nemo-mcp/src/native_contract.rs'), /op if item::owns\(op\) => item::request\(op, payload\),/);
   assert.match(read('nemo-mcp/src/native_item_contract.rs'), /matches!\(operation, ITEM \| ATTACH \| REMOVE \| bitmap_stroke::OP\)/);
