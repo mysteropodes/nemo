@@ -107,7 +107,7 @@ const rows = [
       await K.apply(ctx, 'erase a stale stroke', P.booleanErase(layerUid, 'native-stroke:99999:9', [[0, 0], [10, 0], [10, 10]]), { refused: true });
     } },
 
-  { id: '2108-layer-lifecycle', title: 'layer create, rename, duplicate, visibility, reorder, split, delete: each one revision, one undo', tasks: ['F07'],
+  { id: '2108-layer-lifecycle', title: 'layer create, rename, duplicate, visibility, split, delete: each one revision, one undo', tasks: ['F07'],
     async run(ctx) {
       const { layerUid: l1 } = await K.fresh(ctx);
       await stroke(ctx, 'create artwork on layer 1', rect(l1, 40, 40, 140, 140, RED));
@@ -131,12 +131,6 @@ const rows = [
       await K.step(ctx, 'undo hiding the duplicate', 'undo');
       ctx.eq('pixel', 'undo shows the duplicate again', (await K.exportPng(ctx, 'unhide')).digest, base.digest);
       await K.apply(ctx, 'show layer 1', P.layerVisibility(l1, true));
-      await K.apply(ctx, 'reorder the duplicate to the first gap', P.layerReorder([dup], 0, dup));
-      const order2 = await K.layerOrder(ctx);
-      ctx.ok('read', 'layer order changed', JSON.stringify(order2) !== JSON.stringify(order1), { order1, order2 });
-      ctx.eq('read', 'reorder only permutes the layers', [...order2].sort(), [...order1].sort());
-      await K.step(ctx, 'undo the reorder', 'undo');
-      ctx.eq('read', 'undo restores the previous order', await K.layerOrder(ctx), order1);
       await K.apply(ctx, 'split layer 1 into shape layers', P.layerSplit(l1));
       ctx.ok('read', 'split adds layers', (await K.layerOrder(ctx)).length > order1.length, (await K.layerOrder(ctx)).length, '>' + order1.length);
       ctx.eq('pixel', 'split keeps the pixels', (await K.exportPng(ctx, 'split')).digest, base.digest);
@@ -149,6 +143,29 @@ const rows = [
       ctx.ok('read', 'undo brings the duplicate back', (await K.layerOrder(ctx)).includes(dup), 'dup restored');
       await K.apply(ctx, 'rename a missing layer', P.layerRename('layer-missing', 'x'), { refused: true });
       await K.apply(ctx, 'delete a missing layer', P.layerDelete('layer-missing'), { refused: true });
+    } },
+
+  // Split out of the lifecycle row because of what the installed app does with a reorder: the command commits (revision advances) and
+  // then answers unavailable / committed / indeterminate ("release before re-entry"), after which the app refuses every later
+  // project.new with "Native project state is unconfirmed. Reopen Nemo before continuing." So this row runs last (`last`): a reorder
+  // that leaves the app unusable must not hide the rows that do not reorder.
+  { id: '2108-layer-reorder', title: 'layer reorder: one revision, a pure permutation, one undo restores the order', tasks: ['F07'], last: true,
+    limitations: ['Runs after every other row: on the first candidate run a reorder left the app unconfirmed and unusable for later rows.'],
+    async run(ctx) {
+      const { layerUid: l1 } = await K.fresh(ctx);
+      await stroke(ctx, 'create artwork on layer 1', rect(l1, 40, 40, 140, 140, RED));
+      await K.apply(ctx, 'create a layer', P.layerCreate('Second'));
+      const order0 = await K.layerOrder(ctx);
+      await K.apply(ctx, 'duplicate layer 1', P.layerDuplicate(l1));
+      const order1 = await K.layerOrder(ctx);
+      const dup = order1.find(id => !order0.includes(id));
+      ctx.ok('read', 'a new layer id appears for the duplicate', typeof dup === 'string', { order0, order1 });
+      await K.apply(ctx, 'reorder the duplicate to the first gap', P.layerReorder([dup], 0, dup));
+      const order2 = await K.layerOrder(ctx);
+      ctx.ok('read', 'layer order changed', JSON.stringify(order2) !== JSON.stringify(order1), { order1, order2 });
+      ctx.eq('read', 'reorder only permutes the layers', [...order2].sort(), [...order1].sort());
+      await K.step(ctx, 'undo the reorder', 'undo');
+      ctx.eq('read', 'undo restores the previous order', await K.layerOrder(ctx), order1);
     } },
 
   { id: '2108-selection-clipboard-remap', title: 'selection duplicate and delete, copy and paste remap group and stroke ids atomically, cut, locked layer refuses', tasks: ['F08', 'F15'],

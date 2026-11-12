@@ -278,3 +278,12 @@ test('a released project answers "No native project is open." with no document i
   assert.equal(released.ok, false);
   assert.equal(released.error.message, 'No native project is open.');
 });
+
+test('a row marked last runs after every other selected row', async t => {
+  const { session } = setup(t, {});
+  const order = [];
+  const row = (id, last) => ({ ...mini(id, async ctx => { order.push(id); ctx.ok('read', 'x', true, true); }), ...(last ? { last: true } : {}) });
+  const results = await runRows({ rows: [row('first-last', true), row('second'), row('third')], session });
+  assert.deepEqual(order, ['second', 'third', 'first-last']);
+  assert.deepEqual(results.map(r => r.id), order);
+});
