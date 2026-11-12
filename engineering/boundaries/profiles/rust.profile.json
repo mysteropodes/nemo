@@ -2238,6 +2238,7 @@
         "src/wire_failure_tests.rs",
         "src/native_diagnostics_contract.rs",
         "src/native_layer_policy_contract.rs",
+        "src/native_layer_policy_contract_tests.rs",
         "src/native_layer_policy_wire_tests.rs",
         "src/native_property_track_contract.rs",
         "src/native_property_track_contract_tests.rs",
