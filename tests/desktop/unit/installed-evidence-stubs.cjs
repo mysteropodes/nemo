@@ -198,11 +198,12 @@ function createStubApp(options = {}) {
         commit(doc, 'layer delete', () => { doc.layers = doc.layers.filter(l => l.layerUid !== uid); doc.rasters = doc.rasters.filter(r => r.layerUid !== uid); doc.strokes = doc.strokes.filter(s => s.layerUid !== uid); });
         return ok(2, request, receipt());
       }
-      case 'command.document.object.selection.delete': {
-        const ids = p.strokeIds, known = id => doc.strokes.some(s => s.id === id) || doc.rasters.some(r => r.id === id);
-        if (!ids.every(known)) return ownerRefusal(request, 'not_found', 'unknown stroke');
-        commit(doc, 'selection delete', () => { doc.strokes = doc.strokes.filter(s => !ids.includes(s.id)); doc.rasters = doc.rasters.filter(r => !ids.includes(r.id)); });
-        return ok(2, request, receipt());
+      case 'command.document.object.item.edit': {
+        if (p.command !== 'object.raster.delete') return refuse(2, request, 'invalid_request', 'unsupported item edit');
+        const id = p.stableTarget.strokeId;
+        if (!doc.rasters.some(r => r.id === id)) return ownerRefusal(request, 'not_found', 'unknown raster');
+        commit(doc, 'raster delete', () => { doc.rasters = doc.rasters.filter(r => r.id !== id); });
+        return ok(2, request, receipt({ operation: 'raster.delete', strokeId: id }));
       }
       case 'command.document.object.asset.attach': return assetAttach(request, doc, p);
       case 'command.document.object.asset.remove': {

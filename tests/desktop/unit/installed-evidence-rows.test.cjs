@@ -76,7 +76,7 @@ const samples = [
   P.layerCreate('N'), P.layerDuplicate('L1'), P.layerRename('L1', 'n'), P.layerReorder(['L2'], 0, 'L2'), P.layerDelete('L2'), P.layerVisibility('L1', false), P.layerSplit('L1'),
   P.selectionDelete('L1', ['s1']), P.selectionDuplicate('L1', ['s1'], [0, 200]), P.selectionDuplicate('L1', ['s1']), P.clipboardCopy('L1', ['s1']), P.clipboardCut('L1', ['s1']), P.clipboardPaste('L1', clip),
   P.assetAttach({ pin: 'snap-1', name: 'n', path: '/tmp/x.png', lifecycleGeneration: 1 }), P.assetRemove('snap-1', 'asset-1'),
-  P.rasterMove(T, 1, 2), P.rasterResize(T, 3, 4), P.rasterRotate(T, 90), P.rasterOpacity(T, 0.5), P.textCreate('L1', P.textBlock('HELLO', { size: 72 })), P.textEdit(T, { size: 36, letterSpacing: 10 }), P.textDelete(T),
+  P.rasterMove(T, 1, 2), P.rasterDelete(T), P.rasterResize(T, 3, 4), P.rasterRotate(T, 90), P.rasterOpacity(T, 0.5), P.textCreate('L1', P.textBlock('HELLO', { size: 72 })), P.textEdit(T, { size: 36, letterSpacing: 10 }), P.textDelete(T),
   P.textCreate('L1', P.textBlock('X', { font: { kind: 'asset', assetId: 'a' } })), P.textTargets(0, 'p', 'L1'), P.textInspect(0, 'p', T), P.textBody(0, 'p', T),
   P.brushPublish('snap-1', 'asset-1', 'b', 8, 8), P.brushInspect(0, 'snap-1', 'b'),
   P.brushStroke({ pin: 'snap-1', lifecycleGeneration: 1, layerUid: 'L1', groupId: 'bmb_1', path: '/tmp/b.png', companion: { x: 1, y: 2, width: 58, height: 18, opacity: 1 }, segments: [P.seg(1, 1), P.seg(9, 9)] }),

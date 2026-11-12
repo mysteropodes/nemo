@@ -59,7 +59,7 @@ const rows = [
       ctx.eq('file', 'the catalog holds the asset', (await catalog('held')).length, 1);
       await removeIt('remove the asset while a placement uses it', { refused: true });
       ctx.eq('file', 'a refused removal left the asset in the catalog', (await catalog('in-use')).length, 1);
-      await K.apply(ctx, 'delete the placement', P.selectionDelete(layer, [made.result.target.strokeId]));
+      await K.apply(ctx, 'delete the placement', P.rasterDelete(made.result.target));
       ctx.eq('pixel', 'the deleted placement leaves no ink', probe.inkBounds((await K.exportPng(ctx, 'no-placement')).image), null);
       await removeIt('remove the now unreferenced asset');
       ctx.eq('file', 'the removed asset is gone from the catalog', (await catalog('removed')).length, 0);
@@ -115,7 +115,7 @@ const rows = [
       ctx.eq('pixel', 'undo restores the resized export', (await K.exportPng(ctx, 'r3-undone')).digest, e2.digest);
       await K.apply(ctx, 'set opacity to 0.5', P.rasterOpacity(tgt, 0.5));
       const e4 = await K.exportPng(ctx, 'r4');
-      const ratio = probe.coverageRatio(e2, e4, probe.inkBounds(e2.image).box);
+      const ratio = probe.coverageRatio(e2.image, e4.image, probe.inkBounds(e2.image).box);
       ctx.near('pixel', 'opacity is applied once: half the coverage', ratio, 0.5, 0.08);
       await K.apply(ctx, 'raster move on a stale target', P.rasterMove(P.target(tgt.layerUid, 'native-stroke:99999:9'), 1, 1), { refused: true });
       fs.rmSync(file);

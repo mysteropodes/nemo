@@ -100,9 +100,11 @@ async function apply(ctx, label, built, opts = {}) {
   const before = await ctx.wire.discover(), h0 = await history(ctx);
   if (typeof built === 'function') built = await built();
   const res = await ctx.wire.command(built.operation, built.payload, opts.send || {});
+  // A refused command is reported as that refusal before any follow-up read: after a command whose consumer synchronization was
+  // indeterminate the app answers no further reads, and the failure must name the command, not the read.
+  if (!opts.refused) ctx.book.ok('reply', label + ': accepted', res.ok === true, res.ok ? 'ok' : res.error);
   const after = await ctx.wire.discover(), h1 = await history(ctx);
   if (opts.refused) { refusal(ctx, label, res, before, after, h0, h1, opts); return { res, before, after }; }
-  ctx.book.ok('reply', label + ': accepted', res.ok === true, res.ok ? 'ok' : res.error);
   if (opts.noop) {
     ctx.book.eq('reply', label + ': no-op receipt', [res.result.applied, res.result.historyEntriesAdded], [false, 0]);
     ctx.book.eq('read', label + ': no-op keeps revision', after.contentRevision, before.contentRevision);
@@ -123,9 +125,11 @@ async function resource(ctx, label, built, opts = {}) {
   const before = await ctx.wire.discover(), h0 = await history(ctx);
   if (typeof built === 'function') built = await built();
   const res = await ctx.wire.command(built.operation, built.payload, opts.send || {});
+  // A refused command is reported as that refusal before any follow-up read: after a command whose consumer synchronization was
+  // indeterminate the app answers no further reads, and the failure must name the command, not the read.
+  if (!opts.refused) ctx.book.ok('reply', label + ': accepted', res.ok === true, res.ok ? 'ok' : res.error);
   const after = await ctx.wire.discover(), h1 = await history(ctx);
   if (opts.refused) { refusal(ctx, label, res, before, after, h0, h1, opts); return { res, before, after }; }
-  ctx.book.ok('reply', label + ': accepted', res.ok === true, res.ok ? 'ok' : res.error);
   if (opts.applied !== undefined) ctx.eq('reply', label + ': receipt applied', res.result.applied, opts.applied);
   ctx.eq('read', label + ': publishing is not an edit: no revision', after.contentRevision, before.contentRevision);
   ctx.eq('reply', label + ': reply names the unchanged revision', res.revision, before.contentRevision);

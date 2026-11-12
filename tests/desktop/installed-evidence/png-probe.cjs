@@ -11,7 +11,9 @@ function decodeExport(bytes) {
 }
 const pixels = image => crypto.createHash('sha256').update(image.rgba).digest('hex');
 // Composite over white, so a straight and a premultiplied export compare the same way.
+// Every measurement takes a decoded image (export.image), never the export record: run 9 lost three rows to a record passed here.
 function over(image, x, y) {
+  if (!image || !image.rgba) throw new Error('probe needs a decoded image (export.image), not an export record');
   const [r, g, b, a] = png.pixelAt(image, x, y), k = a / 255;
   return [r, g, b].map(c => Math.round(c * k + 255 * (1 - k)));
 }

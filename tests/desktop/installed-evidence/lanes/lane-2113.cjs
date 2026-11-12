@@ -52,7 +52,7 @@ const rows = [
       const sample = [[40, 40], [120, 100], [500, 60], [30, 240], [190, 270]];
       await K.apply(ctx, 'raster layer opacity to half', () => opacityBuilder(ctx, l2, 0.5));
       const e2 = await K.exportPng(ctx, 'op');
-      ctx.near('pixel', 'opacity is applied once to the raster', probe.coverageRatio(e0, e2, tealBox.box), 0.5, 0.08);
+      ctx.near('pixel', 'opacity is applied once to the raster', probe.coverageRatio(e0.image, e2.image, tealBox.box), 0.5, 0.08);
       ctx.eq('pixel', 'vector, gradient and text pixels are untouched by the raster layer opacity', same(e0.image, e2.image, sample), []);
       await K.step(ctx, 'undo the opacity', 'undo');
       ctx.eq('pixel', 'undo restores the export', (await K.exportPng(ctx, 'op-undone')).digest, e0.digest);
@@ -181,7 +181,7 @@ const rows = [
       await K.apply(ctx, 'bitmap-brush stroke', () => K.pinned(ctx, ({ pin, lifecycleGeneration }) => P.brushStroke({ pin, lifecycleGeneration, layerUid, groupId: 'bmb_evidence_1', path: tip,
         companion: { x: 35, y: 215, width: 58, height: 18, opacity: 1 }, segments: [P.seg(10, 210), P.seg(60, 220)] })));
       const e1 = await K.exportPng(ctx, 'after-stroke');
-      ctx.near('pixel', 'the baked companion paints its image at its rectangle', probe.over(e1.image, 64, 224), TEAL, 14);
+      ctx.near('pixel', 'the baked companion paints its image at its rectangle (the companion x,y is its centre)', probe.over(e1.image, 35, 215), TEAL, 14);
       ctx.ok('pixel', 'the stroke changed the export', e1.digest !== e0.digest, [e0.digest, e1.digest]);
       await K.step(ctx, 'one undo removes the whole stroke', 'undo');
       ctx.eq('pixel', 'undo restores the pre-stroke export', (await K.exportPng(ctx, 'stroke-undone')).digest, e0.digest);
@@ -208,7 +208,7 @@ const rows = [
       const e1 = await K.exportPng(ctx, 'half');
       const ev1 = await valueNow();
       ctx.near('read', 'evaluate reports half opacity', ev1.value, 50, 0.5);
-      const ratio = probe.coverageRatio(e0, e1, probe.inkBounds(e0.image).box);
+      const ratio = probe.coverageRatio(e0.image, e1.image, probe.inkBounds(e0.image).box);
       ctx.near('pixel', 'the export coverage agrees with the evaluated value', ratio, ev1.value / 100, 0.08);
       const { revision: r1, pin: p1 } = await K.pinNow(ctx);
       await K.apply(ctx, 'edit after the pin: opacity to a quarter', () => opacityBuilder(ctx, layerUid, 0.25));

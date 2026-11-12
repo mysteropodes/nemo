@@ -171,6 +171,7 @@ test('png probes measure ink, colours, differences and coverage on decoded pixel
   const composite = probe.decodeExport(K.solidPng(4, 4, [140, 204, 153, 255]));
   assert.equal(probe.distanceAt(composite, 1, 1), 115);
   assert.ok(Math.abs(probe.paintAlphaAt(composite, 1, 1, [26, 153, 51]) - 128) <= 2);
+  assert.throws(() => probe.coverageRatio({ image }, { image }, [0, 0, 3, 3]), /decoded image/, 'an export record is not an image');
   assert.throws(() => probe.decodeExport(Buffer.from('nope')), /not a PNG/);
 });
 
