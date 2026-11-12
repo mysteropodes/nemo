@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => expression_random_tests
 use crate::evaluation::expression_noise::{hash_unit, noise_1d};
 use crate::evaluation::expression_random::{
     gauss_from_uniforms, property_seed, property_seed_offset, rand01, random_with, RandomBound,

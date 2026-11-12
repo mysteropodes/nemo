@@ -243,6 +243,13 @@ test('cached UI metadata callback is stable and delegates to the current sole Pr
   await assert.rejects(captured[0].readPropertyMetadata(old));
   assert.equal((await captured[0].readPropertyMetadata(selector(f))).documentId,f.session.info().documentId);
 });
+test('an entered component receives the frameOnly flag of the repaint (the scrub contract reaches its own paint)',async()=>{
+  const f=await fixture();await f.open();const seen=[];
+  f.root.NemoNativeComponentContext={paint:(_r,frameOnly)=>{seen.push(frameOnly);return true;}};
+  f.root.NemoNativeObjectUI.render=()=>{throw new Error('the scene paint must not run');};
+  assert.equal(Project.paintUI(f.root,true),true);assert.equal(Project.paintUI(f.root,false),true);assert.equal(Project.paintUI(f.root),true);
+  assert.deepEqual(seen,[true,false,undefined]);
+});
 test('metadata exact selector and SDK view validation reject malformed inputs before transport or owner changes',async()=>{
   const f=fixture();await f.open();const pin=retained(f),good=selector(f),bad=[null,[],{...good,extra:true}];
   for(const key of Object.keys(good)){const q={...good};delete q[key];bad.push(q);}
@@ -412,7 +419,7 @@ test('factory retains policy-specific SDK dispatch and policy notifications afte
   // Test a connected factory instance directly; it still creates no Project session.
   await ports.subscribeRevisions(()=>{},()=>{});assert.equal(ports.policyAvailable(),true);
   assert.strictEqual(await ports.dispatchApplication(q),q);assert.equal(dispatched,1);
-  const before=f.log.length;ports.presented(f.session.info());await timerTurn();assert.deepEqual(f.log.slice(before),['presented','policy']);
+  const before=f.log.length;ports.presented(f.session.info());await timerTurn();assert.deepEqual(f.log.slice(before),['presented','timing','policy']);
 });
 
 test('SDK-valid advancing partial-page cursor is preserved without a local completeness guess',async()=>{
@@ -519,11 +526,12 @@ test('completion notification drops stale revision, owner, subscription and same
   }
 });
 
-test('Motion completion repaint requires the captured owner, document, frame and active mode',async()=>{
+test('timing and Motion completion require the captured owner, document and frame; Motion also requires active mode',async()=>{
   for(const mode of ['current','frame','mode','owner','document','unconfirmed']){
-    const f=fixture();await f.open();const ports=Ports.createPorts(f.root),paints=[];
+    const f=fixture();await f.open();const ports=Ports.createPorts(f.root),paints=[],timings=[];
     f.root.state.appMode='motion';
     f.root.NemoNativeObjectUI.paintMotionInspector=root=>paints.push(root);
+    f.root.NemoNativeObjectUI.refreshTiming=root=>timings.push(root);
     ports.presented(f.session.info());
     if(mode==='frame')f.root.state.currentFrame=1;
     if(mode==='mode')f.root.state.appMode='animation';
@@ -532,6 +540,7 @@ test('Motion completion repaint requires the captured owner, document, frame and
     if(mode==='unconfirmed')f.transports[0].disconnected(new Error('controlled subscription loss'));
     await timerTurn();
     assert.deepEqual(paints,mode==='current'?[f.root]:[],mode);
+    assert.deepEqual(timings,['current','mode'].includes(mode)?[f.root]:[],mode);
   }
 });
 
@@ -540,7 +549,7 @@ test('newest same-port completion is coalesced and callback exceptions cannot re
   const before=f.notifications.length,start=f.log.length;
   ports.presented(pin.info);ports.presented(pin.info);await timerTurn();
   assert.equal(f.notifications.length-before,1);
-  assert.deepEqual(f.log.slice(start),['presented','policy']);assertRetained(f,pin);
+  assert.deepEqual(f.log.slice(start),['presented','timing','policy']);assertRetained(f,pin);
   let attempted=0;
   f.root.NemoNativeProjectSettingsController.presented=()=>{attempted++;throw Error('controlled advisory callback failure');};
   await f.session.presentPreview(1);await timerTurn();

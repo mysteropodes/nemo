@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-export_job => export_job_lifecycle_tests
 use crate::export_job::{
     CleanupReceipt, CleanupStatus, ExportBegin, ExportCompositor, ExportFrameInput,
     ExportJobManager, ExportReadback, ExternalEffectDisposition, JobError, JobReceipt, JobStatus,

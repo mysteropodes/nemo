@@ -187,6 +187,80 @@ impl TextGlyphScene {
     pub(crate) fn holder_id(&self) -> &str {
         &self.holder_id
     }
+    /// `applyMatrixToStrokeData`'s path branch over every contour (a placed component's camera or
+    /// symMatrix): points through `[a, b, c, d, tx, ty]`, handles through its linear part.
+    pub(crate) fn affine(
+        &self,
+        [a, b, c, d, tx, ty]: [f64; 6],
+        admission: GeometryAdmission,
+    ) -> Result<Self, TextSceneError> {
+        let linear = |[x, y]: [f64; 2]| [x * a + y * c, x * b + y * d];
+        let contours = self
+            .contours
+            .iter()
+            .map(|k| {
+                let ring: Vec<GlyphSegment> = k
+                    .contour
+                    .segments()
+                    .iter()
+                    .map(|s| {
+                        let [x, y] = linear(s.point);
+                        GlyphSegment {
+                            point: [x + tx, y + ty],
+                            handle_in: linear(s.handle_in),
+                            handle_out: linear(s.handle_out),
+                        }
+                    })
+                    .collect();
+                placed(k.role, k.key.clone(), &ring, &[], k.opacity, admission)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
+            holder_id: self.holder_id.clone(),
+            contours,
+        })
+    }
+    /// #2520: every contour VERTEX through a 3D layer projector (baseline `project3DSegments` over the text segments):
+    /// points projected, handles projected as absolute points and differenced from the projected anchor. A contour that
+    /// collapses to no ink (an edge-on turn) is dropped like an exact zero scale, never a refusal of the block; the second
+    /// result names the contours kept.
+    pub(crate) fn projected(
+        &self,
+        projector: &crate::evaluation::property_projection_3d::Projector3D,
+        admission: GeometryAdmission,
+    ) -> Result<(Self, Vec<usize>), TextSceneError> {
+        use crate::evaluation::property_projection_3d::{project_segments, Seg};
+        let (mut contours, mut kept) = (Vec::new(), Vec::new());
+        for (index, k) in self.contours.iter().enumerate() {
+            let flat: Vec<Seg> = k
+                .contour
+                .segments()
+                .iter()
+                .map(|s| Seg { point: s.point, handle_in: Some(s.handle_in), handle_out: Some(s.handle_out) })
+                .collect();
+            let ring: Vec<GlyphSegment> = project_segments(&flat, projector)
+                .into_iter()
+                .map(|s| GlyphSegment {
+                    point: s.point,
+                    handle_in: s.handle_in.unwrap_or([0.0, 0.0]),
+                    handle_out: s.handle_out.unwrap_or([0.0, 0.0]),
+                })
+                .collect();
+            let finite = ring.iter().all(|s| s.point.iter().chain(&s.handle_in).chain(&s.handle_out).all(|n| n.is_finite()));
+            if !finite {
+                return Err(TextSceneError::UnsupportedGeometry { role: k.role, flag: None, reason: "text 3D projection must remain finite" });
+            }
+            match placed(k.role, k.key.clone(), &ring, &[], k.opacity, admission) {
+                Ok(contour) => {
+                    contours.push(contour);
+                    kept.push(index);
+                }
+                Err(TextSceneError::UnsupportedGeometry { .. }) => {}
+                Err(other) => return Err(other),
+            }
+        }
+        Ok((Self { holder_id: self.holder_id.clone(), contours }, kept))
+    }
     /// Paint order: per line the decorations, then that line's glyph paths.
     pub(crate) fn contours(&self) -> &[SceneContour] {
         &self.contours

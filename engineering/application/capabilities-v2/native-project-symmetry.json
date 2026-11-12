@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-symmetry",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.project.symmetry.read",
+    "command.document.object.project.symmetry.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectSymmetryReadPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectSymmetryEditPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete 4096-byte pinned response or typed refusal; no raw document, path or resource payload."
+  },
+  "semantics": "Original Draw symmetry settings (#2361 G23): enable toggle, mode set with the original guide re-centre, guide reset, axis and radial-centre release commits, sector slider clamp 2..24 and stop-at-axis toggle, each one native history entry through the existing project settings owner (the original kept these as unsaved-history state; native follows the accepted Perspective precedent). The read provider returns supplied raw members unchanged (null distinct from missing) and computes the original importJSON effective values (enabled||false, mode||'y', axis/centre from the canvas when null, sectors||6, extend defaulting to true) without persisting them. Native drag owns only the transient guide and one release command. No legacy desktop persistent mirror or fallback. Source candidate only; installed guide drag, drawing with copies and save-reopen remain open.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Native effective defaults preserve absent stored symmetry metadata",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "symmetry-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.project.symmetry.read",
+        "payload": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "selector": {
+            "kind": "settings"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "symmetry-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "result": {
+            "effective": {
+              "enabled": false,
+              "mode": "y",
+              "axis": {
+                "x1": 960.0,
+                "y1": 0.0,
+                "x2": 960.0,
+                "y2": 1080.0
+              },
+              "radialCenter": {
+                "x": 960.0,
+                "y": 540.0
+              },
+              "radialSectors": 6.0,
+              "extend": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "label": "Original radial centre drag release commits once through native history",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "symmetry-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.symmetry.edit",
+        "payload": {
+          "command": "object.project.symmetry.edit",
+          "action": {
+            "kind": "setRadialCenter",
+            "x": -12.25,
+            "y": 90.5
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "symmetry-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

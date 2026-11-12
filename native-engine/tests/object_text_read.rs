@@ -379,3 +379,46 @@ fn document_asset_font_identity_and_actual_encoded_font_survive_bind_undo_redo_a
         "actual project contains identical font bytes and references"
     );
 }
+
+#[test]
+fn a_component_context_text_block_reads_through_its_own_layers_and_frames() {
+    let timing = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let target = json!({"contextId":"comp","layerUid":"inner","strokeId":"words",
+        "frameScope":{"kind":"authored","frame":1}});
+    let o = support::bare(&json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":2,
+        "layers":[{"layerUid":"host","timing":timing}],"objects":[],
+        "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+            "migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[{"contextId":"scene-root",
+            "layers":[{"layerUid":"host","naturalPosition":0,"order":{}}],
+            "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":[]}]}]},
+        "componentTables":{"components":{"format":"nemo.native-component-set","formatVersion":1,
+            "components":[{"symbolId":"comp","totalFrames":4,"layers":[{"layerUid":"inner","timing":timing}],"objects":[]}],
+            "instances":[{"contextId":"scene-root","layerUid":"host","symbolId":"comp"}]}},
+        "items":{"text":[{"target":target,"block":block("Inside")}]}}));
+    let p = pin(&o);
+    // Frame 1 exists only in the component (four frames) and the layer only inside it.
+    let inspected = read(&p, json!({"kind":"inspect","target":target}));
+    assert_eq!(inspected["kind"], "inspect", "{inspected}");
+    let text = read(&p, json!({"kind":"text","target":target,"offset":0,"limit":128}));
+    assert_eq!(text["text"], "Inside");
+    let scope = json!({"contextId":"comp","layerUid":"inner","frameScope":{"kind":"authored","frame":1}});
+    let page = read(&p, json!({"kind":"targets","scope":scope,"offset":0,"limit":8}));
+    assert_eq!(page["items"].as_array().map(Vec::len), Some(1), "{page}");
+    let code = |target: Value| {
+        p.dispatch(request(&p, json!({"kind":"inspect","target":target})))
+            .unwrap()
+            .error
+            .unwrap()
+            .code
+    };
+    let mut beyond = target.clone();
+    beyond["frameScope"]["frame"] = json!(4);
+    assert_eq!(code(beyond), DispatchErrorCode::InvalidRequest);
+    let mut scene_layer = target.clone();
+    scene_layer["layerUid"] = json!("host");
+    assert_eq!(code(scene_layer), DispatchErrorCode::NotFound);
+    let mut undeclared = target;
+    undeclared["contextId"] = json!("other");
+    assert_eq!(code(undeclared), DispatchErrorCode::Unavailable);
+}

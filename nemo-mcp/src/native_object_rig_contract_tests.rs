@@ -12,6 +12,37 @@ pub(super) const OPERATIONS: [&str; 6] = [
     "rig.edit",
     "rig.pose",
 ];
+/// U36 (#2362): the Labs generators share the table; the agreement corpus stays the original six.
+pub(super) const LABS: [&str; 8] = [
+    "labs.speedLines",
+    "labs.boil",
+    "labs.followPath",
+    "labs.referenceFill",
+    "labs.pingpong",
+    "labs.retime",
+    "labs.interval",
+    "labs.moveToLayer",
+];
+/// D20-D22 (#2358): the four tween commands share the table too; their own shapes are pinned in the tween tests.
+pub(super) const TWEEN: [&str; 4] = [
+    "tween.generate",
+    "tween.regenerate",
+    "tween.split",
+    "tween.reassign",
+];
+
+/// G39 (#2376): the Motion preset apply shares the table; its own shapes are pinned in the preset tests.
+pub(super) const PRESET: [&str; 11] = [
+    "property.preset.apply", "property.keys.paste", "property.batch",
+    "layer.compositing.edit",
+    "layer.parent.set",
+    "layer.timeLink.set",
+    "layer.followPath.set",
+    "layer.color.set",
+    "layer.kind.create",
+    "layer.folder.reparent",
+    "layer.range.arrange",
+];
 
 pub(super) fn corpus() -> Value {
     serde_json::from_str(CORPUS).expect("the agreement corpus parses")
@@ -25,9 +56,9 @@ pub(super) fn envelope(operation: &str, payload: Value) -> NativeApplicationRequ
 }
 
 #[test]
-fn the_table_declares_exactly_the_six_operations_and_nothing_else() {
-    assert_eq!(table().len(), 6, "an unparsable table admits nothing");
-    for suffix in OPERATIONS {
+fn the_table_declares_exactly_the_twenty_nine_operations_and_nothing_else() {
+    assert_eq!(table().len(), 29, "an unparsable table admits nothing");
+    for &suffix in OPERATIONS.iter().chain(&LABS).chain(&TWEEN).chain(&PRESET) {
         assert!(admitted(&format!("{P}{suffix}")), "{suffix}");
     }
     for other in [
@@ -391,4 +422,99 @@ fn binding_duplicate_members_are_refused_from_original_bytes_at_every_new_object
             "{duplicate}"
         );
     }
+}
+
+/// G39 (#2376): the preset payload is closed; the engine repeats every rule on original bytes.
+#[test]
+fn the_motion_preset_payload_is_closed_and_bounded() {
+    let op = format!("{P}property.preset.apply");
+    let target = json!({"contextId":"scene-root","layerUid":"L"});
+    let ok = |properties: Value| {
+        let request = envelope(
+            &op,
+            json!({"command":"object.property.preset.apply","target":target,"properties":properties}),
+        );
+        crate::native_contract::validate_request(&request.operation, &request.payload)
+    };
+    let key = json!({"frame":0,"v":[1,2],"hold":true,"curvePoints":[{"x":0,"y":0},{"x":1,"y":1,"tx":0.5}],"hIn":[0,0],"hOut":[1,1]});
+    assert!(ok(json!([{"property":"position","keys":[key]},{"property":"opacity","keys":[],"static":[75]}])));
+    assert!(!ok(json!([])), "at least one property");
+    assert!(!ok(json!([{"property":"order","keys":[]}])), "another owner");
+    assert!(!ok(json!([{"property":"position"}])), "keys are required");
+    assert!(!ok(json!([{"property":"position","keys":[{"frame":0,"v":[]}]}])));
+    assert!(!ok(json!([{"property":"position","keys":[{"frame":0,"v":[1],"x":1}]}])));
+    assert!(!ok(json!([{"property":"opacity","keys":[],"static":[1,2,3,4,5]}])));
+    assert!(!ok(json!([{"property":"opacity","keys":[{"frame":0,"v":[1],"lockTo":"up"}]}])));
+}
+
+/// #2372: the layer compositing edit is one closed shape per edit kind; the engine repeats every rule on original bytes.
+#[test]
+fn the_layer_compositing_edit_is_a_closed_union_by_edit() {
+    let op = format!("{P}layer.compositing.edit");
+    let ok = |extra: Value| {
+        let mut payload = json!({"command":"object.layer.compositing.edit","layerUid":"L"});
+        for (key, member) in extra.as_object().unwrap() {
+            payload[key] = member.clone();
+        }
+        crate::native_contract::validate_request(&op, &payload)
+    };
+    assert!(ok(json!({"edit":"blend","mode":"multiply"})));
+    assert!(ok(json!({"edit":"matteMode","mode":"luma","source":"S"})));
+    assert!(ok(json!({"edit":"matteClear"})));
+    assert!(ok(json!({"edit":"matteMoreAdd","source":"S"})));
+    assert!(ok(json!({"edit":"matteMoreSet","index":0,"mode":"alpha"})));
+    assert!(ok(json!({"edit":"folderCollapsed","collapsed":true})));
+    assert!(ok(json!({"edit":"blendKeySet","index":12,"mode":"multiply"})));
+    assert!(ok(json!({"edit":"blendKeyRemove","index":12})));
+    assert!(ok(json!({"edit":"blendKeysClear"})));
+    assert!(ok(json!({"edit":"blendKeysRemove","frames":[3,4]})) && ok(json!({"edit":"blendKeysMove","frames":[3,4],"by":-2})));
+    assert!(ok(json!({"edit":"blendKeysClear","mode":"screen"})));
+    let blur = json!({"type":"blur","enabled":true,"p1":4,"p2":null,"keys":{"p1":{"keys":[]}}});
+    assert!(ok(json!({"edit":"effects","effects":[blur, {"type":"vignette","enabled":false}]})));
+    assert!(ok(json!({"edit":"effects","effects":[]})));
+    assert!(!ok(json!({"edit":"blend","mode":"Multiply"})), "unknown blend");
+    assert!(!ok(json!({"edit":"blend"})), "mode is required");
+    assert!(!ok(json!({"edit":"matteMode","mode":"none"})), "none is matteClear");
+    assert!(!ok(json!({"edit":"blend","mode":"screen","source":"S"})), "closed members");
+    assert!(!ok(json!({"edit":"matteClear","mode":"alpha"})));
+    assert!(!ok(json!({"edit":"matteMoreRemove","index":-1})));
+    assert!(!ok(json!({"edit":"blendKeySet","index":12})), "a key needs its mode");
+    assert!(!ok(json!({"edit":"blendKeySet","mode":"screen"})), "a key needs its frame");
+    assert!(!ok(json!({"edit":"blendKeySet","index":12,"mode":"luma"})), "a matte mode is no blend mode");
+    assert!(!ok(json!({"edit":"blendKeyRemove","index":12,"mode":"screen"})));
+    assert!(!ok(json!({"edit":"blendKeysClear","index":1})));
+    for refused in [json!({"edit":"blendKeysRemove"}), json!({"edit":"blendKeysRemove","frames":[]}), json!({"edit":"blendKeysRemove","frames":[1],"by":1}), json!({"edit":"blendKeysMove","frames":[1]}), json!({"edit":"blendKeysMove","by":1}), json!({"edit":"blendKeysMove","frames":[-1],"by":1}), json!({"edit":"blendKeysMove","frames":[1],"by":1.5})] { assert!(!ok(refused.clone()), "{refused}"); }
+    assert!(!ok(json!({"edit":"effects"})), "the stack is required");
+    assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur"}]})));
+    assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur","enabled":true,"p9":1}]})));
+    assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur","enabled":true,"keys":[]}]})));
+    assert!(!ok(json!({"edit":"effects","effects":[{"type":"blur","enabled":true,"p1":"4"}]})));
+    assert!(!ok(json!({"edit":"unknown"})));
+    assert!(!ok(json!({"layerUid":"L"})), "edit is required");
+    let wide = json!({"type":"blur","enabled":true,"keys":{"p1":{"keys":"x".repeat(2100)}}});
+    assert!(!ok(json!({"edit":"effects","effects":[wide]})), "key tracks are bounded");
+}
+
+/// #2372 U12: the Parent A write is one closed shape; the engine repeats every rule on original bytes.
+#[test]
+fn the_layer_parent_set_names_one_layer_one_parent_or_null_and_one_frame() {
+    let op = format!("{P}layer.parent.set");
+    let base = || json!({"command":"object.layer.parent.set","contextId":"scene-root","layerUid":"L","parentLayerUid":"P","frame":3});
+    let ok = |edit: &dyn Fn(&mut Value)| {
+        let mut payload = base();
+        edit(&mut payload);
+        crate::native_contract::validate_request(&op, &payload)
+    };
+    assert!(ok(&|_| {}));
+    assert!(ok(&|p| p["parentLayerUid"] = Value::Null), "Parent A : None");
+    assert!(ok(&|p| p["frame"] = json!(4294967295u64)));
+    assert!(!ok(&|p| p["parentLayerUid"] = json!("")), "an empty uid is not a parent");
+    assert!(!ok(&|p| p["parentLayerUid"] = json!(7)));
+    assert!(!ok(&|p| { p.as_object_mut().unwrap().remove("parentLayerUid"); }), "null is explicit");
+    assert!(!ok(&|p| { p.as_object_mut().unwrap().remove("contextId"); }));
+    assert!(!ok(&|p| p["frame"] = json!(-1)));
+    assert!(!ok(&|p| p["frame"] = json!(1.5)));
+    assert!(!ok(&|p| p["extra"] = json!(1)), "closed members");
+    assert!(!ok(&|p| p["layerUid"] = json!("x".repeat(129))));
+    assert!(!ok(&|p| p["command"] = json!("object.layer.rename")));
 }

@@ -98,7 +98,7 @@ fn actual_owner_default_settings_replace_history_and_reopen_have_one_digest() {
     let view = reopened.project_file_info().unwrap();
     assert_eq!(view["reference"], red["reference"]);
     assert_eq!(view["documentDigest"], red["documentDigest"]);
-    assert_eq!(view["layers"], json!([{"layerUid":"drawing"}]));
+    assert_eq!(view["layers"], json!([{"layerUid":"drawing","kind":"draw"}]));
     assert_eq!(view["totalFrames"], 21);
     assert_eq!(view["undoDepth"], 0);
     assert_eq!(bytes(&reopened), saved);

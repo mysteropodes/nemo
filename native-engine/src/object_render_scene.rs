@@ -11,6 +11,9 @@ pub(crate) mod component_scene;
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_component_render_scene.rs"]
 mod component_tests;
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_component_exposed_override.rs"]
+mod component_override_tests;
 
 use scene_effect_kernels::object_scene_resource_set::{
     same_scene_resources, SceneResourceMismatch,
@@ -23,6 +26,23 @@ use scene_effect_kernels::scene_effect_scene_join::SceneEffectPlan;
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 #[path = "object_reference_scene.rs"]
 mod reference;
+// #2373: the viewport-only "Show transparency" checker painted under the artwork.
+#[path = "object_viewport_checker.rs"]
+pub(crate) mod viewport_checker;
+pub use viewport_checker::{
+    outline::viewport_outline_quality_suffix, shadow::viewport_shadow_guides_quality_suffix,
+    solo::viewport_solo_quality_suffix,
+    viewport_checker_quality_suffix,
+};
+// #2358 GHOST-UNDER: onion / Ghost All frames composed under the live frame of a viewport witness.
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+#[path = "object_ghost_underlay.rs"]
+pub(crate) mod ghost_underlay;
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+pub use ghost_underlay::{
+    GhostFrameSpec, GhostMode, GhostPath, GhostReceipt, GhostShift, GhostSource, GhostUnderlay,
+    GhostUnderlayRequest, GhostVisual,
+};
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 pub use reference::{
     object_viewport_quality, prepare_object_camera_viewport_composition,
@@ -53,15 +73,23 @@ pub(crate) mod raster_scene;
 // T12 / T28.media: video placements drawn from decoded source frames.
 #[path = "object_media_scene_join.rs"]
 pub(crate) mod media_scene;
-pub(crate) use paint::raster::{ordered_entries, PaintEntry, PaintIndex};
+pub(crate) use paint::raster::{
+    folder_ranks, layered_entries, ordered_entries, ordered_entries_ranked, PaintEntry, PaintIndex,
+};
 pub(crate) use raster_scene::declared_versions as object_raster_resource_versions;
 #[path = "object_mask_inputs.rs"]
 pub(crate) mod mask_inputs;
+// #2257: the production join of a witness' packet to its layer-composition and effect-stack plan.
+#[path = "object_layer_join.rs"]
+mod layer_join;
 #[path = "object_paint_plan.rs"]
 mod paint;
 // L07-F (#2113): contour scene producer joined through the L07-C pin registry.
 #[path = "object_duplicator_scene.rs"]
 pub(crate) mod duplicator_scene;
+// L03-P (#2252): the single rig pose call site shared by the contour and raster joins.
+#[path = "object_rig_packet_pose.rs"]
+pub(crate) mod rig_packet_pose;
 #[path = "object_scene_producer_contour.rs"]
 mod object_scene_producer_contour;
 use object_scene_producer_contour::CompiledContour;
@@ -112,6 +140,10 @@ pub struct ObjectCompositionWitness {
     viewport_quality: Option<String>,
     camera: Option<[f64; 6]>,
     resources: Option<Arc<ObjectSceneResourceSet>>,
+    /// Viewport-only transparency checker painted under the artwork (#2373); never present on an export witness.
+    viewport_checker: Option<viewport_checker::ViewportChecker>,
+    viewport_outline: Option<f64>, // #2372 outline stroke width, viewport only
+    viewport_hides_shadow: bool,   // #2373 Shadow guides hidden, viewport only
     /// Joined layer/effect plan of this witness' packet (L08-K); `None` keeps the flat fast path.
     scene_effects: Option<Arc<SceneEffectPlan>>,
     /// Decoded video frames of the plan's video slots (T12); `None` while undecoded.
@@ -120,6 +152,9 @@ pub struct ObjectCompositionWitness {
     rasters: Option<Arc<raster_scene::RasterResources>>,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     reference: Option<reference::ReferenceScene>,
+    /// Viewport-only onion / Ghost All frames drawn under the live paint sequence; never on an export witness.
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    ghosts: Option<Arc<ghost_underlay::GhostUnderlay>>,
 }
 
 pub fn prepare_object_composition(
@@ -137,6 +172,9 @@ pub fn prepare_object_composition(
         plan: plan.clone(),
         viewport: false,
         viewport_quality: None,
+        viewport_checker: None,
+        viewport_outline: None,
+        viewport_hides_shadow: false,
         camera,
         resources: None,
         scene_effects: None,
@@ -145,10 +183,13 @@ pub fn prepare_object_composition(
         reference: None,
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         rasters: None,
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        ghosts: None,
     };
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     {
-        return brush_paint::attach(text_scene::attach(raster_scene::attach(witness, None)?)?);
+        return brush_paint::attach(text_scene::attach(raster_scene::attach(witness, None)?)?)?
+            .with_joined_layers(1.);
     }
     #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
     {
@@ -158,7 +199,7 @@ pub fn prepare_object_composition(
                 "native raster resources require project media support",
             ));
         }
-        text_scene::attach(witness)
+        text_scene::attach(witness)?.with_joined_layers(1.)
     }
 }
 
@@ -213,6 +254,12 @@ impl ObjectCompositionWitness {
     pub(crate) fn scene_effects(&self) -> Option<&Arc<SceneEffectPlan>> {
         self.scene_effects.as_ref()
     }
+    /// Test control: the witness as it was before the layer join (production joins on construction).
+    #[cfg(test)]
+    pub(crate) fn without_scene_effects(mut self) -> Self {
+        self.scene_effects = None;
+        self
+    }
     /// Set equality with an evaluation key's declaration; an absent set is empty.
     pub(crate) fn verify_scene_resources(
         &self,
@@ -261,6 +308,19 @@ impl ObjectCompositionWitness {
             && self.frame() == other.frame()
             && same_scene_resources(self.resources.as_deref(), other.resources.as_deref())
             && self.scene_effects == other.scene_effects
+            && self.same_ghosts(other)
+    }
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    fn same_ghosts(&self, other: &Self) -> bool {
+        match (&self.ghosts, &other.ghosts) {
+            (None, None) => true,
+            (Some(a), Some(b)) => Arc::ptr_eq(a, b) || a.request() == b.request(),
+            _ => false,
+        }
+    }
+    #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+    fn same_ghosts(&self, _: &Self) -> bool {
+        true
     }
 }
 
@@ -311,6 +371,12 @@ impl<'a> ObjectRenderEntry<'a> {
     }
     pub(crate) fn layer_opacity(&self) -> f64 {
         self.compiled.layer_opacity
+    }
+    /// The whole-layer pose the item's paint style follows.
+    pub(crate) fn paint_pose(
+        &self,
+    ) -> &'a crate::evaluation::object_scene_style_kernels::object_scene_paint_pose::PaintPose {
+        &self.compiled.paint
     }
     /// Typed straight-RGBA paint admitted with the contour (L07-A `SceneSolid`).
     pub(crate) fn solid(&self) -> &'a SceneSolid {
@@ -370,14 +436,22 @@ pub fn prepare_object_render_scene(
     expected: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectRenderScene, ObjectSceneError> {
     validate_pins(packet, expected)?;
-    let contours = object_scene_producer_contour::produce(packet).into_admitted()?;
+    let (contours, early_texts) = object_scene_producer_contour::produce_with_texts(packet);
+    let contours = contours.into_admitted()?;
+    let duplicators = Arc::new(duplicator_scene::prepare(packet)?);
+    let mut rasters = raster_scene::sources(packet)?;
+    let mut texts = match early_texts {
+        Some(texts) => texts?,
+        None => text_scene::prepare(packet)?,
+    };
+    let components = component_scene::prepare(packet, expected, &mut rasters, &mut texts)?;
     Ok(ObjectRenderScene {
-        duplicators: Arc::new(duplicator_scene::prepare(packet)?),
+        duplicators,
         packet: packet.clone(),
         contours: contours.into(),
-        rasters: raster_scene::sources(packet)?.into(),
-        texts: text_scene::prepare(packet)?,
-        components: component_scene::prepare(packet, expected)?,
+        rasters: rasters.into(),
+        texts,
+        components,
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         brushes: None,
         videos: media_scene::slots(packet)?.into(),
@@ -420,3 +494,22 @@ fn validate_pins(
 ))]
 #[path = "../tests/object_raster_scene_join.rs"]
 mod raster_join_tests;
+#[cfg(all(
+    test,
+    feature = "history",
+    feature = "application",
+    feature = "project_media_codec"
+))]
+#[path = "../tests/object_component_render_image.rs"]
+mod component_image_tests;
+#[cfg(all(
+    test,
+    feature = "history",
+    feature = "application",
+    feature = "project_media_codec"
+))]
+#[path = "../tests/object_component_convert_images.rs"]
+mod component_convert_image_tests;
+
+#[path = "object_subselect_projection.rs"]
+mod subselect_projection;

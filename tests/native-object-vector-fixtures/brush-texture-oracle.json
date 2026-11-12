@@ -1,0 +1,946 @@
+{
+ "commit": "fbe4b8a33e6d5a229f014154df2ba21988a9fabc",
+ "generator": "gen-brush-texture-oracle.cjs (outside the repository)",
+ "generatorSha256": "3a15e406c38ea45abb15b30636e41f47fc0adda5665257307fe424d0bd8713b9",
+ "slices": {
+  "colorHex8": "ea3c0613f41b0aab3cd1688ee015b3725536e75ccef6ff54ed70cd4807987894",
+  "applyBrushKeyline": "522859148c63935f653fc2563cec9da4dc8ed58c247abf9e87c0a7f470cfb862",
+  "_r3": "a42533c01486ff534d859e116bb8cf48182287f1dae7a679c52765c718911449",
+  "serP": "c71e9d4fbae1837b3f50bec603808a701ed629412eb050c64b9a62b8710e635e",
+  "desP": "e14636767dccba47d429b7f7097bef50d9682658942b9a8373a5b6f403a42044"
+ },
+ "cases": [
+  {
+   "id": "anchor-no-fill",
+   "in": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "opacity": 0,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "fillColor": null,
+    "brushTexturePreset": "charcoal-smooth",
+    "brushGroupId": "bg1",
+    "preTextureOpacity": 1
+   },
+   "out": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": null,
+    "opacity": 0,
+    "dashOffset": 0,
+    "brushGroupId": "bg1",
+    "brushTexturePreset": "charcoal-smooth",
+    "preTextureOpacity": 1
+   },
+   "out2": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": null,
+    "opacity": 0,
+    "dashOffset": 0,
+    "brushGroupId": "bg1",
+    "brushTexturePreset": "charcoal-smooth",
+    "preTextureOpacity": 1
+   }
+  },
+  {
+   "id": "anchor-fill",
+   "in": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "opacity": 1,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "fillColor": "#336699ff",
+    "brushTexturePreset": "ink-dry",
+    "brushGroupId": "bg2",
+    "preTextureStroke": "#112233ff"
+   },
+   "out": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": "#336699",
+    "opacity": 1,
+    "dashOffset": 0,
+    "brushGroupId": "bg2",
+    "brushTexturePreset": "ink-dry",
+    "preTextureStroke": "#112233ff"
+   },
+   "out2": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": "#336699",
+    "opacity": 1,
+    "dashOffset": 0,
+    "brushGroupId": "bg2",
+    "brushTexturePreset": "ink-dry",
+    "preTextureStroke": "#112233ff"
+   }
+  },
+  {
+   "id": "anchor-fill-null-stroke",
+   "in": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "opacity": 1,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "fillColor": "#336699ff",
+    "brushTexturePreset": "ink-dry",
+    "brushGroupId": "bg3",
+    "preTextureStroke": null
+   },
+   "out": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": "#336699",
+    "opacity": 1,
+    "dashOffset": 0,
+    "brushGroupId": "bg3",
+    "brushTexturePreset": "ink-dry",
+    "preTextureStroke": null
+   },
+   "out2": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": "#336699",
+    "opacity": 1,
+    "dashOffset": 0,
+    "brushGroupId": "bg3",
+    "brushTexturePreset": "ink-dry",
+    "preTextureStroke": null
+   }
+  },
+  {
+   "id": "anchor-opacity-zero",
+   "in": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "opacity": 0,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "brushTexturePreset": "p",
+    "brushGroupId": "g",
+    "preTextureOpacity": 0
+   },
+   "out": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": null,
+    "opacity": 0,
+    "dashOffset": 0,
+    "brushGroupId": "g",
+    "brushTexturePreset": "p",
+    "preTextureOpacity": 0
+   },
+   "out2": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": null,
+    "opacity": 0,
+    "dashOffset": 0,
+    "brushGroupId": "g",
+    "brushTexturePreset": "p",
+    "preTextureOpacity": 0
+   }
+  },
+  {
+   "id": "dab",
+   "in": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "opacity": 0.55,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "fillColor": "#20304080",
+    "isBrushTextureCopy": true,
+    "brushGroupId": "bg1"
+   },
+   "out": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": "#20304080",
+    "opacity": 0.55,
+    "dashOffset": 0,
+    "brushGroupId": "bg1",
+    "isBrushTextureCopy": true
+   },
+   "out2": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": "#20304080",
+    "opacity": 0.55,
+    "dashOffset": 0,
+    "brushGroupId": "bg1",
+    "isBrushTextureCopy": true
+   }
+  },
+  {
+   "id": "dab-falsy-copy",
+   "in": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "opacity": 1,
+    "strokeColor": "#112233",
+    "isBrushTextureCopy": false,
+    "brushGroupId": "",
+    "brushTexturePreset": ""
+   },
+   "out": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeColor": "#112233",
+    "hasRealStroke": true,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": null,
+    "opacity": 1,
+    "dashOffset": 0
+   },
+   "out2": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeColor": "#112233",
+    "hasRealStroke": true,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": null,
+    "opacity": 1,
+    "dashOffset": 0
+   }
+  },
+  {
+   "id": "group-only",
+   "in": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "opacity": 1,
+    "strokeColor": "#112233",
+    "brushGroupId": "lone"
+   },
+   "out": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeColor": "#112233",
+    "hasRealStroke": true,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": null,
+    "opacity": 1,
+    "dashOffset": 0,
+    "brushGroupId": "lone"
+   },
+   "out2": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeColor": "#112233",
+    "hasRealStroke": true,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": null,
+    "opacity": 1,
+    "dashOffset": 0,
+    "brushGroupId": "lone"
+   }
+  }
+ ]
+}

@@ -9,7 +9,9 @@
 //! Members (camelCase, the baseline dict names): `assetId`, `x`, `y` (the raster
 //! CENTRE, Paper `position`), `width`, `height` (display size), `opacity`
 //! (absent reads as the baseline `1`), `rotation` (degrees, absent reads as
-//! `0`; `serR` omits it when zero) and the reserved passthrough tags
+//! `0`; `serR` omits it when zero), the optional `flipX` / `flipY` / `skew` (#2372: a mirror and an x-shear
+//! in degrees about the centre, absent reads as none), the optional Select pivot `xformAnchorKey` (nine presets) / `xformAnchorCustom`
+//! (a world point `[x, y]` that wins), and the reserved passthrough tags
 //! `isBitmapBrush`, `brushGroupId`, `isBrushTextureCopy` (lane 7) and `meshId`
 //! (lane 3), preserved verbatim and never interpreted here. Absent, default
 //! and explicit values stay distinct on a round trip, as does the spelling
@@ -33,6 +35,7 @@ use serde_json::Number;
 #[path = "object_raster_asset_geometry.rs"]
 pub(crate) mod geometry;
 
+use crate::object_document::object_raster_asset_kernels::object_item_local_form::{pivot_custom, pivot_key, pivot_valid, LocalForm, MAX_SKEW_DEGREES};
 use geometry::{capture_geometry, ImageRect, RasterItemError, RasterSurface};
 
 const MAX_TAG_BYTES: usize = 255;
@@ -68,6 +71,16 @@ pub(crate) struct RasterItem {
     #[serde(skip_serializing_if = "Presence::missing")]
     rotation: Presence<Number>,
     #[serde(skip_serializing_if = "Presence::missing")]
+    flip_x: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    flip_y: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    skew: Presence<Number>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    xform_anchor_key: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    xform_anchor_custom: Presence<Vec<Number>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
     is_bitmap_brush: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
     brush_group_id: Presence<String>,
@@ -89,6 +102,11 @@ struct RasterItemWire {
     height: Number,
     opacity: Presence<Number>,
     rotation: Presence<Number>,
+    flip_x: Presence<bool>,
+    flip_y: Presence<bool>,
+    skew: Presence<Number>,
+    xform_anchor_key: Presence<String>,
+    xform_anchor_custom: Presence<Vec<Number>>,
     is_bitmap_brush: Presence<bool>,
     brush_group_id: Presence<String>,
     is_brush_texture_copy: Presence<bool>,
@@ -98,6 +116,11 @@ object_deserialize!(RasterItemWire {
     asset_id: String, x: Number, y: Number, width: Number, height: Number,
     #[serde(default)] opacity: Presence<Number>,
     #[serde(default)] rotation: Presence<Number>,
+    #[serde(default)] flip_x: Presence<bool>,
+    #[serde(default)] flip_y: Presence<bool>,
+    #[serde(default)] skew: Presence<Number>,
+    #[serde(default)] xform_anchor_key: Presence<String>,
+    #[serde(default)] xform_anchor_custom: Presence<Vec<Number>>,
     #[serde(default)] is_bitmap_brush: Presence<bool>,
     #[serde(default)] brush_group_id: Presence<String>,
     #[serde(default)] is_brush_texture_copy: Presence<bool>,
@@ -138,6 +161,11 @@ impl RasterItem {
             height: wire.height,
             opacity: wire.opacity,
             rotation: wire.rotation,
+            flip_x: wire.flip_x,
+            flip_y: wire.flip_y,
+            skew: wire.skew,
+            xform_anchor_key: wire.xform_anchor_key,
+            xform_anchor_custom: wire.xform_anchor_custom,
             is_bitmap_brush: wire.is_bitmap_brush,
             brush_group_id: wire.brush_group_id,
             is_brush_texture_copy: wire.is_brush_texture_copy,
@@ -160,6 +188,18 @@ impl RasterItem {
             if !f64_of(rotation).is_finite() {
                 return Err(RasterItemError::NonFinite);
             }
+        }
+        if let Some(skew) = self.skew.value() {
+            let skew = f64_of(skew);
+            if !skew.is_finite() {
+                return Err(RasterItemError::NonFinite);
+            }
+            if skew.abs() > MAX_SKEW_DEGREES {
+                return Err(RasterItemError::Malformed);
+            }
+        }
+        if !pivot_valid(&self.xform_anchor_key, &self.xform_anchor_custom) {
+            return Err(RasterItemError::Malformed);
         }
         if let Some(opacity) = self.opacity.value() {
             let opacity = f64_of(opacity);
@@ -222,6 +262,11 @@ impl RasterItem {
                 Some(rotation) => Presence::Present(number_of(rotation)?),
                 None => Presence::Missing,
             },
+            flip_x: Presence::Missing,
+            flip_y: Presence::Missing,
+            skew: Presence::Missing,
+            xform_anchor_key: Presence::Missing,
+            xform_anchor_custom: Presence::Missing,
             is_bitmap_brush: truthy(tags.is_bitmap_brush),
             brush_group_id: text(&tags.brush_group_id),
             is_brush_texture_copy: truthy(tags.is_brush_texture_copy),
@@ -257,6 +302,22 @@ impl RasterItem {
     pub(crate) fn rotation(&self) -> f64 {
         self.rotation_authored().unwrap_or(0.0)
     }
+    /// #2372: the stored mirror and shear (absent reads as none).
+    pub(crate) fn local_form(&self) -> LocalForm {
+        LocalForm {
+            flip_x: self.flip_x.value() == Some(&true),
+            flip_y: self.flip_y.value() == Some(&true),
+            skew: self.skew.value().map(f64_of).unwrap_or(0.0),
+        }
+    }
+    /// #2372: the stored Select pivot preset, if any.
+    pub(crate) fn pivot_key(&self) -> Option<String> {
+        pivot_key(&self.xform_anchor_key)
+    }
+    /// #2372: the stored custom Select pivot (a world point), if any.
+    pub(crate) fn pivot_custom(&self) -> Option<[f64; 2]> {
+        pivot_custom(&self.xform_anchor_custom)
+    }
     pub(crate) fn is_bitmap_brush(&self) -> Option<bool> {
         self.is_bitmap_brush.value().copied()
     }
@@ -289,17 +350,45 @@ impl RasterItem {
     pub(crate) fn selection_companion_clone(
         &self,
         group: &str,
-        offset: f64,
+        offset: [f64; 2],
     ) -> Result<Self, RasterItemError> {
-        if !offset.is_finite() {
+        if !offset.iter().all(|v| v.is_finite()) {
             return Err(RasterItemError::NonFinite);
         }
         let mut next = self.clone();
         next.brush_group_id = Presence::Present(group.to_string());
-        if offset != 0.0 {
+        if offset != [0.0, 0.0] {
             let (x, y) = self.center();
-            next.x = Number::from_f64(x + offset).ok_or(RasterItemError::NonFinite)?;
-            next.y = Number::from_f64(y + offset).ok_or(RasterItemError::NonFinite)?;
+            next.x = Number::from_f64(x + offset[0]).ok_or(RasterItemError::NonFinite)?;
+            next.y = Number::from_f64(y + offset[1]).ok_or(RasterItemError::NonFinite)?;
+        }
+        next.validate()?;
+        Ok(next)
+    }
+
+    /// The same bitmap as a plain image (a component's break apart): optionally at a new centre and size (rotation and the
+    /// brush tags go, as `applyMatrixToStrokeData` builds its new dict), at `opacity` (kept as authored when unchanged).
+    pub(crate) fn baked(
+        &self,
+        rect: Option<((f64, f64), (f64, f64))>,
+        opacity: f64,
+    ) -> Result<Self, RasterItemError> {
+        let mut next = self.clone();
+        if let Some(((x, y), (width, height))) = rect {
+            next.x = number_of(x)?;
+            next.y = number_of(y)?;
+            next.width = number_of(width)?;
+            next.height = number_of(height)?;
+            next.rotation = Presence::Missing;
+            next.flip_x = Presence::Missing;
+            next.flip_y = Presence::Missing;
+            next.skew = Presence::Missing;
+        }
+        if !opacity.is_finite() {
+            return Err(RasterItemError::NonFinite);
+        }
+        if opacity != self.opacity() {
+            next.opacity = Presence::Present(number_of(opacity)?);
         }
         next.validate()?;
         Ok(next)

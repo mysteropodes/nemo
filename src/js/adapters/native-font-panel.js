@@ -9,6 +9,24 @@
   'use strict';
   var bundled = ['Roboto-Regular', 'Roboto-Bold', 'DejaVuSans-Regular', 'DejaVuSans-Bold',
     'DejaVuSerif-Regular', 'DejaVuSerif-Bold', 'Manrope-Regular', 'Inter-Regular'];
+  // Human font names (family/style) for this panel and the Text popover: a resource row carries the stored source name (a bundled key such as
+  // "Manrope-Regular", or a Google family); the opaque native-font-<hash> asset id is an identity (tooltip / option value), never a label.
+  var KNOWN = {
+    'Roboto-Regular': 'Roboto Regular', 'Roboto-Bold': 'Roboto Bold',
+    'DejaVuSans-Regular': 'DejaVu Sans Regular', 'DejaVuSans-Bold': 'DejaVu Sans Bold',
+    'DejaVuSerif-Regular': 'DejaVu Serif Regular', 'DejaVuSerif-Bold': 'DejaVu Serif Bold',
+    'Manrope-Regular': 'Manrope Regular', 'Inter-Regular': 'Inter Regular'
+  };
+  var RAW_ID = /^native-font-[0-9a-f]{8,}$/i;
+  // The label of a font resource name; falls back to a generic word when the name is itself the raw id.
+  function label(name) {
+    if (typeof name !== 'string' || !name.trim()) return 'Imported font';
+    var n = name.trim();
+    if (Object.prototype.hasOwnProperty.call(KNOWN, n)) return KNOWN[n];
+    if (RAW_ID.test(n)) return 'Imported font';
+    return n.replace(/\.(ttf|otf|woff2?|ttc)$/i, '').replace(/[-_]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\s+/g, ' ').trim() || 'Imported font';
+  }
+  var Label = {label: label};
   function owner(a, b) {
     return !!a && !!b && ['instanceId', 'documentId', 'lifecycleGeneration'].every(function (k) { return a[k] === b[k]; });
   }
@@ -110,18 +128,22 @@
     function current(t, revision) {
       return alive() && t.epoch === epoch && t.serial === serial && (revision ? pin(t.pin, info()) : owner(t.pin, info()));
     }
+    function nameOf(id) {
+      var row = rows.find(function (r) { return r.assetId === id; });
+      return row ? Label.label(row.name) : 'font';
+    }
     function renderRows() {
       list.replaceChildren();
       rows.forEach(function (row) {
         var item = node('div'); item.setAttribute('role', 'listitem'); item.setAttribute('data-asset-id', row.assetId);
         item.style.overflowWrap = 'anywhere';
-        item.appendChild(node('span', row.name + ' — ' + row.assetId));
+        item.title = row.assetId; item.appendChild(node('span', Label.label(row.name)));
         if (!row.available) item.appendChild(node('span', ' Unavailable: ' + row.reason));
         var choose = button('Select', null, function () {
           if (!alive()) return; var previous = identity; sync();
           if (!pin(previous, identity)) { controls(); if (opened && !busy) return reload(); return; }
           if (busy || listBusy || !rows.includes(row)) { controls(); return; }
-          selected = row.assetId; status.textContent = 'Selected resource: ' + selected;
+          selected = row.assetId; status.textContent = 'Selected resource: ' + nameOf(selected);
           if (unknown) status.textContent += ' Import outcome unknown; do not repeat the import.'; controls();
         });
         choose.setAttribute('data-select-asset-id', row.assetId); choose.setAttribute('aria-pressed', String(selected === row.assetId));
@@ -159,7 +181,7 @@
       if (!pin(expected, identity)) { controls(); if (opened && !busy) return reload(); return; }
       var api = resources();
       if (!identity || !api || busy || listBusy || importing && unknown) { controls(); return; }
-      busy = true; serial++; var t = token();
+      busy = true; serial++; var t = token(), done = null;
       abort = typeof AbortController === 'function' ? new AbortController() : null;
       var signal = abort && abort.signal; status.textContent = importing ? 'Importing font resource…' : 'Loading font resource…'; controls();
       try {
@@ -169,7 +191,7 @@
           if (!value || typeof value.assetId !== 'string' || !value.assetId) throw new Error('Imported font identity is unavailable');
           selected = value.assetId;
         }
-        status.textContent = importing ? 'Imported resource: ' + selected : 'Loaded resource: ' + selected;
+        status.textContent = (importing ? 'Imported resource: ' : 'Loaded resource: ') + nameOf(selected); done = importing ? 'Imported resource: ' : 'Loaded resource: ';
         if (unknown) status.textContent += ' Import outcome unknown; do not repeat the import.';
       } catch (error) {
         if (current(t, false)) {
@@ -179,7 +201,7 @@
       } finally {
         if (alive() && t.epoch === epoch && t.serial === serial) {
           busy = false; abort = null; var message = status.textContent;
-          sync(); if (opened && importing && !unknown) { await reload(); if (owner(t.pin, info())) status.textContent = message; }
+          sync(); if (opened && importing && !unknown) { await reload(); if (owner(t.pin, info())) status.textContent = done ? done + nameOf(selected) + (unknown ? ' Import outcome unknown; do not repeat the import.' : '') : message; }
           controls();
         }
       }
@@ -204,5 +226,5 @@
     refresh();
     return Object.freeze({refresh: refresh, retire: retire});
   }
-  return Object.freeze({create: create});
+  return Object.freeze({create: create, label: label});
 }));

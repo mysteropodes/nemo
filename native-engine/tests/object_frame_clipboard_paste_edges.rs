@@ -54,6 +54,7 @@ fn stroke_cell(rel_layer: u32, rel_frame: u32, id: &str, z: i64, g: i64) -> Past
         g,
     };
     PasteCell {
+        items: Default::default(),
         order_elements: crate::object_document::Presence::Missing,
         rel_layer,
         rel_frame,

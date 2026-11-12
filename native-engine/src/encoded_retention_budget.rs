@@ -489,3 +489,6 @@ mod tests {
         ));
     }
 }
+
+#[path = "encoded_retention_batch.rs"]
+mod batch;

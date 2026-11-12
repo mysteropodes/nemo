@@ -75,6 +75,8 @@ impl RetainedDisposition {
                     CompactResult::VectorEdit(vector) => vector.result(),
                     #[cfg(feature = "project_media_codec")]
                     CompactResult::ImageImported(image) => image.result(),
+                    #[cfg(feature = "project_media_codec")]
+                    CompactResult::VideoLinked(video) => video.result(),
                     CompactResult::ItemEdit(item) => item.result(),
                     CompactResult::ImportBatch(batch) => batch.result(),
                     CompactResult::Transaction(record) => record.result(),

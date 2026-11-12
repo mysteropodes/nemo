@@ -122,18 +122,15 @@ fn missing_timing_outside_the_window_is_still_unavailable_not_fake_empty() {
 }
 
 #[test]
-fn source_range_support_does_not_admit_unsupported_visible_vector_parenting() {
+fn source_range_support_admits_a_3d_vector_parent_through_its_2d_motion() {
     let mut value = drawing(2, 8, true);
     value["layers"][0]["parentLayerUid"] = json!("L1");
-    // The static2D parent producer is admitted; a3D ancestor is still unjoined.
+    // #2520: a 3D ancestor contributes its 2D Motion to the layers parented to it (baseline `computeMotionMat`), so it is joined.
     value["layers"][1]["threeD"] = json!(true);
     value["layers"][0]["range"] = json!({"inPoint":2,"outPoint":4});
     let snapshot = snapshot(&value);
     let bytes = encode_storage_project(snapshot.document()).unwrap();
-    assert_eq!(
-        prepare_object_exposure_frame(&snapshot, &selector(&snapshot, 3)).err(),
-        Some(ObjectFrameError::Unavailable)
-    );
+    assert!(prepare_object_exposure_frame(&snapshot, &selector(&snapshot, 3)).is_ok());
     assert_eq!(encode_storage_project(snapshot.document()).unwrap(), bytes);
 }
 
@@ -238,8 +235,16 @@ fn visibility_and_unconsumed_motion_keep_their_original_publication_guards() {
             .all(|command| command.paint()[3].as_f64() == Some(1.)));
     }
     assert_eq!(encode_storage_project(rotation.document()).unwrap(), bytes);
-    // A dormant3D-only field has no2D consumer even when its drawing is outside the range.
+    // #2520/#2525: a stored 3D key on a layer whose 3D switch is off is dormant (the baseline keeps it), so it neither
+    // refuses the frame nor changes the picture.
     value["propertyHolders"][0]["properties"][0] = json!({"property":"positionZ","static":[30]});
+    let dormant = snapshot(&value);
+    assert_eq!(
+        prepare_object_exposure_frame(&dormant, &selector(&dormant, 3)).unwrap().records().len(),
+        2
+    );
+    // A field with no consumer at all stays unavailable even when its drawing is outside the range.
+    value["propertyHolders"][0]["properties"][0] = json!({"property":"dupOffsetPosZ","static":[30]});
     let unsupported = snapshot(&value);
     let bytes = encode_storage_project(unsupported.document()).unwrap();
     assert_eq!(

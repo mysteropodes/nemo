@@ -1,5 +1,6 @@
 'use strict';
 // Real layer-inout handlers + Range/Desktop/Intent/Project/SDK. Only native I/O and DOM are modeled.
+// BEGIN REUSABLE REAL RANGE FIXTURE (tests/native-layer-range-menu.test.cjs compiles this region)
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const Selection=require('../src/js/layer-inout-selection.js'),Range=require('../src/js/adapters/native-layer-range-desktop.js'),Desktop=require('../src/js/adapters/native-frame-edit-desktop.js');
 const Intent=require('../src/js/adapters/native-frame-edit-intent.js'),Project=require('../src/js/adapters/native-object-project.js'),SDK=require('../src/js/adapters/native-application.js');
@@ -34,6 +35,8 @@ async function harness(options={}){
  const doc=new Node('document');doc.createElement=tag=>new Node(tag);doc.body=doc.createElement('body');doc.appendChild(doc.body);const grid=doc.createElement('div');doc.body.appendChild(grid);grid.appendChild(doc.createElement('div'));
  const root={document:doc,NemoLayerInOutSelection:Selection,FC:10,state:{currentFrame:2,activeLayerIdx:0,totalFrames:12,appMode:'motion',activeSymbolId:null,activeCompositionId:null,layers:[{layerUid:'alpha'},{layerUid:'beta'}]},_layerSel:[],_sel:{frames:[]},events:new Map(),notices:[]};
  root.addEventListener=(k,f)=>root.events.set(k,f);root.showToast=m=>root.notices.push(m);
+ Object.assign(root,{menus:[],showContextMenu:(x,y,items)=>root.menus.push({x,y,items}),NemoNativeObjectRigCommand:require('../src/js/adapters/native-object-rig-command.js'),NemoNativeObjectRigContract:require('../src/js/adapters/native-object-rig-contract.js'),
+  NemoNativeLayerRangeMenu:require('../src/js/adapters/native-layer-range-menu.js'),NemoNativeMotionKeySpans:require('../src/js/adapters/native-motion-key-spans.js'),NemoNativeLayerParent:require('../src/js/adapters/native-layer-parent.js')});
  for(const layer of root.state.layers)for(const field of ['inPoint','outPoint','frames','timeLink'])Object.defineProperty(layer,field,{get(){legacy++;throw Error('LEGACY '+field);}});
  const queuedPublic=[],calls=[],info=()=>({apiVersion:2,instanceId:'range-instance',documentId:'range-document',lifecycleGeneration:1,contentRevision:revision,documentSnapshotId:'range-snapshot-'+revision,
   documentDigest:String(revision).repeat(64),byteCount:1200,canvasW:320,canvasH:180,fps:24,totalFrames:12,layers:[{layerUid:'alpha'},{layerUid:'beta'}],reference:null,undoDepth:revision,redoDepth:0});
@@ -47,8 +50,10 @@ async function harness(options={}){
   if(q.operation==='query.document.object.layer.timing'){
    assert.equal(q.payload.view,'range');const {view,...selector}=q.payload;
    return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,
-    result:{kind:'layerRange',instanceId:q.instanceId,documentId:q.documentId,...selector,range:{...resolved}}};
+    result:{kind:'layerRange',instanceId:q.instanceId,documentId:q.documentId,...selector,range:{...resolved,...(typeof options.rangeExtras==='function'?options.rangeExtras(selector.layerUid):options.rangeExtras||{})}}};
   }
+  if(/^command\.document\.object\.layer\.(range\.arrange|timeLink\.set)$/.test(q.operation)){if(options.arrangeRefusal)return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:false,error:{code:options.arrangeRefusal,message:'refused'}};
+   revision++;return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};}
   assert.equal(q.operation,OP);if(gate)await gate.promise;revision++;
   return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};
  }
@@ -100,6 +105,7 @@ async function harness(options={}){
   async settle(){for(let i=0;i<30&&controller.isPending();i++)await turn();assert.equal(controller.isPending(),false);await turn();await turn();}};
 }
 
+// END REUSABLE REAL RANGE FIXTURE
 test('real layer-inout native mount and handles render only qualified raw D27 points, never legacy ranges',async()=>{
  const h=await harness();assert.equal(h.rows().length,2);assert.equal(h.bar(0).style.left,'-25px');assert.equal(h.bar(0).style.width,'175px');assert.equal(h.bar(0).attrs['aria-disabled'],'false');
  assert.equal(h.legacy(),0);assert.equal(h.commands().length,0);assert.equal(h.calls.filter(c=>c.q?.payload?.view==='range').length,2);
@@ -192,14 +198,15 @@ test('one native rectangle center-tests actual property diamonds and bar parts w
  h.down(0,'both');h.move(120);h.up(120);await h.settle();assert.deepEqual(h.commands()[0].q.payload.selectedKeys.map(k=>k.frame),[2.25,7]);
 });
 
-test('native key timeline refuses stale detached/frame/FC scopes and never trims over32 marquee selection',async()=>{
+test('native key timeline refuses stale detached/frame/FC scopes and a marquee over 33 keys selects them all (no key limit)',async()=>{
  for(const change of [h=>h.root.state.currentFrame++,h=>h.root.FC++,h=>h.keyEditor.cancel(),h=>h.keyEditor.dispose()]){
   const h=await harness({propertyKeys:[2.25,7]});const node=h.keyNodes()[0];change(h);node.fire('mousedown',{button:0});
   const captured=h.keyEditor.captureSelectedKeys();assert.ok(captured===null||captured.keys.length===0);assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
  }
  const h=await harness({propertyKeys:Array.from({length:33},(_,i)=>i)});h.keyNodes().forEach((n,i)=>{n.getBoundingClientRect=()=>({left:i*10,top:6,width:9,height:9});});
+ for(let i=0;i<2;i++){const bar=h.bar(i);if(!bar)continue;bar.getBoundingClientRect=()=>({left:900,right:950,top:100,bottom:120});bar.querySelector('.layer-inout-handle.left').getBoundingClientRect=()=>({left:900,right:904,top:100,bottom:120});bar.querySelector('.layer-inout-handle.right').getBoundingClientRect=()=>({left:946,right:950,top:100,bottom:120});}
  Range.startMarquee(h.root,{clientX:0,clientY:0});h.doc.fire('mousemove',{clientX:400,clientY:20});
- assert.deepEqual(h.keyEditor.captureSelectedKeys().keys,[]);assert.equal(h.commands().length,0);assert.ok(h.root.notices.length);
+ assert.equal(h.keyEditor.captureSelectedKeys().keys.length,33);assert.equal(h.commands().length,0);
 });
 
 
@@ -282,4 +289,236 @@ test('frame drift during queued lease validation refuses before a native range d
  const h=await harness({beforeQueuedGuard:root=>{root.state.currentFrame++;}});h.down(0,'both');h.move(120);h.up(120);await h.settle();
  assert.ok(h.queuedPublic.length>0);assert.ok(h.queuedPublic.every(value=>value===null));assert.equal(h.commands().length,0);
  assert.equal(h.s.info().contentRevision,0);assert.equal(h.legacy(),0);
+});
+
+test('a native video placement\'s Time Remap keys draw as one selectable lane from its read, beside the property keys',async()=>{
+ const h=await harness();h.root.NemoNativeTimeRemapKeys=require('../src/js/adapters/native-time-remap-keys.js');
+ h.root.SM={timeRemapKeyFacts:li=>li===1?{keyCount:2,keyAtFrame:true,value:3,keys:[{frame:2,value:0,color:'#4ea9ff'},{frame:6,value:10,hold:true}]}:li===0?{keyCount:0,keys:null}:null};
+ Range.refreshKeys(h.root);
+ const nodes=h.keyNodes();assert.equal(nodes.length,2);
+ assert.deepEqual(nodes.map(n=>n.dataset.frame),['2','6']);assert.ok(nodes.every(n=>n.parentNode===h.rows()[1]&&!n.disabled&&(n.events.get('mousedown')||[]).length===1));
+ assert.ok(nodes[0].classes.has('tinted')&&!nodes[1].classes.has('tinted'));
+ await nodes[0].fire('mousedown',{button:0});assert.deepEqual(h.keyNodes().map(n=>n.dataset.selected),['true','false']);
+ h.root.SM={};Range.refreshKeys(h.root);assert.equal(h.keyNodes().length,0);
+ assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
+});
+
+// #2524 / #2377: a plain press on a selected key keeps the group and drags it; the key menu acts on its opened selection.
+const KeyGesture = require('../src/js/adapters/native-motion-key-gesture.js');
+const KeyBox = require('../src/js/adapters/native-motion-key-box.js');
+test('dragging a selected key group previews one shift and commits it on release; a plain press keeps the group', async () => {
+  const h = await harness({ propertyKeys: [2.25, 7, 10.5] });
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  h.keyNodes()[0].fire('mousedown', { button: 0 }); h.keyNodes()[1].fire('mousedown', { button: 0, ctrlKey: true });
+  assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map((k) => k.frame), [2.25, 7]);
+  h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 });
+  assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map((k) => k.frame), [2.25, 7], 'the press on a selected key does not collapse the selection');
+  h.doc.fire('mousemove', { clientX: 130 });
+  const preview = h.keyNodes().filter((n) => n.classes.has('sel')).map((n) => n.style.transform);
+  assert.deepEqual(preview, ['translateX(30px)', 'translateX(30px)']);
+  assert.deepEqual(edits, [], 'nothing is written while dragging');
+  h.doc.fire('mouseup', { clientX: 130 });
+  assert.deepEqual(edits, [{ kind: 'shift', delta: 3 }]);
+  assert.ok(h.keyNodes().every((n) => !n.style.transform));
+  assert.equal(h.commands().length, 0);
+  // A plain press on an UNselected key still selects just that key.
+  h.keyNodes()[2].fire('mousedown', { button: 0, clientX: 100 }); h.doc.fire('mouseup', { clientX: 100 });
+  assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map((k) => k.frame), [10.5]);
+  assert.equal(edits.length, 1, 'a click without movement writes nothing');
+});
+
+test('the key context menu selects an unselected key first and refuses a click after the selection changed', async () => {
+  const h = await harness({ propertyKeys: [2.25, 7, 10.5] });
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  h.keyNodes()[1].fire('contextmenu', { clientX: 40, clientY: 50, button: 2 });
+  assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map((k) => k.frame), [7]);
+  const menu = h.root.menus.pop();
+  assert.deepEqual([menu.x, menu.y], [40, 50]);
+  assert.equal(menu.items[0].label, 'Delete this key');
+  menu.items.find((i) => i.label === 'Easy Ease  (F9)').action();
+  assert.deepEqual(edits, [{ kind: 'preset', preset: 'ease' }]);
+  // The selection moves on after the menu opened: the stale item commits nothing.
+  h.keyNodes()[1].fire('contextmenu', { clientX: 1, clientY: 2, button: 2 });
+  const stale = h.root.menus.pop();
+  h.keyNodes()[0].fire('mousedown', { button: 0, ctrlKey: true });
+  edits.length = 0; h.root.notices.length = 0;
+  stale.items.find((i) => i.label === 'Linear  (Cmd+Alt+K)').action();
+  assert.deepEqual(edits, []);
+  assert.match(h.root.notices.join('|'), /selection changed/);
+});
+
+function placeKeys(h) {
+  // The key buttons sit at their frame in the row, 22px apart per lane, like the real grid; rectangles follow whatever is currently drawn.
+  Node.prototype.getBoundingClientRect = function () {
+    if (!/native-motion-property-key/.test(this.className || '')) return { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
+    const x = (Number(this.dataset.frame) + 0.5) * h.root.FC - 4.5, y = Number.parseFloat(this.style.top) || 0;
+    return { left: x, right: x + 9, top: y, bottom: y + 9, width: 9, height: 9 };
+  };
+}
+const boxes = (h) => h.doc.body.children.filter((n) => n.className === 'motion-keysel-box');
+const twoRows = () => {
+  const target = { contextId: 'scene-root', layerUid: 'alpha' };
+  return { propertyTracks: [{ target, property: 'opacity', dimension: 1, items: [{ frame: 2, v: [50], color: '#e8b64c' }, { frame: 7, v: [75] }] }, { target, property: 'position', dimension: 2, items: [{ frame: 4, v: [3, 7] }] }] };
+};
+
+test('a tinted key carries the baseline tint class and colour; the tint is part of what the grid redraws', async () => {
+  const h = await harness(twoRows());
+  const [tinted, plain] = h.keyNodes();
+  assert.equal(tinted.classes.has('tinted'), true);
+  assert.equal(plain.classes.has('tinted'), false);
+  assert.equal(tinted.style['--key-color'], '#e8b64c');
+  assert.equal(plain.style['--key-color'], undefined);
+});
+
+test('#2377: a connector bar joins two consecutive keys whose value changes, tinted only when both carry the same colour; a press selects both end keys', async () => {
+  const target = { contextId: 'scene-root', layerUid: 'alpha' };
+  const h = await harness({ propertyTracks: [{ target, property: 'opacity', dimension: 1, items: [
+    { frame: 1, v: [10], color: '#e8b64c' }, { frame: 4, v: [20], color: '#e8b64c' }, { frame: 6, v: [20] }, { frame: 9, v: [30], color: '#e8b64c' }, { frame: 11, v: [40], color: '#111111' }] }] });
+  const bars = () => h.grid.querySelectorAll('.native-key-connect');
+  // 1->4 changes (same colour: tinted); 4->6 holds the value (no bar); 6->9 changes (one end uncoloured: default); 9->11 changes (two colours: a boundary, default).
+  assert.deepEqual(bars().map((b) => [b.dataset.keyFrom, b.dataset.keyTo, b.style.left, b.style.width, b.classes.has('tinted'), b.style['--key-color']]),
+    [['1', '4', '15px', '30px', true, '#e8b64c'], ['6', '9', '65px', '30px', false, undefined], ['9', '11', '95px', '20px', false, undefined]]);
+  assert.equal(h.grid.querySelectorAll('.native-key-durblock').length, 0, 'below 18px per frame no duration blocks, as the baseline');
+  const before = bars()[0];
+  await before.fire('mousedown', { button: 0 });
+  assert.equal(h.keyNodes().filter((n) => n.dataset.selected === 'true').map((n) => n.dataset.frame).join(), '1,4');
+  assert.equal(bars().find((b) => b.dataset.keyFrom === '1').classes.has('sel'), true, 'both end keys selected: the bar reads selected');
+});
+
+test('#2377: a press on a connector moves the playhead to its first key, like the baseline goToFrame(keyA.frame), and a refused move is reported', async () => {
+  const target = { contextId: 'scene-root', layerUid: 'alpha' };
+  const h = await harness({ propertyTracks: [{ target, property: 'opacity', dimension: 1, items: [
+    { frame: 1, v: [10] }, { frame: 4, v: [20] }, { frame: 8, v: [30] }] }] });
+  const jumps = []; h.root.goToFrame = (frame) => { jumps.push(frame); return Promise.resolve(); };
+  const bar = (from) => h.grid.querySelectorAll('.native-key-connect').find((b) => b.dataset.keyFrom === from);
+  await bar('4').fire('mousedown', { button: 0 });
+  assert.deepEqual(jumps, [4], 'the playhead goes to the first end key');
+  assert.equal(h.keyNodes().filter((n) => n.dataset.selected === 'true').map((n) => n.dataset.frame).join(), '4,8');
+  // A failing move is reported and never throws out of the press.
+  h.root.goToFrame = () => Promise.reject(new Error('refused'));
+  h.root.notices.length = 0;
+  await bar('1').fire('mousedown', { button: 0 });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.match(h.root.notices.join('|'), /playhead could not move/);
+});
+
+test('#2377: dragging a connector moves both end keys with ONE shift; Alt+drag retimes the second key alone and selects the pair again', async () => {
+  const target = { contextId: 'scene-root', layerUid: 'alpha' };
+  const h = await harness({ propertyTracks: [{ target, property: 'opacity', dimension: 1, items: [
+    { frame: 1, v: [10] }, { frame: 4, v: [20] }, { frame: 8, v: [30] }] }] });
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.root.NemoNativeMotionConnectorDrag = require('../src/js/adapters/native-motion-connector-drag.js');
+  h.ports.editSelectedKeys = (a) => { edits.push([a, h.keyNodes().filter((n) => n.dataset.selected === 'true').map((n) => Number(n.dataset.frame))]); return Promise.resolve(true); };
+  const bar = () => h.grid.querySelectorAll('.native-key-connect').find((b) => b.dataset.keyFrom === '1');
+  await bar().fire('mousedown', { button: 0, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 120, metaKey: true });
+  assert.deepEqual(h.keyNodes().filter((n) => n.dataset.selected === 'true').map((n) => n.style.transform), ['translateX(20px)', 'translateX(20px)']);
+  h.doc.fire('mouseup', { clientX: 120 });
+  assert.deepEqual(edits, [[{ kind: 'shift', delta: 2 }, [1, 4]]], 'both end keys moved by one shift');
+  edits.length = 0;
+  await bar().fire('mousedown', { button: 0, clientX: 100, altKey: true });
+  h.doc.fire('mousemove', { clientX: 120, metaKey: true });
+  assert.deepEqual(h.keyNodes().map((n) => n.style.transform || ''), ['', '', ''].map((_, i) => (i === 1 ? 'translateX(20px)' : '')));
+  h.doc.fire('mouseup', { clientX: 120 });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(edits, [[{ kind: 'shift', delta: 2 }, [4]]], 'only the second key moved');
+  assert.equal(h.commands().length, 0);
+});
+
+test('the selection box appears over keys on two rows and a skew drag commits ONE warp; Alt + dragging a selected key skews like the bottom edge', async () => {
+  const h = await harness(twoRows());
+  placeKeys(h);
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.root.NemoNativeMotionKeyBox = KeyBox;
+  h.ports.editSelectedKeys = (a, o) => { edits.push([a, o]); return Promise.resolve(true); };
+  h.keyNodes()[0].fire('mousedown', { button: 0 });
+  h.doc.fire('mouseup', {});
+  assert.equal(boxes(h).length, 0, 'one key is no box');
+  h.keyNodes().find((n) => n.dataset.keyTrack.includes('position')).fire('mousedown', { button: 0, ctrlKey: true });
+  assert.equal(boxes(h).length, 1, 'keys on two property rows earn the box');
+  const box = boxes(h)[0];
+  assert.deepEqual(box.children.map((c) => c.className.replace('motion-keysel-', '')), ['fill', 'edge motion-keysel-edge-top', 'edge motion-keysel-edge-bottom', 'edge motion-keysel-edge-left', 'edge motion-keysel-edge-right']);
+  box.children[1].fire('mousedown', { clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 140 });
+  assert.deepEqual(edits, [], 'nothing is written while dragging');
+  h.doc.fire('mouseup', { clientX: 140 });
+  assert.deepEqual(edits.map((e) => e[0]), [{ kind: 'warp', mode: 'top', total: 4 }]);
+  const at = { contextId: 'scene-root', layerUid: 'alpha' };
+  assert.deepEqual([{ target: at, property: 'position' }, { target: at, property: 'opacity' }].sort(edits[0][1].order).map((t) => t.property), ['opacity', 'position'], 'rows are top to bottom as drawn');
+  assert.equal(h.commands().length, 0, 'the gesture reaches the key route, never a layer range write');
+  // Alt + dragging an already selected key: the bottom edge's skew.
+  edits.length = 0;
+  h.keyNodes().find((n) => n.dataset.selected === 'true').fire('mousedown', { button: 0, altKey: true, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 120, metaKey: true });
+  h.doc.fire('mouseup', { clientX: 120 });
+  assert.deepEqual(edits.map((e) => e[0]), [{ kind: 'warp', mode: 'bottom', total: 2 }]);
+  // Back to one selected key: the box goes.
+  h.keyNodes()[1].fire('mousedown', { button: 0 });
+  h.doc.fire('mouseup', {});
+  assert.equal(boxes(h).length, 0);
+  delete Node.prototype.getBoundingClientRect;
+});
+
+test('dragging the grabbed key snaps to the work area with a guide line and commits the snapped shift; Cmd/Ctrl drags free', async () => {
+  const h = await harness({ propertyKeys: [3, 6] });
+  placeKeys(h);
+  const wrap = h.doc.createElement('div'); h.doc.body.appendChild(wrap);
+  h.doc.getElementById = (id) => (id === 'fg-wrap' ? wrap : wrap.children.find((c) => c.id === id) || null);
+  h.root.state.waOut = 11;
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.root.NemoNativeMotionKeyBox = KeyBox;
+  h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 170 }); // 7 frames: 3 -> 10, one frame from the work area end at 11
+  assert.equal(wrap.children[0].id, 'motion-snap-guide');
+  assert.equal(wrap.children[0].dataset.label, 'Fin zone · 12');
+  assert.equal(wrap.children[0].style.left, '115px');
+  h.doc.fire('mouseup', { clientX: 170 });
+  assert.deepEqual(edits, [{ kind: 'shift', delta: 8 }]);
+  assert.equal(wrap.children.length, 0, 'the guide is gone after the drop');
+  h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 170, metaKey: true });
+  h.doc.fire('mouseup', { clientX: 170, metaKey: true });
+  assert.deepEqual(edits.pop(), { kind: 'shift', delta: 7 }, 'Cmd disables the snap');
+  delete Node.prototype.getBoundingClientRect;
+});
+
+test('#2377 a Time Remap key is a snap candidate for a key drag, as the baseline addTrack(ld.timeRemap)', async () => {
+  const h = await harness({ propertyKeys: [3, 6] });
+  placeKeys(h);
+  const wrap = h.doc.createElement('div'); h.doc.body.appendChild(wrap);
+  h.doc.getElementById = (id) => (id === 'fg-wrap' ? wrap : wrap.children.find((c) => c.id === id) || null);
+  h.root.state.waOut = 39;
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture; h.root.NemoNativeMotionKeyBox = KeyBox;
+  h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  h.root.NemoNativeTimeRemapKeys = require('../src/js/adapters/native-time-remap-keys.js');
+  h.root.SM = { timeRemapKeyFacts: (li) => (li === 1 ? { keyCount: 1, keyAtFrame: false, value: 0, keys: [{ frame: 10, value: 0 }] } : null) };
+  Range.refreshKeys(h.root);
+  h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 160 }); // 6 frames: 3 -> 9, one frame from the remap key at 10
+  assert.equal(wrap.children[0].dataset.label, 'Clé · 11');
+  h.doc.fire('mouseup', { clientX: 160 });
+  assert.deepEqual(edits, [{ kind: 'shift', delta: 7 }]);
+  h.root.SM = {}; Range.refreshKeys(h.root);
+  h.keyNodes()[0].fire('mousedown', { button: 0, clientX: 100 });
+  h.doc.fire('mousemove', { clientX: 160 });
+  h.doc.fire('mouseup', { clientX: 160 });
+  assert.deepEqual(edits.pop(), { kind: 'shift', delta: 6 }, 'without the remap lane nothing is near');
+  delete Node.prototype.getBoundingClientRect;
+});
+
+test('the key menu lists the colour palette and the per-key lock rows, and reaches the key route with one edit each', async () => {
+  const h = await harness({ propertyKeys: [2, 7, 10] });
+  const edits = []; h.root.NemoNativeMotionKeyGesture = KeyGesture;
+  h.ports.editSelectedKeys = (a) => { edits.push(a); return Promise.resolve(true); };
+  h.keyNodes()[0].fire('mousedown', { button: 0 }); h.keyNodes()[1].fire('mousedown', { button: 0, ctrlKey: true });
+  h.keyNodes()[1].fire('contextmenu', { clientX: 40, clientY: 50, button: 2 });
+  const menu = h.root.menus.pop();
+  assert.ok(menu.items.some((i) => i.label === 'Lock keyframes on:' && i.disabled));
+  menu.items.find((i) => i.label === '   • the out point').action();
+  assert.deepEqual(edits, [{ kind: 'lockTo', mode: 'out' }]);
+  menu.items.find((i) => i.label === 'Color the keys…').action();
+  const palette = h.root.menus.pop();
+  assert.deepEqual([palette.x, palette.y], [48, 58], 'the palette opens beside the click');
+  palette.items.find((i) => i.label === 'Pink').action();
+  assert.deepEqual(edits.pop(), { kind: 'color', color: '#ff6b8b' });
+  palette.items.find((i) => i.label === 'Remove the color').action();
+  assert.deepEqual(edits.pop(), { kind: 'color', color: null });
 });

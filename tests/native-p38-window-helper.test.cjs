@@ -354,36 +354,45 @@ for(const mode of ['positive','EOF','malformed','foreign','refused','oversized',
   }
 });
 
-test('press helper cleanup refuses a live process group after helper exit',async()=>{
+for(const stalled of [false,true])test('press helper cleanup refuses a live process group after helper exit'+(stalled?' (event loop stalled past any fixed worker lifetime)':''),async()=>{
   // Disposable Node processes only. This models the Swift sampler outliving its supervisor.
+  // The modeled sampler descendant stays alive until this test kills it: no assertion depends
+  // on a wall-clock lifetime, so a loaded host cannot let it exit before the group is probed.
   const {createWindowTransport,cleanupHelper,safeDirectory}=require('./desktop/p38-installed-driver.cjs');
   const {once}=require('node:events'),crypto=require('node:crypto'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'p38-v2-worker-group-')),
     helpers=new Set(),workerPidFile=path.join(dir,'worker.pid');
+  let workerPid=0;
   try{
     const fixtures=['A','B'].map(label=>{const file=path.join(dir,label+'.json');fs.writeFileSync(file,'{}');
       return{label,path:file,sha256:crypto.createHash('sha256').update('{}').digest('hex')};});
     const script=path.join(dir,'modeled-helper');
     fs.writeFileSync(script,'#!/usr/bin/env node\nconsole.log(JSON.stringify({status:"pinned",pid:123,windowId:45,matchedAX:true}));\n'+
       'require("node:readline").createInterface({input:process.stdin}).on("line",()=>{'+
-      'const worker=require("node:child_process").spawn(process.execPath,["-e","setTimeout(()=>process.exit(0),1500)"],{stdio:"ignore"});'+
-      'require("node:fs").writeFileSync('+JSON.stringify(workerPidFile)+',String(worker.pid));setTimeout(()=>process.exit(0),30);});\n',{mode:0o700});
+      // Safety bound only (2 min) so an orphaned worker can never outlive a crashed test run.
+      'const worker=require("node:child_process").spawn(process.execPath,["-e","setTimeout(()=>process.exit(0),120000)"],{stdio:"ignore"});'+
+      'require("node:fs").writeFileSync('+JSON.stringify(workerPidFile)+',String(worker.pid));process.exit(0);});\n',{mode:0o700});
+    // Generous helper reply bound (the maximum): a cold node start under load must not look like a dead helper.
     const guard=safeDirectory(dir,['reports']),window=createWindowTransport({windowHelper:script,grant:{id:'worker-group-model'},fixtures},
-      guard.directory,()=>guard,helpers,1000);
+      guard.directory,()=>guard,helpers,10000);
     assert.equal((await window('discover',123)).windowId,45);
     const helper=[...helpers][0],closed=once(helper,'close');
     assert.equal(helper.p38GroupMayContainDescendants,false);
     await assert.rejects(window('press',123,45,{element:'2'}),error=>error.code==='helper-input-ended');
     await closed;
+    workerPid=Number(fs.readFileSync(workerPidFile,'utf8'));
+    assert.ok(Number.isSafeInteger(workerPid)&&workerPid>0);
+    // Simulate a starved host: the whole test process stalls longer than the old fixed 1.5 s worker lifetime.
+    if(stalled)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,1800);
     assert.equal(helper.p38GroupMayContainDescendants,true);
     assert.equal(helpers.has(helper),true,'helper remains tracked while its sampler descendant occupies the group');
-    const workerPid=Number(fs.readFileSync(workerPidFile,'utf8'));
-    assert.ok(Number.isSafeInteger(workerPid)&&workerPid>0);
     assert.doesNotThrow(()=>process.kill(-helper.pid,0),'the modeled sampler descendant must still occupy the helper group');
     await assert.rejects(cleanupHelper(helper,{delay:async()=>{}}),error=>error.code==='helper-cleanup-failed'&&
       error.cleanupDiagnostics?.[0]?.stage==='group-remains'&&
       error.cleanupDiagnostics[0].signalAttempts===0);
     assert.equal(helpers.size,1,'the caller owns set removal after cleanup');
   }finally{
+    // Reap the modeled descendant first, then require the real cleanup to observe an empty group.
+    if(workerPid>0)try{process.kill(workerPid,'SIGKILL');}catch(e){if(e.code!=='ESRCH')throw e;}
     for(const child of [...helpers])await cleanupHelper(child).catch(()=>{});
     fs.rmSync(dir,{recursive:true,force:true});
   }

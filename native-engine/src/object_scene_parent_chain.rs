@@ -3,19 +3,14 @@
 use crate::evaluation::motion_parent_chain::{
     motion_mat_from_values, ChainEntry, MotionMat, CHAIN_NODE_LIMIT,
 };
-use crate::evaluation::object_vector_kernels::render_vector_eval::{
-    evaluate_vector_rest, is_vector_record, record_layer_has_active_path_fx,
-};
 use crate::object_frame_packet::text::{ObjectLayer, Presence, PropertyHolderTarget};
 use crate::object_frame_packet::ObjectFramePacket;
 use crate::object_render_scene::object_scene_producer_text::TextSceneItem;
-use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use std::collections::{BTreeMap, BTreeSet};
 use vello::kurbo::{Rect, Shape};
 
 #[path = "object_scene_parent_curve.rs"]
-mod curve;
-use curve::curve_path;
+pub(crate) mod curve;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ChainUnavailable {
@@ -80,25 +75,20 @@ impl PoseSample {
         )
     }
 }
+/// #2257: blend, matte and effect properties of a layer are composition inputs the layered compositor applies to the
+/// layer's painted result (`SceneEffectPlan`); they do not move a pixel of the layer's own geometry, so they no longer
+/// make the layer's transform chain unavailable. A widget, a legacy group or a legacy folder id still do.
 fn safe_layer(layer: &ObjectLayer) -> bool {
     layer.widget.value().is_none()
         && layer.groups.value().is_none()
-        && layer.rig.value().is_none()
         && !layer.folder_id.value().is_some_and(|v| v.is_some())
-        && !layer.blend_mode().is_some_and(|v| v != "normal")
-        && !layer.matte_mode().is_some_and(|v| v != "none")
-        && layer.matte_source_layer_uid.value().is_none()
-        && !layer.mattes_more.value().is_some_and(|v| !v.is_empty())
-        && layer.is_effect_layer.value() != Some(&true)
-        && !layer.effects.value().is_some_and(|v| !v.is_empty())
-        && layer.effects_from.value().is_none()
 }
 fn sample(packet: &ObjectFramePacket, layer: usize) -> Result<PoseSample, ChainUnavailable> {
     let source = packet
         .source_layers()
         .get(layer)
         .ok_or(ChainUnavailable::MissingLayer)?;
-    if !safe_layer(source) {
+    if !safe_layer(source) || !crate::object_render_scene::rig_packet_pose::rig_leaves_pivot_alone(packet, layer, source) {
         return Err(ChainUnavailable::LayerContext);
     }
     let target = PropertyHolderTarget {
@@ -158,6 +148,8 @@ pub(crate) struct SceneParentChains {
     samples: BTreeMap<usize, PoseSample>,
     needed: BTreeSet<usize>,
     bounds: BTreeMap<usize, Rect>,
+    // #2372 the Text/raster/video part of `bounds`, so a vector preview can re-join it with its edited geometry.
+    media: BTreeMap<usize, Rect>,
 }
 impl SceneParentChains {
     pub(crate) fn new(packet: &ObjectFramePacket) -> Result<Self, ChainFailure> {
@@ -168,6 +160,7 @@ impl SceneParentChains {
             samples: BTreeMap::new(),
             needed: BTreeSet::new(),
             bounds: BTreeMap::new(),
+            media: BTreeMap::new(),
         };
         for (layer, source) in packet
             .text_records()
@@ -245,12 +238,16 @@ impl SceneParentChains {
                     if !in_context && !identity_v1 {
                         return Err(ChainUnavailable::Context);
                     }
-                    if pose.mat(index == start).is_some() {
+                    // A 3D consumer layer is placed by its 3D projection around the union bounds of its content, and ignores
+                    // its own parents (baseline `is3D`: `motionMat = null; parentChain = []`).
+                    let three_d_start = index == start && layer.three_d.value() == Some(&true);
+                    if pose.mat(index == start).is_some() || three_d_start {
                         result.needed.insert(index);
                     }
                     result.samples.insert(index, pose);
                     walk.push(index);
                     next = match parent_uid {
+                        _ if three_d_start => None,
                         None => None,
                         Some(uid) => Some(
                             packet
@@ -283,7 +280,7 @@ impl SceneParentChains {
                     .ok_or_else(|| result.failure(layer, ChainUnavailable::MissingGeometry))?;
                 let rect = Rect::new(0.0, 0.0, f64::from(w), f64::from(h));
                 result
-                    .add(layer, rect)
+                    .add_media(layer, rect)
                     .map_err(|kind| result.failure(layer, kind))?;
             }
         }
@@ -335,43 +332,7 @@ impl SceneParentChains {
             .collect();
         for (source, layer, record) in records {
             let admitted = (|| -> Result<(), ChainUnavailable> {
-                let path = if is_vector_record(&record) {
-                    let evaluated =
-                        evaluate_vector_rest(self.packet.snapshot(), source, self.packet.frame())
-                            .map_err(|_| ChainUnavailable::VectorGeometry)?;
-                    curve_path(
-                        &evaluated
-                            .segments
-                            .iter()
-                            .map(|s| (s.point, s.handle_in, s.handle_out))
-                            .collect::<Vec<_>>(),
-                        evaluated.closed,
-                    )?
-                } else {
-                    if record_layer_has_active_path_fx(&self.packet, &record) {
-                        return Err(ChainUnavailable::VectorGeometry);
-                    }
-                    let pair=|p:&crate::object_frame_packet::text::ObjectPoint| -> Result<[f64;2],ChainUnavailable> {
-                    Ok([p.x.as_f64().filter(|v|v.is_finite()).ok_or(ChainUnavailable::VectorGeometry)?,
-                        p.y.as_f64().filter(|v|v.is_finite()).ok_or(ChainUnavailable::VectorGeometry)?])
-                };
-                    let segments = record
-                        .geometry
-                        .segments
-                        .iter()
-                        .map(|s| {
-                            Ok(CubicSegment {
-                                point: pair(&s.point)?,
-                                handle_in: pair(&s.handle_in)?,
-                                handle_out: pair(&s.handle_out)?,
-                            })
-                        })
-                        .collect::<Result<Vec<_>, ChainUnavailable>>()?;
-                    ClosedCubicPath::new(segments)
-                        .map_err(|_| ChainUnavailable::VectorGeometry)?
-                        .path()
-                        .clone()
-                };
+                let path = self.record_path(source, &record)?;
                 self.add(layer, path.bounding_box())?;
                 Ok(())
             })();
@@ -428,7 +389,7 @@ impl SceneParentChains {
                 for (x, y) in points {
                     rect = rect.union(Rect::new(x, y, x, y));
                 }
-                self.add(layer, rect)?;
+                self.add_media(layer, rect)?;
                 Ok(())
             })();
             admitted.map_err(|kind| (layer, kind))?;
@@ -444,17 +405,20 @@ impl SceneParentChains {
     ) -> Result<(), ChainUnavailable> {
         if self.needs_bounds(layer) {
             for (path, _) in item.painted() {
-                self.add(layer, path.contour.path().bounding_box())?;
+                self.add_media(layer, path.contour.path().bounding_box())?;
             }
         }
         Ok(())
     }
-    pub(crate) fn chain(&self, layer: usize) -> Result<Vec<ChainEntry>, ChainUnavailable> {
+    /// `own`, when given, replaces the consumer layer's own pivot geometry (a vector preview, #2372).
+    pub(crate) fn chain_with(&self, layer: usize, own: Option<Rect>) -> Result<Vec<ChainEntry>, ChainUnavailable> {
         let mut chain = Vec::new();
-        for &index in self
-            .walks
-            .get(&layer)
-            .ok_or(ChainUnavailable::MissingLayer)?
+        let walk = self.walks.get(&layer).ok_or(ChainUnavailable::MissingLayer)?;
+        // A 3D consumer is placed by `place_image` / the 3D vector batch, never by a 2D chain.
+        if self.packet.source_layers().get(layer).is_some_and(|l| l.three_d.value() == Some(&true)) {
+            return Ok(chain);
+        }
+        for &index in walk
         {
             if let Some(mat) = self.samples[&index].mat(index == layer) {
                 let canvas = self
@@ -468,9 +432,9 @@ impl SceneParentChains {
                 {
                     Some(base) => base,
                     None => {
-                        let rect = self
-                            .bounds
-                            .get(&index)
+                        let rect = own
+                            .filter(|_| index == layer)
+                            .or_else(|| self.bounds.get(&index).copied())
                             .ok_or(ChainUnavailable::MissingGeometry)?;
                         [rect.center().x, rect.center().y]
                     }

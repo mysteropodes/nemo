@@ -36,14 +36,14 @@ fn project(drawing: Value) -> Value {
         "assets":[{"id":"ink","name":"Authored ink","kind":"image","source":{"kind":"embedded",
             "mediaType":"image/png","encoding":"base64","data":png()}}],"assetInventory":{"assetIds":["ink"],"placements":[]}})
 }
-fn owner(drawing: Value) -> NativeObjectHistory {
+pub(super) fn owner(drawing: Value) -> NativeObjectHistory {
     NativeObjectHistory::from_project_file(
         "native-normal-brush",
         project(drawing).to_string().as_bytes(),
     )
     .unwrap()
 }
-fn selector(pin: &ObjectSnapshot) -> ObjectFrameSelector<'_> {
+pub(super) fn selector(pin: &ObjectSnapshot) -> ObjectFrameSelector<'_> {
     ObjectFrameSelector {
         instance_id: pin.instance_id(),
         document_id: pin.document_id(),
@@ -54,12 +54,12 @@ fn selector(pin: &ObjectSnapshot) -> ObjectFrameSelector<'_> {
         frame: 0,
     }
 }
-fn runtime() -> BrushRuntime {
+pub(super) fn runtime() -> BrushRuntime {
     BrushRuntime::for_controls(BrushBitmapStore::with_budget(
         ImageResourceBudget::isolated(32 << 20).unwrap(),
     ))
 }
-fn scene(
+pub(super) fn scene(
     pin: &ObjectSnapshot,
     runtime: &mut BrushRuntime,
     previous: Option<&BrushSources>,
@@ -478,3 +478,4 @@ fn real_duplicator_on_another_layer_keeps_brush_ink_but_same_layer_copies_refuse
         );
     }
 }
+

@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {verifyEvidence,runEvidenceFile,plan}=require('./desktop/play-publication-oracle.cjs');
-const {encodeRGBA,canvas,fillRect}=require('./fixtures/lib/png.cjs');
+const {encodeRGBA,canvas,fillRect,crc32}=require('./fixtures/lib/png.cjs');
 const crypto=require('node:crypto');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 const RUN='da5f47f9-5681-4e71-a0b6-aa7578b6b5fa',CUT='3d755db1-cdf7-44f8-8706-cc812e1845ca';
@@ -233,5 +233,27 @@ test('foreign revision rollback cannot share a pending intent; valid unlinked ro
     e.events.splice(index,0,{event:'rollback',instanceId:RUN,documentId:'native-document-1',contentRevision:foreign?1:0,intent:3,frame:0,currentFrame:0});
     const result=verifyEvidence(refresh(e));assert.equal(result.status,'partial');
     assert.equal(result.code,foreign?'rollback-context':'false-publication');
+  }
+});
+
+test('original Display P3 PNGs are measured in sRGB; wrong colors and metadata still fail',()=>{
+  // Independent ColorSync reference encodings; no installed evidence or image
+  // conversion is used to manufacture these synthetic full-oracle controls.
+  for(const mode of ['valid','wrong-pixels','wrong-profile','out-of-gamut','bad-hash']){
+    const e=model();
+    for(const [i,color] of [[0,[247,206,205]],[1,[239,135,132]],[2,[235,72,63]]]){
+      const v=e.visuals[i],im=canvas(320,180);
+      const rgb=mode==='wrong-pixels' ? [120,120,120] : mode==='out-of-gamut' ? [255,0,0] : color;
+      fillRect(im,20+v.positionX,60,20,20,[...rgb,255]);
+      const raw=encodeRGBA(320,180,im.rgba),tag=Buffer.from([0,0,0,4,99,73,67,80,12,13,0,1,0,0,0,0]);
+      if(mode==='wrong-profile')tag[8]=1;
+      tag.writeUInt32BE(crc32(tag.subarray(4,12)),12);
+      v.png=Buffer.concat([raw.subarray(0,33),tag,raw.subarray(33)]);
+      if(mode!=='bad-hash')v.sha256=hash(v.png);
+    }
+    const originals=e.visuals.map(v=>Buffer.from(v.png)),result=verifyEvidence(e);
+    assert.equal(result.status,mode==='valid'?'consistent':'partial',mode);
+    if(['wrong-pixels','wrong-profile','out-of-gamut'].includes(mode))assert.equal(result.code,'visual-pixels');
+    e.visuals.forEach((v,i)=>assert.deepEqual(v.png,originals[i]));
   }
 });

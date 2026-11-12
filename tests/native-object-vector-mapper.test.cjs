@@ -146,7 +146,7 @@ test('literal records: a pressure ribbon has no real stroke and carries the cent
   }
   assert.deepEqual(map('vb-no-center-no-profile').record.vectorExt, { pressure: {} }, 'a ribbon without centreline or profile is still a vector brush');
   assert.deepEqual(map('vb-empty-arrays-zero-base').record.vectorExt, { pressure: { centerSegments: [], widthProfile: [] } }, 'empty arrays are kept; strokeProfile "" and profileBase 0 are dropped');
-  assert.deepEqual(map('vb-fill-shape').unmapped, ['isFillShape'], 'the fill-shape flag has no record slot and is reported');
+  assert.deepEqual(map('vb-fill-shape').unmapped, ['isFillShape'], 'importing drops the fill-shape flag as the baseline reload does (desP never restores it) and reports it');
   // pressure-looking members on a plain stroke are dropped by the baseline and are not a ribbon
   const plain = map('non-vb-with-pressure-fields');
   assert.equal('vectorExt' in plain.record, false);
@@ -209,12 +209,14 @@ test('members the record cannot carry without changing the look refuse; the rest
     assert.equal(result.ok, false, key); assert.equal(result.code, 'unavailable', key); assert.deepEqual(result.members, [key], key);
   }
   assert.equal(Stroke.toRecord(Object.assign({}, base, { effects: [], fillGradient: null, isMask: false }), WHERE).ok, true, 'empty, null and false members are the baseline absent');
-  const kept = Stroke.toRecord(Object.assign({}, base, { fillSeed: [1, 2], fillGapPx: 0, groupId: 'g_9', tweenOn: true, ownerId: 'u1', xformAnchorKey: 'tl' }), WHERE);
+  const kept = Stroke.toRecord(Object.assign({}, base, { fillSeed: [1, 2], fillGapPx: 0, groupId: 'g_9', tweenOn: true, ownerId: 'u1', xformAnchorKey: 'tl', xformAnchorCustom: [12.5, -3] }), WHERE);
   assert.equal(kept.ok, true);
   assert.deepEqual(kept.record.vectorExt.fillTrace, { seed: [1, 2], gapPx: 0 }, 'zero is persisted as a value');
   assert.deepEqual(Stroke.toDict(kept.record).fillSeed, [1, 2]);
   assert.equal(Stroke.toDict(kept.record).fillGapPx, 0);
-  assert.deepEqual(kept.unmapped, ['groupId', 'tweenOn', 'ownerId', 'xformAnchorKey'], 'only fields without native storage stay explicitly unmapped');
+  assert.deepEqual(kept.unmapped, ['groupId', 'tweenOn', 'ownerId'], 'only fields without native storage stay explicitly unmapped');
+  assert.deepEqual([kept.record.vectorExt.xformAnchorKey, kept.record.vectorExt.xformAnchorCustom], ['tl', [12.5, -3]], 'the Select pivot is stored (serP xformAnchorKey / xformAnchorCustom)');
+  assert.deepEqual([Stroke.toDict(kept.record).xformAnchorKey, Stroke.toDict(kept.record).xformAnchorCustom], ['tl', [12.5, -3]]);
   assert.equal(Stroke.toRecord(cases.get('stroke-id-kept').in, WHERE).authoredStrokeId, 'st_01');
   assert.deepEqual(Stroke.toRecord(cases.get('stroke-id-kept').in, WHERE).unmapped, ['groupId']);
   assert.equal(Stroke.toRecord(base, WHERE).authoredStrokeId, null);

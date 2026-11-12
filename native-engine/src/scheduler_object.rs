@@ -40,12 +40,19 @@ impl ObjectSchedulePins {
                 "object pins do not match the retained owner revision",
             ));
         }
-        if self.scope != ObjectScheduleScope::Authored || self.context_id != "scene-root" {
+        if self.scope != ObjectScheduleScope::Authored {
             return Err(ScheduleError::InvalidKey(
-                "object scheduling requires authored scene-root scope",
+                "object scheduling requires authored scope",
             ));
         }
-        if self.frame >= snapshot.document().total_frames() {
+        // #2256: scene-root or a component the snapshot declares (an entered component is presented by the viewport);
+        // the frame is bounded by that context's own frame count. Any other id is not a context.
+        let Some(frames) = snapshot.declared_context_frames(&self.context_id) else {
+            return Err(ScheduleError::InvalidKey(
+                "object scheduling requires a declared context",
+            ));
+        };
+        if self.frame >= frames {
             return Err(ScheduleError::InvalidKey(
                 "object frame is outside the retained document range",
             ));

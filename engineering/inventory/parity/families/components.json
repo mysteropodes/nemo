@@ -1,0 +1,119 @@
+{
+  "schema": "nemo.parity-family/1",
+  "family": "components",
+  "lane": "#2110 (L04) with #2214 (L04-I component document); I16a via #2193 (L07-H)",
+  "tasks": [
+    "D33",
+    "I14",
+    "I15",
+    "I16a"
+  ],
+  "taskReasoning": {
+    "I14": "declared by #2110/#2214/#2174; records, document codec and history are the checks comp-records, comp-document",
+    "I15": "declared by #2110/#2120; playback and evaluate checks",
+    "D33": "declared by #2110/#2120; time-remap and held-frame rows in playback and evaluate checks",
+    "I16a": "declared by #2193 (component evaluated shapes through the scene contract); comp-evaluate and comp-pixels exercise it. D29/I17/I20/U23 excluded: they are JS consumer exit and import/tab adapters (#2256, #2258, #2233), not covered by native tests"
+  },
+  "checks": [
+    {
+      "id": "comp-records",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_component_records::",
+      "covers": [
+        "positive",
+        "oracle",
+        "save-reopen"
+      ],
+      "source": "native-engine/tests/object_component_records.rs"
+    },
+    {
+      "id": "comp-document",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_component_document::",
+      "covers": [
+        "positive",
+        "oracle",
+        "undo-redo",
+        "save-reopen"
+      ],
+      "source": "native-engine/tests/object_component_document*.rs"
+    },
+    {
+      "id": "comp-playback",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_component_playback::",
+      "covers": [
+        "positive",
+        "oracle"
+      ],
+      "source": "native-engine/tests/object_component_playback.rs"
+    },
+    {
+      "id": "comp-evaluate",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_component_evaluate::",
+      "covers": [
+        "positive",
+        "oracle"
+      ],
+      "source": "native-engine/tests/object_component_evaluate*.rs"
+    },
+    {
+      "id": "comp-exposed",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_component_exposed",
+      "covers": [
+        "positive",
+        "oracle"
+      ],
+      "source": "native-engine/tests/object_component_exposed*.rs"
+    },
+    {
+      "id": "comp-convert",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_component_convert::",
+      "covers": [
+        "positive",
+        "oracle"
+      ],
+      "source": "native-engine/tests/object_component_convert*.rs"
+    },
+    {
+      "id": "comp-convert-history",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_component_convert_history::",
+      "covers": [
+        "positive",
+        "undo-redo"
+      ],
+      "source": "native-engine/tests/object_component_convert_history.rs"
+    },
+    {
+      "id": "comp-pixels",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_render_scene::component_tests::pixels::",
+      "covers": [
+        "positive",
+        "save-reopen",
+        "pixels"
+      ],
+      "source": "native-engine/tests/object_component_render_scene.rs (actual Metal)"
+    }
+  ]
+}

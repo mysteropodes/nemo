@@ -203,6 +203,7 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 #history-pop .hist-header{display:flex;align-items:center;justify-content:space-between;padding:2px 4px 8px;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.03em;}
 #history-pop .hist-clear{cursor:pointer;color:var(--text-dim);}
 #history-pop .hist-clear:hover{color:var(--text);}
+#history-pop .hist-clear.disabled,#history-pop .hist-clear.disabled:hover{opacity:.4;cursor:default;color:var(--text-dim);}
 .project-tab{flex:none;display:flex;align-items:center;gap:9px;height:100%;padding:0;background:transparent;border-radius:0;font-size:12.5px;font-weight:500;color:rgba(236,234,231,.35);cursor:pointer;max-width:180px;user-select:none;}
 .project-tab:hover{color:rgba(236,234,231,.7);}
 .project-tab.act{background:transparent;color:var(--text);font-weight:600;}
@@ -613,6 +614,10 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
    is measured from the padding box, so "right 8px" reliably keeps the
    chevron clear of the border-radius regardless of box width. */
 .psel{background-color:var(--panel3);border:none;color:var(--text);border-radius:6px;padding:5px 24px 5px 8px;font-size:12px;outline:none;flex:1;appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(236,234,231,.45)' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;}
+/* #2267: the Text popover is 230px wide; a long font name (an imported document font) must be clipped with an ellipsis inside it, not widen the select past the popover (baseline popover select stayed in its flex row). */
+#text-popover .pr{min-width:0;}
+#text-popover select,#text-popover input[type=number]{min-width:0;max-width:100%;text-overflow:ellipsis;}
+#text-popover #text-font{width:0;min-width:0;max-width:100%;flex:1 1 0;overflow:hidden;white-space:nowrap;}
 /* Blend-mode custom dropdown list (hover = live canvas preview, see
    initBlendDropdown in timeline.js) */
 #blend-pop,#matte-pop{display:none;position:fixed;z-index:300;width:180px;max-height:340px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px;}
@@ -1028,6 +1033,9 @@ body.mode-motion #btn-tween-curves{display:none;}
 .motion-stopwatch{color:var(--text-dark);cursor:pointer;}
 .motion-stopwatch:hover{background:var(--panel3);color:var(--text);}
 .motion-stopwatch.on{color:var(--accent);}
+.motion-stopwatch.disabled{opacity:.4;cursor:default;}
+.motion-stopwatch.disabled:hover{background:transparent;color:var(--text-dark);}
+.motion-stopwatch.on.disabled:hover{color:var(--accent);}
 /* ƒx expression toggle (2026-07) — sits right after the stopwatch, same
    hollow/on visual language: neutral when no expression, accent when one is
    enabled, red when it's enabled but currently throwing (lastError set),
@@ -1070,6 +1078,21 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
    alone wasn't enough (still 24px/clipped when rendered inside this right-
    panel mirror specifically). */
 #motion-props-body .lrow.motion-expr-editor{height:auto;}
+/* Native Motion property panel (adapters/native-motion-property-panel.js): its wrapper elements take no
+   box so the layer-name / Transform header rows and '#motion-props-body .lrow' rules above apply as in baseline. */
+.native-motion-property-panel,.native-motion-property-rows{display:contents;}
+.native-motion-toolbar,.native-motion-status{padding:2px 8px;font-size:10px;color:var(--text-dim);}
+.native-motion-toolbar[hidden],.native-motion-status[hidden]{display:none;}
+.native-motion-property-slot{display:contents;}
+.native-motion-unavailable-groups{flex-wrap:wrap;gap:2px 8px;height:auto;opacity:.55;font-size:10px;}
+/* On-demand authored-keys drawer (baseline expression-editor idiom): an indented row under its property. */
+.motion-keys-slot{display:contents;}
+.motion-keys-drawer[hidden]{display:none;}
+.motion-keys-drawer .native-motion-property-keys{display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:var(--text-dim);}
+.motion-keys-drawer .native-motion-property-keys label{display:flex;align-items:center;gap:5px;cursor:pointer;}
+.motion-keys-drawer [role="toolbar"]{display:flex;flex-wrap:wrap;gap:3px;}
+.native-motion-property-status{font-size:9px;color:var(--danger,#ff6b6b);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.native-motion-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
 .motion-prop-name{display:flex;align-items:center;gap:5px;flex:1;color:var(--text-dim);}
 .motion-prop-name svg{flex-shrink:0;}
 .motion-fields{display:flex;align-items:center;gap:3px;flex-shrink:0;}
@@ -1173,6 +1196,15 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .motion-key-connect.tinted{fill:var(--key-color,#2E6B60);}
 .motion-key-connect.tinted:hover{fill:var(--key-color,#3E8C7E);filter:brightness(1.25);}
 .motion-key-connect.tinted.sel{fill:var(--key-color,#6FD9C4);filter:brightness(1.45);}
+/* Native property rows draw the same spans as divs behind the key buttons (native-motion-key-spans.js): the duration block and the connector bar. */
+.native-key-durblock{background:var(--accent);opacity:.13;pointer-events:none;}
+.native-key-durblock.tinted{background:var(--key-color,var(--accent));}
+.native-key-connect{background:#2E6B60;border-radius:2px;pointer-events:auto;cursor:ew-resize;transition:background .1s linear;}
+.native-key-connect:hover{background:#3E8C7E;}
+.native-key-connect.sel{background:#6FD9C4;}
+.native-key-connect.tinted{background:var(--key-color,#2E6B60);}
+.native-key-connect.tinted:hover{background:var(--key-color,#3E8C7E);filter:brightness(1.25);}
+.native-key-connect.tinted.sel{background:var(--key-color,#6FD9C4);filter:brightness(1.45);}
 /* Alt = retime (first key planted, second one slides). Driven by the SAME
    #frame-grid.timelink-alt class layer-inout.js already toggles for the
    Parent-in-Time dot reveal, mirroring the spec's own .kstage.alt container
@@ -1860,7 +1892,7 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 #statusbar{height:20px;flex-shrink:0;background:transparent;border-top:none;display:flex;align-items:center;justify-content:space-between;padding:0 6px;font-size:10.5px;color:rgba(236,234,231,.4);font-weight:500;}
 #statusbar>span:first-child{display:flex;gap:16px;}
 .sc{background:transparent;color:rgba(236,234,231,.6);font-weight:700;padding:0;border-radius:0;font-family:inherit;font-size:10.5px;margin:0 3px 0 0;}
-#toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel3);color:var(--text);padding:6px 16px;border-radius:6px;font-size:11px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:100;border:1px solid var(--border);}
+#toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel3);color:var(--text);padding:6px 16px;border-radius:6px;font-size:11px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:10000;border:1px solid var(--border);}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 ::-webkit-scrollbar{width:6px;height:6px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
@@ -1876,6 +1908,9 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .sym-tab::before{content:'';width:9px;height:9px;border-radius:50%;background:#3a3942;flex-shrink:0;transition:background .12s;}
 .sym-tab.act{color:var(--text);background:transparent;border-bottom:none;font-weight:600;}
 .sym-tab.act::before{background:var(--green);}
+.sym-tab.unavail{color:var(--red);}
+.sym-tab.unavail::before{background:var(--red);}
+.sym-tab.unavail span:first-child{text-decoration:line-through;text-decoration-color:var(--red);}
 .sym-tab .sym-tab-x{font-size:12px;line-height:1;color:var(--text-dim);}
 .sym-tab .sym-tab-x:hover{color:var(--text);}
 .lico.comp-badge{color:var(--accent);}
@@ -1906,7 +1941,7 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    plain ld.folderId/.lfolder grouping above (which has no transform/effects
    of its own). Drop-target highlight while dragging a layer onto its
    middle band (moveLayerReorder, timeline.js) to reparent it. */
-.lrow.folder-drop-target,#frame-grid .frow.folder-drop-target{outline:2px solid var(--accent);outline-offset:-2px;background:color-mix(in srgb,var(--accent) 14%,transparent);}
+.lrow.folder-drop-target,.native-object-layer.folder-drop-target,#frame-grid .frow.folder-drop-target{outline:2px solid var(--accent);outline-offset:-2px;background:color-mix(in srgb,var(--accent) 14%,transparent);}
 
 /* TOOLTIP */
 #ui-tip{position:fixed;z-index:400;background:var(--panel3);border:1px solid var(--border2);color:var(--text);
@@ -2871,3 +2906,33 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .history-version-row:hover{background:var(--panel3);}
 .history-version-row span{min-width:0;overflow-wrap:anywhere;}
 .history-version-row button{flex:none;font-size:10px;}
+
+/* Native presenter controls (2026-10-26): the buttons and selects the native adapters create without an app
+   class or id render as the app's dark pill on one line (a static control with an id keeps its own styling). `:where()` keeps the rule at zero specificity, so every control
+   that already has its own rule keeps it; only the browser's default white button is replaced. */
+:where(button:not([class]):not([id]), select:not([class]):not([id])){background:var(--panel3);border:none;color:rgba(236,234,231,.75);
+  border-radius:6px;padding:4px 8px;font:inherit;font-size:12px;font-weight:600;line-height:1.3;white-space:nowrap;
+  cursor:pointer;transition:background .15s,color .15s;}
+:where(button:not([class]):not([id]):hover:not(:disabled)){background:#2c2a31;color:var(--text);}
+:where(button:not([class]):not([id])[aria-pressed="true"]){background:var(--accent-dim);color:var(--text);}
+:where(button:not([class]):not([id]):disabled,select:not([class]):not([id]):disabled){opacity:.4;cursor:not-allowed;}
+:where(select:not([class]):not([id])){max-width:100%;text-overflow:ellipsis;}
+:where(button:not([class]):not([id]),select:not([class]):not([id])){margin:2px 0;}
+:where(:not(.native-object-layer)>button:not([class]):not([id])+button:not([class]):not([id])){margin-left:4px;}
+/* Native layer rows stay one line: the layer name truncates instead of wrapping under its Hide/Lock/Shy pills. */
+.native-object-layer{gap:3px;align-items:center;min-width:0;margin:1px 0;}
+.native-object-layer>button{flex:none;}
+.native-object-layer>button:first-of-type{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+/* #2371: display-only decorations of a native layer row (baseline .lico/.lkind/.comp-badge rules apply); the folder indent matches .lrow.in-folder. */
+.native-object-layer.in-folder{padding-left:16px;}
+.native-object-layer>[data-native-layer-decor]{flex:none;}
+/* Badges, panel buttons and shortcut pills never break their label over two rows. */
+.badge,.pbtn,.sc{white-space:nowrap;}
+/* The status-bar help is one line, truncated, never a second row inside the 20px bar. */
+#statusbar>span{white-space:nowrap;}
+#statusbar>span:first-child{min-width:0;overflow:hidden;}
+#statusbar>span:last-child{flex:none;margin-left:12px;}
+#statusbar-help{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+
+/* #2372 UNAVAIL-NOTICES: a control with no native owner on a native object project (adapters/native-inspector-unavailable.js) stays listed but reads as unavailable. */
+[data-native-unavailable="1"] { opacity: .45; cursor: not-allowed; }

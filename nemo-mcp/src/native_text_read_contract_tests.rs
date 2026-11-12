@@ -124,3 +124,37 @@ fn native_positive_metadata_semantics_are_stricter_than_generic_item_number_shap
         assert!(!result("document", &p, &bad), "{field}");
     }
 }
+#[test]
+fn the_animator_view_may_name_a_component_context_and_its_chunk_echoes_it() {
+    let view = |extra: Value| {
+        let mut v = json!({"kind":"animators","layerUid":"inner","frame":0,"offset":0,"limit":1024});
+        for (k, x) in extra.as_object().unwrap() {
+            v[k] = x.clone();
+        }
+        v
+    };
+    assert!(request(&payload(view(json!({})))));
+    assert!(request(&payload(view(json!({"contextId":"comp-a"})))));
+    assert!(!request(&payload(view(json!({"contextId":""})))));
+    assert!(!request(&payload(view(json!({"contextId":3})))));
+    let chunk = |extra: Value| {
+        let mut c = header("animators");
+        c["layerUid"] = json!("inner");
+        c["frame"] = json!(0);
+        c["textBytes"] = json!(2);
+        c["offset"] = json!(0);
+        c["text"] = json!("{}");
+        c["nextOffset"] = Value::Null;
+        for (k, x) in extra.as_object().unwrap() {
+            c[k] = x.clone();
+        }
+        c
+    };
+    let asked = payload(view(json!({"contextId":"comp-a"})));
+    let plain = payload(view(json!({})));
+    assert!(result("document", &asked, &chunk(json!({"contextId":"comp-a"}))));
+    assert!(!result("document", &asked, &chunk(json!({}))), "the chunk must echo the context it was asked for");
+    assert!(!result("document", &asked, &chunk(json!({"contextId":"comp-b"}))));
+    assert!(!result("document", &plain, &chunk(json!({"contextId":"comp-a"}))), "and must not invent one");
+    assert!(result("document", &plain, &chunk(json!({}))));
+}

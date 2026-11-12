@@ -8,13 +8,14 @@
   function create(session,context,ports){
     if(!ports||!ports.reader||typeof ports.reader.readAnimators!=='function'||!ports.command||typeof ports.command.execute!=='function'||typeof ports.samePin!=='function')throw fault('unavailable','Native animator reader and command ports required');
     var reader=ports.reader,command=ports.command,same=ports.samePin,pending=null,busy=false;
-    function current(expected){var c=context(),p=session.info();if(!session.isActive()||!c||!c.layerUid||!same(c.pin,p)||expected&&(!same(expected.pin,p)||expected.layerUid!==c.layerUid||expected.frame!==c.frame||expected.selectionKey!==c.selectionKey))throw fault('stale_revision','Text animator intent is stale');return clone(c);}
-    async function load(){var c=current(),value=await reader.readAnimators(c.layerUid,c.frame,c.pin);current(c);var ids=new Set();value.animators.forEach(function(r){Item.animator(r);if(ids.has(r.id))throw fault("uncorrelated","Duplicate native animator identity");ids.add(r.id);});value.selectors.forEach(function(s){
+    function current(expected){var c=context(),p=session.info();if(!session.isActive()||!c||!c.layerUid||!same(c.pin,p)||expected&&(!same(expected.pin,p)||expected.layerUid!==c.layerUid||expected.contextId!==c.contextId||expected.frame!==c.frame||expected.selectionKey!==c.selectionKey))throw fault('stale_revision','Text animator intent is stale');return clone(c);}
+    async function load(){var c=current(),value=await reader.readAnimators(c.layerUid,c.frame,c.pin,c.contextId);current(c);var ids=new Set();value.animators.forEach(function(r){Item.animator(r);if(ids.has(r.id))throw fault("uncorrelated","Duplicate native animator identity");ids.add(r.id);});value.selectors.forEach(function(s){
       if(!s||typeof s.available!=='boolean'||Object.keys(s).length!==2)throw fault('uncorrelated','Native selector availability invalid');
       if(s.available){if(!Object.prototype.hasOwnProperty.call(s,'value'))throw fault('uncorrelated','Native selector facts invalid');Item.animator({id:'native-view',selector:s.value});}
       else if(typeof s.reason!=='string'||!s.reason.length)throw fault('uncorrelated','Native selector refusal invalid');
     });return {context:c,animators:clone(value.animators),selectors:clone(value.selectors),hasText:value.hasText};}
     async function write(payload,origin){
+      if(origin.contextId&&origin.contextId!=='scene-root')payload=Object.assign({},payload,{contextId:origin.contextId}); // an entered component's layer (#2267)
       if(busy||pending)throw fault('unavailable','Resolve the previous animator command first');current(origin);busy=true;
       try{return await command.execute(Item.ITEM,function(){current(origin);return clone(payload);});}
       catch(e){if(e&&e.code==='item_command_indeterminate')pending=e;throw e;}finally{busy=false;}

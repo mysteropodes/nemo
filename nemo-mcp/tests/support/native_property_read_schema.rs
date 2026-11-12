@@ -17,7 +17,20 @@ pub(super) fn check(valid: impl Fn(&Value) -> bool) {
     let mut context = q.clone();
     context["payload"]["view"]["kind"] = json!("expressionContext");
     assert!(valid(&context));
-    for source in [q, keys, context] {
+    // expressionSource is frameless and takes no paging fields.
+    let mut source_view = q.clone();
+    source_view["payload"]["view"]
+        .as_object_mut()
+        .unwrap()
+        .remove("frame");
+    source_view["payload"]["view"]["kind"] = json!("expressionSource");
+    assert!(valid(&source_view));
+    for key in ["frame", "offset", "limit"] {
+        let mut bad = source_view.clone();
+        bad["payload"]["view"][key] = json!(0);
+        assert!(!valid(&bad), "{key}");
+    }
+    for source in [q, keys, context, source_view] {
         let mut bad = source.clone();
         bad["expectedRevision"] = json!(7);
         assert!(!valid(&bad));

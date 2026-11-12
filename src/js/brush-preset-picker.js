@@ -188,7 +188,11 @@
     return key.split('-').map(function (w) { return w[0].toUpperCase() + w.slice(1); }).join(' - ');
   }
 
+  // The preset the button shows: the draw default, or a selected native item's own preset (timeline.js nativeStyleReadback).
+  // The popover opens on it, so its highlight and the favourites toggle agree with the button.
+  var shownPreset = 'none';
   function paintButton(presetKey) {
+    shownPreset = presetKey || 'none';
     var canvas = document.getElementById('p-brushpreset-preview');
     var label = document.getElementById('p-brushpreset-label');
     if (canvas) drawPreview(canvas, presetKey);
@@ -347,7 +351,7 @@
     if (!btn) return;
     btn.addEventListener('click', function (e) {
       e.preventDefault(); e.stopPropagation();
-      open(btn, state.brushPreset || 'none', selectPreset);
+      open(btn, shownPreset, selectPreset);
     });
     paintButton(state.brushPreset || 'none');
     renderFavoritesRow();

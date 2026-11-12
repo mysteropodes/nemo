@@ -1,6 +1,8 @@
 //! Independent production-router/file/actual-owner persistence and refusal controls.
 use crate::native_object_bootstrap::bootstrap_raw;
-use crate::native_object_bootstrap::reopen::{bootstrap_request, open_regular, MAX_FILE_BYTES};
+use crate::native_object_bootstrap::reopen::{
+    admit_source, bootstrap_request, open_regular, MAX_FILE_BYTES,
+};
 use crate::{
     application_mcp::ApplicationMcp,
     native_application::{admit_release_request, complete_release},
@@ -439,4 +441,51 @@ fn active_and_releasing_owner_refusals_preserve_real_history_and_revision_subscr
         ),
         (1, 1, 0)
     );
+}
+
+// #2269: a recent entry or a recovery generation is never dialog-picked, so the route (which consults only the dynamic
+// scope) refused it as outside the scope. The UI's own project-only request now admits that one file first.
+#[test]
+fn unpicked_project_file_is_admitted_only_for_the_ui_project_open_request() {
+    use tauri::Manager;
+    use tauri_plugin_fs::FsExt;
+    let scratch = Scratch::new();
+    let state = ApplicationMcp::default();
+    let path = scratch.file(document().to_string().as_bytes());
+    let app = tauri::test::mock_builder()
+        .plugin(tauri_plugin_fs::init())
+        .build(tauri::test::mock_context(tauri::test::noop_assets()))
+        .unwrap();
+    let handle = app.handle().clone();
+    let scope = handle.fs_scope();
+    let ask = |extra: Value| {
+        let mut value = request(&state, &path);
+        for (key, member) in extra.as_object().unwrap() {
+            value[key] = member.clone();
+        }
+        value.to_string()
+    };
+    // Not a project-only request, a cancelled one and another instance's request admit nothing.
+    admit_source(&handle, &state, &ask(json!({})));
+    admit_source(&handle, &state, &ask(json!({"projectOnly": true, "cancelledBeforeDispatch": true})));
+    admit_source(&handle, &state, &ask(json!({"projectOnly": true, "instanceId": "other"})));
+    admit_source(&handle, &state, "not json");
+    assert!(!scope.is_allowed(&path));
+    refused(
+        &state,
+        &ask(json!({"projectOnly": true})),
+        |resolved| scope.is_allowed(resolved),
+        "unavailable",
+    );
+    admit_source(&handle, &state, &ask(json!({"projectOnly": true})));
+    // The file is under the system temp dir, one of the static roots.
+    assert!(scope.is_allowed(&path), "the named file is admitted");
+    assert!(!scope.is_allowed(scratch.0.join("sibling.json")));
+    let receipt = bootstrap_request(
+        &state,
+        &ask(json!({"projectOnly": true})),
+        |resolved| scope.is_allowed(resolved),
+    );
+    // Past the scope gate the strict project-only format gate answers (the fixture is a bare object document).
+    assert_eq!(receipt.unwrap_err().code, "unsupported_format");
 }

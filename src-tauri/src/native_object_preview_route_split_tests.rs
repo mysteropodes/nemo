@@ -4,6 +4,8 @@ use crate::application_mcp::revision_sync::{RevisionBinding, RevisionControl};
 use crate::native_application_contract::host_error;
 use crate::native_object_desktop_preview::{admit_request, preview_with_target};
 use serde_json::{json, Value};
+#[path = "native_object_preview_route_property_tests.rs"]
+mod property_tests;
 
 fn expected_split(before: &Value) -> Value {
     let mut expected = before.clone();

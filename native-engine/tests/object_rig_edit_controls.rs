@@ -453,6 +453,7 @@ fn a_plan_refusal_maps_to_a_stable_dispatch_code() {
         (NoLayer, DispatchErrorCode::NotFound),
         (NoRig, DispatchErrorCode::NotFound),
         (NoStroke, DispatchErrorCode::NotFound),
+        (NoMesh, DispatchErrorCode::NotFound),
         (NoBind, DispatchErrorCode::NotFound),
         (NoBone, DispatchErrorCode::NotFound),
         (AmbiguousBind, DispatchErrorCode::InvalidRequest),

@@ -1,0 +1,198 @@
+[
+ {
+  "layerUid": "u6",
+  "row": {
+   "rowClasses": "",
+   "nodes": [
+    {
+     "cls": "larrow lico",
+     "html": "",
+     "text": "▸",
+     "dot": null,
+     "title": "Déplier le dossier"
+    },
+    {
+     "cls": "layer-color-dot lico",
+     "html": "",
+     "text": "",
+     "dot": "#8b8b9e",
+     "title": "layerColorDotTitle"
+    },
+    {
+     "cls": "lkind lkind-folder",
+     "html": "<svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z\"/></svg>",
+     "text": "",
+     "dot": null,
+     "title": "Dossier"
+    }
+   ]
+  }
+ },
+ {
+  "layerUid": "u5",
+  "row": {
+   "rowClasses": "",
+   "nodes": [
+    {
+     "cls": "larrow-spacer lico",
+     "html": "",
+     "text": "",
+     "dot": null,
+     "title": ""
+    },
+    {
+     "cls": "layer-color-dot lico",
+     "html": "",
+     "text": "",
+     "dot": "#8b8b9e",
+     "title": "layerColorDotTitle"
+    },
+    {
+     "cls": "comp-badge lico off",
+     "html": "<span style=\"font-size:9px;line-height:1;font-weight:700\">M▲</span>",
+     "text": "",
+     "dot": null,
+     "title": "Source de matte pour un autre calque"
+    }
+   ]
+  }
+ },
+ {
+  "layerUid": "u4",
+  "row": {
+   "rowClasses": "",
+   "nodes": [
+    {
+     "cls": "larrow-spacer lico",
+     "html": "",
+     "text": "",
+     "dot": null,
+     "title": ""
+    },
+    {
+     "cls": "layer-color-dot lico",
+     "html": "",
+     "text": "",
+     "dot": "#8b8b9e",
+     "title": "layerColorDotTitle"
+    },
+    {
+     "cls": "comp-badge lico",
+     "html": "<span style=\"font-size:9px;line-height:1;font-weight:700\">M</span>",
+     "text": "",
+     "dot": null,
+     "title": "Matte: alpha — clic pour changer"
+    }
+   ]
+  }
+ },
+ {
+  "layerUid": "u3",
+  "row": {
+   "rowClasses": "is-comp",
+   "nodes": [
+    {
+     "cls": "larrow-spacer lico",
+     "html": "",
+     "text": "",
+     "dot": null,
+     "title": ""
+    },
+    {
+     "cls": "layer-color-dot lico",
+     "html": "",
+     "text": "",
+     "dot": "#8b8b9e",
+     "title": "layerColorDotTitle"
+    },
+    {
+     "cls": "lkind lkind-component",
+     "html": "<svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"8\" width=\"11\" height=\"11\" rx=\"2\"/><rect x=\"9\" y=\"3\" width=\"11\" height=\"11\" rx=\"2\"/></svg>",
+     "text": "",
+     "dot": null,
+     "title": "Composant"
+    },
+    {
+     "cls": "comp-badge lico",
+     "html": "<span style=\"font-size:11px;line-height:1;font-weight:700\">C</span>",
+     "text": "",
+     "dot": null,
+     "title": "Component — double-click to edit"
+    }
+   ]
+  }
+ },
+ {
+  "layerUid": "u1",
+  "row": {
+   "rowClasses": "",
+   "nodes": [
+    {
+     "cls": "larrow lico",
+     "html": "",
+     "text": "▾",
+     "dot": null,
+     "title": "Replier le dossier"
+    },
+    {
+     "cls": "layer-color-dot lico",
+     "html": "",
+     "text": "",
+     "dot": "#3366cc",
+     "title": "layerColorDotTitle"
+    },
+    {
+     "cls": "lkind lkind-folder",
+     "html": "<svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H3Z\"/><path d=\"M3 8l1.3 8.3A2 2 0 0 0 6.3 18h11.4a2 2 0 0 0 2-1.7L21 8Z\"/></svg>",
+     "text": "",
+     "dot": null,
+     "title": "Dossier"
+    }
+   ]
+  }
+ },
+ {
+  "layerUid": "u2",
+  "row": {
+   "rowClasses": "in-folder",
+   "nodes": [
+    {
+     "cls": "larrow-spacer lico",
+     "html": "",
+     "text": "",
+     "dot": null,
+     "title": ""
+    },
+    {
+     "cls": "layer-color-dot lico",
+     "html": "",
+     "text": "",
+     "dot": "#33aa33",
+     "title": "layerColorDotTitle"
+    }
+   ]
+  }
+ },
+ {
+  "layerUid": "u0",
+  "row": {
+   "rowClasses": "",
+   "nodes": [
+    {
+     "cls": "larrow-spacer lico",
+     "html": "",
+     "text": "",
+     "dot": null,
+     "title": ""
+    },
+    {
+     "cls": "layer-color-dot lico",
+     "html": "",
+     "text": "",
+     "dot": "#aa3333",
+     "title": "layerColorDotTitle"
+    }
+   ]
+  }
+ }
+]

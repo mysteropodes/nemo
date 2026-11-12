@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-codec => object_codec_tests
 //! N25A frozen record oracle exercised through real native persistence admission.
 use crate::object_codec::{decode_project, encode_project, ObjectCodecErrorKind};
 use serde_json::{json, Value};

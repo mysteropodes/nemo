@@ -15,6 +15,18 @@ mod history;
 mod support;
 #[path = "object_text_scene_svg.rs"]
 mod svg;
+#[path = "object_text_scene_hit_listing.rs"]
+mod hit_listing;
+#[path = "object_text_scene_mixed_subselect.rs"]
+mod mixed_subselect;
+#[path = "object_text_scene_font_refusal.rs"]
+mod font_refusal;
+#[path = "object_text_rotation.rs"]
+mod rotation;
+#[path = "object_text_scene_pivot_listing.rs"]
+mod pivot_listing;
+#[path = "object_text_scene_three_d.rs"]
+mod three_d;
 
 pub(super) fn block() -> Value {
     json!({"text":"A","font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":24,
@@ -71,6 +83,7 @@ pub(super) fn labels(plan: &ObjectPaintPlan) -> Vec<String> {
             PaintEntry::Text(t) => t.item.group_id().to_owned(),
             PaintEntry::Duplicator(_) => panic!("original fixture gained unexpected Duplicator"),
             PaintEntry::Video(_) => panic!("video-free fixture gained unexpected Video"),
+            PaintEntry::Dab(_) => panic!("dab-free fixture gained an unexpected brush-texture dab"),
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             PaintEntry::Brush(_) => panic!("non-brush fixture gained unexpected bitmap brush"),
             PaintEntry::Component(_) => {
@@ -422,7 +435,7 @@ fn text_alpha_never_admits_other_layer_properties_or_enabled_expressions() {
     other["propertyHolders"][0]["properties"]
         .as_array_mut()
         .unwrap()
-        .push(json!({"property":"position","static":[0,0]}));
+        .push(json!({"property":"positionZ","static":[0]}));
     let mut active = base.clone();
     active["propertyHolders"][0]["properties"][0]["expression"] =
         json!({"enabled":true,"code":"50"});
@@ -437,6 +450,15 @@ fn text_alpha_never_admits_other_layer_properties_or_enabled_expressions() {
         );
         assert_eq!(o.history_depths(), (0, 0));
     }
+    // Position, like the rest of the layer pose, is consumed with the Text by the shared vector batch.
+    let mut posed = base.clone();
+    posed["propertyHolders"][0]["properties"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"property":"position","static":[0,0]}));
+    let o = owner(&posed);
+    let snapshot = support::head(&o);
+    assert!(prepare_object_exposure_frame(&snapshot, &selector(&snapshot, 7)).is_ok());
     let mut disabled = base;
     disabled["propertyHolders"][0]["properties"][0]["expression"] =
         json!({"enabled":false,"code":"throw 1"});
@@ -447,3 +469,8 @@ fn text_alpha_never_admits_other_layer_properties_or_enabled_expressions() {
 #[cfg(feature = "font_asset_wire")]
 #[path = "object_text_scene_gpu.rs"]
 mod gpu;
+
+// #2358 GHOST-UNDER: text and raster ghosts of the ghosted layer, composed under the live frame.
+#[cfg(feature = "font_asset_wire")]
+#[path = "object_ghost_items.rs"]
+mod ghost_items;

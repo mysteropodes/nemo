@@ -233,34 +233,18 @@ fn a_widget_layer_adds_no_objects_and_leaves_the_pinned_frame_packet_records_unc
         "create",
         create_payload("joystick", "Joystick 1", [960., 540.]),
     );
-    // The creation declares a layer-level property holder, and L01-H's packet guard (`holders_fully_consumed`,
-    // pinned by `every_other_holder_keeps_the_packet_unavailable`) keeps a packet over ANY unconsumed holder
-    // `Unavailable`, so the pinned-frame packet of the created document is refused rather than compared.
-    {
-        let snapshot = current(&owner);
-        let selector = ObjectFrameSelector {
-            instance_id: snapshot.instance_id(),
-            document_id: snapshot.document_id(),
-            content_revision: snapshot.content_revision(),
-            document_snapshot_id: snapshot.snapshot_id(),
-            context_id: "scene-root",
-            scope_kind: FrameScopeKind::Authored,
-            frame: 7,
-        };
-        assert_eq!(
-            prepare_object_frame(&snapshot, &selector).err(),
-            Some(crate::object_frame_packet::ObjectFrameError::Unavailable)
-        );
-    }
-    // The widget layer itself contributes nothing: the same document without its holder table (the only
-    // thing that gate reads) yields the very same frame records plus exactly one more source layer.
+    // The creation declares a layer-level property holder holding only the widget's controls. A widget layer never
+    // paints and its controls are read by expressions elsewhere, so that holder is consumed: the pinned-frame packet
+    // of the created document is admitted and carries the very same records plus exactly one more source layer.
+    let (layers_after, after) = records(&owner);
+    assert_eq!((layers_after, &after), (layers_before + 1, &before));
+    // The same document without its holder table is not a different frame.
     let mut stripped = wire(&owner);
     stripped
         .as_object_mut()
         .unwrap()
         .remove("propertyHolders")
         .expect("creation declared the holder");
-    let (layers_after, after) = records(&owner_of(&stripped));
-    assert_eq!((layers_after, &after), (layers_before + 1, &before));
+    assert_eq!(records(&owner_of(&stripped)), (layers_after, after));
     assert_eq!(current(&owner).document().objects().len(), objects_before);
 }

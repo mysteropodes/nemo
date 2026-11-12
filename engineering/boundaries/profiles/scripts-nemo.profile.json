@@ -114,6 +114,7 @@
       "dir": "scripts/nemo/lib",
       "files": [
         "capability-drift.cjs",
+        "capability-raw-client.cjs",
         "capability-schema.cjs"
       ],
       "publicApi": [
@@ -278,6 +279,30 @@
       "sizeProfile": "Platform/engine adapter"
     },
     {
+      "id": "nemo.lib.boundariesFreeze",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-freeze.cjs"
+      ],
+      "publicApi": [
+        "boundaries-freeze.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.boundariesSuggest",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-suggest.cjs"
+      ],
+      "publicApi": [
+        "boundaries-suggest.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
       "id": "nemo.lib.receipt",
       "layer": "tooling-application",
       "dir": "scripts/nemo/lib",
@@ -327,6 +352,18 @@
       "sizeProfile": "Domain/application JS or TS"
     },
     {
+      "id": "nemo.lib.parityMatrix",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "parity-matrix.cjs"
+      ],
+      "publicApi": [
+        "parity-matrix.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
       "id": "nemo.lib.inventorySurfaces",
       "layer": "tooling-application",
       "dir": "scripts/nemo/lib",
@@ -349,6 +386,54 @@
         "inventory.cjs"
       ],
       "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.parityMatrix",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "parity-matrix.cjs"
+      ],
+      "publicApi": [
+        "parity-matrix.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.refreshAppPins",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "refresh-app-pins.cjs"
+      ],
+      "publicApi": [
+        "refresh-app-pins.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.scriptManifest",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "script-manifest.cjs"
+      ],
+      "publicApi": [
+        "script-manifest.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.scriptManifest",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "script-manifest.cjs"
+      ],
+      "publicApi": [
+        "script-manifest.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
     },
     {
       "id": "nemo.lib.jobs",
@@ -605,6 +690,18 @@
       "sizeProfile": "Test file"
     },
     {
+      "id": "nemo.test.inventoryCheck",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "inventory-check.test.cjs"
+      ],
+      "publicApi": [
+        "inventory-check.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
       "id": "nemo.test.inventory",
       "layer": "tooling-test",
       "dir": "scripts/nemo",
@@ -613,6 +710,30 @@
       ],
       "publicApi": [
         "inventory.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.parityMatrix",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "parity-matrix.test.cjs"
+      ],
+      "publicApi": [
+        "parity-matrix.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.refreshAppPins",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "refresh-app-pins.test.cjs"
+      ],
+      "publicApi": [
+        "refresh-app-pins.test.cjs"
       ],
       "sizeProfile": "Test file"
     },
@@ -676,6 +797,7 @@
         "boundaries-object-frame-packet.test.cjs",
         "boundaries-object-render-scene.test.cjs",
         "boundaries-native-object-save.test.cjs",
+        "boundaries-native-object-recovery.test.cjs",
         "boundaries-native-object-order.test.cjs",
         "boundaries-object-order-history.test.cjs",
         "boundaries-object-order-evaluation.test.cjs",
@@ -743,6 +865,42 @@
       ],
       "publicApi": [
         "boundaries-discovery.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesFreeze",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-freeze.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-freeze.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesSuggest",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-suggest.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-suggest.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.legacySurfaceIds",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "legacy-surface-ids.test.cjs"
+      ],
+      "publicApi": [
+        "legacy-surface-ids.test.cjs"
       ],
       "sizeProfile": "Test file"
     },
@@ -841,6 +999,54 @@
         "coverage-rust.test.cjs"
       ],
       "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.cli.familyAcceptance",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "family-acceptance.cjs"
+      ],
+      "publicApi": [
+        "family-acceptance.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.cli.legacyWriters",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "legacy-writers.cjs"
+      ],
+      "publicApi": [
+        "legacy-writers.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.test.familyAcceptance",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "family-acceptance.test.cjs"
+      ],
+      "publicApi": [
+        "family-acceptance.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.lib.familyAcceptance",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "family-acceptance.cjs"
+      ],
+      "publicApi": [
+        "family-acceptance.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
     }
   ],
   "layerRules": {

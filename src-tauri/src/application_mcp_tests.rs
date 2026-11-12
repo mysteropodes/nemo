@@ -320,3 +320,138 @@ mod audio_track_public_tests;
 mod layer_playhead_cut_public_tests;
 #[path = "native_project_placement_public_tests.rs"]
 mod project_placement_public_tests;
+
+// #2242 the generation published in host status is the actual active owner slot's, never a reserved or retired one
+// (ported from the superseded #2324).
+#[test]
+fn status_generation_follows_the_actual_slot_through_release_and_reinstall() {
+    let (state, old_document) = fixture();
+    let original = state.native_status(status_request()).unwrap();
+    let original_generation = state.native.lock().unwrap().active_generation().unwrap();
+    assert_eq!(original.lifecycle_generation, Some(original_generation));
+    state.retire_native_for_test(json!({"status":"succeeded"}));
+    let released = state.native_status(status_request()).unwrap();
+    released.validate().unwrap();
+    assert!(!released.available);
+    assert_eq!(released.lifecycle_generation, None);
+    assert!(serde_json::to_value(&released)
+        .unwrap()
+        .get("lifecycleGeneration")
+        .is_none());
+
+    let application = NativeApplication::new(
+        state.instance_id.clone(),
+        document(),
+        Port,
+        Compositor,
+        Resolver,
+    )
+    .unwrap();
+    let next_document = application.document_id().to_owned();
+    state.install_native(application).unwrap();
+    let current = state.native_status(status_request()).unwrap();
+    current.validate().unwrap();
+    let expected = {
+        let authority = state.native.lock().unwrap();
+        let (generation, owner) = authority.active().unwrap();
+        (
+            generation,
+            owner.document_id().to_owned(),
+            owner.content_revision(),
+        )
+    };
+    assert!(
+        expected.0 > original_generation,
+        "a constant generation cannot qualify"
+    );
+    assert_ne!(next_document, old_document);
+    assert_eq!(current.lifecycle_generation, Some(expected.0));
+    assert_eq!(current.document_id.as_deref(), Some(expected.1.as_str()));
+    assert_eq!(current.content_revision, Some(expected.2));
+    assert_eq!(expected.1, next_document);
+    let mut wrong_instance = status_request();
+    wrong_instance.instance_id = "foreign-instance".into();
+    let refused = state.native_status(wrong_instance).unwrap();
+    refused.validate().unwrap();
+    assert!(!refused.available);
+    assert_eq!(refused.lifecycle_generation, None);
+    assert_eq!(
+        refused.reason.as_deref(),
+        Some("native application instance mismatch")
+    );
+    assert_eq!(state.native_status(status_request()).unwrap(), current);
+}
+
+#[test]
+fn installing_status_never_publishes_the_reserved_generation() {
+    let state = ApplicationMcp {
+        instance_id: "native-host-fixture".into(),
+        ..ApplicationMcp::default()
+    };
+    let reservation = state.reserve_native_install().unwrap();
+    assert!(reservation.generation() > 0);
+    let installing = state.native_status(status_request()).unwrap();
+    installing.validate().unwrap();
+    assert!(!installing.available);
+    assert_eq!(installing.lifecycle_generation, None);
+    assert_eq!(installing.document_id, None);
+    assert_eq!(installing.content_revision, None);
+    assert_eq!(
+        installing.reason.as_deref(),
+        Some("native application installation is in progress")
+    );
+    drop(reservation);
+    let vacant = state.native_status(status_request()).unwrap();
+    vacant.validate().unwrap();
+    assert!(!vacant.available);
+    assert_eq!(vacant.lifecycle_generation, None);
+}
+
+#[test]
+fn host_status_generation_agrees_with_normal_project_metadata_without_mutation() {
+    let state = ApplicationMcp {
+        instance_id: "native-host-fixture".into(),
+        ..ApplicationMcp::default()
+    };
+    let (document_id, revision, _) = state.install_native_blank_project(64, 64, 24.0).unwrap();
+    let before = state.native_project_info(&document_id).unwrap();
+    let status = state.native_status(status_request()).unwrap();
+    status.validate().unwrap();
+    assert!(status.available);
+    assert_eq!(status.instance_id, before["instanceId"].as_str().unwrap());
+    assert_eq!(status.document_id.as_deref(), Some(document_id.as_str()));
+    assert_eq!(status.content_revision, Some(revision));
+    assert_eq!(
+        status.lifecycle_generation,
+        before["lifecycleGeneration"].as_u64()
+    );
+    assert_eq!(state.native_project_info(&document_id).unwrap(), before);
+}
+
+#[test]
+fn replacing_status_cannot_publish_old_or_reserved_owner_generation() {
+    let (state, document_id) = fixture();
+    let old_generation = state
+        .native_status(status_request())
+        .unwrap()
+        .lifecycle_generation
+        .unwrap();
+    let reserved = state
+        .native
+        .lock()
+        .unwrap()
+        .admit_replace(&state.instance_id, &document_id, 0, |_| Ok(()))
+        .unwrap();
+    assert!(reserved > old_generation);
+    let replacing = state.native_status(status_request()).unwrap();
+    replacing.validate().unwrap();
+    assert!(!replacing.available);
+    assert_eq!(replacing.lifecycle_generation, None);
+    assert_eq!(replacing.document_id, None);
+    assert_eq!(replacing.content_revision, None);
+    assert_eq!(
+        replacing.reason.as_deref(),
+        Some("native replacement is in progress or indeterminate")
+    );
+}
+

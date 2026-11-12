@@ -1,536 +1,255 @@
-// ---- C7 CUTOVER: Subselect tool (node/handle editing) on the Rust engine ----
-// Same architecture as select-bridge.js/shape-bridge.js: capture-phase
-// pointer interception (stopImmediatePropagation blocks Paper's own
-// onMouseDown/Drag/Up for the same canvas), engine-bridge.js's tick()
-// suspended for the whole gesture, and only Paper.js *data* is mutated
-// (segment points/handles, centerSegments) — rendering comes entirely from
-// the Rust mirror, which already draws the node/handle overlay from the
-// exact same source data (nodeEditTargetPath/nodeEditSegmentsData/_nodeSel,
-// see engine-bridge.js's buildNodeHandleItems), so no separate overlay-
-// drawing code is needed here: just mutate state, then ask engine-bridge to
-// re-render.
-//
-// Faithful line-for-line port of the 'subselect' branches of
-// onMouseDown/onMouseDrag/onMouseUp in tools.js — anchor/handle hit-test
-// against the shared `nodeHandles` array (rebuilt by tools.js's own
-// renderNodeHandles(), unchanged), single-node drag (point/handleIn/
-// handleOut, with Alt breaking handle mirroring), group drag of a multi-
-// selected set of anchors (points only, no handles), the node marquee
-// (_nmq, anchor-points-only containment test), and vector-brush centerline
-// special-casing (mutates data.centerSegments + rebuildVectorBrushOutline
-// instead of touching path.segments directly) — all reusing the exact same
-// global helpers/state tools.js already defines (nodeHandles, _nodeDrag,
-// _nmq, _nodeSel, nodeEditTargetPath, nodeEditSegmentsData,
-// renderNodeHandles, rebuildVectorBrushOutline, fillRegenerateLinked,
-// clearSel, pushUndo, saveActiveLayerFrame, renderArcs, updateUI) rather
-// than reimplementing any of it.
-(function () {
-  var lastPt = null;
-  // Click-vs-drag disambiguation for the Alt+click "toggle tangent" gesture
-  // below — onDown already always starts a normal 'point' drag on hit, so
-  // the only way to tell "user clicked to toggle" from "user dragged the
-  // anchor a tiny bit" is comparing screen-space start/end position in onUp.
-  var _downClientX = 0, _downClientY = 0, _downAlt = false;
-  // #122: mirrors vector-sculpt.js's own wasInterpolated capture — see
-  // harmonizeAfterEdit's comment (tweens.js) for why this has to be read
-  // BEFORE ensureKeyframe()/saveActiveLayerFrame() touch the frame's state.
-  var _wasInterpolated = false;
-
-  function shouldIntercept() {
-    return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && state.tool === 'subselect' && !state.playing;
+/* Native subselect controller. Paper is used only for detached curve hit testing.
+ * Selection and SVG overlays are disposable views; every edit and preview goes to the native owner. */
+(function(root,factory){
+  const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;
+  else {root.NemoNativeSubselect=api;api.install(root);}
+}(typeof globalThis==='object'?globalThis:this,function(){
+  'use strict';
+  const pins=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
+  const same=(a,b)=>!!a&&!!b&&pins.every(k=>a[k]===b[k]);
+  const map=(m,p)=>[m[0]*p[0]+m[2]*p[1]+m[4],m[1]*p[0]+m[3]*p[1]+m[5]];
+  function inverse(m,p){const d=m[0]*m[3]-m[1]*m[2];if(!Number.isFinite(d)||Math.abs(d)<1e-12)throw new Error('Subselect transform is singular');const x=p[0]-m[4],y=p[1]-m[5];return [(m[3]*x-m[2]*y)/d,(-m[1]*x+m[0]*y)/d];}
+  function snap(start,p){const x=p[0]-start[0],y=p[1]-start[1],distance=Math.sqrt(x*x+y*y),angle=Math.round(Math.atan2(y,x)/(Math.PI/4))*(Math.PI/4);return [start[0]+Math.cos(angle)*distance,start[1]+Math.sin(angle)*distance];}
+  const consume=e=>{if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();};
+  function create(root){
+    const RESTORE_TRIES=20,RESTORE_MS=60;
+    let selection=null,drag=null,marquee=null,overlay=null,held=null,pending=null,uncertain=null,recovering=false,readToken=0,previewToken=0,previewBusy=false,previewNext=null,retired=false;
+    let watching=false;
+    let settled=Promise.resolve({status:'idle'});
+    const session=()=>root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);
+    const mapping=()=>root.NemoNativeViewportUnderlay&&root.NemoNativeViewportUnderlay.canvasMapping;
+    function native(){const s=session();return !!s&&s.blocksLegacy();}
+    function refreshUI(){if(root.NemoNativeSubselectUI)root.NemoNativeSubselectUI.refresh(root);}
+    function selectionState(){return !pending&&!uncertain&&!drag&&!marquee&&selection&&current(selection)&&selection.indices.length?Object.freeze(typeOf(selection)):null;}
+    // #2356: with ONE vertex selected the state also names its type (the engine's effective type: the stored hint, else the one its handles show), so the point-type row can mark it.
+    function typeOf(t){const n=t.indices.length,type=n===1&&t.item&&t.item.pointTypes&&t.item.pointTypes[t.indices[0]];return type?{count:n,pointType:type}:{count:n};}
+    function notice(error){if(root.showToast)root.showToast(error&&error.message||String(error));}
+    // #2356: Direct Select works on the shapes of an ENTERED component (baseline: state.activeSymbolId set), through the context the workspace controller holds.
+    function ctx(){const c=root.NemoNativeComponentContext;try{return c&&typeof c.contextId==='function'?c.contextId(root):'scene-root';}catch(_){return 'scene-root';}}
+    function layer(pin){const st=root.state,row=st.layers&&st.layers[st.activeLayerIdx],sel=root._layerSel;
+      if(!row||!Array.isArray(sel)||sel.length!==1||sel[0]!==st.activeLayerIdx)throw new Error('Select one native Drawing layer.');
+      const comp=ctx()!=='scene-root'&&root.NemoNativeComponentContext.layers(root),layers=(comp||pin.layers).filter(l=>l.layerUid===row.layerUid);
+      if(layers.length!==1||layers[0].locked||layers[0].visible===false)throw new Error('The selected Drawing layer is unavailable.');return row.layerUid;}
+    function bounds(pin){const d=root.document,r=d.getElementById('drawing-canvas').getBoundingClientRect(),html=d.documentElement;
+      if(!html.classList.contains('nemo-native-underlay')||![r.left,r.top,r.width,r.height,pin.canvasW,pin.canvasH].every(Number.isFinite)||r.width<=0||r.height<=0||
+        r.left<0||r.top<0||r.right>html.clientWidth||r.bottom>html.clientHeight||!['left','top','right','bottom'].every((k,i)=>parseFloat(html.style.getPropertyValue('--nemo-native-'+k))===[r.left,r.top,r.right,r.bottom][i]))throw new Error('Native canvas presentation changed.');
+      return {left:r.left,top:r.top,width:r.width,height:r.height};}
+    function mode(){const s=root.state;return s.appMode==='anim2d'&&!s.playing&&!s.spaceDown&&!s.isPanning&&!s.shadowMode&&(!s.activeSymbolId||ctx()===s.activeSymbolId);}
+    function capture(){const s=session(),pin=s&&s.info(),shown=s&&s.readPresentedObjectSession(),st=root.state,M=mapping();
+      if(retired||!s||!s.isActive()||!pin||!shown||!same(pin,shown)||!same(pin,shown.presentation)||shown.presentation.owner!=='native'||shown.presentation.status!=='presented'||
+        !M||!M.matchesView(root,shown.presentation)||shown.presentation.frame!==st.currentFrame||shown.presentation.contextId!==ctx()||
+        !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!mode())throw new Error('Native subselect is unavailable in this mode.');
+      return {session:s,pin:pin,presentation:shown.presentation,selector:{contextId:ctx(),layerUid:layer(pin),frame:st.currentFrame},bounds:bounds(pin)};}
+    // #2372: the native queue hides the presentation while ANY command is pending (a hover read, the repaint of the last edit). That is "cannot prove it
+    // right now", not "it changed": a gesture or selection survives it, and every write re-proves the presentation through its dispatch lease (admitted).
+    function current(t,lease){try{const s=session(),pin=s&&s.info(),why=[],shown=lease?lease.readPresentedObjectSession():s&&s.readPresentedObjectSession(c=>why.push(c)),unproven=!lease&&!shown&&why[0]==='queue-pending';
+      return !retired&&!t.cancelled&&s===t.session&&s.isActive()&&s.blocksLegacy()&&same(pin,t.pin)&&(shown?shown.presentation===t.presentation&&same(shown,t.pin):unproven)&&
+        root.state.tool==='subselect'&&mode()&&ctx()===t.selector.contextId&&root.state.currentFrame===t.selector.frame&&layer(pin)===t.selector.layerUid&&
+        (lease||unproven||mapping().matchesView(root,t.presentation))&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)===true&&JSON.stringify(bounds(pin))===JSON.stringify(t.bounds);
+    }catch(_){return false;}}
+    function point(e,t){const p=mapping().point(e,{bounds:t.bounds,canvasW:t.pin.canvasW,canvasH:t.pin.canvasH,presentation:t.presentation});return [p.x,p.y];}
+    function client(p,t){const q=map(mapping().transform({presentation:t.presentation},false),p);return [t.bounds.left+q[0]*t.bounds.width/t.pin.canvasW,t.bounds.top+q[1]*t.bounds.height/t.pin.canvasH];}
+    function clear(){if(overlay){overlay.remove();overlay=null;}}
+    // #2356: the drawing of an applied edit stays up until its re-read selection replaces it, so the handles never blink off between commit and restore.
+    function drop(){if(held){held.remove();held=null;}}
+    function grab(el,id){try{if(el.setPointerCapture)el.setPointerCapture(id);}catch(_){/* a press replayed after its release has no pointer left to capture */}}
+    function release(t){try{if(t&&t.capture&&t.capture.releasePointerCapture)t.capture.releasePointerCapture(t.pointer);}catch(_){}}
+    function cancel(clearSelection){if(gate)gate.cancel();if(drag)drag.cancelled=true;if(marquee)marquee.cancelled=true;if(selection)selection.cancelled=true;release(drag);release(marquee);++readToken;++previewToken;previewNext=null;drawLatest=null;drag=null;marquee=null;clear();drop();if(clearSelection)selection=null;refreshUI();return {status:'cancelled'};}
+    function node(tag,attrs){const n=root.document.createElementNS('http://www.w3.org/2000/svg',tag);Object.keys(attrs).forEach(k=>n.setAttribute(k,attrs[k]));return n;}
+    function watch(){if(watching||!root.requestAnimationFrame)return;watching=true;root.requestAnimationFrame(()=>{watching=false;if(pending)return;if((selection&&!current(selection))||(marquee&&!current(marquee))){cancel(true);return;}if(selection||marquee)watch();});}
+    function draw(t,segments,previewMatrix){if(!current(t)){clear();drop();return;}watch();
+      const d=root.document,old=overlay;overlay=node('svg',{viewBox:'0 0 '+t.pin.canvasW+' '+t.pin.canvasH,preserveAspectRatio:'none','aria-hidden':'true'});
+      Object.assign(overlay.style,{position:'fixed',pointerEvents:'none',zIndex:'20',left:t.bounds.left+'px',top:t.bounds.top+'px',width:t.bounds.width+'px',height:t.bounds.height+'px'});d.body.appendChild(overlay);if(old)old.remove();drop();/* swap, never remove-then-add: no frame without handles */
+      const m=previewMatrix||t.item.matrix,V=mapping().transform({presentation:t.presentation},false),world=p=>map(V,map(m,p));
+      let text='';segments.forEach((a,i)=>{if(!i){const p=world(a.point);text='M '+p.join(' ');return;}curve(segments[i-1],a);});
+      function curve(a,b){text+=' C '+world([a.point[0]+a.handleOut[0],a.point[1]+a.handleOut[1]]).join(' ')+' '+world([b.point[0]+b.handleIn[0],b.point[1]+b.handleIn[1]]).join(' ')+' '+world(b.point).join(' ');}
+      if(t.item.closed&&segments.length){curve(segments[segments.length-1],segments[0]);text+=' Z';}
+      overlay.appendChild(node('path',{d:text,fill:'none',stroke:'#4b9bff','stroke-width':1,'vector-effect':'non-scaling-stroke'}));
+      segments.forEach((a,i)=>{const p=world(a.point),selected=t.indices.includes(i);
+        if(selected)for(const key of ['handleIn','handleOut']){const h=a[key];if(!h[0]&&!h[1])continue;const q=world([a.point[0]+h[0],a.point[1]+h[1]]);
+          overlay.appendChild(node('line',{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:'#4b9bff','vector-effect':'non-scaling-stroke'}));
+          overlay.appendChild(node('circle',{cx:q[0],cy:q[1],r:3*t.pin.canvasW/t.bounds.width,fill:'white',stroke:'#4b9bff','vector-effect':'non-scaling-stroke'}));}
+        const r=3*t.pin.canvasW/t.bounds.width;overlay.appendChild(node('rect',{x:p[0]-r,y:p[1]-r,width:2*r,height:2*r,fill:selected?'#4b9bff':'white',stroke:'#4b9bff','vector-effect':'non-scaling-stroke'}));});
+      refreshUI();
+    }
+    function hitAnchor(e,t){let best=null,distance=10;
+      t.item.segments.forEach((a,index)=>{for(const key of ['point','handleIn','handleOut']){if(key!=='point'&&(!t.indices.includes(index)||!a[key].some(Boolean)))continue;
+        const p=key==='point'?a.point:[a.point[0]+a[key][0],a.point[1]+a[key][1]],q=client(map(t.item.matrix,p),t),dist=Math.hypot(q[0]-e.clientX,q[1]-e.clientY);
+        if(dist<distance){distance=dist;best={index:index,key:key};}}});return best;}
+    function path(item,editable){const Path=root.Path||(root.paper&&root.paper.Path);if(!Path)throw new Error('Subselect geometry hit testing is unavailable.');
+      const geometry=!editable&&item.paint?item.paint:item;
+      return new Path({insert:false,closed:geometry.closed,segments:geometry.segments.map(a=>[a.point,a.handleIn,a.handleOut])});}
+    function rectangle(t){const Rectangle=root.Rectangle||(root.paper&&root.paper.Rectangle),Point=root.Point||(root.paper&&root.paper.Point);return new Rectangle(new Point(t.start),new Point(t.end));}
+    function drawMarquee(t){clear();drop();if(!current(t))return;watch();
+      if(t.target)draw(t.target,t.target.item.segments);
+      if(!overlay){overlay=node('svg',{'aria-hidden':'true'});Object.assign(overlay.style,{position:'fixed',pointerEvents:'none',zIndex:'20',left:t.bounds.left+'px',top:t.bounds.top+'px',width:t.bounds.width+'px',height:t.bounds.height+'px'});root.document.body.appendChild(overlay);}
+      // Keep the selection rectangle in the same project coordinate system as the
+      // native geometry, then apply only the disposable viewport presentation.
+      const V=mapping().transform({presentation:t.presentation},false),r=rectangle(t),corners=[[r.left,r.top],[r.right,r.top],[r.right,r.bottom],[r.left,r.bottom]].map(p=>map(V,p));
+      overlay.setAttribute('viewBox','0 0 '+t.pin.canvasW+' '+t.pin.canvasH);overlay.setAttribute('preserveAspectRatio','none');
+      overlay.appendChild(node('polygon',{points:corners.map(p=>p.join(',')).join(' '),fill:'rgba(255,184,108,.08)',stroke:'#ffb86c','stroke-width':1,'stroke-dasharray':'4 3','vector-effect':'non-scaling-stroke'}));
+    }
+    // #2356: the editable listing omits a record that has no editable points (a brush, textured or pressure stroke). A plain click that
+    // selected nothing therefore says so when it landed on such a record, instead of clearing without a word. The hit-test listing is read
+    // (no geometry paged) only for that click; any failure of this courtesy read stays silent.
+    function uneditableNotice(t){const s=t.session;if(!s||typeof s.readPresentedStrokes!=='function'||!t.items)return Promise.resolve(false);const token=readToken,key=i=>JSON.stringify(i.stableTarget),own=new Set(t.items.map(key));
+      return Promise.resolve().then(()=>s.readPresentedStrokes({contextId:t.selector.contextId,layerUid:t.selector.layerUid,frame:t.selector.frame},t.pin,()=>false)).then(data=>{
+        if(token!==readToken||retired||!data||!data.presentation||data.presentation!==t.presentation)return false;
+        const hit=(data.items||[]).find(i=>!own.has(key(i))&&['plain','ribbon','fill','shape','brush'].includes(i.role)&&Array.isArray(i.bounds)&&i.bounds.length===4&&Array.isArray(i.matrix)&&(()=>{
+          const m=i.matrix,b=i.bounds,pad=4+(i.strokeWidth||0)/2,xs=[],ys=[];[[b[0],b[1]],[b[2],b[1]],[b[0],b[3]],[b[2],b[3]]].forEach(c=>{const q=map(m,c);xs.push(q[0]);ys.push(q[1]);});
+          return t.start[0]>=Math.min(...xs)-pad&&t.start[0]<=Math.max(...xs)+pad&&t.start[1]>=Math.min(...ys)-pad&&t.start[1]<=Math.max(...ys)+pad;})());
+        if(hit)notice(new Error('This stroke has no editable points.'));return !!hit;}).catch(()=>false);}
+    function finishMarquee(t){if(marquee!==t||!current(t)){cancel(true);return {status:'cancelled'};}
+      marquee=null;release(t);if(!t.moved){cancel(true);return uneditableNotice(t).then(()=>({status:'cleared'}));}
+      const r=rectangle(t);let item=t.target&&t.target.item;
+      if(!item)for(const candidate of t.items){const curve=path(candidate);try{
+        const Matrix=root.Matrix||(root.paper&&root.paper.Matrix);curve.transform(new Matrix(...candidate.matrix));if(curve.bounds.intersects(r))item=candidate;
+      }finally{curve.remove();}}
+      const Point=root.Point||(root.paper&&root.paper.Point),indices=[];
+      if(item)item.segments.forEach((a,i)=>{if(r.contains(new Point(map(item.matrix,a.point))))indices.push(i);});
+      if(!indices.length){cancel(true);return {status:'cleared'};}
+      selection={session:t.session,pin:t.pin,presentation:t.presentation,selector:t.selector,bounds:t.bounds,item,indices};draw(selection,item.segments);return {status:'selected'};
+    }
+    function hitItem(e,t,item,editable){const p=inverse(item.matrix,point(e,t)),curve=path(item,editable);try{
+      const P=root.Point||(root.paper&&root.paper.Point),local=new P(p[0],p[1]),near=curve.getNearestLocation(local);
+      if(near){const q=client(map(item.matrix,[near.point.x,near.point.y]),t);if(Math.hypot(q[0]-e.clientX,q[1]-e.clientY)<10)return {curve:near.index,time:near.curve.getTimeAt(near.curveOffset)};}
+      return curve.closed&&curve.contains(local)?{}:null;
+    }finally{curve.remove();}}
+    async function load(t,token){const data=await t.session.readSubselect(t.selector,t.pin);if(token!==readToken||!current(t)||data.presentation!==t.presentation||!same(data.info,t.pin))return null;return data.items;}
+    // #2356: the pointer redraws the outline and handles locally on every move (at most once per frame); the engine preview is latest-only and only refines it.
+    let drawFrame=0,drawLatest=null;
+    function localSegments(t,intent){const src=t.item.segments,seg=i=>({point:src[i].point.slice(),handleIn:src[i].handleIn.slice(),handleOut:src[i].handleOut.slice()}),out=src.map((_,i)=>seg(i));
+      if(intent.kind==='move')intent.indices.forEach(i=>{if(out[i])out[i].point=[out[i].point[0]+intent.delta[0],out[i].point[1]+intent.delta[1]];});
+      else if(intent.kind==='handle'&&out[intent.index]){const a=out[intent.index],other=intent.handle==='handleOut'?'handleIn':'handleOut',h=[intent.point[0]-a.point[0],intent.point[1]-a.point[1]];a[intent.handle]=h;
+        // #2356: a plain drag follows the vertex type like the engine: symmetric mirrors, smooth keeps the opposite handle's length on the opposite direction, corner leaves it.
+        if(!intent.breakPair){const type=(t.item.pointTypes&&t.item.pointTypes[intent.index])||'symmetric',old=src[intent.index][other],d=Math.hypot(h[0],h[1]);
+          if(type==='symmetric')a[other]=[-h[0],-h[1]];else if(type==='smooth'&&d>1e-9){const k=-Math.hypot(old[0],old[1])/d;a[other]=[h[0]*k,h[1]*k];}}
+        else if(intent.pairedPoint)a[other]=[-(intent.pairedPoint[0]-a.point[0]),-(intent.pairedPoint[1]-a.point[1])];}
+      return out;}
+    function flushDraw(){drawFrame=0;const j=drawLatest;drawLatest=null;if(j&&drag===j.t&&current(j.t))draw(j.t,j.segments);}
+    function drawSoon(t,intent){drawLatest={t,segments:localSegments(t,intent)};if(drawFrame)return;if(!root.requestAnimationFrame){flushDraw();return;}drawFrame=root.requestAnimationFrame(flushDraw);}
+    function preview(t,intent){previewNext={t,intent,token:++previewToken};if(previewBusy)return;previewBusy=true;
+      (async()=>{while(previewNext){const job=previewNext;previewNext=null;try{const r=await job.t.session.previewSubselect(job.t.selector,job.t.item.stableTarget,job.intent,job.t.pin);
+        if(job.token===previewToken&&!previewNext&&drag===job.t&&current(job.t)&&r.presentation===job.t.presentation&&same(r.info,job.t.pin)){drawLatest=null;draw(job.t,r.segments,r.matrix);}
+      }catch(e){if(job.token===previewToken){cancel(false);notice(e);}}}previewBusy=false;})();}
+    function admitted(t,lease){if(!recovering)return current(t,lease);const s=session(),p=s&&s.info();return !retired&&s===t.session&&s.isActive()&&p&&['instanceId','documentId','lifecycleGeneration'].every(k=>p[k]===t.pin[k]);}
+    // The scene's resource route, or the component route of the entered context (one revision and one history entry either way).
+    function route(t,s){const f=t.selector.contextId==='scene-root'?s.runResourceCommand:s.runComponentCommand;if(typeof f!=='function')throw new Error('Subselect is unavailable inside this component.');return f.bind(s);}
+    function commit(t,intent){if(uncertain)throw new Error('Resolve the previous subselect command before another edit.');if(pending)throw new Error('A native subselect command is still pending.');
+      if(!current(t))throw new Error('Subselect target or frame changed.');
+      const s=t.session,guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:action=>route(t,s)(lease=>{
+        if(!admitted(t,lease))throw new Error('Subselect intent changed before dispatch.');return action({reconcile:lease.reconcile,dispatch:q=>{if(!admitted(t,lease))throw new Error('Subselect intent changed before dispatch.');return lease.dispatch(q);}});
+      })};
+      const command=root.NemoNativeObjectVectorCommand.create(guarded,'subselect',root.NemoNativeSubselectContract);
+      ++previewToken;previewNext=null;
+      const send=()=>command.execute(root.NemoNativeSubselectContract.EDIT,pin=>{if(!same(pin,t.pin))throw new Error('Subselect revision changed.');return {command:'object.subselect.edit',stableTarget:t.item.stableTarget,atFrame:t.selector.frame,intent:intent};});
+      // The Project records the presentation a command is SUBMITTED under and the queue hides it while any command is pending: an edit submitted in that window is
+      // refused at dispatch. Wait (bounded) until it is readable, then submit; a real change meanwhile ends the edit with no write (native-presentation-wait.js).
+      const Wait=root.NemoNativePresentationWait,read=f=>{const x=session();return x?x.readPresentedObjectSession(f):null;};
+      pending=Wait&&Wait.busy(read)?Wait.until(root,{readPresentedObjectSession:read},()=>!!read(),()=>current(t),{notice:'The canvas is still busy - the edit was not applied.'}).then(ok=>ok?send():{applied:false}):send();
+      // #2356: a completed edit keeps the edited item and its vertices selected (baseline kept _nodeSel across every commit): the selection is re-read at the new
+      // revision once the presentation is readable. A refusal, a stale gesture or an indeterminate outcome clears it as before.
+      const keep={session:s,selector:t.selector,stableTarget:t.item.stableTarget,indices:t.indices.slice(),intent};
+      refreshUI();const outcome=pending.then(receipt=>{const shown=overlay;overlay=null;cancel(true);held=shown;return {result:{status:receipt.applied?'applied':'noop',receipt},keep};},error=>{cancel(true);notice(error);if(error&&error.code==='subselect_command_indeterminate'){uncertain=error;return {result:{status:'indeterminate',error}};}return {result:{status:'refused',error}};});
+      settled=outcome.then(o=>{pending=null;refreshUI();return o.keep?restore(o.keep).then(kept=>{if(!kept)drop();return o.result;},()=>{drop();return o.result;}):o.result;},error=>{pending=null;refreshUI();throw error;});return settled;
+    }
+    // Index of the same vertices after the edit: an insert selects the new vertex (curve + 1, appended for the closing curve), a delete removes what was selected.
+    function remap(keep,count){const k=keep.intent;let idx=keep.indices;if(k.kind==='insert')idx=[k.curve+1];else if(k.kind==='delete')idx=[];return idx.filter(i=>i<count);}
+    // After a commit the info pin moves to the new revision before the canvas presents it, and hover reads re-present it again: capture() and load() then
+    // refuse as stale for a few frames. That is "not yet", never "gone", so the re-read is retried (bounded) until the new revision is presented (#2356).
+    async function restore(keep){const token=++readToken,Wait=root.NemoNativePresentationWait,read=f=>{const x=session();return x?x.readPresentedObjectSession(f):null;},
+      holds=()=>token===readToken&&!retired&&!selection&&native()&&root.state.tool==='subselect'&&root.state.currentFrame===keep.selector.frame,
+      sleep=ms=>new Promise(done=>(root.setTimeout||setTimeout)(done,ms));
+      for(let attempt=0;attempt<RESTORE_TRIES;attempt++){
+        if(attempt)await sleep(RESTORE_MS);
+        if(!holds())return null;
+        if(!read()&&!(Wait&&await Wait.until(root,{readPresentedObjectSession:read},()=>!!read(),holds)))continue;
+        if(!holds())return null;
+        let t;try{t=capture();}catch(_){continue;}
+        if(t.session!==keep.session||t.selector.layerUid!==keep.selector.layerUid||t.selector.frame!==keep.selector.frame)return null;
+        let items;try{items=await load(t,token);}catch(_){items=null;}
+        if(token!==readToken||selection)return null;
+        if(!items)continue;
+        // A held frame is promoted by its first edit, which re-scopes the record to the current frame: match the record, not its frame scope.
+        const item=items.find(i=>i.stableTarget.strokeId===keep.stableTarget.strokeId&&i.stableTarget.layerUid===keep.stableTarget.layerUid&&i.stableTarget.contextId===keep.stableTarget.contextId);
+        if(!item)return null;
+        selection={...t,item,indices:remap(keep,item.segments.length)};draw(selection,item.segments);return selection;
+      }
+      return null;
+    }
+    function start(e,t,hit){
+      const group=hit.key==='point'&&t.indices.includes(hit.index)&&t.indices.length>1;
+      t.dragIndices=group?t.indices.slice():[hit.index];t.pairedPoint=null;
+      if(hit.key==='point'&&!group)t.indices=e.shiftKey?Array.from(new Set(t.indices.concat(hit.index))):[hit.index];
+      t.hit=hit;t.start=inverse(t.item.matrix,point(e,t));t.clientStart=[e.clientX,e.clientY];t.pointer=e.pointerId;t.alt=e.altKey;t.intent=null;drag=t;t.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');grab(t.capture,t.pointer);draw(t,t.item.segments);
+    }
+    function down(e){if(pending||drag)return;
+      // A fresh gesture supersedes an earlier marquee even when its read has not
+      // returned. Retire it before the vertex/Alt-insert fast paths can dispatch.
+      if(marquee){const prior=marquee;marquee=null;prior.cancelled=true;++readToken;release(prior);clear();}
+      if(selection&&!current(selection))cancel(true);
+      const t=capture();if(selection&&current(selection)&&selection.presentation===t.presentation){const hit=hitAnchor(e,selection);if(hit){start(e,selection,hit);return;}
+        if(e.altKey){const hit=hitItem(e,selection,selection.item,true);if(hit&&hit.time!==undefined){commit(selection,{kind:'insert',curve:hit.curve,time:hit.time});return;}}}
+      const token=++readToken;const origin={...e,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,altKey:e.altKey,shiftKey:e.shiftKey};
+      const box={...t,start:point(e,t),end:point(e,t),pointer:e.pointerId,target:selection&&current(selection)?selection:null,items:null,moved:false,ended:false};marquee=box;
+      box.capture=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');grab(box.capture,box.pointer);watch();refreshUI();
+      settled=load(t,token).then(items=>{if(!items||marquee!==box)return {status:'cancelled'};let chosen=null;for(const item of items)if(hitItem(origin,t,item))chosen=item;
+        if(!chosen){box.items=items;if(box.ended)return finishMarquee(box);if(box.moved)drawMarquee(box);return {status:'marquee'};}
+        marquee=null;release(box);selection={...t,item:chosen,indices:[]};draw(selection,chosen.segments);return {status:'selected'};
+      }).catch(error=>{if(token===readToken){cancel(true);notice(error);}return {status:'refused',error};});
+    }
+    function move(e){if(marquee&&marquee.pointer===e.pointerId){const t=marquee;if(!current(t)){cancel(true);return;}t.end=point(e,t);t.moved=true;if(t.items)drawMarquee(t);return;}
+      const t=drag;if(!t||t.pointer!==e.pointerId)return;if(!current(t)){cancel(true);return;}
+      let p=inverse(t.item.matrix,point(e,t));if(e.shiftKey)p=snap(t.hit.key==='point'?t.start:t.item.segments[t.hit.index].point,p);
+      // Alt-drag from a vertex pulls out its tangent handles in one gesture (a symmetric pair, Illustrator style); a press that has not left the click radius stays an Alt+click.
+      if(t.hit.key==='point'&&t.alt&&Math.hypot(e.clientX-t.clientStart[0],e.clientY-t.clientStart[1])>=3){
+        const a=t.item.segments[t.hit.index];if(e.shiftKey)p=snap(a.point,inverse(t.item.matrix,point(e,t)));t.intent={kind:'handle',index:t.hit.index,handle:'handleOut',point:p,breakPair:false};}
+      else if(t.hit.key==='point'&&t.alt)t.intent=null;
+      else if(t.hit.key==='point')t.intent={kind:'move',indices:t.dragIndices.slice(),delta:[p[0]-t.start[0],p[1]-t.start[1]]};
+      else {t.intent={kind:'handle',index:t.hit.index,handle:t.hit.key,point:p,breakPair:!!e.altKey};
+        // The endpoint Alt keeps is where the opposite handle is NOW (the mirror of the drag for a symmetric vertex), so pressing Alt never moves it.
+        if(!e.altKey){const a=t.item.segments[t.hit.index],o=localSegments(t,t.intent)[t.hit.index][t.hit.key==='handleOut'?'handleIn':'handleOut'];t.pairedPoint=[a.point[0]-o[0],a.point[1]-o[1]];}
+        if(e.altKey&&t.pairedPoint)t.intent.pairedPoint=t.pairedPoint;}
+      if(t.intent){drawSoon(t,t.intent);preview(t,t.intent);}}
+    function up(e){if(marquee&&marquee.pointer===e.pointerId){const t=marquee;t.ended=true;if(t.items)settled=Promise.resolve(finishMarquee(t));return;}
+      const t=drag;if(!t||t.pointer!==e.pointerId)return;drag=null;release(t);++previewToken;previewNext=null;
+      if(!current(t)){cancel(true);return;}const click=Math.hypot(e.clientX-t.clientStart[0],e.clientY-t.clientStart[1])<3;
+      if(click&&t.alt&&t.hit.key==='point')commit(t,{kind:'toggle',index:t.hit.index});else if(t.intent&&!click)commit(t,t.intent);
+      else if(t.item.stableTarget.frameScope.frame!==t.selector.frame)commit(t,{kind:'move',indices:[t.hit.index],delta:[0,0]});else draw(t,t.item.segments);}
+    function action(intent){if(!selection||!current(selection)||!selection.indices.length){notice(new Error('Select one or more native path points.'));return Promise.resolve({status:'refused'});}
+      try{return commit(selection,Object.assign({indices:selection.indices.slice()},intent));}catch(error){notice(error);return Promise.resolve({status:'refused',error});}}
+    function handle(kind,e){if(!native()||root.state.tool!=='subselect')return false;
+      const d=root.document,canvas=e.target===d.getElementById('drawing-canvas')||e.target===d.getElementById('canvas-area');if(!canvas&&!drag&&!marquee)return false;consume(e);
+      try{if(kind==='lost'){if(drag||marquee&&!marquee.ended)cancel(false);}else if(kind==='cancel')cancel(false);else if(kind==='down')down(e);else if(kind==='move')move(e);else if(kind==='up')up(e);}catch(error){cancel(true);notice(error);}return true;}
+    // #2372: a press while the queue is busy waits for the presentation and replays with the events that followed it (native-presentation-wait.js).
+    const Wait=root.NemoNativePresentationWait,onCanvas=e=>{const d=root.document;return e.target===d.getElementById('drawing-canvas')||e.target===d.getElementById('canvas-area');},
+      gate=Wait&&Wait.gate(root,{handle,notice:'The canvas is still busy - try again.',begins:(k,e)=>native()&&root.state.tool==='subselect'&&!pending&&!drag&&onCanvas(e)&&!e.button,
+        read:f=>{const s=session();return s?s.readPresentedObjectSession(f):null;},snapshot:()=>{const s=session(),i=s&&s.info(),st=root.state;return JSON.stringify([st.tool,st.currentFrame,st.activeLayerIdx,root._layerSel||null,i&&[i.instanceId,i.documentId,i.lifecycleGeneration,i.contentRevision]]);},
+        holds(token){return !retired&&native()&&root.state.tool==='subselect'&&this.snapshot()===token;}});
+    function deleteFrames(){
+      if(pending||uncertain){notice(new Error('Resolve the previous subselect command before another edit.'));return;}
+      cancel(true);
+      const frames=root.NemoNativeFrameEditController;
+      if(!frames||typeof frames.run!=='function'){notice(new Error('Native frame editing is unavailable.'));settled=Promise.resolve({status:'unavailable'});return;}
+      // The original timeline gives selected cells priority over path points.
+      // Use the native owner directly: releasing this capture must never reach a legacy writer.
+      try{pending=Promise.resolve(frames.run({kind:'deleteFrames'}));}
+      catch(error){notice(error);settled=Promise.resolve({status:'refused',error});return;}
+      settled=pending.catch(error=>{notice(error);return {status:'refused',error};}).finally(()=>{pending=null;refreshUI();});
+    }
+    function key(e){if(retired||!native()||root.state.tool!=='subselect'||e.target&&(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable))return false;
+      if(e.key==='Escape'){consume(e);cancel(true);return true;}
+      if(e.key==='Delete'||e.key==='Backspace'){consume(e);
+        if(root.state.appMode==='anim2d'&&root._sel&&Array.isArray(root._sel.frames)&&root._sel.frames.length)deleteFrames();
+        else action({kind:'delete'});return true;}return false;}
+    function recover(){if(!uncertain||pending)return Promise.resolve({status:'unavailable'});const prior=uncertain;recovering=true;pending=Promise.resolve().then(()=>prior.replay());settled=pending.then(receipt=>{uncertain=null;return {status:'reconciled',receipt};},error=>{notice(error);return {status:'indeterminate',error};}).finally(()=>{pending=null;recovering=false;});return settled;}
+    return Object.freeze({handle:gate?gate.handle:handle,key,recover,selectionState,cancel:()=>cancel(true),setPointType:type=>action({kind:'pointType',pointType:type}),scale:(scale,anchor)=>action({kind:'scale',scale,anchor}),rotate:(degrees,center)=>action({kind:'rotate',degrees,center}),settled:()=>settled,
+      dispose:()=>{retired=true;cancel(true);}});
   }
-  function allowLegacySelectionEdit(e){var b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow('subselect')===true;}catch(_){}if(!a&&e){e.stopImmediatePropagation();e.preventDefault();}return a;}
-  // Map rendered Motion points back to the document geometry used below.
-  //
-  // 2026-08-29 fix (feedback #125, "pourquoi les points de tracé ne
-  // correspondent pas à la forme dessinée ?"): the Motion mapping above
-  // covers Motion Position/Rotation/Scale, but a Component's OWN instance
-  // placement (`ld.symMatrix` — set by dragging/resizing the instance on
-  // stage with the Select tool, symGestureAccumulate in app.js) is a
-  // SEPARATE render-time-only transform, applied in getEffectiveStrokes
-  // (app.js) BEFORE Motion, and was never accounted for here at all. Same
-  // failure mode as the Motion bug above: click straight through to
-  // layer.hitTest/nodeHandles[].pos in raw document space while the shape
-  // actually renders wherever symMatrix placed it — confirmed live
-  // (reproduced the reported screenshot exactly: node handles clustered at
-  // the shape's raw position, the visible ribbon rendered elsewhere via
-  // symMatrix). symMatrix is a plain Paper Matrix (no pivot decomposition
-  // needed, unlike Motion), applied to the ALREADY Motion-inverted point —
-  // mirrors the forward order in app.js (raw -> symMatrix -> Motion ->
-  // world), so undoing it here means peeling Motion off first, then
-  // symMatrix. buildNodeHandleItems (engine-bridge.js) needs the same fix
-  // for the overlay's forward direction — see its own comment.
-  function toLocalPoint(pt, layerIdx) {
-    var p = pt;
-    if (window.SMMotion) {
-      var map = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(layerIdx) : null;
-      // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
-      // 3D-toggled layer even with real rotationX/rotationY set (it only
-      // recognizes the base 2D properties); layerMotion3DPointMap is the
-      // dedicated perspective-correct counterpart — see its own header
-      // comment in motion.js for the ray-plane-intersection math.
-      if (!map && SMMotion.layerMotion3DPointMap) map = SMMotion.layerMotion3DPointMap(layerIdx);
-      if (map) {
-        var lp = map.inv(p.x, p.y);
-        p = new Point(lp[0], lp[1]);
-      }
-    }
-    var ld = state.layers[layerIdx];
-    if (ld && ld.symMatrix && typeof symMatrixOf === 'function') {
-      var inv = symMatrixOf(ld).inverted();
-      if (inv) p = inv.transform(p);
-    }
-    // feedback #210 ("impossible de déplacer les vertex avec subselect dans
-    // motion si la shape est dans un groupe [...] ou si je rentre dans le
-    // groupe aussi") — a shape animated with its OWN per-element Motion
-    // (CLAUDE.md §8 "Motion niveau SHAPE" — exactly what entering a
-    // per-object group and keying one of its members produces) renders
-    // through a THIRD transform beyond symMatrix/layer Motion:
-    // buildNodeHandleItems (engine-bridge.js) already composes it into the
-    // overlay's drawn position (elementMotionAt + transformSegments,
-    // applied innermost, before symMatrix/layer Motion), but this function
-    // never undid it — so a click/drag landed short of nodeHandles[].pos
-    // (renderNodeHandles, tools.js — still raw, untransformed positions) by
-    // exactly the element's Motion delta, and the hit-test tolerance missed
-    // every handle whenever that delta was non-zero. elementLocalPoint
-    // (tools.js) is the exact inverse of transformSegments already used
-    // elsewhere for element-aware hit-testing (hitTestPosed) — undone LAST,
-    // mirroring the forward order (element -> symMatrix -> layer) in
-    // reverse (layer -> symMatrix -> element).
-    if (window.elementLocalPoint && typeof nodeEditTargetPath === 'function') {
-      var tgt = nodeEditTargetPath();
-      var layer = userLayers[layerIdx];
-      if (tgt && layer) p = elementLocalPoint(layer, tgt, p);
-    }
-    return p;
-  }
-
-  // Illustrator/Figma "Convert Anchor Point" convention, ported to a plain
-  // Alt+click (no drag) instead of a dedicated tool: a point WITH tangent
-  // handles loses them (becomes a sharp corner); a point with NONE gets a
-  // symmetric pair computed from its neighbors (Catmull-Rom-ish — direction
-  // toward the far neighbor, length 1/3 of the distance to each adjacent
-  // point) instead of requiring a drag to define them, since this is a
-  // single click, not a drag-to-shape gesture.
-  function toggleTangentAtSegments(segs, closed, idx) {
-    var s = segs[idx];
-    var hasTangent = (Math.abs(s.handleIn[0]) > 0.01 || Math.abs(s.handleIn[1]) > 0.01 || Math.abs(s.handleOut[0]) > 0.01 || Math.abs(s.handleOut[1]) > 0.01);
-    if (hasTangent) { s.handleIn = [0, 0]; s.handleOut = [0, 0]; return; }
-    var n = segs.length;
-    var prev = closed ? segs[(idx - 1 + n) % n] : (idx > 0 ? segs[idx - 1] : null);
-    var next = closed ? segs[(idx + 1) % n] : (idx < n - 1 ? segs[idx + 1] : null);
-    var dir, distOut = 40, distIn = 40;
-    var px = s.point[0], py = s.point[1];
-    if (prev && next) {
-      var dx = next.point[0] - prev.point[0], dy = next.point[1] - prev.point[1];
-      var dl = Math.hypot(dx, dy) || 1; dir = [dx / dl, dy / dl];
-    } else if (next) {
-      var dx2 = next.point[0] - px, dy2 = next.point[1] - py;
-      var dl2 = Math.hypot(dx2, dy2) || 1; dir = [dx2 / dl2, dy2 / dl2];
-    } else if (prev) {
-      var dx3 = px - prev.point[0], dy3 = py - prev.point[1];
-      var dl3 = Math.hypot(dx3, dy3) || 1; dir = [dx3 / dl3, dy3 / dl3];
-    } else { dir = [1, 0]; }
-    if (next) distOut = Math.hypot(next.point[0] - px, next.point[1] - py);
-    if (prev) distIn = Math.hypot(px - prev.point[0], py - prev.point[1]);
-    s.handleOut = [dir[0] * distOut / 3, dir[1] * distOut / 3];
-    s.handleIn = [-dir[0] * distIn / 3, -dir[1] * distIn / 3];
-  }
-  function toggleTangentAt(path, idx) {
-    if (path.data && path.data.isVectorBrush && path.data.centerSegments) {
-      toggleTangentAtSegments(path.data.centerSegments, !!path.closed, idx);
-      rebuildVectorBrushOutline(path);
-    } else {
-      var seg = path.segments[idx];
-      var hasTangent = seg.handleIn.length > 0.01 || seg.handleOut.length > 0.01;
-      if (hasTangent) { seg.handleIn = new Point(0, 0); seg.handleOut = new Point(0, 0); return; }
-      var segs = path.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
-      toggleTangentAtSegments(segs, !!path.closed, idx);
-      seg.handleOut = new Point(segs[idx].handleOut[0], segs[idx].handleOut[1]);
-      seg.handleIn = new Point(segs[idx].handleIn[0], segs[idx].handleIn[1]);
-    }
-  }
-
-  function onDown(e) {
-    if (!shouldIntercept()) return;
-    if (!allowLegacySelectionEdit(e)) return;
-    e.stopImmediatePropagation();
-    e.preventDefault();
-    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    var pt = toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx);
-    lastPt = pt;
-    _downClientX = e.clientX; _downClientY = e.clientY; _downAlt = e.altKey;
-    window.SMEngineBridge.suspend();
-
-    var layer = userLayers[state.activeLayerIdx];
-
-    var bestNh = null, bestNd = 8 / view.zoom;
-    for (var ni = 0; ni < nodeHandles.length; ni++) {
-      var nh = nodeHandles[ni];
-      var nd = pt.getDistance(nh.pos);
-      if (nd < bestNd) { bestNd = nd; bestNh = nh; }
-    }
-    // Add a vertex (2026-09, the counterpart to the Delete-key removal
-    // that already existed — see insertVertexAt's own header, tools.js):
-    // Alt+click that missed every existing point/handle (bestNh above)
-    // but lands on the edit target's own curve inserts a new anchor
-    // there. Scoped to an ALREADY-selected target (nodeEditTargetPath()
-    // requires selectedPaths.length===1) rather than any path under the
-    // cursor — same "see the handles first, then Alt+click again"
-    // two-step toggleTangentAt already trains the user on, and it means
-    // this can never fire on the SAME click that first selects a path
-    // (which still needs to fall through to the subHit branch below).
-    if (!bestNh && e.altKey) {
-      var insertTarget = nodeEditTargetPath();
-      if (insertTarget) {
-        var newIdx = insertVertexAt(insertTarget, pt);
-        if (newIdx >= 0) {
-          _nodeSel = [newIdx];
-          nodeSelCommitTail(insertTarget);
-          window.SMEngineBridge.renderNow();
-          return;
-        }
-      }
-    }
-    if (bestNh) {
-      // feedback #216 ("dans motion ajouté une keyframe de path > modifié le
-      // path avec subselect ne créer pas un blend de vertex ni de keyframes
-      // de path mais une nouvelle clé d'animation 2D"): once a shape's
-      // "Path" group is armed (motion.js's renderPathVertexGroup stopwatch,
-      // CLAUDE.md §12ter's vtxN machinery), a vertex drag must write an
-      // animated per-vertex OFFSET into that track — the ensureKeyframe()/
-      // raw-segment-mutation path below is the Animation 2D system, an
-      // entirely different persistence layer vtxN exists specifically to
-      // bypass (CLAUDE.md §8 "le path est keyable au niveau du VERTEX").
-      // Scoped to 'point' handles only — vtxN has no notion of tangent
-      // handles (applyPathVertexOffsets only ever offsets s.point).
-      // Vector-brush ribbons included (2026-08-31 follow-up, "ce que tu as
-      // fait qui marche bien avec paramétric shape faut le faire aussi pour
-      // brush shape"): their editable geometry is data.centerSegments, not
-      // path.segments, but every piece this needs is already brush-aware —
-      // nodeEditSegmentsData (tools.js, used below by renderNodeHandles/
-      // buildNodeHandleItems) already hands back centerSegments for a brush
-      // path (feedback #181), and applyVectorBrushOutlineFor (motion.js)
-      // already reads THIS SAME vtxN track off centerSegments to rebuild the
-      // outline at render time — that whole read side predates this fix and
-      // was simply never reachable because nothing could ever WRITE to it.
-      // setPathVertexOffset itself never touches segments/centerSegments at
-      // all (just holder.motion['vtx'+vi]), so no branch is needed here.
-      var vtxTargetPath = typeof nodeEditTargetPath === 'function' ? nodeEditTargetPath() : null;
-      var vtxStrokeId = (bestNh.type === 'point' && vtxTargetPath && vtxTargetPath.data) ? vtxTargetPath.data.strokeId : null;
-      var isMotionVertexDrag = !!(vtxStrokeId && state.appMode === 'motion' && window.SMMotion && SMMotion.hasPathVertexMotionFor(state.activeLayerIdx, vtxStrokeId));
-
-      pushUndo();
-      if (isMotionVertexDrag) {
-        _nodeDrag.motionStrokeId = vtxStrokeId;
-        _nodeDrag.motionLi = state.activeLayerIdx;
-        _wasInterpolated = false;
-      } else {
-      _nodeDrag.motionStrokeId = null;
-      // Promote a HELD frame to a real keyframe before touching geometry.
-      // Without this, editing vertices on a frame that merely inherits an
-      // earlier keyframe was silently DISCARDED: saveActiveLayerFrame (app.js)
-      // returns early when the frame is neither a keyframe nor interpolated,
-      // so the edit lived only in the live Paper items until the next
-      // loadFrame threw it away. Reported 2026-07-28 ("quand je modifie les
-      // vecteurs d'une clé prolongée [...] ça ne modifie pas la clé").
-      //
-      // This also makes subselect answer the same way the Draw tool already
-      // did — drawing on a held frame has always created a keyframe. Same
-      // gesture class, same answer, nothing lost either way.
-      var _wasKey = (function () {
-        var f = state.layers[state.activeLayerIdx].frames[state.currentFrame];
-        return !!(f && (f.isKeyframe || f.isInterpolated));
-      })();
-      _wasInterpolated = (function () {
-        var f = state.layers[state.activeLayerIdx].frames[state.currentFrame];
-        return !!(f && f.isInterpolated);
-      })();
-      ensureKeyframe();
-      if (!_wasKey) {
-        // ensureKeyframe -> loadFrame rebuilds the layer's children, so every
-        // Paper reference captured above is now stale. Re-resolve by INDEX
-        // (bestNh.segIndex stays valid — same geometry, new objects), exactly
-        // as select-bridge's beginDistort does after its own ensureKeyframe.
-        selectedPaths = state.selectedStrokeIndices
-          .map(function (i) { return userLayers[state.activeLayerIdx].children[i]; })
-          .filter(Boolean);
-        if (!selectedPaths.length) return;
-        renderNodeHandles();
-      }
-      }
-      _nodeDrag.active = true; _nodeDrag.path = selectedPaths[0]; _nodeDrag.segIndex = bestNh.segIndex;
-      _nodeDrag.dragStartPointer = pt.clone(); _nodeDrag.appliedDelta = new Point(0, 0);
-      // grabbing one of several marquee-selected anchors drags them all
-      if (bestNh.type === 'point' && _nodeSel.indexOf(bestNh.segIndex) >= 0 && _nodeSel.length > 1) {
-        _nodeDrag.type = 'group';
-      } else {
-        _nodeDrag.type = bestNh.type;
-        if (bestNh.type === 'point') {
-          _nodeSel = e.shiftKey ? _nodeSel.concat([bestNh.segIndex]) : [bestNh.segIndex];
-          renderNodeHandles();
-        }
-      }
-      window.SMEngineBridge.renderNow();
-      return;
-    }
-    var subHit = layer.hitTest(pt, { stroke: true, fill: true, pixel: true, tolerance: 8 / view.zoom });
-    // Isolation entered by a Select double-click (tools.js's
-    // onViewDoubleClick sets _fsIsolation): only that shape/group is
-    // reachable, and a click outside it leaves back to Select. This file is
-    // the ENGINE-ON port of the same branch and the engine is on by default,
-    // so the guard has to exist in both or the gesture behaves differently
-    // depending on the renderer — CLAUDE.md §3's duplicated-pair rule.
-    if (window._fsIsolation && subHit) {
-      var subAllowed = window._fsIsolation.groupId
-        ? !!(subHit.item.data && subHit.item.data.groupId === window._fsIsolation.groupId)
-        : subHit.item === window._fsIsolation.path;
-      if (!subAllowed) subHit = null;
-    }
-    if (!subHit && window._fsIsolation) {
-      window._fsIsolation = null; clearSel(); window.SM.setTool('select');
-      renderArcs(); updateUI(); window.SMEngineBridge.renderNow();
-      return;
-    }
-    // Raster companions count too (Bitmap Brush v2, bitmap-brush.js): the
-    // visible texture over a bitmap-brush stroke is ONE Raster tagged
-    // isBrushTextureCopy — its anchor path has strokeColor camouflaged to
-    // null, so the stroke hit-test can't land on the anchor directly and
-    // the texture is often the only thing under the cursor. The vector
-    // presets never hit this (their dabs are Paths, already matched);
-    // resolveBrushAnchor maps either kind back to the anchor. The
-    // `instanceof Path` guard on subTarget keeps a plain imported image
-    // (a Raster with NO companion tag, resolved to itself) un-node-editable
-    // as before.
-    if (subHit && (subHit.item instanceof Path || (subHit.item instanceof Raster && subHit.item.data && subHit.item.data.isBrushTextureCopy))) {
-      clearSel();
-      var subTarget = resolveBrushAnchor(subHit.item, layer);
-      if (!(subTarget instanceof Path)) { window.SMEngineBridge.renderNow(); return; }
-      selectedPaths.push(subTarget);
-      state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
-      // The Rust mirror redraws the handle overlay fresh from
-      // nodeEditTargetPath() every frame regardless, so this looked correct
-      // visually — but the NEXT click's hit-test reads the plain `nodeHandles`
-      // JS array, which only tools.js's renderNodeHandles() populates. Left
-      // stale (still describing whatever was selected before, or empty on
-      // the very first click), so a click that looked like "grab this
-      // tangent handle" silently missed and fell through to reselecting the
-      // path or starting a marquee — the actual "can't edit tangents" bug.
-      renderNodeHandles();
-    } else {
-      // "avoir aussi les rect selection box pour cet outil" (2026-07): a
-      // marquee already existed here, but ONLY once a path was already
-      // the edit target (selectedPaths.length===1) — dragging on empty
-      // space with nothing pre-selected fell through to clearSel() and
-      // did nothing, unlike Illustrator/Figma's Direct Selection tool,
-      // where a marquee box works in one drag with no separate prior
-      // click. Now always starts the marquee; onUp below picks the
-      // target path itself (whichever path's bounds the box overlaps)
-      // when none was already selected, THEN does the same node-
-      // containment test as before.
-      _nmq.active = true; _nmq.start = pt.clone(); _nmq.rect = null;
-      window.SMEngineBridge.renderNow();
-      return;
-    }
-    renderArcs(); updateUI();
-    window.SMEngineBridge.renderNow();
-  }
-
-  function onMove(e) {
-    if (!(_nmq.active || _nodeDrag.active)) return;
-    if (!allowLegacySelectionEdit(e)) return;
-    e.stopImmediatePropagation();
-    e.preventDefault();
-    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    var pt = toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx);
-    var delta = pt.subtract(lastPt);
-    if (_nodeDrag.active && (_nodeDrag.type === 'point' || _nodeDrag.type === 'group')) {
-      var desired = pt.subtract(_nodeDrag.dragStartPointer || lastPt);
-      if (e.shiftKey) {
-        var snapped = constrainAngle45(_nodeDrag.dragStartPointer || lastPt, pt);
-        desired = snapped.subtract(_nodeDrag.dragStartPointer || lastPt);
-      }
-      var already = _nodeDrag.appliedDelta || new Point(0, 0);
-      delta = desired.subtract(already);
-      _nodeDrag.appliedDelta = desired;
-    } else if (_nodeDrag.active && e.shiftKey && (_nodeDrag.type === 'handleIn' || _nodeDrag.type === 'handleOut')) {
-      var hs = nodeEditSegmentsData(_nodeDrag.path)[_nodeDrag.segIndex];
-      if (hs) pt = constrainAngle45(new Point(hs.point[0], hs.point[1]), pt);
-    }
-
-    if (_nmq.active) {
-      var nx1 = Math.min(_nmq.start.x, pt.x), ny1 = Math.min(_nmq.start.y, pt.y);
-      var nx2 = Math.max(_nmq.start.x, pt.x), ny2 = Math.max(_nmq.start.y, pt.y);
-      if (_nmq.rect) _nmq.rect.remove();
-      var prevA2 = project.activeLayer; marqueeLayer.activate();
-      _nmq.rect = new Path.Rectangle({
-        from: new Point(nx1, ny1), to: new Point(nx2, ny2),
-        strokeColor: 'rgba(255,184,108,.9)', strokeWidth: 1 / view.zoom,
-        dashArray: [4 / view.zoom, 3 / view.zoom], fillColor: new Color(1, 0.72, 0.42, 0.08), insert: true,
-      });
-      prevA2.activate();
-    } else if (_nodeDrag.active && _nodeDrag.motionStrokeId) {
-      // feedback #216 — armed Path-vertex Motion track: write the total
-      // accumulated drag delta into vtxN (SMMotion.setPathVertexOffset)
-      // instead of mutating path.segments, mirroring image-mesh-bridge.js's
-      // setMeshVertexOffset pattern (same vtxN machinery, CLAUDE.md §12ter).
-      // `desired` is the SAME total-since-mousedown delta the raw-geometry
-      // branches below would have added to the segment point, so this is a
-      // like-for-like swap of destination, not a different gesture.
-      var vtxIndices = _nodeDrag.type === 'group' ? _nodeSel : [_nodeDrag.segIndex];
-      vtxIndices.forEach(function (vi) {
-        SMMotion.setPathVertexOffset(_nodeDrag.motionLi, _nodeDrag.motionStrokeId, vi, desired.x, desired.y);
-      });
-      if (SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
-    } else if (_nodeDrag.active && _nodeDrag.type === 'group') {
-      var gp = _nodeDrag.path;
-      if (gp.data && gp.data.isVectorBrush && gp.data.centerSegments) {
-        _nodeSel.forEach(function (si) { var cs3 = gp.data.centerSegments[si]; if (cs3) cs3.point = [cs3.point[0] + delta.x, cs3.point[1] + delta.y]; });
-        rebuildVectorBrushOutline(gp);
-      } else {
-        _nodeSel.forEach(function (si) { var sg = gp.segments[si]; if (sg) sg.point = sg.point.add(delta); });
-      }
-      // Perf fix (2026-07, "pas très fluide" with thousands of points):
-      // renderNodeHandles() rebuilds EVERY node's Paper.js Path/Circle
-      // display objects from scratch — O(segment count) allocations, on
-      // every single pointermove of the drag. Wasted work whenever the
-      // Rust engine is on (the default): its own overlay
-      // (buildNodeHandleItems, engine-bridge.js) re-reads segment
-      // positions/_nodeSel directly from the live path on every
-      // renderNow() call below, completely independent of nodeLayer's
-      // Paper objects — confirmed by reading it before making this
-      // change. nodeHandles[].pos (built by renderNodeHandles, used for
-      // hit-testing) is only ever read at the START of a NEW click
-      // (onDown), never mid-drag, so it doesn't need to stay fresh DURING
-      // one either — onUp already refreshes it once the drag ends. Only
-      // skipped when the engine is OFF, where nodeLayer's own Paper
-      // objects ARE the visible overlay (the Paper-native fallback has no
-      // other rendering path).
-      if (!window.SMEngineBridge.isEnabled()) renderNodeHandles();
-      // Live fill follow: without this, a fill linked to this stroke only
-      // regenerated at mouseup, so the fill visibly lagged behind the
-      // stroke for the whole drag instead of tracking it in real time.
-      fillRegenerateLinked(userLayers[state.activeLayerIdx], gp);
-      // Live texture follow for Bitmap Brush anchors — same "at mouseup
-      // only, it visibly lags" complaint as the fill line above, fixed the
-      // same way (rAF-coalesced + in-place re-upload, see liveRestamp's
-      // own comment for why this is cheap where full regenerate isn't).
-      if (gp.data && gp.data.bitmapBrushSpec && window.SMBitmapBrush) SMBitmapBrush.liveRestamp(gp, userLayers[state.activeLayerIdx]);
-    } else if (_nodeDrag.active) {
-      var sdp = _nodeDrag.path;
-      if (sdp.data && sdp.data.isVectorBrush && sdp.data.centerSegments) {
-        var scs = sdp.data.centerSegments[_nodeDrag.segIndex];
-        if (_nodeDrag.type === 'point') { scs.point = [scs.point[0] + delta.x, scs.point[1] + delta.y]; }
-        else if (_nodeDrag.type === 'handleOut') { var sno = [pt.x - scs.point[0], pt.y - scs.point[1]]; scs.handleOut = sno; if (!e.altKey) scs.handleIn = [-sno[0], -sno[1]]; }
-        else if (_nodeDrag.type === 'handleIn') { var sni = [pt.x - scs.point[0], pt.y - scs.point[1]]; scs.handleIn = sni; if (!e.altKey) scs.handleOut = [-sni[0], -sni[1]]; }
-        rebuildVectorBrushOutline(sdp);
-      } else {
-        var sseg = sdp.segments[_nodeDrag.segIndex];
-        if (_nodeDrag.type === 'point') sseg.point = sseg.point.add(delta);
-        else if (_nodeDrag.type === 'handleOut') { sseg.handleOut = pt.subtract(sseg.point); if (!e.altKey) sseg.handleIn = sseg.handleOut.multiply(-1); }
-        else if (_nodeDrag.type === 'handleIn') { sseg.handleIn = pt.subtract(sseg.point); if (!e.altKey) sseg.handleOut = sseg.handleIn.multiply(-1); }
-      }
-      // See the identical perf comment in the group-drag branch above.
-      if (!window.SMEngineBridge.isEnabled()) renderNodeHandles();
-      fillRegenerateLinked(userLayers[state.activeLayerIdx], sdp);
-      // Live texture follow — see the identical call in the group branch.
-      if (sdp.data && sdp.data.bitmapBrushSpec && window.SMBitmapBrush) SMBitmapBrush.liveRestamp(sdp, userLayers[state.activeLayerIdx]);
-    }
-    lastPt = pt;
-    window.SMEngineBridge.renderNow();
-  }
-
-  function onUp(e) {
-    if (!(_nmq.active || _nodeDrag.active)) return;
-    if (!allowLegacySelectionEdit(e)) return;
-    e.stopImmediatePropagation();
-    e.preventDefault();
-    if (_nmq.active) {
-      if (_nmq.rect) {
-        var nmb = _nmq.rect.bounds;
-        var npath = nodeEditTargetPath();
-        // No path was already the edit target — pick one from what the
-        // box actually overlaps (topmost, matching project.layers'
-        // back-to-front draw order, same convention select-bridge.js
-        // uses for its own topmost-first hit search) instead of leaving
-        // the drag a no-op.
-        if (!npath) {
-          var layerForPick = userLayers[state.activeLayerIdx];
-          var candidates = layerForPick ? layerForPick.children.filter(function (c) { return c instanceof Path && c.segments && c.segments.length && isSelectablePathChild(c) && c.bounds.intersects(nmb); }) : [];
-          if (candidates.length) {
-            var picked = candidates[candidates.length - 1];
-            clearSel();
-            selectedPaths.push(picked);
-            state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
-            npath = nodeEditTargetPath();
-          }
-        }
-        _nodeSel = [];
-        if (npath) {
-          var nsegs = nodeEditSegmentsData(npath);
-          nsegs.forEach(function (s, i) { if (nmb.contains(new Point(s.point[0], s.point[1]))) _nodeSel.push(i); });
-        }
-        _nmq.rect.remove(); _nmq.rect = null;
-        if (!_nodeSel.length) clearSel();
-      } else { clearSel(); }
-      _nmq.active = false; renderNodeHandles(); renderArcs(); updateUI();
-    } else if (_nodeDrag.active && _nodeDrag.motionStrokeId) {
-      // feedback #216 — the vtxN write already happened live in onMove
-      // (setValue there handles both the key-at-playhead and static-override
-      // cases); nothing here touches Animation 2D geometry/frames, so none
-      // of the raw-segment commit machinery below applies (fork/fill-regen/
-      // saveActiveLayerFrame/harmonizeAfterEdit are all specific to that
-      // system). updateUI() only — a fresh key may have just appeared on
-      // the Path group's row, which only a full timeline rebuild picks up
-      // (same reasoning as image-mesh-bridge.js's onUp).
-      _nodeDrag.active = false; _nodeDrag.path = null; _nodeDrag.motionStrokeId = null;
-      renderNodeHandles(); updateUI();
-    } else if (_nodeDrag.active) {
-      var editedPath = _nodeDrag.path; var editedType = _nodeDrag.type; var editedSegIndex = _nodeDrag.segIndex;
-      _nodeDrag.active = false; _nodeDrag.path = null;
-      // Alt+click (not drag) on an anchor toggles its tangent handles —
-      // Illustrator/Figma "Convert Anchor Point" convention, reported as
-      // "avec alt enfoncé il faudrait que ça referme les tangentes et si
-      // il n'y a pas de tangente alors ça les affiche". onDown always
-      // starts a normal 'point' drag on hit (no separate gesture to grab
-      // here), so this only fires when Alt was held at mousedown AND the
-      // pointer barely moved — a real drag still reshapes/repositions.
-      var movedPx = Math.hypot(e.clientX - _downClientX, e.clientY - _downClientY);
-      if (editedType === 'point' && _downAlt && movedPx < 4) {
-        // No pushUndo() here — onDown already snapshotted state before any
-        // mutation (line ~76: pushUndo() right before starting the drag),
-        // a second one here would just double up the undo stack for one
-        // visual change.
-        toggleTangentAt(editedPath, editedSegIndex);
-      }
-      // Team review: reshaping someone else's stroke forks it — see
-      // forkIfForeignOwner's own comment. Must run BEFORE fillRegenerateLinked/
-      // regenerateBrushTexture below, which read the CURRENT strokeId to
-      // re-associate fills/texture — forking assigns editedPath a fresh id.
-      forkIfForeignOwner(editedPath);
-      fillRegenerateLinked(userLayers[state.activeLayerIdx], editedPath);
-      regenerateBrushTexture(editedPath, userLayers[state.activeLayerIdx]);
-      saveActiveLayerFrame();
-      if (_wasInterpolated && typeof harmonizeAfterEdit === 'function') harmonizeAfterEdit(state.currentFrame);
-      // Same stale-onion-ghost fix as select-bridge.js's xform/move commits
-      // — onionPrevLayer/onionNextLayer are a snapshot cache never rebuilt
-      // by a node-edit commit, so a held neighbor frame kept ghosting this
-      // path at its pre-edit shape until an unrelated frame-nav/onion
-      // toggle happened to call renderOS().
-      renderOS();
-      renderNodeHandles(); updateUI();
-    }
-    window.SMEngineBridge.renderNow();
-    window.SMEngineBridge.resume();
-  }
-
-  function init() {
-    var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
-    target.addEventListener('pointerdown', onDown, { capture: true });
-    target.addEventListener('pointermove', onMove, { capture: true });
-    target.addEventListener('pointerup', onUp, { capture: true });
-    target.addEventListener('pointercancel', onUp, { capture: true });
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-})();
+  function install(root){const init=()=>{const controller=create(root);root.NemoNativeSubselectController=controller;const d=root.document,target=d.getElementById('canvas-area')||d.getElementById('drawing-canvas');if(!target)return;
+    // Document-level capture runs before any canvas-area listener whatever the script order, so select-bridge's native canvas intent can never swallow a Subselect gesture; handle() filters on tool, native project and event target.
+    for(const [event,kind] of [['pointerdown','down'],['pointermove','move'],['pointerup','up'],['pointercancel','cancel'],['lostpointercapture','lost']])d.addEventListener(event,e=>controller.handle(kind,e),{capture:true});
+    d.addEventListener('keydown',e=>controller.key(e),{capture:true});root.addEventListener('blur',()=>controller.cancel());
+  };if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init);else init();}
+  return Object.freeze({create,install,inverse,map});
+}));

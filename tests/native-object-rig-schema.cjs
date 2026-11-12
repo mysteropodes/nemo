@@ -1,7 +1,7 @@
 'use strict';
 /* A minimal validator of the JSON-schema keyword subset the lane-3 payload defs use (not a general validator): type, const,
  * enum, required, properties, additionalProperties:false, items, minItems, maxItems, minLength, maxLength, minimum, maximum,
- * minProperties, oneOf, allOf and local $ref. Used only to show that the closed schema and the contract accept and refuse
+ * minProperties, oneOf, allOf, not and local $ref. Used only to show that the closed schema and the contract accept and refuse
  * the same payloads. */
 function validator(root) {
   const resolve = (ref) => {
@@ -18,6 +18,7 @@ function validator(root) {
     if (schema.$ref) return ok(resolve(schema.$ref), v);
     if (schema.allOf && !schema.allOf.every((s) => ok(s, v))) return false;
     if (schema.oneOf && schema.oneOf.filter((s) => ok(s, v)).length !== 1) return false;
+    if (schema.not && ok(schema.not, v)) return false;
     if ('const' in schema && JSON.stringify(schema.const) !== JSON.stringify(v)) return false;
     if (schema.enum && !schema.enum.some((e) => JSON.stringify(e) === JSON.stringify(v))) return false;
     if (schema.type && !typeOk(schema.type, v)) return false;

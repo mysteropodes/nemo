@@ -45,11 +45,27 @@
     "fallback": "none"
   },
   "resourceBoundary": {
-    "maxRequestBytes": 4096,
-    "maxReadResponseBytes": 4096,
-    "policy": "Complete correlated retained receipt or typed refusal. Full original request and full response are limited to 4096 encoded bytes; never split or truncate. Bitmap packets carry existing raster records and retained-origin identity, never encoded media."
+    "maxRequestBytes": 65536,
+    "maxReadResponseBytes": 65536,
+    "policy": "Complete correlated retained receipt or typed refusal. Full original request and full response are limited to 4096 encoded bytes, except the shape clipboard that carries its detached clip inline: clipboard.paste accepts a 65536-byte request and clipboard.copy and clipboard.cut return a reply of at most 65536 bytes (the engine's own clip payload bound); a clip over the bound is a typed refusal before any cut publishes, never split or truncated. Bitmap packets carry existing raster records and retained-origin identity, never encoded media.",
+    "requestBytesByOperation": {
+      "command.document.object.selection.delete": 4096,
+      "command.document.object.selection.duplicate": 4096,
+      "command.document.object.layer.split": 4096,
+      "command.document.object.clipboard.paste": 65536,
+      "command.document.object.clipboard.copy": 4096,
+      "command.document.object.clipboard.cut": 4096
+    },
+    "responseBytesByOperation": {
+      "command.document.object.selection.delete": 4096,
+      "command.document.object.selection.duplicate": 4096,
+      "command.document.object.layer.split": 4096,
+      "command.document.object.clipboard.paste": 4096,
+      "command.document.object.clipboard.copy": 65536,
+      "command.document.object.clipboard.cut": 65536
+    }
   },
-  "semantics": "Delete or duplicate selected elements, split a layer into one layer per independent element, or copy/cut/paste a bounded inline clip, atomically with groups and references. A pressure linked-fill path and a bitmap-brush raster companion travel with their primary; each retains its actual geometry and paint-order entry. Copies receive fresh stroke, linked-fill, brush-group and combine-group identities. Asset-bearing paste reconstructs the complete packet from its same-owner retained source revision and requires the same current encoded asset allocation. Copy changes no revision, history or redo. Cut preflights the complete correlated response before one deletion revision/undo entry; empty selection returns null without editing. Replay returns the original retained clipboard and disposition. Animation2D promotes the complete held cell once; Motion edits its inherited key. Unsupported family references refuse atomically. No JS/Paper writer or optimistic mutation.",
+  "semantics": "Delete or duplicate selected elements, split a layer into one layer per independent element (layer.split takes scene-root or a declared component as its contextId, #2256: the component is the scene of the unchanged split and the result is one revision and one undo entry; an undeclared context refuses), or copy/cut/paste a bounded inline clip, atomically with groups and references. A pressure linked-fill path and a bitmap-brush raster companion travel with their primary; each retains its actual geometry and paint-order entry. Copies receive fresh stroke, linked-fill, brush-group and combine-group identities. Asset-bearing paste reconstructs the complete packet from its same-owner retained source revision and requires the same current encoded asset allocation. Copy changes no revision, history or redo. Cut preflights the complete correlated response before one deletion revision/undo entry; empty selection returns null without editing. Replay returns the original retained clipboard and disposition. Animation2D promotes the complete held cell once; Motion edits its inherited key. Unsupported family references refuse atomically. No JS/Paper writer or optimistic mutation.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",

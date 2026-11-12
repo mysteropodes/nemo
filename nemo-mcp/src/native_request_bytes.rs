@@ -16,7 +16,16 @@ pub(super) const MAX_REQUEST_BYTES: usize = 65_536;
 pub(super) fn request_limit(operation: &str) -> usize {
     if super::native_clipboard_transport::owns(operation) {
         super::native_clipboard_transport::MESSAGE_BYTES
-    } else if operation == "command.document.object.vector.edit" {
+    } else if operation == "command.document.object.vector.edit"
+        || operation == "command.document.object.fill.brush"
+        || operation == "command.document.object.brush.bitmap.stroke"
+        || operation.starts_with("command.document.object.tween.")
+        || operation == "command.document.object.property.preset.apply"
+        || operation == "command.document.object.property.keys.paste"
+        || operation == "command.document.object.property.batch"
+        // The shape clipboard paste carries its detached clip inline (the engine's own clip bound).
+        || operation == "command.document.object.clipboard.paste"
+    {
         MAX_REQUEST_BYTES
     } else {
         crate::contract::NATIVE_MAX_MESSAGE_BYTES

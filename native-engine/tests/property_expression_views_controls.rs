@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => property_expression_views_controls_tests
 //! Controls for the expression context views: mutation detection, identity,
 //! detachment and the contexts this provider refuses to describe.
 

@@ -6,8 +6,9 @@
   var Reader=typeof module==='object'&&module.exports?require('./native-text-read.js'):root.NemoNativeTextRead;
   var Writer=typeof module==='object'&&module.exports?require('./native-object-text-layout.js'):root.NemoNativeObjectTextLayout;
   var Mapping=(typeof module==='object'&&module.exports?require('./native-viewport-underlay.js'):root.NemoNativeViewportUnderlay);
-  var api=factory(Tool,Item,Reader,Writer,Mapping&&Mapping.canvasMapping);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextToolDesktop=api;
-}(typeof globalThis==='object'?globalThis:this,function(Tool,Item,Reader,Writer,Mapping){
+  var Label=typeof module==='object'&&module.exports?require('./native-font-panel.js'):root.NemoNativeFontPanel;
+  var api=factory(Tool,Item,Reader,Writer,Mapping&&Mapping.canvasMapping,Label);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextToolDesktop=api;
+}(typeof globalThis==='object'?globalThis:this,function(Tool,Item,Reader,Writer,Mapping,Label){
   'use strict';var bindings=new WeakMap(),traceBudget=64;
   // Temporary local-candidate diagnostic: eager scalars, no Event retention or content.
   function trace(root,decision,method,sampled){
@@ -51,23 +52,37 @@
     colorHexLabel.appendChild(colorHex);if(pop&&colorParent){colorParent.style.flexWrap='wrap';colorParent.appendChild(colorHexLabel);}
     var savedFonts=font?Array.from(font.children):[],savedFontValue=font&&font.value,events=[];
     function on(n,name,fn,capture){if(!n)return;n.addEventListener(name,fn,!!capture);events.push([n,name,fn,!!capture]);}
+    // Non-focusable popover chrome (padding, labels) gives blur relatedTarget=null: track where the last pointerdown landed instead.
+    var popDown=false;on(doc,'pointerdown',function(e){popDown=!!(pop&&e.target&&pop.contains(e.target));},true);
     function ownsUI(){return !b.retired&&bindings.get(root)===b;}
     function notify(message){if(ownsUI())status.textContent=message;}
+    // Baseline look (1065e9d8 text drag rect): dashed orange outline, faint fill; pure presentation, never a document item.
+    var guide=null,dragBox=null;
+    function removeGuide(){if(guide&&guide.parentNode)guide.parentNode.removeChild(guide);guide=null;}
+    function updateGuide(x,y){
+      if(!drag||drag.clickOnly||Math.abs(x-drag.x)<=4){removeGuide();return;}
+      if(!guide){guide=node('div');guide.id='native-text-drag-guide';guide.setAttribute('aria-hidden','true');
+        Object.assign(guide.style,{position:'fixed',pointerEvents:'none',zIndex:'200',boxSizing:'border-box',border:'1px dashed rgba(255,184,108,.9)',background:'rgba(255,184,108,.06)'});}
+      if(!guide.parentNode)doc.body.appendChild(guide);
+      Object.assign(guide.style,{left:Math.min(drag.x,x)+'px',top:Math.min(drag.y,y)+'px',width:Math.abs(x-drag.x)+'px',height:Math.max(24,Math.abs(y-drag.y))+'px'});
+    }
     var perspectiveProof=null,presentedView=null;
     function context(presented,lease){
       var current=b.ports.currentSession(),s=root.state,info=current&&current.info();
       var port=root.NemoNativePerspectiveController,perspective=port&&(presented?port.read():typeof port.readForCommand==='function'&&port.readForCommand(perspectiveProof));
-      if(b.retired||current!==session||!current.isActive()||!info||!s||s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.activeSymbolId||s.shadowMode||s.maskMode||s.symmetryEnabled||!perspective||!Tool.samePin(perspective.info,info)||perspective.perspective.settings.perspectiveEnabled)return null;
+      if(b.retired||current!==session||!current.isActive()||!info||!s||!(s.appMode==='anim2d'||s.appMode==='motion')||s.playing||s.spaceDown||s.isPanning||s.shadowMode||s.maskMode||s.symmetryEnabled||!perspective||!Tool.samePin(perspective.info,info))return null;
       if(presented)perspectiveProof=perspective;
-      var layer=info.layers[s.activeLayerIdx],frame=s.currentFrame,rect=bounds(root,info);
-      if(!rect||!layer||layer.locked||!Number.isInteger(frame)||frame<0||frame>=info.totalFrames)return null;
+      // #2267: inside an entered component the context, its layer rows and its frame count are the component's (the ones the workspace controller holds); the Perspective guide does not gate Text.
+      var comp=root.NemoNativeComponentContext,held=comp?comp.contextId(root):'scene-root',rows=comp&&comp.layerRows(root)||info.layers;
+      var layer=rows[s.activeLayerIdx],frame=s.currentFrame,rect=bounds(root,info);
+      if(s.activeSymbolId&&s.activeSymbolId!==held||!rect||!layer||layer.locked||!Number.isInteger(frame)||frame<0||frame>=(comp?comp.frameBound(root,info):info.totalFrames))return null;
       if(!presented&&(!lease||typeof lease.readPresentedObjectSession!=='function'))return null;
       var p=presented?current.readPresentedObjectSession():lease.readPresentedObjectSession();
-      if(!p||!Tool.samePin(p,info)||!p.presentation||p.presentation.frame!==frame)return null;
+      if(!p||!Tool.samePin(p,info)||!p.presentation||p.presentation.frame!==frame||(p.presentation.contextId||'scene-root')!==held)return null;
       if(presented){if(!Mapping.matchesView(root,p.presentation))return null;presentedView=p.presentation;}
       else if(p.presentation!==presentedView||(p.presentation.view?p.presentation.view.mode:'canvas')!==(s.cameraView===true?'stored-camera':'canvas'))return null;
       return {pin:{instanceId:info.instanceId,documentId:info.documentId,lifecycleGeneration:info.lifecycleGeneration,contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId},layerUid:layer.layerUid,frame:frame,
-        selectionKey:JSON.stringify([s.activeLayerIdx,root._layerSel||[],s.tool]),viewKey:JSON.stringify([rect,presentedView.view||null]),presentation:presentedView,bounds:rect,canvasW:info.canvasW,canvasH:info.canvasH};
+        contextId:held,selectionKey:JSON.stringify([held,s.activeLayerIdx,root._layerSel||[],s.tool]),viewKey:JSON.stringify([rect,presentedView.view||null]),presentation:presentedView,bounds:rect,canvasW:info.canvasW,canvasH:info.canvasH};
     }
     function controls(){if(!ownsUI())return;var c=context(true),blocked=modelState.busy||modelState.unknown;
       if(apply)apply.disabled=blocked||!shown||!c||invalidHex;colorHex.disabled=blocked||!shown||!c;select.disabled=blocked||!page;refresh.disabled=b.retired||refreshing||modelState.busy;
@@ -75,34 +90,56 @@
     function validHex(value){return /^#[0-9a-fA-F]{6}$/.test(value);}
     function hexValidity(){invalidHex=!validHex(colorHex.value);colorHex.setAttribute('aria-invalid',String(invalidHex));return !invalidHex;}
     function syncHex(){colorHex.value=fields.color.value;hexValidity();}
-    function hide(){fontTicket++;shown=null;dirty.clear();invalidHex=false;colorHex.setAttribute('aria-invalid','false');if(!ownsUI())return;
+    function hide(){removeGuide();dragBox=null;fontTicket++;shown=null;dirty.clear();invalidHex=false;colorHex.setAttribute('aria-invalid','false');if(!ownsUI())return;
       if(area&&area.parentNode)area.parentNode.removeChild(area);area=null;if(pop)pop.style.display='none';controls();}
     function chosenFont(value){var i=Number(value);return Number.isInteger(i)&&fontChoices[i]?fontChoices[i].font:null;}
     function fillFonts(rows,d,ticket){
       if(!ownsUI()||shown!==d||ticket!==fontTicket)return;
       var wanted=dirty.has('font')?chosenFont(font.value):d.block.font;wanted=wanted||d.block.font;
-      var choices=Item.FONTS.map(function(key){return {name:key,font:{kind:'bundled',fontKey:key}};});
-      rows.filter(function(r){return r&&r.available===true&&typeof r.assetId==='string';}).forEach(function(r){choices.push({name:r.name+' — '+r.assetId,font:{kind:'asset',assetId:r.assetId}});});
+      // #2267: the human family/style name is the label; the opaque asset id stays the tooltip and the committed value, never the text.
+      var label=Label&&Label.label||function(n){return String(n);};
+      var choices=Item.FONTS.map(function(key){return {name:label(key),title:key,font:{kind:'bundled',fontKey:key}};});
+      rows.filter(function(r){return r&&r.available===true&&typeof r.assetId==='string';}).forEach(function(r){choices.push({name:label(r.name),title:r.assetId,font:{kind:'asset',assetId:r.assetId}});});
       var selected=choices.findIndex(function(c){return c.font.kind===wanted.kind&&(c.font.kind==='asset'?c.font.assetId===wanted.assetId:c.font.fontKey===wanted.fontKey);});
-      if(selected<0){choices.push({name:'Unavailable font: '+(wanted.assetId||wanted.fontKey),font:wanted,unavailable:true});selected=choices.length-1;}
-      fontChoices=choices;font.replaceChildren();choices.forEach(function(c,i){var o=node('option',c.name);o.value=String(i);o.disabled=!!c.unavailable;font.appendChild(o);});font.value=String(selected);controls();
+      if(selected<0){choices.push({name:'Unavailable font'+(wanted.fontKey?': '+label(wanted.fontKey):''),title:wanted.assetId||wanted.fontKey,font:wanted,unavailable:true});selected=choices.length-1;}
+      fontChoices=choices;font.replaceChildren();choices.forEach(function(c,i){var o=node('option',c.name);o.value=String(i);o.title=c.title||'';o.disabled=!!c.unavailable;font.appendChild(o);});font.value=String(selected);controls();
     }
+    function turnedBox(b){ // Doc-unit frame of a turned block: stored width, else a monospace-ish estimate of the longest line.
+      var lines=String(b.text).split('\n'),longest=Math.max.apply(null,lines.map(function(l){return l.length;}));
+      return {w:typeof b.fixedWidth==='number'&&b.fixedWidth>0?b.fixedWidth:Math.max(b.size*2,longest*b.size*0.6),h:lines.length*b.size*1.25};}
     function show(d){
       if(!ownsUI()){trace(root,'show.reject.owner',null,null);return;}
       if(!pop||Object.values(fields).some(function(n){return !n;})){trace(root,'show.reject.controls',null,null);notify('Text editor controls are unavailable.');return;}
       shown=d;dirty.clear();fields.text.value=d.block.text;fields.size.value=String(d.block.size);fields.color.value=d.block.color.slice(0,7);syncHex();fields.align.value=d.block.align;
       var c=context(true);if(!c){trace(root,'show.reject.context',null,null);return;}var at=screen(d.block.anchorTopLeft,c);
-      pop.style.display='block';pop.style.left=Math.max(4,Math.min(doc.documentElement.clientWidth-240,at.x+10))+'px';pop.style.top=Math.max(4,Math.min(doc.documentElement.clientHeight-220,at.y+10))+'px';
+      var isArea=!d.target&&!!d.placement&&d.placement.fixedWidth!==null,sx=c.bounds.width/c.canvasW,sy=c.bounds.height/c.canvasH,box=dragBox;dragBox=null;
+      // #2267: a stored turn (degrees about the anchor) edits in place: the overlay carries it as a screen-space transform about the anchor's screen point.
+      var rot=Number.isFinite(d.block.rotation)?d.block.rotation:0,turned=!!d.target&&rot!==0,tb=turned?turnedBox(d.block):null;
+      var m=c.presentation.view?Mapping.transform(c,false):null,wDoc=isArea?d.placement.fixedWidth:turned?tb.w:0,wPx=box?box.w:wDoc*sx,hPx=box?box.h:Math.max(24,(turned?tb.h:d.block.size*1.25)*sy);
+      var th=rot*Math.PI/180,cs=Math.cos(th),sn=Math.sin(th),M=m||[1,0,0,1,0,0];
+      var L=[sx*(M[0]*cs+M[2]*sn),sy*(M[1]*cs+M[3]*sn),sx*(M[2]*cs-M[0]*sn),sy*(M[3]*cs-M[1]*sn)]; // doc units -> screen px, turn included
+      var left=at.x+10,top=at.y+10,vh=root.innerHeight||doc.documentElement.clientHeight,popH=pop.offsetHeight||220;
+      if(turned){ // Dock outside the turned frame: its screen corners bound the overlay.
+        var xs=[],ys=[];[[0,0],[tb.w,0],[0,tb.h],[tb.w,tb.h]].forEach(function(q){xs.push(at.x+L[0]*q[0]+L[2]*q[1]);ys.push(at.y+L[1]*q[0]+L[3]*q[1]);});
+        var x0=Math.min.apply(null,xs),x1=Math.max.apply(null,xs),y0=Math.min.apply(null,ys),y1=Math.max.apply(null,ys);
+        left=x0;top=y1+8;
+        if(top>vh-220){var over=y0-popH-8;if(over>=4)top=over;else if(x1+8<=doc.documentElement.clientWidth-240){left=x1+8;top=y0;}}
+      }
+      if(isArea){ // Dock outside the draft rect so the dragged box stays visible (baseline had no popover for area drafts).
+        left=at.x;top=at.y+hPx+8;
+        if(top>vh-220){var above=at.y-popH-8;if(above>=4)top=above;else if(at.x+wPx+8<=doc.documentElement.clientWidth-240){left=at.x+wPx+8;top=at.y;}}
+      }
+      pop.style.display='block';pop.style.left=Math.max(4,Math.min(doc.documentElement.clientWidth-240,left))+'px';pop.style.top=Math.max(4,Math.min(vh-220,top))+'px';
       if(area&&area.parentNode)area.parentNode.removeChild(area);area=null;
-      if(!d.target&&d.placement.fixedWidth!==null){
+      if(isArea||turned){
         area=node('textarea');area.id='native-text-area-draft';area.setAttribute('aria-label','Text');area.value=d.block.text;
-        Object.assign(area.style,{position:'fixed',zIndex:'201',left:at.x+'px',top:at.y+'px',width:(d.placement.fixedWidth*c.bounds.width/c.canvasW)+'px',minHeight:Math.max(24,d.block.size*1.25*c.bounds.height/c.canvasH)+'px',fontSize:(d.block.size*c.bounds.height/c.canvasH)+'px',color:d.block.color,background:'transparent'});
-        if(c.presentation.view){
-          var m=Mapping.transform(c,false),sx=c.bounds.width/c.canvasW,sy=c.bounds.height/c.canvasH;
-          Object.assign(area.style,{width:d.placement.fixedWidth+'px',minHeight:Math.max(24/sy,d.block.size*1.25)+'px',fontSize:d.block.size+'px',transformOrigin:'0 0',transform:'matrix('+[sx*m[0],sy*m[1],sx*m[2],sy*m[3],0,0].join(',')+')'});
-        }
+        Object.assign(area.style,{position:'fixed',zIndex:'201',left:at.x+'px',top:at.y+'px',width:(wDoc*sx)+'px',height:hPx+'px',boxSizing:'border-box',resize:'none',border:'1px dashed rgba(255,184,108,.9)',background:'rgba(255,184,108,.06)',fontSize:(d.block.size*sy)+'px',color:d.block.color});
+        if(m){
+          var ky=Math.hypot(sy*m[1],sy*m[3])||1;
+          Object.assign(area.style,{width:wDoc+'px',height:(turned?tb.h:hPx/ky)+'px',fontSize:d.block.size+'px',transformOrigin:'0 0',transform:'matrix('+L.concat([0,0]).join(',')+')'});
+        }else if(rot)Object.assign(area.style,{transformOrigin:'0 0',transform:'rotate('+rot+'deg)'});
         area.addEventListener('input',function(){dirty.add('text');input.value=area.value;});area.addEventListener('keydown',key);
-        area.addEventListener('blur',function(e){if(!e.relatedTarget||!pop.contains(e.relatedTarget))commit();});doc.body.appendChild(area);area.focus();
+        area.addEventListener('blur',function(e){var inPop=popDown||(e.relatedTarget&&pop.contains(e.relatedTarget));popDown=false;if(!inPop)commit();});doc.body.appendChild(area);area.focus();
       }else input.focus();
       var ticket=++fontTicket;fillFonts([],d,ticket);
       var resources=b.ports.fontResources&&b.ports.fontResources();
@@ -110,7 +147,7 @@
       controls();trace(root,'show.visible',null,{area:!!area});
     }
     var core=Tool.create({session:session,reader:Reader,writer:Writer,context:context,defaultColor:function(){var color=root.state.strokeColor||'#000000';return /^#[0-9a-fA-F]{3}$/.test(color)?'#'+color.slice(1).split('').map(function(x){return x+x;}).join(''):color;},
-      draft:show,state:function(s){modelState=s;controls();flushPerspectiveRefresh();},cancelled:hide,committed:function(){hide();notify('Text updated.');b.refresh();}});
+      inherit:function(){return root.state.appMode==='motion';},draft:show,state:function(s){modelState=s;controls();flushPerspectiveRefresh();},cancelled:hide,committed:function(){hide();notify('Text updated.');b.refresh();}});
     async function commit(){if(!ownsUI()||!shown||modelState.busy||modelState.unknown)return;
       if(!hexValidity()){notify('Enter a color as #rrggbb.');controls();return;}var changes={};
       dirty.forEach(function(k){changes[k]=k==='font'?chosenFont(font.value):k==='size'?Number(fields.size.value):k==='text'&&area?area.value:fields[k].value;
@@ -123,7 +160,7 @@
       dirty.add('color');if(hexValidity())fields.color.value=colorHex.value.toLowerCase();controls();}
     on(colorHex,'input',hexInput,true);on(colorHex,'change',hexInput,true);on(colorHex,'keydown',key,true);
     on(input,'keydown',key,true);on(apply,'click',function(e){consume(e);if(shown)commit();},true);on(cancel,'click',function(e){consume(e);core.cancel();},true);
-    function cancelIntent(){trace(root,'cancel.intent',null);drag=null;discovery=null;core.cancel();}
+    function cancelIntent(){trace(root,'cancel.intent',null);removeGuide();drag=null;discovery=null;core.cancel();}
     function syncTool(){var tool=root.state&&root.state.tool;if(tool!==lastTool){lastTool=tool;cancelIntent();}}
     on(root,'blur',cancelIntent,false);
     on(doc,'keydown',function(e){if(e.key==='Escape'&&(drag||shown||core.snapshot().discovering)){consume(e);cancelIntent();}},true);
@@ -139,6 +176,23 @@
         result.page.items.forEach(function(row,i){var option=node('option',row.target.strokeId);option.value=String(i);select.appendChild(option);});select.value='';
         notify(result.page.items.length?'Select a text block to edit.':'No authored text at this frame. Use the Text tool to place text.');
       }catch(error){readyPin=null;page=null;notify(error.message||'Native text is unavailable.');}finally{refreshing=false;controls();flushPerspectiveRefresh();}};
+    // The text block under the click, as the exact native read target; null when there is none (or no pick port: place new text).
+    // Select's own rule (baseline hit-test): the active layer first, then every other visible unlocked layer from the topmost down (#2267 D3).
+    // A hit on another layer activates it through the native layer-selection route first (the edit reads the active layer's authored frame);
+    // a refused activation is a notice, never a stray new block.
+    function pickExisting(x,y){
+      var I=root.NemoSelectCanvasIntent;
+      if(!I||typeof I.pick!=='function')return Promise.resolve(null);
+      return Promise.resolve(I.pick(root,x,y)).then(function(hit){
+        if(hit===undefined)throw new Error('The canvas is still busy - try again.');
+        var d=hit&&hit.data,t=d&&d.nativeRole==='text'&&d.nativeStableTarget;
+        if(!t)return null;
+        if(Number.isInteger(d.nativeLayerIndex)&&d.nativeLayerIndex!==root.state.activeLayerIdx){
+          var project=root.NemoNativeObjectProject,comp=root.NemoNativeComponentContext,inComp=comp&&comp.contextId(root)!=='scene-root';
+          if(inComp?!comp.selectLayer(root,d.nativeLayerIndex):(!project||typeof project.selectLayerUI!=='function'||project.selectLayerUI(root,d.nativeLayerIndex,false,d.nativeLayerUid)!==true)||root.state.activeLayerIdx!==d.nativeLayerIndex)throw new Error('That text layer could not be selected.');
+        }
+        return {contextId:t.contextId,layerUid:t.layerUid,frameScope:t.frameScope,strokeId:t.strokeId};});
+    }
     b.handle=function(method,e){
       syncTool();if(b.retired||!root.state||root.state.tool!=='text')return false;
       var sampled={};function read(k){return sampled[k]=e[k];}
@@ -158,22 +212,43 @@
         // A zero-mask primary edge is only a paired point click, never evidence of a held drag.
         trace(root,mask===0?'down.clickOnly':'down.accepted',method,sampled);drag={id:read('pointerId'),context:c,point:point(e,c),x:read('clientX'),y:read('clientY'),clickOnly:mask===0};}
       else if(method==='move'&&drag&&(read('buttons')!==1||drag.clickOnly)){trace(root,drag.clickOnly?'reject.clickOnly.move':'reject.buttons.move',method,sampled);cancelIntent();}
-      else if(method==='up'&&drag){var held=drag;drag=null;if(read('buttons')!==0||!Tool.samePin(held.context.pin,c.pin)||held.context.selectionKey!==c.selectionKey||held.context.viewKey!==c.viewKey){trace(root,'reject.releaseOrPin',method,sampled);return true;}
+      else if(method==='move'&&drag)updateGuide(sampled.clientX,sampled.clientY);
+      else if(method==='up'&&drag){var held=drag;removeGuide();drag=null;if(read('buttons')!==0||!Tool.samePin(held.context.pin,c.pin)||held.context.selectionKey!==c.selectionKey||held.context.viewKey!==c.viewKey){trace(root,'reject.releaseOrPin',method,sampled);return true;}
         var end=point(e,c),wide=Math.abs(read('clientX')-held.x)>20,token={id:held.id};
         if(held.clickOnly&&(!stage||wide||Math.hypot(sampled.clientX-held.x,read('clientY')-held.y)>20||held.context.frame!==c.frame||held.context.layerUid!==c.layerUid)){trace(root,'reject.clickOnly.release',method,sampled);return true;}
-        discovery=token;trace(root,'openNew.start',method,sampled);
-        core.openNew({anchorTopLeft:wide?{x:Math.min(held.point.x,end.x),y:Math.min(held.point.y,end.y)}:held.point,fixedWidth:wide?Math.abs(end.x-held.point.x):null})
-          .catch(function(error){trace(root,'openNew.error',null);if(discovery===token)notify(error.message);}).finally(function(){trace(root,'openNew.finished',null,{current:discovery===token,shown:!!shown});if(discovery===token)discovery=null;});
+        discovery=token;dragBox=wide?{w:Math.abs(sampled.clientX-held.x),h:Math.max(24,Math.abs(read('clientY')-held.y))}:null;trace(root,'openNew.start',method,sampled);
+        // #2267: a plain click on an existing native text block edits it (baseline: Text tool click on text = its popover); a drag always places a new area.
+        (wide?Promise.resolve(null):pickExisting(sampled.clientX,sampled.clientY)).then(function(hit){
+          if(discovery!==token)return null;
+          return hit?core.openExisting(hit):core.openNew({anchorTopLeft:wide?{x:Math.min(held.point.x,end.x),y:Math.min(held.point.y,end.y)}:held.point,fixedWidth:wide?Math.abs(end.x-held.point.x):null});})
+          .catch(function(error){trace(root,'openNew.error',null);if(discovery===token)notify(error.message);}).finally(function(){dragBox=null;trace(root,'openNew.finished',null,{current:discovery===token,shown:!!shown});if(discovery===token)discovery=null;});
       }return true;};
-    b.retire=function(){if(b.retired)return;perspectiveRefreshNeeded=false;if(removePerspectiveRead){removePerspectiveRead();removePerspectiveRead=null;}if(b.animators)b.animators.retire();var owned=ownsUI();hide();b.retired=true;core.retire();events.forEach(function(a){a[0].removeEventListener(a[1],a[2],a[3]);});
+    b.retire=function(){if(b.retired)return;removeGuide();perspectiveRefreshNeeded=false;if(removePerspectiveRead){removePerspectiveRead();removePerspectiveRead=null;}if(b.animators)b.animators.retire();var owned=ownsUI();hide();b.retired=true;core.retire();events.forEach(function(a){a[0].removeEventListener(a[1],a[2],a[3]);});
       if(owned&&font){font.replaceChildren.apply(font,savedFonts);font.value=savedFontValue;}if(colorHexLabel.parentNode)colorHexLabel.parentNode.removeChild(colorHexLabel);if(owned&&colorParent)colorParent.style.flexWrap=colorParentWrap;if(section.parentNode)section.parentNode.removeChild(section);};
-    b.ready=function(){var c=context(true);return !!c&&!!readyPin&&Tool.samePin(c.pin,readyPin);};b.core=core;bindings.set(root,b);
+    b.mid=function(e){return !!drag&&e.pointerId===drag.id;};b.ready=function(){var c=context(true);return !!c&&!!readyPin&&Tool.samePin(c.pin,readyPin);};b.core=core;bindings.set(root,b);
     var perspectiveController=root.NemoNativePerspectiveController;
     if(perspectiveController&&typeof perspectiveController.onRead==='function')removePerspectiveRead=perspectiveController.onRead(perspectiveReadChanged);
     b.refresh();return b;
   }
+  // #2372: a press while the native queue is busy (queue-pending) waits for the presentation and replays with the events that followed it, so a click
+  // right after an edit opens the text instead of "Native Text is unavailable." (native-presentation-wait.js).
+  function gateOf(root,b){
+    var W=root.NemoNativePresentationWait,d=root.document;
+    if(!W||b.gate)return b.gate;
+    var session=function(){var s=b.ports.currentSession();return s&&typeof s.readPresentedObjectSession==='function'?s:null;};
+    return b.gate=W.gate(root,{ends:['cancelEvent'],notice:'The canvas is still busy - try again.',
+      handle:function(kind,ev){var ok=b.handle(kind,ev);if(ok&&typeof b.cancelOther==='function')b.cancelOther();return ok;},
+      begins:function(kind,ev){if(b.retired||root.state.tool!=='text'||kind==='cancelEvent')return false;if(kind!=='down')return b.mid(ev); // a move / release of a press already taken
+        return (ev.target===d.getElementById('drawing-canvas')||ev.target===d.getElementById('canvas-area'))&&ev.button===0&&ev.isPrimary===true;},
+      read:function(f){var s=session();return s?s.readPresentedObjectSession(f):null;},
+      snapshot:function(){var s=b.ports.currentSession(),i=s&&s.info(),st=root.state;return JSON.stringify([st.tool,st.currentFrame,st.activeLayerIdx,root._layerSel||null,i&&[i.instanceId,i.documentId,i.lifecycleGeneration,i.contentRevision]]);},
+      holds:function(token){return !b.retired&&root.state.tool==='text'&&this.snapshot()===token;}});
+  }
   function handle(root,method,e,cancelOtherIntent){
     var b=bindings.get(root);if(method!=='move')trace(root,'route',method,{binding:!!b});
+    if(b)b.cancelOther=cancelOtherIntent;
+    var gate=b&&b.ports&&typeof b.ports.currentSession==='function'&&gateOf(root,b);
+    if(gate&&root.state&&root.state.tool==='text')return gate.handle(method,e);
     var handled=!!b&&b.handle(method,e);
     if(handled&&typeof cancelOtherIntent==='function')cancelOtherIntent();
     return handled;

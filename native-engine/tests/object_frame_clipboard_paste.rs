@@ -21,6 +21,7 @@ fn doc(text: &str) -> ObjectDocument {
 }
 fn cell(rel_layer: u32, rel_frame: u32, keyframe: bool, strokes: &[(&str, i64, i64)]) -> PasteCell {
     PasteCell {
+        items: Default::default(),
         order_elements: crate::object_document::Presence::Missing,
         rel_layer,
         rel_frame,
@@ -149,6 +150,7 @@ fn malformed_cell_sets_refuse_before_any_write() {
         serde_json::from_value(record_json(context, scope, "L9", "q", 0, 1, 1)).unwrap()
     };
     let with_record = |record| PasteCell {
+        items: Default::default(),
         records: vec![record],
         ..cell(0, 0, true, &[])
     };

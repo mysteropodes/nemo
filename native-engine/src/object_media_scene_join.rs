@@ -107,9 +107,14 @@ pub(crate) fn slots(packet: &ObjectFramePacket) -> Result<Vec<VideoSlot>, Object
                 "a video layer with drawn records or path effects is unavailable",
             ));
         }
-        let opacity = packet
-            .layer_opacity(layer_index)
-            .map_err(|_| unavailable(layer_index, "raw layer opacity is unavailable"))?;
+        // A 3D layer suppresses its 2D Motion opacity (baseline `motionMat = null`).
+        let opacity = if layers[layer_index].three_d.value() == Some(&true) {
+            1.0
+        } else {
+            packet
+                .layer_opacity(layer_index)
+                .map_err(|_| unavailable(layer_index, "raw layer opacity is unavailable"))?
+        };
         slots.push(VideoSlot {
             layer_index,
             placement_id: video.placement_id().to_owned(),
@@ -230,15 +235,17 @@ impl MediaDraws {
                 }
             };
             let (width, height, id) = (first.width, first.height, id.as_str());
-            let chain = plan
+            let (source, chain) = plan
                 .native_parent_chains()
-                .chain(slot.layer_index)
+                .place_image(
+                    slot.layer_index,
+                    RasterSceneSource {
+                        asset_id: id.to_owned(),
+                        rect: contain_rect(canvas, width, height),
+                        opacity: slot.opacity,
+                    },
+                )
                 .map_err(|error| unavailable(slot.layer_index, error.reason()))?;
-            let source = RasterSceneSource {
-                asset_id: id.to_owned(),
-                rect: contain_rect(canvas, width, height),
-                opacity: slot.opacity,
-            };
             let placed = prepare_raster_scene_image(&source, &chain, &Pixels(width, height, id))
                 .map_err(|_| unavailable(slot.layer_index, "video placement is unavailable"))?;
             draws.push(MediaDraw {
@@ -311,6 +318,7 @@ pub(crate) fn insert_slots(
             PaintIndex::Component(i) => scene.components.paints[*i].host_layer_index,
             PaintIndex::Video(i) => scene.videos[*i].layer_index,
             PaintIndex::Duplicator(i) => scene.duplicators.paints[*i].layer_index,
+            PaintIndex::Dab(_, layer) => *layer,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             PaintIndex::Brush(i) => scene
                 .brushes
@@ -384,6 +392,11 @@ impl crate::object_render_scene::ObjectCompositionWitness {
     /// the media gate from finishing, blocking every later preview and export.
     pub(crate) fn without_media(&self) -> Self {
         let mut retained = self.clone();
+        // Ghost pieces hold decoded ghost-frame pixels: the renderer keeps no witness longer than its own images need.
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        {
+            retained.ghosts = None;
+        }
         if retained.media.take().is_some() {
             retained.resources = retained.resources.take().and_then(|set| {
                 let kept: Vec<_> = set

@@ -34,10 +34,10 @@ test('numeric order private children have exact census without another API file 
   assert.equal(profile.sizeProfiles['Rust production module'].hardMax, 500);
 });
 
-test('numeric order uses the adopted eighteen-module forty-nine-edge engine policy', () => {
+test('numeric order uses the adopted eighteen-module fifty-edge engine policy', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
-  assert.equal(result.moduleCount, 18); assert.equal(result.edges.length, 49);
+  assert.equal(result.moduleCount, 18); assert.equal(result.edges.length, 50);
   assert.deepEqual(result.unsupported, []); assert.deepEqual(result.exceptionsApplied, []);
 });
 
@@ -70,7 +70,11 @@ function indexedLookup(candidate) {
   assert.equal((indexed.match(/records\.iter\(\)/g) || []).length, 1);
   const natural = candidate.slice(candidate.indexOf('fn natural_component('));
   assert.equal((natural.match(/\.objects\(\)/g) || []).length, 1);
-  assert.match(natural, /for \(source_object_index, record\) in context\.objects\(\)\.iter\(\)\.enumerate\(\)/);
+  // One linear pass: the targets iterator is built once (local objects chained with the
+  // global item tables) and enumerated once; nothing rescans the document per element.
+  assert.match(natural, /let targets = context\s*\.objects\(\)\s*\.iter\(\)\s*\.map\(\|record\| record\.target\(\)\)\s*\.chain\(/);
+  assert.equal((natural.match(/targets\.enumerate\(\)/g) || []).length, 1);
+  assert.match(natural, /for \(source_object_index, target\) in targets\.enumerate\(\)/);
   const layers = natural.slice(natural.indexOf('let layers = context'));
   assert.doesNotMatch(layers, /\.objects\(|\.position\(/);
   assert.match(layers, /std::mem::take\(&mut layer_elements\[index\]\)/);

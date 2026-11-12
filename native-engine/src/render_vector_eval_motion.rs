@@ -18,7 +18,17 @@ use kurbo::Shape;
 
 /// Element Motion is nested inside layer Motion, after the original path-FX
 /// and parametric stages. Its pivot is the actual native cubic bounds centre.
-pub(super) fn apply_element_motion(
+pub(crate) fn apply_element_motion(
+    snapshot: &ObjectSnapshot,
+    record: &ObjectRecord,
+    frame: u32,
+    segments: Vec<EvalSegment>,
+) -> Result<Vec<EvalSegment>, VectorEvalError> {
+    let segments = crate::evaluation::object_vector_kernels::render_vector_eval::vertex::apply_vertex_offsets(snapshot, record, frame, segments)?;
+    apply_element_pose(snapshot, record, frame, segments)
+}
+
+fn apply_element_pose(
     snapshot: &ObjectSnapshot,
     record: &ObjectRecord,
     frame: u32,
@@ -126,9 +136,90 @@ fn vector_layer_holder_consumed(document: &ObjectDocument, holder: &PropertyHold
             !property.expression.value().is_some_and(|code| code.enabled)
                 && match property.property() {
                     "opacity" | "timeLinkInOffset" | "timeLinkOutOffset" => true,
-                    "position" => vector_only_layer(document, target),
+                    "position" => {
+                        vector_only_layer(document, target)
+                            || contentless_unreferenced_layer(document, target)
+                    }
+                    "anchor" | "rotation" | "scale" => {
+                        contentless_unreferenced_layer(document, target)
+                    }
+                    // A layer with nothing to place (Folder, Effect, widget, Null, empty drawing) has nothing for the 3D
+                    // keys to move; the baseline `toggleLayer3D` takes on any layer and the document keeps rendering.
+                    "positionZ" | "rotationX" | "rotationY" => {
+                        crate::evaluation::object_vector_kernels::render_vector_eval::plain_empty_layer(
+                            document,
+                            target.layer_uid(),
+                        )
+                    }
                     _ => false,
                 }
+        })
+}
+
+/// True when another layer reads this layer's pose or paint: a parent, a matte or effect source, or a follow-path
+/// target. Such a layer's transform reaches the frame through its dependents, so it is not free to ignore.
+fn layer_is_referenced(document: &ObjectDocument, uid: &str) -> bool {
+    document.layers().iter().any(|other| {
+        other.parent_layer_uid.value().and_then(Option::as_deref) == Some(uid)
+            || other.matte_source_layer_uid.value().map(String::as_str) == Some(uid)
+            || other
+                .mattes_more
+                .value()
+                .is_some_and(|mattes| mattes.iter().any(|matte| matte.uid == uid))
+            || other.effects_from.value().map(String::as_str) == Some(uid)
+            || other
+                .follow_path
+                .value()
+                .and_then(Option::as_ref)
+                .is_some_and(|follow| follow.target_layer_uid() == uid)
+    })
+}
+
+/// An ordinary root layer that paints nothing (no record, text/raster item or component instance) and that no other
+/// layer, duplicator or effector reads. Its transform
+/// cannot change a single pixel, so a holder carrying only transform keys is consumed by simply not being applied.
+/// The first content record or the first dependent makes the keys unavailable again until their producer consumes them.
+fn contentless_unreferenced_layer(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
+    let uid = target.layer_uid();
+    ordinary_root_layer(document, target)
+        && !document
+            .objects()
+            .iter()
+            .any(|record| record.target.layer_uid == uid)
+        && document
+            .item_records()
+            .is_none_or(|items| !items.targets().any(|item| item.layer_uid() == uid))
+        && !layer_is_referenced(document, uid)
+        && !document
+            .component_set()
+            .is_some_and(|set| set.instance(target.context_id(), uid).is_some())
+        && document.duplicator_set().is_none()
+}
+
+/// A widget layer is an on-canvas editor of its own controls and never paints. Its holder is consumed when it holds
+/// only those controls' values (plus inert opacity/time-link keys); its transform keys are consumed only while no
+/// dependent layer inherits the pose. Expressions elsewhere read the controls through the Motion port, not this gate.
+pub(super) fn widget_holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
+    let target = holder.target();
+    let widget = target.context_id() == "scene-root"
+        && target.stroke_id().is_none()
+        && document.layers().iter().any(|layer| {
+            layer.layer_uid() == target.layer_uid()
+                && layer.widget.value().is_some()
+                && !layer.is_effect_layer()
+                && !layer.is_folder_layer()
+        });
+    widget
+        && holder.properties().iter().all(|property| {
+            let key = property.property();
+            !property.expression.value().is_some_and(|code| code.enabled)
+                && (holder
+                    .controls
+                    .value()
+                    .is_some_and(|controls| controls.iter().any(|control| control.key == key))
+                    || matches!(key, "opacity" | "timeLinkInOffset" | "timeLinkOutOffset")
+                    || matches!(key, "position" | "anchor" | "rotation" | "scale")
+                        && !layer_is_referenced(document, target.layer_uid()))
         })
 }
 
@@ -206,19 +297,31 @@ pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &Property
         return true;
     }
     let target = holder.target();
+    // The 3D keys of a layer with nothing to place (Folder, Effect, widget, Null, empty drawing): nothing for them to move.
+    if target.context_id() == "scene-root"
+        && target.stroke_id().is_none()
+        && !holder.properties().is_empty()
+        && holder.properties().iter().all(|p| {
+            matches!(p.property(), "positionZ" | "rotationX" | "rotationY") && !p.expression.value().is_some_and(|c| c.enabled)
+        })
+        && crate::evaluation::object_vector_kernels::render_vector_eval::plain_empty_layer(document, target.layer_uid())
+    {
+        return true;
+    }
     if !scene_consumer_uses_layer(document, target) || holder.properties().is_empty() {
         return false;
     }
     // The new provider transforms only Text/raster paints. A visible vector on
     // the same layer must never silently ignore rotation/scale/anchor/Position.
-    let visible_vector = document.layers().iter().any(|layer| {
-        layer.layer_uid() == target.layer_uid()
-            && layer.visible()
-            && document.objects().iter().any(|record| {
-                record.target.context_id == target.context_id()
-                    && record.target.layer_uid == target.layer_uid()
-            })
-    });
+    let visible_vector = !layer_vectors_batchable(document, target)
+        && document.layers().iter().any(|layer| {
+            layer.layer_uid() == target.layer_uid()
+                && crate::object_frame_packet::solo_view::layer_visible("scene-root", document.layers(), layer)
+                && document.objects().iter().any(|record| {
+                    record.target.context_id == target.context_id()
+                        && record.target.layer_uid == target.layer_uid()
+                })
+        });
     holder.properties().iter().all(|property| {
         !property.expression.value().is_some_and(|code| code.enabled)
             && match property.property() {
@@ -229,11 +332,32 @@ pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &Property
     })
 }
 
+/// Every object record the layer paints is an authored, non-mask vector or closed legacy record. The common vector batch
+/// then moves them with the pivot and chain the layer's Text and raster items already use, so a layer that mixes the
+/// families consumes its pose in all of them. A mask or any other record family keeps the explicit refusal.
+pub(crate) fn layer_vectors_batchable(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
+    document
+        .objects()
+        .iter()
+        .filter(|record| {
+            record.target.context_id == target.context_id()
+                && record.target.layer_uid == target.layer_uid()
+        })
+        .all(|record| {
+            record.target.frame_scope.kind == FrameScopeKind::Authored
+                && !record.is_mask()
+                && matches!(
+                    record.family.as_str(),
+                    VECTOR_FAMILY | "closed-solid-fill-cubic-path"
+                )
+        })
+}
+
 /// Static parenting is consumed only by the exact ordinary common-layer batch.
 /// Other visible contour/vector parents still refuse without a Motion holder.
 pub(super) fn visible_vector_parents_supported(document: &ObjectDocument) -> bool {
     !document.layers().iter().any(|layer| {
-        layer.visible()
+        crate::object_frame_packet::solo_view::layer_visible("scene-root", document.layers(), layer)
             && layer.parent_layer_uid.value().is_some_and(Option::is_some)
             && !crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(document, &PropertyHolderTarget {
                 context_id: "scene-root".into(), layer_uid: layer.layer_uid().to_owned(), stroke_id: Presence::Missing,

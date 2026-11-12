@@ -213,9 +213,11 @@ fn svg_stale_owner_snapshot_and_invalid_range_never_publish_or_rearm_a_request()
             .is_err());
         scratch.assert_empty_initialized_cache();
     }
+    // The original request is bounded before any media, guest or artifact work
+    // (6e7d9d5d): an invalid range is a pre-staging refusal, never a receipt.
     for frames in [vec![], vec![7, 0], vec![0, 0], (0..33).collect()] {
         let scratch = Scratch::new();
-        let result = owner
+        let error = owner
             .export_pinned_object_svg_frames(
                 &base,
                 &frames,
@@ -225,9 +227,10 @@ fn svg_stale_owner_snapshot_and_invalid_range_never_publish_or_rearm_a_request()
                 65536,
                 &mut scratch.port(),
             )
-            .unwrap();
-        assert!(result.receipt.is_err());
-        assert!(result.release.cleanup_complete);
+            .err()
+            .expect("an invalid frame range is refused before staging");
+        assert_eq!(error, "native object export frames are invalid");
+        scratch.assert_empty_initialized_cache();
         assert!(!scratch.0.join("published").exists());
     }
     let small = Scratch::new();

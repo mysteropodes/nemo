@@ -27,8 +27,10 @@
     return count;
   }
   function clipboardOperation(op) { return [PREFIX + 'frames.clipboard.copy', PREFIX + 'frames.clipboard.cut', PREFIX + 'frames.clipboard.paste'].indexOf(op) >= 0; }
-  function requestByteLimit(op) { return clipboardOperation(op) ? MESSAGE_BYTES : 4096; }
-  function responseByteLimit(op) { return packetResult(op) ? MESSAGE_BYTES : 4096; }
+  // The shape clipboard (object.clipboard.*, native-object-edit-contract.js) carries its clip inline: a paste request and a copy / cut reply get 64 KiB.
+  var SHAPE_CLIP_BYTES = 65536;
+  function requestByteLimit(op) { return clipboardOperation(op) ? MESSAGE_BYTES : op === 'command.document.object.clipboard.paste' ? SHAPE_CLIP_BYTES : 4096; }
+  function responseByteLimit(op) { return packetResult(op) ? MESSAGE_BYTES : op === 'command.document.object.clipboard.copy' || op === 'command.document.object.clipboard.cut' ? SHAPE_CLIP_BYTES : 4096; }
   var PREFIX = 'command.document.object.';
   // Operation -> native payload command. Clipboard records remain detached data; Rust alone validates/publishes them.
   var COMMANDS = Object.freeze({
@@ -51,7 +53,7 @@
     'command.document.object.frames.repeat': 'object.frames.repeat'
   });
   var OPERATIONS = Object.freeze(Object.keys(COMMANDS));
-  var OPAQUE_PATH = /^payload\.(?:layerUid|activeLayerUid|fromLayerUid|toLayerUid)$|^payload\.layerUids\.\d+$|^payload\.(?:targets|selection)\.\d+\.layerUid$/;
+  var OPAQUE_PATH = /^payload\.(?:contextId|layerUid|activeLayerUid|fromLayerUid|toLayerUid)$|^payload\.layerUids\.\d+$|^payload\.(?:targets|selection)\.\d+\.layerUid$/;
 
   function has(value, key) { return Object.prototype.hasOwnProperty.call(value, key); }
   function fail(message) { throw new TypeError(message); }
@@ -84,6 +86,8 @@
       seen.add(token);
     });
   }
+  // #2256: the optional declared component an edit works inside (absent is the scene root); the native owner resolves it.
+  function context(p) { if (has(p, 'contextId')) uid(p.contextId, 'contextId'); }
   function layerList(value, label) { list(value, label, function (item) { uid(item, label + ' entry'); }); }
   function cell(value) {
     exact(value, ['layerUid', 'frame'], [], 'cell reference');
@@ -102,12 +106,16 @@
     if (!Array.isArray(value) || value.length > MAX_LIST) fail('clipboard cells must be bounded');
     var dataBytes = 0;
     value.forEach(function (v) {
-      exact(v, ['relLayer', 'relFrame', 'keyframe', 'records'], ['orderElements'], 'clipboard cell');
+      exact(v, ['relLayer', 'relFrame', 'keyframe', 'records'], ['orderElements', 'rasterItems', 'textItems'], 'clipboard cell');
       u32(v.relLayer, 'relLayer'); u32(v.relFrame, 'relFrame');
       if (typeof v.keyframe !== 'boolean' || !Array.isArray(v.records) || v.records.length > MAX_DATA_ITEMS ||
           !v.records.every(plain)) fail('invalid clipboard records');
       if (has(v, 'orderElements') && (!Array.isArray(v.orderElements) || v.orderElements.length > MAX_DATA_ITEMS ||
           !v.orderElements.every(plain))) fail('invalid clipboard order');
+      ['rasterItems', 'textItems'].forEach(function (key) {
+        if (has(v, key) && (!Array.isArray(v[key]) || v[key].length > MAX_DATA_ITEMS || !v[key].every(plain))) fail('invalid clipboard items');
+        if (has(v, key)) v[key].forEach(function (item) { dataBytes += bytes(item); });
+      });
       v.records.forEach(function (record) { dataBytes += bytes(record); });
       if (has(v, 'orderElements')) dataBytes += bytes(v.orderElements);
       if (dataBytes > DATA_BYTES) fail('clipboard data exceeds native 4MiB bound');
@@ -155,60 +163,60 @@
   }
   var SHAPES = {
     'object.layer.range.drag': rangeDrag,
-    'object.frames.clipboard.copy': function (p) { exact(p, ['command', 'selection'], [], 'clipboard copy'); selectedCells(p.selection); },
-    'object.frames.clipboard.cut': function (p) { exact(p, ['command', 'selection'], [], 'clipboard cut'); selectedCells(p.selection); },
+    'object.frames.clipboard.copy': function (p) { exact(p, ['command', 'selection'], ['contextId'], 'clipboard copy'); context(p); selectedCells(p.selection); },
+    'object.frames.clipboard.cut': function (p) { exact(p, ['command', 'selection'], ['contextId'], 'clipboard cut'); context(p); selectedCells(p.selection); },
     'object.frames.clipboard.paste': function (p) {
-      exact(p, ['command', 'instanceId', 'documentId', 'layerUid', 'frame', 'cells'], [], 'clipboard paste');
+      exact(p, ['command', 'instanceId', 'documentId', 'layerUid', 'frame', 'cells'], ['contextId'], 'clipboard paste'); context(p);
       uid(p.instanceId, 'instanceId'); uid(p.documentId, 'documentId'); uid(p.layerUid, 'layerUid'); u32(p.frame, 'frame'); packetCells(p.cells);
     },
     'object.frames.insert': function (p) {
-      exact(p, ['command', 'cell'], ['layerUids'], 'frames insert');
-      u32(p.cell, 'cell'); if (has(p, 'layerUids')) layerList(p.layerUids, 'layerUids');
+      exact(p, ['command', 'cell'], ['layerUids', 'contextId'], 'frames insert');
+      context(p); u32(p.cell, 'cell'); if (has(p, 'layerUids')) layerList(p.layerUids, 'layerUids');
     },
     'object.frames.extend': function (p) {
-      exact(p, ['command', 'cell', 'count'], [], 'frames extend');
-      u32(p.cell, 'cell'); u32(p.count, 'count');
+      exact(p, ['command', 'cell', 'count'], ['contextId'], 'frames extend');
+      context(p); u32(p.cell, 'cell'); u32(p.count, 'count');
       if (p.count > MAX_EXTEND) fail('count exceeds the frame-count field bound');
     },
     'object.frames.duplicate': function (p) {
-      exact(p, ['command', 'layerUid', 'cell'], [], 'frames duplicate'); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
+      exact(p, ['command', 'layerUid', 'cell'], ['contextId'], 'frames duplicate'); context(p); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
     },
     'object.frames.remove': function (p) {
-      exact(p, ['command', 'from', 'to'], [], 'frames remove'); u32(p.from, 'from'); u32(p.to, 'to');
+      exact(p, ['command', 'from', 'to'], ['contextId'], 'frames remove'); context(p); u32(p.from, 'from'); u32(p.to, 'to');
     },
     'object.layer.key.promote': function (p) {
-      exact(p, ['command', 'cells'], ['layerUids'], 'key promote');
+      exact(p, ['command', 'cells'], ['layerUids', 'contextId'], 'key promote'); context(p);
       list(p.cells, 'cells', function (item) { u32(item, 'cell'); });
       if (has(p, 'layerUids')) layerList(p.layerUids, 'layerUids');
     },
     'object.layer.key.blank': function (p) {
-      exact(p, ['command', 'layerUid', 'cell'], [], 'key blank'); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
+      exact(p, ['command', 'layerUid', 'cell'], ['contextId'], 'key blank'); context(p); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
     },
     'object.layer.key.clear': function (p) {
-      exact(p, ['command', 'layerUid', 'cell'], [], 'key clear'); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
+      exact(p, ['command', 'layerUid', 'cell'], ['contextId'], 'key clear'); context(p); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
     },
     'object.layer.key.clear_cells': function (p) {
-      exact(p, ['command', 'targets'], [], 'clear cells'); list(p.targets, 'targets', cell, cellKey);
+      exact(p, ['command', 'targets'], ['contextId'], 'clear cells'); context(p); list(p.targets, 'targets', cell, cellKey);
     },
     'object.layer.tween.remove': function (p) {
-      exact(p, ['command', 'layerUid', 'from', 'to'], [], 'tween remove');
-      uid(p.layerUid, 'layerUid'); u32(p.from, 'from'); u32(p.to, 'to');
+      exact(p, ['command', 'layerUid', 'from', 'to'], ['contextId'], 'tween remove');
+      context(p); uid(p.layerUid, 'layerUid'); u32(p.from, 'from'); u32(p.to, 'to');
     },
     'object.layer.key.move': function (p) {
-      exact(p, ['command', 'layerUid', 'from', 'to'], ['activeLayerUid'], 'key move');
+      exact(p, ['command', 'layerUid', 'from', 'to'], ['activeLayerUid', 'contextId'], 'key move'); context(p);
       if (has(p, 'activeLayerUid')) uid(p.activeLayerUid, 'activeLayerUid');
       uid(p.layerUid, 'layerUid'); u32(p.from, 'from'); u32(p.to, 'to');
     },
     'object.frames.clipboard.duplicate': function (p) {
-      exact(p, ['command', 'layerUid', 'selection'], [], 'selection duplicate');
+      exact(p, ['command', 'layerUid', 'selection'], ['contextId'], 'selection duplicate'); context(p);
       uid(p.layerUid, 'layerUid'); list(p.selection, 'selection', cell, cellKey);
     },
     'object.frames.move': function (p) {
-      exact(p, ['command', 'selection', 'layerUid', 'frame'], [], 'frames move');
+      exact(p, ['command', 'selection', 'layerUid', 'frame'], ['contextId'], 'frames move'); context(p);
       selectedCells(p.selection); uid(p.layerUid, 'layerUid'); u32(p.frame, 'frame');
     },
     'object.frames.repeat': function (p) {
-      exact(p, ['command', 'fromLayerUid', 'toLayerUid', 'fromFrame', 'toFrame', 'times'], [], 'frames repeat');
+      exact(p, ['command', 'fromLayerUid', 'toLayerUid', 'fromFrame', 'toFrame', 'times'], ['contextId'], 'frames repeat'); context(p);
       uid(p.fromLayerUid, 'fromLayerUid'); uid(p.toLayerUid, 'toLayerUid'); u32(p.fromFrame, 'fromFrame'); u32(p.toFrame, 'toFrame');
       if (!Number.isSafeInteger(p.times)) fail('times must be an integer');
     }
@@ -289,8 +297,8 @@
   // Layer UIDs are opaque authored bytes: a `data:`-prefixed UID is a name, not a resource payload.
   function paths(operation) {
     return admitted(operation) ? { has: function (path) {
-      return OPAQUE_PATH.test(path) || (operation === PREFIX + 'layer.range.drag' && (/^payload\.(?:contextId|activeLayerUid)$/.test(path) || /^payload\.barSelection\.\d+\.layerUid$/.test(path) || /^payload\.selectedKeys\.\d+\.target\.(?:target\.)?(?:contextId|layerUid|strokeId)$/.test(path))) || (operation === PREFIX + 'frames.move' && /^result\.selection\.\d+\.layerUid$/.test(path)) || /^payload\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId))$/.test(path) ||
-        /^result\.clipboard\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId))$/.test(path);
+      return OPAQUE_PATH.test(path) || (operation === PREFIX + 'layer.range.drag' && (/^payload\.(?:contextId|activeLayerUid)$/.test(path) || /^payload\.barSelection\.\d+\.layerUid$/.test(path) || /^payload\.selectedKeys\.\d+\.target\.(?:target\.)?(?:contextId|layerUid|strokeId)$/.test(path))) || (operation === PREFIX + 'frames.move' && /^result\.selection\.\d+\.layerUid$/.test(path)) || /^payload\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId)|(?:rasterItems|textItems)\.\d+\.target\.(?:contextId|layerUid|strokeId))$/.test(path) ||
+        /^result\.clipboard\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId)|(?:rasterItems|textItems)\.\d+\.target\.(?:contextId|layerUid|strokeId))$/.test(path);
     } } : null;
   }
   // The SDK holds one contract object. join() adds these operations to whichever contract it already has (fonts).

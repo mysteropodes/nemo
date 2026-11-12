@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "capability-v2.schema.json",
+  "title": "Native capability declaration v2 (descriptor-owned host metadata)",
+  "description": "Constrains the host-facing fields of engineering/application/capabilities-v2/*.json that the drift checker derives code from. Every other descriptor field stays feature-owned and is advertised verbatim by discovery (additionalProperties is open on purpose). Source of truth for the Tauri raw object client allowlist (src-tauri/src/native_object_client.rs OPERATIONS) and the per-operation revision advance.",
+  "type": "object",
+  "required": ["schemaVersion", "apiVersion", "id", "operations"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "apiVersion": { "const": 2 },
+    "id": { "type": "string", "minLength": 1 },
+    "operations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/OperationName" } },
+    "hostOperations": {
+      "description": "Operations reachable only through the private Tauri raw object client. They are deliberately NOT in `operations`, so they never enter the public v2 transport union or MCP discovery registration.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/OperationName" }
+    },
+    "rawClient": {
+      "description": "Operations admitted by the Tauri raw object client. A key is the operation name, present means the raw-client flag is set; it must name an operation of `operations` or `hostOperations` of this same descriptor. The set of keys across all descriptors must equal the OPERATIONS allowlist in native_object_client.rs.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/RawClientOperation" }
+    }
+  },
+  "$defs": {
+    "OperationName": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$" },
+    "RawClientOperation": {
+      "type": "object",
+      "required": ["revisionDelta"],
+      "additionalProperties": false,
+      "properties": {
+        "revisionDelta": {
+          "description": "How far one successful execution advances the document content revision. Reads declare 0; every command (undo and redo included) is one revision transaction and declares 1.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

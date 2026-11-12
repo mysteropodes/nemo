@@ -508,23 +508,12 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     }
 }
 
-fn resolution_code(kind: ResourceResolutionErrorKind) -> DispatchErrorCode {
-    match kind {
-        ResourceResolutionErrorKind::InvalidRequest => DispatchErrorCode::InvalidRequest,
-        ResourceResolutionErrorKind::Unavailable => DispatchErrorCode::Unavailable,
-        ResourceResolutionErrorKind::NotFound => DispatchErrorCode::NotFound,
-        ResourceResolutionErrorKind::Internal => DispatchErrorCode::Internal,
-    }
-}
-
-fn export_error_code(kind: ExportJobErrorKind) -> DispatchErrorCode {
-    match kind {
-        ExportJobErrorKind::InvalidRequest | ExportJobErrorKind::ChangedRequestId => {
-            DispatchErrorCode::InvalidRequest
-        }
-        ExportJobErrorKind::Busy => DispatchErrorCode::BusyConflict,
-        ExportJobErrorKind::NotFound => DispatchErrorCode::NotFound,
-        ExportJobErrorKind::WrongDocument => DispatchErrorCode::WrongDocument,
-        ExportJobErrorKind::Released => DispatchErrorCode::Unavailable,
-    }
-}
+#[path = "application_tween.rs"]
+mod tween;
+use tween::{export_error_code, resolution_code};
+#[cfg(test)]
+pub(crate) use tween::prepared_frames as prepared_ghost_frames;
+pub use tween::{
+    prepare_ghost_underlay, release_ghost_caches, TweenGhostFrame, TweenGhostKind, TweenGhostPath, TweenGhostRead,
+    TweenGhostVisual,
+};

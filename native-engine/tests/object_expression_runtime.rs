@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-object_expression_runtime => object_expression_runtime_tests
 //! Frozen ORIGINAL39 substrate controls through real immutable native pins.
 //! The case block below is copied byte-for-byte from #1696's A0 source; its
 //! original block SHA256 is 321e8402f388e061b301e7f98e4071f0b88f0a2b5b1f98aa71ba85bcba328bc8.
@@ -9,8 +10,7 @@ use crate::object_expression_runtime::{evaluate_for_owner, ExpressionLimits, Exp
 use crate::object_frame_packet::ObjectFrameSelector;
 use serde_json::json;
 use std::io::Read;
-use std::process::{Command, Stdio};
-use std::thread;
+use std::{process::{Command, Stdio}, thread};
 use std::time::{Duration, Instant};
 
 #[derive(Clone)]

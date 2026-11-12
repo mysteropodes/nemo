@@ -1,0 +1,143 @@
+{
+  "schema": "nemo.parity-family/1",
+  "family": "frames",
+  "lane": "#2111 (L05); #2246 (L05-G ranges); #2216 (L05-I clipboard); #2227/#2245 (L05-J repeat)",
+  "tasks": [
+    "F09",
+    "F10",
+    "F11",
+    "F12",
+    "F13"
+  ],
+  "taskReasoning": {
+    "F09": "native F7 blank key (#2059, #2248)",
+    "F10": "native F6 snapshot key (#2248)",
+    "F11": "global frame insert/remove/spans/duration and range records (#2133, #2246)",
+    "F12": "drawing-frame clipboard, move/shift (#2216)",
+    "F13": "clear-key, exposure, repeat (#2227, #2245). I22/I25/U09/U35 excluded: JS caller adapters (#2355, #2248 open), not native tests; D21 excluded: tween authority"
+  },
+  "checks": [
+    {
+      "id": "frames-blank-key",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_blank_key_edit::",
+      "covers": [
+        "positive",
+        "oracle"
+      ],
+      "source": "native-engine/tests/object_blank_key_edit*.rs"
+    },
+    {
+      "id": "frames-key-exposure",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_exposure_edit_key",
+      "covers": [
+        "positive",
+        "oracle",
+        "undo-redo",
+        "save-reopen"
+      ],
+      "source": "native-engine/tests/object_exposure_edit_key*.rs, object_blank_key_history*.rs"
+    },
+    {
+      "id": "frames-retime",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_exposure_edit_retime",
+      "covers": [
+        "positive",
+        "oracle",
+        "undo-redo",
+        "save-reopen"
+      ],
+      "source": "native-engine/tests/object_exposure_edit_retime*.rs"
+    },
+    {
+      "id": "frames-structure",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_frame_edit_structure",
+      "covers": [
+        "positive",
+        "oracle",
+        "undo-redo",
+        "save-reopen"
+      ],
+      "source": "native-engine/tests/object_frame_edit_structure*.rs"
+    },
+    {
+      "id": "frames-sparse",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_frame_edit_sparse",
+      "covers": [
+        "positive",
+        "oracle"
+      ],
+      "source": "native-engine/tests/object_frame_edit_sparse*.rs"
+    },
+    {
+      "id": "frames-range-records",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_frame_edit_range_records",
+      "covers": [
+        "positive",
+        "oracle",
+        "undo-redo",
+        "save-reopen"
+      ],
+      "source": "native-engine/tests/object_frame_edit_range_records*.rs"
+    },
+    {
+      "id": "frames-clipboard-paste",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_frame_clipboard_paste",
+      "covers": [
+        "positive",
+        "oracle",
+        "undo-redo",
+        "save-reopen"
+      ],
+      "source": "native-engine/tests/object_frame_clipboard_paste*.rs"
+    },
+    {
+      "id": "frames-clipboard-repeat",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_frame_clipboard_repeat",
+      "covers": [
+        "positive",
+        "oracle",
+        "undo-redo",
+        "save-reopen"
+      ],
+      "source": "native-engine/tests/object_frame_clipboard_repeat*.rs"
+    },
+    {
+      "id": "frames-bulk-move",
+      "kind": "native-test",
+      "target": "application",
+      "features": "test-application",
+      "filter": "object_frame_bulk_move::",
+      "covers": [
+        "positive",
+        "oracle",
+        "undo-redo",
+        "save-reopen"
+      ],
+      "source": "native-engine/tests/object_frame_bulk_move*.rs"
+    }
+  ]
+}

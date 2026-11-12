@@ -5,7 +5,7 @@ const Reader=require('../src/js/adapters/native-text-read.js');
 const SDK=require('../src/js/adapters/native-application.js');
 const target={contextId:'scene-root',layerUid:'native layer / 雪',frameScope:{kind:'authored',frame:2},strokeId:'native-text:1:0'};
 const scope={contextId:target.contextId,layerUid:target.layerUid,frameScope:target.frameScope};
-const metadata={font:{kind:'asset',assetId:' native font / 雪 '},size:48,color:'#102030',align:'left',anchorTopLeft:{x:-10,y:20},fixedWidth:null,bold:false};
+const metadata={font:{kind:'asset',assetId:' native font / 雪 '},size:48,color:'#102030',align:'left',anchorTopLeft:{x:-10,y:20},fixedWidth:null,bold:false,rotation:-30};
 const clone=v=>JSON.parse(JSON.stringify(v));
 function fixture(text='Hi 雪🦊\n"\\'){let pin={instanceId:'instance',documentId:'document',lifecycleGeneration:4,contentRevision:7,documentSnapshotId:'native-object:document:7'},serial=0,calls=[],override=null,queue=Promise.resolve();
   function reply(q){const v=q.payload.view,base={instanceId:pin.instanceId,documentId:pin.documentId,atRevision:pin.contentRevision,documentSnapshotId:pin.documentSnapshotId};let result;
@@ -63,11 +63,11 @@ test('UTF-16 lone surrogate chunks cannot replace native scalar values',()=>{
   const f=fixture(),q={apiVersion:2,requestId:'q',instanceId:'instance',documentId:'document',operation:Contract.OP,payload:{atRevision:7,documentSnapshotId:'native-object:document:7',view:{kind:'text',target,offset:0,limit:1024}}};
   assert.throws(()=>Contract.result(Contract.OP,{instanceId:q.instanceId,documentId:q.documentId,atRevision:7,documentSnapshotId:q.payload.documentSnapshotId,kind:'text',target,textBytes:3,offset:0,text:'\ud800',nextOffset:null}));assert.equal(f.calls.length,0);
 });
-test('closed request variants refuse extra data, invalid limits and guessed unsupported contexts',()=>{
+test('closed request variants refuse extra data, invalid limits and a blank context (an undeclared one is the owner\'s refusal)',()=>{
   const p={atRevision:7,documentSnapshotId:'native-object:document:7',view:{kind:'inspect',target}};
   for(const bad of [{...p,extra:true},{...p,view:['inspect',target]},{...p,view:{kind:'inspect',target,extra:true}},
     {...p,view:{kind:'text',target,offset:0,limit:1025}},{...p,view:{kind:'targets',scope,offset:0,limit:0}},
-    {...p,view:{kind:'inspect',target:{...target,contextId:'guessed'}}}])assert.throws(()=>Contract.payload(Contract.OP,bad));
+    {...p,view:{kind:'inspect',target:{...target,contextId:' '}}}])assert.throws(()=>Contract.payload(Contract.OP,bad));
 });
 test('original metadata own keys reject literal __proto__ before any sentinel merge',async()=>{
   const f=fixture();f.override((q,r)=>{r.result.block=JSON.parse(JSON.stringify(r.result.block).slice(0,-1)+',"__proto__":{"arbitraryUnknown":"injected"}}');return r;});
@@ -88,4 +88,17 @@ test('only genuine actual-owner text refusals retain their typed disposition',as
   for(const error of [{code:'unavailable',message:'foreign'},{code:'wrong_document',message:'missing requested document'},{code:'wrong_document',message:'wrong requested document',details:{requestedDocumentId:'forged'}}]){
     const f=fixture();f.override((q,r)=>({apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:'actual-document',contentRevision:3,ok:false,error}));await assert.rejects(f.reader.readBlock(target,f.pin()));
   }
+});
+
+test('#2267: a declared component context reads through the component route; the scene root keeps the resource route',async()=>{
+  const f=fixture(),routes=[];
+  const session={...f.session,runResourceCommand:a=>{routes.push('scene');return f.session.runResourceCommand(a);},runComponentCommand:a=>{routes.push('component');return f.session.runResourceCommand(a);}};
+  const reader=Reader.create(session),inside={...target,contextId:'comp-a'};
+  f.override((q,r)=>{const v=q.payload.view,ctx=(v.scope||v.target).contextId;if(r.result.scope)r.result.scope.contextId=ctx;if(r.result.target)r.result.target.contextId=ctx;(r.result.items||[]).forEach(i=>{i.target.contextId=ctx;});return r;});
+  await reader.listPage({contextId:'comp-a',layerUid:scope.layerUid,frameScope:scope.frameScope},0,8,f.pin());
+  await reader.readBlock(inside,f.pin());await reader.readBlock(target,f.pin());
+  assert.deepEqual(routes,['component','component','scene']);
+  assert.equal(f.calls[0].payload.view.scope.contextId,'comp-a');
+  const bare={...f.session,runComponentCommand:undefined};
+  await assert.rejects(Reader.create(bare).readBlock(inside,f.pin()),e=>e.code==='unavailable');
 });

@@ -6,6 +6,9 @@ use crate::native_contract::vector::{
 };
 use serde_json::Value;
 
+#[path = "native_vector_contract_texture.rs"]
+mod texture;
+
 fn point(value: &Value) -> bool {
     exact(value, &["x", "y"], &[]).is_some() && finite(&value["x"]) && finite(&value["y"])
 }
@@ -16,7 +19,7 @@ fn solid(value: &Value) -> bool {
         && ["r", "g", "b", "a"].iter().all(|key| unit(&value[*key]))
 }
 
-fn geometry(value: &Value) -> bool {
+pub(super) fn geometry(value: &Value) -> bool {
     exact(
         value,
         &[
@@ -76,7 +79,7 @@ fn body(value: &Value) -> bool {
     })
 }
 
-fn anchor(value: &Value) -> bool {
+pub(super) fn anchor(value: &Value) -> bool {
     exact(value, &["point", "handleIn", "handleOut", "width"], &[]).is_some()
         && ["point", "handleIn", "handleOut"]
             .iter()
@@ -143,7 +146,7 @@ pub(super) fn shape(value: &Value, for_set: bool) -> bool {
     })
 }
 
-fn gradient(value: &Value) -> bool {
+pub(super) fn gradient(value: &Value) -> bool {
     let number = |v: &Value| {
         v.as_f64()
             .is_some_and(|n| n.is_finite() && (n as f32).is_finite())
@@ -207,15 +210,25 @@ fn extension(value: &Value, has_stroke: bool) -> bool {
             "maskFeather",
             "linkedFillId",
             "isLinkedFillCompanion",
+            "brushTexture",
+            "shadow",
+            "isFillShape",
+            "xformAnchorKey",
+            "xformAnchorCustom",
         ],
     )
     .is_some_and(|object| {
         !object.is_empty()
+            && object.get("brushTexture").is_none_or(texture::brush_texture)
+            && object.get("shadow").is_none_or(texture::shadow)
+            && object.get("isFillShape").is_none_or(|v| v == &Value::Bool(true))
             && object
                 .get("pressure")
                 .is_none_or(|v| pressure(v) && !has_stroke)
             && object.get("paramShape").is_none_or(|v| shape(v, false))
             && object.get("boxAngle").is_none_or(finite)
+            && object.get("xformAnchorKey").is_none_or(|k| k.as_str().is_some_and(|k| ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"].contains(&k)))
+            && object.get("xformAnchorCustom").is_none_or(|p| p.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(finite)))
             && object.get("linkedFillId").is_none_or(|value| {
                 value.as_str().is_some_and(|id| {
                     !id.is_empty() && id.len() <= 128 && !id.chars().any(char::is_control)

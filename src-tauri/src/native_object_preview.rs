@@ -1,7 +1,7 @@
 //! Owner-held work only: GPU and surface remain borrowed from the caller.
 use crate::native_dispatch::{NativeObjectHost, NativeReleaseProgress};
 use native_engine::desktop_viewport::{
-    ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView, ObjectViewProjection,
+    ObjectPresentedFrame, ObjectPreviewView, ObjectViewProjection,
     ViewportDisplayFilter,
 };
 use native_engine::{
@@ -18,7 +18,6 @@ use native_engine::{
     object_render_scene::{
         prepare_object_navigated_viewport_composition,
         prepare_scheduled_object_composition_from_witness, ObjectCompositionWitness,
-        ObjectPaintPlan,
     },
     resource_leases::WorkId,
     scheduler::{
@@ -30,7 +29,19 @@ use std::collections::BTreeSet;
 
 #[path = "native_object_preview_prepare.rs"]
 mod prepare;
+#[path = "native_object_reference_preview.rs"]
+mod reference_preview;
 use prepare::PreparedObjectPreview;
+#[path = "native_object_image_mesh_read.rs"]
+mod image_mesh_read;
+#[path = "native_object_subselect_read.rs"]
+mod subselect_read;
+#[path = "native_object_widget_read.rs"]
+mod widget_read;
+#[path = "native_object_ghost_read.rs"]
+mod ghost_read;
+#[path = "native_object_rig_read.rs"]
+mod rig_read;
 
 #[derive(Default)]
 pub(super) struct ObjectPreview {
@@ -38,12 +49,18 @@ pub(super) struct ObjectPreview {
     pub(super) brush_runtime: ObjectBrushRuntime,
     prepared: Option<PreparedObjectPreview>,
     reference_cache: Option<ObjectCompositionWitness>,
+    // Geometry reads also need the actual successful vector-only presentation.
+    // This witness is captured before media attachment and never retains video leases.
+    presented_vectors: Option<ObjectCompositionWitness>,
+    presented_mesh_view: Option<PresentationReceipt>,
     // Required original C02 effects remain at this actual owner. They never
     // become a render-time history edit or disappear into an error string.
     pub(super) motion_control: ObjectMotionFrameControl,
     pending: Option<ScheduledFrame>,
     pending_filter: Option<ViewportDisplayFilter>,
     blocked: Option<String>,
+    /// #2371: the Solo set of the export being run (set from its request, read when its witnesses are made); empty otherwise.
+    pub(super) export_solo: Vec<String>,
     released: bool,
     cancelled_on_release: BTreeSet<WorkId>,
     #[cfg(test)]
@@ -113,6 +130,8 @@ impl ObjectPreview {
         Ok(())
     }
     pub(super) fn invalidate(&mut self) {
+        self.presented_mesh_view = None;
+        self.presented_vectors = None;
         self.prepared = None;
         if let Err(error) = self.cancel_pending() {
             self.blocked = Some(error);
@@ -197,51 +216,6 @@ impl NativeObjectHost {
         )
     }
 
-    pub(crate) fn with_prepared_object_preview_for_view<T>(
-        &mut self,
-        expected: &ObjectFrameSelector<'_>,
-        output: OutputSpec,
-        view: ObjectPreviewView,
-        pending_proof_fallback: bool,
-        operation: impl FnOnce(&mut Self) -> Result<T, String>,
-    ) -> Result<T, String> {
-        self.with_prepared_object_preview_for_navigation(
-            expected,
-            output,
-            view,
-            ObjectPreviewNavigation::default(),
-            pending_proof_fallback,
-            operation,
-        )
-    }
-    pub(crate) fn with_prepared_object_preview_for_navigation<T>(
-        &mut self,
-        expected: &ObjectFrameSelector<'_>,
-        output: OutputSpec,
-        view: ObjectPreviewView,
-        navigation: ObjectPreviewNavigation,
-        pending_proof_fallback: bool,
-        operation: impl FnOnce(&mut Self) -> Result<T, String>,
-    ) -> Result<T, String> {
-        if self.preview.prepared.is_some() {
-            return Err("native object preview preparation is already borrowed".into());
-        }
-        let prepared = self.prepare_object_preview_navigation(
-            expected,
-            output,
-            view,
-            navigation,
-            pending_proof_fallback,
-        )?;
-        self.preview.prepared = Some(prepared);
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
-        self.preview.prepared = None;
-        match result {
-            Ok(result) => result,
-            Err(payload) => std::panic::resume_unwind(payload),
-        }
-    }
-
     pub(crate) fn present_prepared_object_preview<P: SurfacePort>(
         &mut self,
         expected: &ObjectFrameSelector<'_>,
@@ -263,6 +237,11 @@ impl NativeObjectHost {
             compositor,
             viewport,
             ViewportDisplayFilter::None,
+            None,
+            None,
+            false,
+            &[],
+            &mut (),
         )
     }
 
@@ -272,12 +251,24 @@ impl NativeObjectHost {
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
         display_filter: ViewportDisplayFilter,
+        alpha_checker: Option<f64>,
+        current_outline: Option<f64>,
+        hide_shadow_guides: bool,
+        solo_layers: &[String],
+        observer: &mut dyn crate::native_dispatch::ObjectPreviewObserver,
     ) -> Result<ObjectPresentedFrame, String> {
-        let prepared = self
+        let mut prepared = self
             .preview
             .prepared
             .take()
             .ok_or("native object preview has no current CPU preparation")?;
+        // #2373: the checker is part of the canonical quality identity of this frame, like the onion settings.
+        prepared.checker_scale = alpha_checker;
+        prepared.outline_scale = current_outline; // #2372, likewise
+        prepared.hide_shadow_guides = hide_shadow_guides; // #2373, likewise
+        prepared.solo_layers = solo_layers.to_vec(); // #2371, likewise
+        self.preview.presented_mesh_view = None;
+        self.preview.presented_vectors = None;
         if self.released.is_some() || self.preview.released || self.preview.blocked.is_some() {
             return Err("native object preview owner requires cleanup or was released".into());
         }
@@ -299,7 +290,7 @@ impl NativeObjectHost {
         }
         // Cancel a different source or viewport identity before brush retirement.
         // The same immutable admission and navigation may retain deferred work.
-        let quality = prepared.navigation.quality(prepared.view);
+        let quality = prepared.quality();
         if self.preview.pending.as_ref().is_some_and(|work| {
             let key = work.key();
             key.document_snapshot_id() != prepared.snapshot.snapshot_id()
@@ -325,6 +316,7 @@ impl NativeObjectHost {
             snapshot,
             view,
             navigation,
+            ghosts,
             ..
         } = prepared;
         // T12: the frame's videos (MissingLink refused before any decode). Media is
@@ -365,7 +357,16 @@ impl NativeObjectHost {
                 .ok_or("preview requires an actual viewport witness")?,
             composition.viewport_stored_camera_available(),
         )?;
+        // #2371: the hit-test geometry follows the Solo view too (baseline: a layer the solo hides has no live item to pick).
+        let vector_source = (!composition.has_scene_images() && !media.draws_video(expected.frame))
+            .then(|| composition.clone().with_viewport_solo(solo_layers))
+            .transpose()
+            .map_err(|e| format!("preview solo hit-test source: {e:?}"))?;
         let composition = media.witness(expected.frame, composition)?;
+        // #2358 GHOST-UNDER: onion / Ghost All composed UNDER the live frame (preview witness only, never an export).
+        let (composition, ghost_receipt) = prepare::attach_ghosts(composition, ghosts.as_ref(), &snapshot, expected.frame)?;
+        // #2373 checker / #2372 outline: view-only aids of this viewport witness (never the retained hit-test source).
+        let composition = prepare::attach_view_aids(composition, key.output_spec().dimensions(), alpha_checker, current_outline, hide_shadow_guides, solo_layers)?;
         let key = if media.draws_video(expected.frame) {
             EvaluationKey::new(
                 key.document_snapshot_id(),
@@ -421,6 +422,15 @@ impl NativeObjectHost {
             .map_err(|e| format!("preview admission: {e:?}"))?;
             let frame =
                 ObjectViewportFrame::compose(compositor, &live).map_err(|e| e.to_string())?;
+            let identity = frame.identity();
+            observer.begin(crate::native_dispatch::ObservedObjectPreview {
+                instance_id: expected.instance_id,
+                document_id: expected.document_id,
+                content_revision: expected.content_revision,
+                frame: identity.evaluation_key().frame(),
+                work_id: identity.work_id().value(),
+                view_generation: identity.view_generation().value(),
+            });
             viewport
                 .register_with_display_filter(frame.identity().clone(), display_filter)
                 .map_err(|e| format!("preview register: {e:?}"))?;
@@ -458,39 +468,14 @@ impl NativeObjectHost {
             // A leaked decoded frame blocks the next preview until cleanup.
             self.preview.blocked = Some("preview video frames were not released".into());
         }
-        Ok(ObjectPresentedFrame { receipt, view })
+        if media_released && receipt.status() == &ViewportStatus::Presented {
+            self.preview.presented_mesh_view = Some(receipt.clone());
+            self.preview.presented_vectors = vector_source;
+        }
+        Ok(ObjectPresentedFrame { receipt, view, ghosts: ghost_receipt })
     }
 
-    fn prepare_reference_preview(
-        &mut self,
-        plan: &ObjectPaintPlan,
-        dimensions: (u32, u32),
-        compositor: &mut Compositor,
-        decode: impl FnOnce(
-            Option<&ObjectCompositionWitness>,
-        ) -> Result<ObjectCompositionWitness, String>,
-    ) -> Result<ObjectCompositionWitness, String> {
-        // Both Vello and the host retain charged pixels. A failed reset leaves
-        // both intact; a failed decode leaves neither stale cache and is retryable.
-        compositor
-            .retire_object_reference_for(plan, dimensions)
-            .map_err(|error| error.to_string())?;
-        if self
-            .preview
-            .reference_cache
-            .as_ref()
-            .is_some_and(|previous| !previous.reference_matches_plan(plan))
-        {
-            self.preview.reference_cache = None;
-        }
-        let composition = decode(self.preview.reference_cache.as_ref())?;
-        if composition.has_scene_images() {
-            self.preview.reference_cache = Some(composition.clone());
-        } else {
-            self.preview.reference_cache = None;
-        }
-        Ok(composition)
-    }
+
 }
 
 #[cfg(test)]
@@ -503,6 +488,10 @@ mod lifecycle_tests;
 #[cfg(test)]
 #[path = "native_object_preview_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_object_component_preview_tests.rs"]
+mod component_tests;
 
 #[cfg(test)]
 #[path = "native_raster_image_preview_tests.rs"]

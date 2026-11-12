@@ -259,6 +259,33 @@ fn explicit_component_order_uses_its_own_complete_plan_and_is_not_replaced_by_na
     assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
 }
 #[test]
+fn plan_less_component_order_equals_baseline_sym_layers_order() {
+    // Baseline convertLayersToComponent (1065e9d8) pushes the sorted source layers into
+    // sym.layers in ascending index order; the captured LO rows record that order.
+    let oracle = include_str!("fixtures/object-context-resolver/oracle.txt");
+    let snapshot = admitted(&source());
+    for context in ["sym_comp", "sym_comp_b"] {
+        let baseline: Vec<&str> = oracle
+            .lines()
+            .filter_map(|line| {
+                let cols: Vec<&str> = line.split('\t').collect();
+                (cols.first() == Some(&"LO") && cols.get(1) == Some(&context)).then(|| cols[2])
+            })
+            .flat_map(|csv| csv.split(','))
+            .collect();
+        assert_eq!(baseline, ["ly_comp_ia", "ly_comp_ib"]);
+        let packet = prepare_object_frame(&snapshot, &selector(&snapshot, context, 7)).unwrap();
+        let natural = packet
+            .numeric_order()
+            .unwrap()
+            .layers()
+            .iter()
+            .map(|layer| packet.source_layers()[layer.source_layer_index()].layer_uid())
+            .collect::<Vec<_>>();
+        assert_eq!(natural, baseline, "{context}");
+    }
+}
+#[test]
 fn malformed_explicit_component_plans_are_refused_instead_of_falling_back_to_natural_order() {
     for defect in 0..5 {
         let mut value = source();

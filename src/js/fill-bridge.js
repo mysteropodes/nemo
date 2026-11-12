@@ -230,7 +230,12 @@
     target.addEventListener('pointermove', onMove, { capture: true });
     document.addEventListener('keydown', onKeyDown);
     var propBtn = document.getElementById('btn-fill-propagate');
-    if (propBtn) propBtn.addEventListener('click', onPropagateClick);
+    // #2372 UNAVAIL-NOTICES: no native owner for propagating across frames - say so (one stable sentence) instead of the silent allowLegacyEdit return.
+    if (propBtn) propBtn.addEventListener('click', function () {
+      var unavailable = window.NemoNativeInspectorUnavailable;
+      if (unavailable && unavailable.refuse(window, 'btn-fill-propagate')) return;
+      onPropagateClick();
+    });
     var nibA = document.getElementById('p-nib-angle');
     if (nibA) nibA.addEventListener('change', function () {
       var v = parseFloat(this.value);

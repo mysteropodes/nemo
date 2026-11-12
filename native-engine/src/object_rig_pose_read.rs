@@ -6,11 +6,16 @@
 //! geometry) through the single function below, exactly like the rig edit facade reaches its kernels.
 //!
 //! The answer is plain numbers and plain classes: the posed vertices of every stroke a surviving bind
-//! drives, and one [`PoseBind`] class per bind of the stored rig. Nothing here owns a rig, a mesh store
-//! or a deformation: an evaluation that cannot run is a typed [`PoseRefusal`], never a defaulted pose.
-//! Without the `evaluation` feature there is no kernel and every call reports
-//! [`PoseRefusal::Unavailable`]. The mesh provider (store and raster rect) is not wired here, so a mesh
-//! bind is [`PoseBind::Unavailable`] and the caller decides what that means for its transaction.
+//! drives, the posed offsets of every mesh a surviving bind drives, and one [`PoseBind`] class per bind of
+//! the stored rig. Nothing here owns a rig, a mesh store or a deformation: an evaluation that cannot run is
+//! a typed [`PoseRefusal`], never a defaulted pose. Without the `evaluation` feature there is no kernel and
+//! every call reports [`PoseRefusal::Unavailable`].
+//!
+//! The mesh provider (#2255) is the snapshot's own image-mesh store plus the display rect of the raster record
+//! that carries the mesh on the layer's exposed frame (the scene join reads the same record through its frame
+//! packet): a store absent is [`PoseBind::Unavailable`], a mesh whose raster is absent or placed differently by
+//! several records has no rect and is [`PoseBind::Unavailable`] too; nothing is guessed (`rig_pose_eval_view.rs`). A held gesture
+//! ([`VertexWrite`]s laid over the stored rig, [`evaluate_layer_pose_over`]) is evaluated detached: the live-pose preview.
 use crate::revision::ObjectSnapshot;
 
 /// One posed vertex: the anchor and both relative handle vectors.
@@ -27,6 +32,25 @@ pub(crate) struct PoseStroke {
     pub(crate) stroke_id: String,
     pub(crate) closed: bool,
     pub(crate) vertices: Vec<PoseVertex>,
+}
+
+/// The posed offsets of one image mesh, with its posed vertices in world space (the first `outline` are the contour).
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PoseMesh {
+    pub(crate) mesh_id: String,
+    pub(crate) offsets: Vec<[f64; 2]>,
+    pub(crate) world: Vec<[f64; 2]>,
+    pub(crate) outline: usize,
+}
+
+/// One vertex of one bone a held gesture rewrites (the anchor and the handle vectors relative to it): plain numbers.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct VertexWrite {
+    pub(crate) bone_id: String,
+    pub(crate) vi: usize,
+    pub(crate) point: Option<[f64; 2]>,
+    pub(crate) handle_in: Option<[f64; 2]>,
+    pub(crate) handle_out: Option<[f64; 2]>,
 }
 
 /// What the evaluation did with one bind of the stored rig.
@@ -51,6 +75,8 @@ pub(crate) struct LayerPose {
     pub(crate) binds: Vec<PoseBind>,
     /// Posed strokes in first-bind order; a stroke no surviving bind drives is not listed.
     pub(crate) strokes: Vec<PoseStroke>,
+    /// Posed meshes in first-bind order.
+    pub(crate) meshes: Vec<PoseMesh>,
 }
 
 /// Why no evaluation was produced at all (nothing partial is ever returned).
@@ -71,15 +97,25 @@ pub(crate) enum PoseRefusal {
 }
 
 /// Evaluate the rig of `layer_uid` at `frame` against one pinned snapshot.
-#[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
 pub(crate) fn evaluate_layer_pose(
     snapshot: &ObjectSnapshot,
     layer_uid: &str,
     frame: u32,
 ) -> Result<LayerPose, PoseRefusal> {
+    evaluate_layer_pose_over(snapshot, layer_uid, frame, &[])
+}
+
+/// [`evaluate_layer_pose`] over the stored rig with `writes` laid over it (none: the stored one); nothing is written or kept.
+#[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
+pub(crate) fn evaluate_layer_pose_over(
+    snapshot: &ObjectSnapshot,
+    layer_uid: &str,
+    frame: u32,
+    writes: &[VertexWrite],
+) -> Result<LayerPose, PoseRefusal> {
     #[cfg(feature = "evaluation")]
     {
-        evaluate(snapshot, layer_uid, frame)
+        evaluate(snapshot, layer_uid, frame, writes)
     }
     #[cfg(not(feature = "evaluation"))]
     {
@@ -92,24 +128,27 @@ fn evaluate(
     snapshot: &ObjectSnapshot,
     layer_uid: &str,
     frame: u32,
+    writes: &[VertexWrite],
 ) -> Result<LayerPose, PoseRefusal> {
     use crate::evaluation::object_image_mesh_kernels::rig_pose_eval::{
-        evaluate_rig_pose, BindOutcome, RigPosePin, RigPoseRefusal,
+        evaluate_for_view, BindOutcome, RigPoseRefusal, RigVertexWrite,
     };
-    let pin = RigPosePin::of(snapshot);
-    let evaluation = evaluate_rig_pose(snapshot, &pin, layer_uid, frame, None).map_err(
-        |refusal| match refusal {
-            RigPoseRefusal::FrameOutOfRange => PoseRefusal::FrameOutOfRange,
-            RigPoseRefusal::LayerAbsent => PoseRefusal::LayerAbsent,
-            RigPoseRefusal::NoRig => PoseRefusal::NoRig,
-            RigPoseRefusal::NotExposed => PoseRefusal::NotExposed,
-            RigPoseRefusal::Deform { .. } => PoseRefusal::Deform,
-            RigPoseRefusal::WrongInstance
-            | RigPoseRefusal::WrongDocument
-            | RigPoseRefusal::WrongRevision
-            | RigPoseRefusal::WrongSnapshot => PoseRefusal::Pin,
-        },
-    )?;
+    let writes: Vec<RigVertexWrite> = writes
+        .iter()
+        .map(|w| RigVertexWrite { bone_id: w.bone_id.clone(), vi: w.vi, point: w.point, handle_in: w.handle_in, handle_out: w.handle_out })
+        .collect();
+    let view = evaluate_for_view(snapshot, layer_uid, frame, &writes).map_err(|refusal| match refusal {
+        RigPoseRefusal::FrameOutOfRange => PoseRefusal::FrameOutOfRange,
+        RigPoseRefusal::LayerAbsent => PoseRefusal::LayerAbsent,
+        RigPoseRefusal::NoRig => PoseRefusal::NoRig,
+        RigPoseRefusal::NotExposed => PoseRefusal::NotExposed,
+        RigPoseRefusal::Deform { .. } => PoseRefusal::Deform,
+        RigPoseRefusal::WrongInstance
+        | RigPoseRefusal::WrongDocument
+        | RigPoseRefusal::WrongRevision
+        | RigPoseRefusal::WrongSnapshot => PoseRefusal::Pin,
+    })?;
+    let evaluation = &view.evaluation;
     let binds = evaluation
         .binds
         .iter()
@@ -137,9 +176,10 @@ fn evaluate(
                 .collect(),
         })
         .collect();
-    Ok(LayerPose {
-        source_frame: evaluation.source_frame,
-        binds,
-        strokes,
-    })
+    let meshes = view
+        .meshes
+        .iter()
+        .map(|m| PoseMesh { mesh_id: m.mesh_id.clone(), offsets: m.offsets.clone(), world: m.world.clone(), outline: m.outline })
+        .collect();
+    Ok(LayerPose { source_frame: evaluation.source_frame, binds, strokes, meshes })
 }

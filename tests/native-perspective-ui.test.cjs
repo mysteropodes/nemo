@@ -66,7 +66,7 @@ function fixture(options = {}) {
   let metadata = clone(options.metadata === undefined ? { perspectiveEnabled: true, perspectiveMode: '2pt', perspectiveDensity: -0.125,
     perspectiveVPs: [{ x: 60, y: 60 }, { x: 260, y: 60, locked: true }] } : options.metadata);
   let revision = 0, ticket = 1, serial = 0, running = 0, active = true, unavailable = false;
-  let block = null, corrupt = null, tail = Promise.resolve(), context, controller;
+  let queueHidden = false, block = null, corrupt = null, tail = Promise.resolve(), context, controller;
   const calls = [], notices = [], history = [clone(metadata)]; let historyIndex = 0, suspends = 0, resumes = 0;
   const projected = pin => ({ ...pin, presentation: { ...pin, owner: 'native', status: 'presented' } });
   function defaultPoints(mode) {
@@ -118,7 +118,9 @@ function fixture(options = {}) {
     return vm.runInContext('JSON.parse(' + JSON.stringify(JSON.stringify(response)) + ')', context);
   }
   const session = { info: () => info, isActive: () => active, requestId: () => 'perspective-' + (++serial),
-    readSubscriptionGeneration: () => ticket, readPresentedObjectSession: () => active && !running ? projected(info) : null,
+    readSubscriptionGeneration: () => ticket, readPresentedObjectSession: refused => {
+      if (queueHidden) { if (typeof refused === 'function') refused('queue-pending'); return null; }
+      return active && !running ? projected(info) : null; },
     runResourceCommand(action) {
       running++;
       const work = tail.then(() => { const origin = info;
@@ -143,6 +145,7 @@ function fixture(options = {}) {
     showToast: text => notices.push(text), SMEngineBridge: { isEnabled: () => true, renderNow() {}, suspend() { suspends++; }, resume() { resumes++; },
       screenToWorld() { throw Error('legacy viewport mapping'); } }, pushUndo() { throw Error('legacy history'); } };
   root.window = root; root.globalThis = root; context = vm.createContext(root);
+  if (options.wait) { root.setTimeout = (fn, ms) => ms ? setImmediate(fn) : setTimeout(fn, 0); vm.runInContext(fs.readFileSync(require.resolve('../src/js/adapters/native-presentation-wait.js'), 'utf8'), context); }
   for (const file of actualOrder()) vm.runInContext(fs.readFileSync(require.resolve('../src/js/' + file), 'utf8'), context, { filename: file });
   controller = root.NemoNativePerspectiveController; document.fire('DOMContentLoaded');
   async function settled() {
@@ -161,7 +164,7 @@ function fixture(options = {}) {
     lock: () => elements['labs-float-params'].children[1].children[1],
     reset: () => elements['labs-float-params'].children[2].children[1],
     pointer(kind, x, y, extra = {}) { return elements['canvas-area'].fire(kind, { ...screen(x, y), ...extra }); },
-    refuse() { unavailable = true; }, resubscribe() { ticket++; }, resize() { rect = { ...rect, left: rect.left + 1 }; },
+    hide(value) { queueHidden = value; }, refuse() { unavailable = true; }, resubscribe() { ticket++; }, resize() { rect = { ...rect, left: rect.left + 1 }; },
     corrupt(fn) { corrupt = fn; },
     fullInfo: () => info, projectionReady: value => ProjectFile.projectionReadyForUI(projectionRoot, value),
     drift() { projectionRoot.state.canvasW++; }, repairProjection: project,
@@ -351,4 +354,34 @@ test('perspective uses full project readiness and retains narrow immutable autho
   f.repairProjection(); await f.controller.presented(); await f.settled();
   assert.ok(f.controller.read());
   assert.equal(f.edits().length, 0, 'restoring readiness does not replay a gesture');
+});
+
+// #2372: a press on a vanishing point while the native queue hides the presentation (queue-pending) waits for it, then drags once.
+const ticks = async (n = 8) => { for (let i = 0; i < n; i++) await new Promise(done => setImmediate(done)); };
+test('queue-pending: a VP press held for several ticks drags once when the presentation returns', async () => {
+  const h = fixture({ wait: true }); await h.ready(); h.root.state.tool = 'perspective'; h.hide(true);
+  assert.equal(h.pointer('pointerdown', 60, 60).stopped, true, 'the press is held, not dropped'); h.pointer('pointermove', 80, 75); h.pointer('pointerup', 80, 75);
+  await ticks(2); assert.equal(h.edits().length, 0); assert.deepEqual(h.notices, []);
+  h.hide(false); await ticks(4); await h.settled();
+  assert.deepEqual(h.edits().map(q => q.payload.action), [{ kind: 'move', ordinal: 1, x: 80, y: 75 }]); assert.equal(h.historyEntries(), 1);
+  assert.deepEqual(h.engine(), { suspends: 1, resumes: 1 }); assert.deepEqual(h.notices, []);
+});
+test('queue-pending: a drag already under way survives the window; the release re-proves the origin before the one write', async () => {
+  const h = fixture({ wait: true }); await h.ready(); h.pointer('pointerdown', 60, 60); h.hide(true); h.pointer('pointermove', 90, 70);
+  assert.equal(h.engine().resumes, 0, 'not cancelled by the hidden presentation'); h.pointer('pointerup', 90, 70); h.hide(false); await ticks(); await h.settled();
+  assert.deepEqual(h.edits().map(q => q.payload.action), [{ kind: 'move', ordinal: 1, x: 90, y: 70 }]);
+});
+test('queue-pending: a real change while the press waits drops it without a write or a notice', async () => {
+  for (const change of ['tool', 'frame', 'pin']) {
+    const h = fixture({ wait: true }); await h.ready(); h.root.state.tool = 'perspective'; h.hide(true);
+    h.pointer('pointerdown', 60, 60); h.pointer('pointerup', 60, 60); await ticks(2);
+    if (change === 'tool') h.root.state.tool = 'draw'; if (change === 'frame') h.root.state.currentFrame = 3; if (change === 'pin') h.replace();
+    h.hide(false); await ticks(); await h.settled();
+    assert.equal(h.edits().length, 0, change); assert.deepEqual(h.notices, [], change);
+  }
+});
+test('queue-pending: a queue that never frees gives one notice and no write', async () => {
+  const h = fixture({ wait: true }); await h.ready(); h.root.state.tool = 'perspective'; h.hide(true);
+  h.pointer('pointerdown', 60, 60); h.pointer('pointerup', 60, 60); await ticks(60);
+  assert.equal(h.edits().length, 0); assert.deepEqual(h.notices, ['The canvas is still busy - try again.']);
 });

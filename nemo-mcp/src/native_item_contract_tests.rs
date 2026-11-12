@@ -167,6 +167,12 @@ fn text_blocks_and_patches_are_closed_and_a_patch_never_carries_the_anchor() {
         ("fixedWidth", json!("120")),
         ("bold", json!(1)),
         ("anchorTopLeft", json!({"x":1})),
+        ("rotation", json!("30")),
+        ("rotation", json!(361)),
+        ("rotation", json!(-360.5)),
+        ("flipX", json!(1)),
+        ("skew", json!(90)),
+        ("skew", json!("10")),
         ("isText", json!(true)),
         ("textOverflow", json!(false)),
     ] {
@@ -174,12 +180,29 @@ fn text_blocks_and_patches_are_closed_and_a_patch_never_carries_the_anchor() {
         payload["block"][key] = bad.clone();
         assert!(!request(ITEM, &payload), "block {key} {bad}");
     }
+    // #2267: a created block may carry its stored turn (degrees within one turn either way); a patch never does.
+    for turn in [json!(0), json!(30), json!(-360), json!(360), json!(12.5)] {
+        let mut turned = commands()[6].clone();
+        turned["block"]["rotation"] = turn.clone();
+        assert!(request(ITEM, &turned), "rotation {turn}");
+    }
+    // #2372: a block (and an image) may carry its stored mirror and shear; a patch never does.
+    let mut formed = commands()[6].clone();
+    formed["block"] = json!({"flipX":true,"flipY":false,"skew":-30.5}).as_object().unwrap().iter().fold(formed["block"].clone(), |mut b, (k, v)| { b[k] = v.clone(); b });
+    assert!(request(ITEM, &formed));
+    let mut image = commands()[0].clone();
+    (image["item"]["flipX"], image["item"]["skew"]) = (json!(true), json!(12));
+    assert!(request(ITEM, &image), "{image}");
+    image["item"]["skew"] = json!(95);
+    assert!(!request(ITEM, &image));
     let mut asset_font = commands()[6].clone();
     asset_font["block"]["font"] = json!({"kind":"asset","assetId":"font-1"});
     assert!(request(ITEM, &asset_font));
     for patch in [
         json!({}),
         json!({"anchorTopLeft":{"x":1,"y":2}}),
+        json!({"rotation":30}),
+        json!({"flipX":true,"skew":10}),
         json!({"isText":true}),
         json!({"text":""}),
         json!({"size":"9"}),
@@ -486,3 +509,6 @@ fn the_shared_result_check_routes_the_item_operations_through_this_module() {
         &json!({"applied":true,"historyEntriesAdded":1,"assetId":"asset-x"})
     ));
 }
+
+#[path = "native_item_contract_component_tests.rs"]
+mod component;

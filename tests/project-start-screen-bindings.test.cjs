@@ -28,18 +28,18 @@ function view({ local = false, missing } = {}) {
   for (const name of ['localStorage', 'indexedDB', 'state']) Object.defineProperty(context, name, {
     get() { throw Error(`presentation must not access ${name}`); } });
   vm.runInNewContext(source, context);
-  let publish;
+  let publish; const publishers = [];
   const ports = {
     readResumePresence() { calls.push('presence'); return local; },
-    readResumePresenceAsync(callback) { calls.push('async-presence'); publish = callback; },
+    readResumePresenceAsync(callback) { calls.push('async-presence'); publish = callback; publishers.push(callback); },
     renderRecents() { calls.push('recents'); },
     resume() { calls.push('resume'); return 'resume-result'; },
     open() { calls.push('open'); return 'open-result'; },
     createProject(config, current, failed) { calls.push({ config, current, failed }); return false; },
     showStartScreen() { calls.push('show'); }, notice(message) { calls.push(message); },
   };
-  root.SMProjectEntry.bindStartScreen({ getElementById: id => elements.get(id) || null, createElement: node }, ports);
-  return { calls, ports, elements, publish: value => publish(value), entry: root.SMProjectEntry };
+  const refreshView = root.SMProjectEntry.bindStartScreen({ getElementById: id => elements.get(id) || null, createElement: node }, ports);
+  return { refreshView, publishers, calls, ports, elements, publish: value => publish(value), entry: root.SMProjectEntry };
 }
 
 test('binding reads only presence, preserves startup order and never invokes document actions', () => {
@@ -47,7 +47,8 @@ test('binding reads only presence, preserves startup order and never invokes doc
   assert.deepEqual(h.calls, ['presence', 'recents']);
   assert.equal(h.elements.get('start-resume').style.display, '');
   assert.equal(h.elements.get('start-cards').classList.contains('has-resume'), true);
-  assert.strictEqual(h.elements.get('start-resume').listeners.get('click'), h.ports.resume);
+  assert.equal(h.elements.get('start-resume').fire('click'), 'resume-result', 'the click runs the Resume action and returns its result');
+  assert.deepEqual(h.calls.slice(-1), ['resume']);
   assert.strictEqual(h.elements.get('start-open').listeners.get('click'), h.ports.open);
   assert.equal(h.elements.get('start-newpanel').style.display, 'none');
 });
@@ -63,6 +64,35 @@ test('asynchronous presence can reveal Resume without transferring bytes or impo
   assert.equal(h.elements.get('start-resume').fire('click'), 'resume-result');
   assert.equal(h.elements.get('start-open').fire('click'), 'open-result');
   assert.deepEqual(h.calls.slice(-2), ['resume', 'open']);
+});
+
+test('the Resume card is re-decided each time the start screen is shown, and hides when nothing valid remains', () => {
+  const h = view();
+  h.publish(true);
+  assert.equal(h.elements.get('start-resume').style.display, '');
+  const shown = h.refreshView;
+  assert.equal(typeof shown.refresh, 'function');
+  shown.refresh();
+  assert.equal(h.calls.filter(c => c === 'async-presence').length, 2, 'presence is read again');
+  h.publish(false);
+  assert.equal(h.elements.get('start-resume').style.display, 'none');
+  assert.equal(h.elements.get('start-cards').classList.contains('has-resume'), false);
+  // A slower earlier answer cannot overwrite the newer one.
+  const stale = h.publishers[h.publishers.length - 1];
+  shown.refresh(); h.publish(true); stale(false);
+  assert.equal(h.elements.get('start-resume').style.display, '');
+});
+
+test('after a click the card is re-read while the start screen is still showing', async () => {
+  const h = view({ local: true });
+  const before = h.calls.filter(c => c === 'presence').length;
+  h.elements.get('start-resume').fire('click');
+  await new Promise(setImmediate);
+  assert.equal(h.calls.filter(c => c === 'presence').length, before + 1);
+  h.elements.get('start-screen').classList.add('hid');
+  h.elements.get('start-resume').fire('click');
+  await new Promise(setImmediate);
+  assert.equal(h.calls.filter(c => c === 'presence').length, before + 1, 'a hidden start screen is not refreshed');
 });
 
 test('an absent view binds nothing and never asks the controller for data or actions', () => {

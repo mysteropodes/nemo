@@ -4,24 +4,28 @@
  * name/order. Multiple contexts require the explicit active-context owner port. */
 (function(root,factory){
   var api=factory(typeof module==='object'&&module.exports?require('./native-motion-property-panel.js'):root.NemoNativeMotionPropertyPanel,
-    typeof module==='object'&&module.exports?require('./native-motion-property-view.js'):root.NemoNativeMotionPropertyView);
+    typeof module==='object'&&module.exports?require('./native-motion-property-view.js'):root.NemoNativeMotionPropertyView,
+    typeof module==='object'&&module.exports?require('./native-motion-key-edit.js'):root.NemoNativeMotionKeyEdit);
   if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeMotionBinding=api;
-}(typeof globalThis==='object'?globalThis:this,function(Panel,View){
+}(typeof globalThis==='object'?globalThis:this,function(Panel,View,KeyEdit){
   'use strict';
   var pins=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   function same(a,b){return !!a&&!!b&&pins.every(function(k){return a[k]===b[k];});}
   function clonePin(v){var p={};pins.forEach(function(k){p[k]=v[k];});return Object.freeze(p);}
   function key(t){return JSON.stringify([t.contextId,t.layerUid,t.strokeId===undefined?null:t.strokeId]);}
+  // The entered component the workspace controller holds (its id, frame count and rows), or null at the scene root.
+  function heldContext(root){try{var c=root.NemoNativeComponentContext,p=c&&typeof c.presented==='function'?c.presented(root):null,rows=p&&c.layers(root);return rows?{contextId:p.contextId,totalFrames:p.totalFrames,rows:rows}:null;}catch(_){return null;}}
   function create(root,ui,reader,options){
     options=options||{};
     if(!root||!root.state||!root.document||!ui||typeof ui.currentSession!=='function'||typeof ui.projectionReady!=='function'||typeof reader!=='function'||!options.container)throw new TypeError('Native Motion binding ports are unavailable');
     var retired=false,generation=0,lastSession=null,lastSignature=null,contextCache=null,pending=null,resolveSerial=0,updateSerial=0,waiting=null;
     function invalidate(){if(lastSession!==null||lastSignature!==null)generation++;lastSession=null;lastSignature=null;return null;}
     function baseScope(lease){try{
-      if(retired||root.state.appMode!=='motion')return invalidate();
+      if(retired||root.state.appMode!=='motion'||options.isCurrent&&options.isCurrent()!==true)return invalidate();
       var session=ui.currentSession();if(!session||!session.isActive||!session.isActive()||!session.info||!session.readPresentedObjectSession)return invalidate();
       var info=session.info(),presented=lease&&typeof lease.readPresentedObjectSession==='function'?lease.readPresentedObjectSession():session.readPresentedObjectSession();
       if(!info||!presented||presented.kind!=='native-object'||ui.projectionReady(info)!==true||!Array.isArray(info.layers))return invalidate();
+      var held=heldContext(root);if(held&&info)info=Object.assign({},info,{layers:held.rows,totalFrames:held.totalFrames}); /* #2256: an entered component is judged by ITS rows and frame count */
       if(lease&&(!same(info,presented)||!same(info,presented.presentation)||presented.available!==true||
         presented.presentation.owner!=='native'||presented.presentation.status!=='presented'||presented.presentation.frame!==root.state.currentFrame))return invalidate();
       if(!Number.isInteger(info.totalFrames)||info.totalFrames<1||!Number.isInteger(root.state.currentFrame)||root.state.currentFrame<0||root.state.currentFrame>=info.totalFrames)return invalidate();
@@ -31,7 +35,7 @@
       var active=root.state.activeLayerIdx;if(info.layers.length&&(!Number.isInteger(active)||active<0||active>=info.layers.length))return invalidate();
       var override=null;if(options.readTargetSelection){var raw=options.readTargetSelection(identity);if(!raw||!Array.isArray(raw.selected))return invalidate();
         override={primary:raw.primary==null?null:View.normalizeTarget(raw.primary),selected:raw.selected.map(function(t){var v=View.normalizeTarget(t);if(!v)throw new Error('Invalid native UI target');return v;})};if(raw.primary!=null&&!override.primary)return invalidate();}
-      var explicit=options.readContextId?options.readContextId(info,presented):null;if(options.readContextId&&(typeof explicit!=='string'||!explicit))return invalidate();
+      var explicit=options.readContextId?options.readContextId(info,presented):held?held.contextId:null;if(options.readContextId&&(typeof explicit!=='string'||!explicit))return invalidate();
       var transport=options.readTransportGeneration?options.readTransportGeneration():null;
       var signature=JSON.stringify([pins.map(function(k){return identity[k];}),indices,active,root.state.activeSymbolId,override,explicit,transport]);
       if(lastSession!==session||lastSignature!==signature){generation++;lastSession=session;lastSignature=signature;}
@@ -87,7 +91,7 @@
       return value;
     }
     async function editProperty(payload,pin,isCurrent,track){
-      var before=scope(),edit=track?ui.editPropertyTrack:ui.editProperty;
+      var before=scope(),edit=track==='paste'?ui.editPropertyKeysPaste:track?ui.editPropertyTrack:ui.editProperty;
       if(!before||!same(before.identity,pin)||typeof edit!=='function'||typeof isCurrent!=='function')
         throw new Error('Native property editing is unavailable');
       // Queue entry temporarily hides readPresentedObjectSession(). The owner
@@ -103,7 +107,7 @@
       }
       var submittedSignature=intentSignature();
       function current(){
-        try{return !retired&&root.state.appMode==='motion'&&ui.currentSession()===before.session&&
+        try{return !retired&&(!options.isCurrent||options.isCurrent()===true)&&root.state.appMode==='motion'&&ui.currentSession()===before.session&&
           before.session.isActive()&&same(before.identity,before.session.info())&&
           ui.projectionReady(before.session.info())===true&&intentSignature()===submittedSignature&&isCurrent()===true;
         }catch(_){return false;}
@@ -124,7 +128,7 @@
         try{
           function sameOwner(){
             var info=before.session.info();
-            return !retired&&root.state.appMode==='motion'&&ui.currentSession()===before.session&&
+            return !retired&&(!options.isCurrent||options.isCurrent()===true)&&root.state.appMode==='motion'&&ui.currentSession()===before.session&&
               before.session.isActive()&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return info[k]===before.identity[k];});
           }
           if(sameOwner()){
@@ -142,23 +146,35 @@
       else{if(typeof ui.selectLayer!=='function')return false;var index=before.info.layers.findIndex(function(l){return l.layerUid===t.layerUid;});if(index<0||preserve&&!before.selected.some(function(item){return key(item)===key(t);}))return false;result=ui.selectLayer(index,preserve,t.layerUid,before.info);}
       if(result!==true)return false;var after=scope();return !!after&&before.session===after.session&&same(before.identity,after.identity)&&after.primary&&key(after.primary)===key(t)&&after.selected.some(function(item){return key(item)===key(t);});
     }
-    function labelTarget(t,pin){var v=scope();if(!v||!same(v.identity,pin)||t.contextId!==v.contextId)throw new Error('Stale native label');if(t.strokeId!==undefined)return t.strokeId;var matches=v.info.layers.filter(function(l){return l.layerUid===t.layerUid;});return matches.length===1&&typeof matches[0].name==='string'?matches[0].name:t.layerUid;}
+    function labelTarget(t,pin){var v=scope();if(!v||!same(v.identity,pin)||t.contextId!==v.contextId)throw new Error('Stale native label');if(t.strokeId!==undefined)return null; /* Element names are a read-model gap: the panel derives an interim label. */ var matches=v.info.layers.filter(function(l){return l.layerUid===t.layerUid;});return matches.length===1&&typeof matches[0].name==='string'?matches[0].name:t.layerUid;}
     var caller=Panel.createCaller({document:root.document,container:options.container,pageBudget:options.pageBudget,yieldControl:options.yieldControl,
       isMotion:function(){return !retired&&root.state.appMode==='motion';},readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,
       query:query,readProperty:readProperty,keyTimelineChanged:options.keyTimelineChanged,
+      // D18-C: the pinned layer table and the toast surface, for the expression editor's Examples menu and its pickwhip messages.
+      layerNames:function(){var v=scope();return v?v.info.layers.map(function(l){return {layerUid:l.layerUid,name:l.name};}):[];},
+      showToast:function(m){if(typeof root.showToast==='function')root.showToast(m);},
       translate:function(key){return root.SM&&typeof root.SM.t==='function'?root.SM.t(key):key;},
+      get showContextMenu(){return typeof root.showContextMenu==='function'?function(x,y,items){return root.showContextMenu(x,y,items);}:undefined;},
       get editPropertyTrack(){return typeof ui.editPropertyTrack==='function'?function(payload,pin,current){return editProperty(payload,pin,current,true);}:undefined;},
+      get editPropertyKeysPaste(){return typeof ui.editPropertyKeysPaste==='function'?function(payload,pin,current){return editProperty(payload,pin,current,'paste');}:undefined;},
       get editProperty(){return typeof ui.editProperty==='function'?editProperty:undefined;},
-      selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,readPreference:options.readPreference,writePreference:options.writePreference});
+      layerLinkRows:function(target){var rows=root.NemoNativeMotionLayerLinkRows,ctl=root.NemoNativeMotionControlRows,link=rows&&typeof rows.build==='function'?rows.build(root,target):null;
+        // D18-B: the "Expression controls…" entry shares the layer's one row slot; it edits only through this binding's pinned owner port.
+        var controls=ctl&&typeof ctl.build==='function'?ctl.build(root,{readContext:readContext,query:query,editProperty:editProperty},target):null;
+        return ctl&&typeof ctl.compose==='function'?ctl.compose(root,link,controls):link;},
+      pathOpened:function(t){var V=root.NemoNativeMotionVertices;if(V&&typeof V.open==='function')V.open(root,t);},
+      selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,dimLabels:options.dimLabels,readPreference:options.readPreference,writePreference:options.writePreference});
     async function update(force){var ticket=++updateSerial,base=baseScope();if(base&&!base.explicit&&!cacheMatches(base)&&uniqueContextAllowed())showWait('Loading properties…',true);
-      if(base)await resolveContext(base,!!force);if(retired||ticket!==updateSerial)return false;clearWait();return caller.update(force);}
+      if(base)await resolveContext(base,!!force);if(retired||ticket!==updateSerial||options.isCurrent&&options.isCurrent()!==true)return false;clearWait();return caller.update(force);}
     function cancel(){var wasPending=!!pending;updateSerial++;resolveSerial++;pending=null;clearWait();var stopped=caller.cancel();if(wasPending&&!retired)showWait('Property read cancelled.',false);return wasPending||stopped;}
     function dispose(){if(retired)return;retired=true;updateSerial++;resolveSerial++;pending=null;clearWait();invalidate();caller.dispose();}
     async function shortcut(k,shift){var before=baseScope();if(!before||!await update(false))return false;var after=baseScope();if(!after||before.session!==after.session||before.uiSignature!==after.uiSignature||before.context.frame!==after.context.frame)return false;return caller.shortcut(k,shift);}
+    // #2524: a batch key edit on the open key tracks; same scope fence as a shortcut, the panel owns the write.
+    async function editKeys(action,opts){var before=baseScope();if(!before||!await update(false))return null;var after=baseScope();if(!after||before.session!==after.session||before.uiSignature!==after.uiSignature||before.context.frame!==after.context.frame)return null;return caller.editKeys(action,opts);}
     var actionScopes=new WeakMap();
     function captureShortcutScope(){var value=baseScope();if(!value)return null;var token=Object.freeze({});actionScopes.set(token,{session:value.session,signature:value.uiSignature,identity:value.identity,frame:value.context.frame});return token;}
     function isShortcutScopeCurrent(token){var before=token&&actionScopes.get(token),after=baseScope();return !!before&&!!after&&before.session===after.session&&before.signature===after.uiSignature&&same(before.identity,after.identity)&&before.frame===after.context.frame;}
-    return Object.freeze({readKeyTimelines:function(){return scope()?caller.readKeyTimelines():null;},readKeyTimeline:function(){return scope()?caller.readKeyTimeline():null;},captureSelectedKeys:function(){return scope()?caller.captureSelectedKeys():null;},update:update,shortcut:shortcut,captureShortcutScope:captureShortcutScope,isShortcutScopeCurrent:isShortcutScopeCurrent,isMounted:caller.isMounted,setFilter:function(mode){return caller.setFilter(mode);},cancel:cancel,dispose:dispose,readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,query:query,selectTarget:selectTarget});
+    return Object.freeze({readKeyTimelines:function(){return scope()?caller.readKeyTimelines():null;},readKeyTimeline:function(){return scope()?caller.readKeyTimeline():null;},captureSelectedKeys:function(){return scope()?caller.captureSelectedKeys():null;},update:update,shortcut:shortcut,editKeys:editKeys,captureShortcutScope:captureShortcutScope,isShortcutScopeCurrent:isShortcutScopeCurrent,isMounted:caller.isMounted,setFilter:function(mode){return caller.setFilter(mode);},cancel:cancel,dispose:dispose,readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,query:query,selectTarget:selectTarget});
   }
   var owners=new WeakMap();
   var revealKeys=['p','a','r','s','t','u','e','m'];
@@ -185,8 +201,16 @@
     document.addEventListener('keydown',onKey,true);
     api=Object.freeze({dispose:function(){if(retired)return;retired=true;serial++;document.removeEventListener('keydown',onKey,true);if(owners.get(document)===api)owners.delete(document);}});owners.set(document,api);return api;
   }
+  function ownsPort(root,ui){return function(){if(root.state.appMode!=='motion')return false;var session=ui.currentSession();return session?typeof session.blocksLegacy==='function'?session.blocksLegacy():null:false;};}
+  // #2524: the Motion key batch shortcuts (F9 family, Cmd+Alt+K/H, Delete, Alt+arrows) over the binding's open key tracks.
+  function installKeyEdit(document,root,ui,binding,options){
+    if(!KeyEdit||typeof KeyEdit.install!=='function')return null;
+    return KeyEdit.install(document,{ownsNativeMotion:ownsPort(root,ui),acceptsTarget:options.acceptsTarget,modalOpen:options.modalOpen,unavailable:options.unavailable,
+      noSelection:function(){var m=root.SM&&typeof root.SM.t==='function'?root.SM.t('toastNoKeySelected'):null;if(typeof root.showToast==='function')root.showToast(typeof m==='string'&&m&&m!=='toastNoKeySelected'?m:'No key selected');},
+      hasSelection:function(){var v=binding.readKeyTimelines();return !!v&&v.tracks.some(function(t){return t.items.some(function(k){return k.selected;});});},edit:binding.editKeys});
+  }
   function installForBinding(document,root,ui,binding,options){options=options||{};return install(document,{
-    ownsNativeMotion:function(){if(root.state.appMode!=='motion')return false;var session=ui.currentSession();return session?typeof session.blocksLegacy==='function'?session.blocksLegacy():null:false;},
+    ownsNativeMotion:ownsPort(root,ui),
     captureScope:binding.captureShortcutScope,isCurrentScope:binding.isShortcutScopeCurrent,route:binding.shortcut,
     acceptsTarget:options.acceptsTarget,modalOpen:options.modalOpen,unavailable:options.unavailable});}
   // One ordinary inspector binding per installed Motion renderer. Ports and
@@ -197,18 +221,28 @@
       if(notifyingTimeline)return;notifyingTimeline=true;
       try{[keyTimelineListener,options.keyTimelineChanged].forEach(function(fn){try{if(typeof fn==='function')fn(reason);}catch(_){}});}finally{notifyingTimeline=false;}
     }
-    function retire(){var old=active;active=null;if(!old)return;old.keyboard.dispose();old.header.removeEventListener('contextmenu',old.menu);old.binding.dispose();}
+    function retire(){var old=active;active=null;if(!old)return;old.keyboard.dispose();if(old.keyEdit)old.keyEdit.dispose();old.header.removeEventListener('contextmenu',old.menu);old.binding.dispose();}
     function unavailable(){if(active&&options.unavailable)options.unavailable();}
-    function paint(ports,container,header){
+    function paint(ports,container,header,isCurrent){
       if(retired||!root.state||root.state.appMode!=='motion'){retire();return false;}
       if(!ports||typeof ports.readPropertyMetadata!=='function'||!container||!header){retire();return false;}
       if(active&&(active.ports!==ports||active.container!==container||active.header!==header||!active.binding.isMounted()))retire();
       if(!active){
-        var binding=create(root,ports,function(selector){return ports.readPropertyMetadata(selector);},Object.assign({},options,{container:container,readTransportGeneration:ports.readTransportGeneration,keyTimelineChanged:keyTimelineChanged}));
+        var binding=create(root,ports,function(selector){return ports.readPropertyMetadata(selector);},Object.assign({},options,{container:container,readTransportGeneration:ports.readTransportGeneration,keyTimelineChanged:keyTimelineChanged,isCurrent:isCurrent}));
         var menu=function(event){event.preventDefault();event.stopPropagation();var scope=binding.captureShortcutScope();if(active&&active.binding===binding&&scope&&options.openFilterMenu)options.openFilterMenu(event,function(mode){if(active&&active.binding===binding&&binding.isShortcutScopeCurrent(scope))return binding.setFilter(mode);return false;});};
         header.addEventListener('contextmenu',menu);
         var keyboard=installForBinding(root.document,root,ports,binding,{acceptsTarget:options.acceptsTarget,modalOpen:options.modalOpen,unavailable:unavailable});
-        active={ports:ports,container:container,header:header,binding:binding,menu:menu,keyboard:keyboard};
+        var keyEdit=installKeyEdit(root.document,root,ports,binding,{acceptsTarget:options.acceptsTarget,modalOpen:options.modalOpen,unavailable:unavailable});
+        var entry={ports:ports,container:container,header:header,binding:binding,menu:menu,keyboard:keyboard,keyEdit:keyEdit};
+        function current(){return active===entry&&(!isCurrent||isCurrent()===true);}
+        entry.handle=Object.freeze({retire:function(){if(active===entry)retire();},
+          shortcut:function(key,shift){return current()?binding.shortcut(key,shift):Promise.resolve(false);},
+          readKeyTimeline:function(){return current()?binding.readKeyTimeline():null;},
+          readKeyTimelines:function(){return current()?binding.readKeyTimelines():null;},
+          captureSelectedKeys:function(){return current()?binding.captureSelectedKeys():null;},
+          editKeys:function(action,opts){return current()?binding.editKeys(action,opts):Promise.resolve(null);},
+          setKeyTimelineListener:function(fn){if(active!==entry||fn!==null&&(!current()||typeof fn!=='function'))return false;keyTimelineListener=fn;keyTimelineChanged('listener');return true;}});
+        active=entry;
       }
       Promise.resolve(active.binding.update(false)).catch(unavailable);return true;
     }
@@ -220,7 +254,68 @@
       if(!info||!root.state||root.state.appMode==='motion')return null;
       var value={pin:clonePin(info),frame:root.state.currentFrame,viewGeneration:0,keys:Object.freeze([])};
       var current=function(){return !retired&&!active&&root.state.appMode!=='motion';};Object.defineProperties(value,{isCurrent:{value:current},isSelectionCurrent:{value:current}});return Object.freeze(value);
-    },paint:paint,retire:retire,shortcut:function(key,shift){return active?active.binding.shortcut(key,shift):Promise.resolve(false);},dispose:function(){if(retired)return;retire();retired=true;keyTimelineChanged('dispose');keyTimelineListener=null;}});
+    },render:function(container,context){
+      if(!context||typeof context.isCurrent!=='function'||context.isCurrent()!==true)return null;
+      return paint(context.ports,container,context.header,context.isCurrent)?active.handle:null;
+    },retire:retire,shortcut:function(key,shift){return active?active.binding.shortcut(key,shift):Promise.resolve(false);},editKeys:function(action,opts){return active?active.binding.editKeys(action,opts):Promise.resolve(null);},dispose:function(){if(retired)return;retire();retired=true;keyTimelineChanged('dispose');keyTimelineListener=null;}});
   }
-  return Object.freeze({create:create,createOrdinary:createOrdinary});
+  // Stateful Motion surface: a provider owns DOM/read work, while this lease
+  // routes actions only to its admitted handle. It owns no document state.
+  function createSurface(root,seam,defaultProvider){
+    if(!root||!seam||typeof seam.getPresenter!=='function')throw TypeError('Motion presenter seam unavailable');
+    var owner=null,unregister=null,disposed=false;
+    var methods=['shortcut','editKeys','readKeyTimeline','readKeyTimelines','captureSelectedKeys','setKeyTimelineListener'];
+    function lifetime(info){return info&&JSON.stringify([info.instanceId,info.documentId,info.lifecycleGeneration]);}
+    function current(entry){try{
+      return !disposed&&owner===entry&&root.state.appMode==='motion'&&
+        seam.getPresenter(root,'motion-properties')===entry.provider&&
+        seam.mountPoint(root,'motion-properties')===entry.body&&
+        root.document.getElementById('motion-props-sec').querySelector('.phdr')===entry.header&&
+        entry.ports.currentSession()===entry.session&&entry.session.isActive()===true&&lifetime(entry.session.info())===entry.lifetime;
+    }catch(_){return false;}}
+    function release(failed){
+      var old=owner;owner=null;if(!old)return;
+      var handle=old.handle;
+      try{if(handle&&typeof handle.setKeyTimelineListener==='function')handle.setKeyTimelineListener(null);}catch(_){}
+      try{if(handle)handle.retire();else if(typeof old.provider.retire==='function')old.provider.retire();}catch(_){}
+      // A throwing/rejected render can have allocated a new lifetime without
+      // returning its handle. Retire that provider as well as the prior handle.
+      if(failed&&handle)try{old.provider.retire();}catch(_){}
+    }
+    function retire(failed){release(failed);if(unregister){var off=unregister;unregister=null;off();}}
+    function validHandle(value){return !!value&&typeof value==='object'&&!Array.isArray(value)&&typeof value.retire==='function'&&methods.every(function(k){return value[k]===undefined||typeof value[k]==='function';});}
+    function paint(ports,body,header){
+      if(disposed)return false;
+      try{
+        if(!seam.isMounted(root,'motion-properties')&&defaultProvider)unregister=seam.register(root,'motion-properties',defaultProvider);
+        var provider=seam.getPresenter(root,'motion-properties'),session=ports.currentSession();
+        if(!provider||typeof provider.retire!=='function'||!session||!body||!header)throw Error('Motion presenter unavailable');
+        if(owner&&(owner.provider!==provider||owner.ports!==ports||owner.session!==session||owner.body!==body||owner.header!==header||owner.lifetime!==lifetime(session.info())))release();
+        if(!owner)owner={provider:provider,ports:ports,session:session,body:body,header:header,lifetime:lifetime(session.info()),handle:null};
+        var entry=owner,previous=entry.handle;
+        var handle=seam.present(root,'motion-properties',Object.freeze({ports:ports,header:header,isCurrent:function(){return current(entry);}}));
+        if(!validHandle(handle)||!current(entry)){
+          if(validHandle(handle)&&handle!==previous)handle.retire();
+          throw Error('Motion presenter handle unavailable');
+        }
+        if(previous!==handle){
+          if(previous)previous.retire();entry.handle=handle;
+          if(handle.setKeyTimelineListener)handle.setKeyTimelineListener(function(){
+            if(!current(entry)||entry.handle!==handle)return;
+            var range=root.NemoNativeLayerRangeDesktop;if(range&&typeof range.refreshKeys==='function')range.refreshKeys(root);
+          });
+        }
+        return true;
+      }catch(_){retire(true);return false;}
+    }
+    function call(method,args){var entry=owner;if(!entry||!current(entry)){release();return null;}var fn=entry.handle&&entry.handle[method];return typeof fn==='function'?fn.apply(entry.handle,args):null;}
+    return Object.freeze({paint:paint,retire:retire,
+      shortcut:function(key,shift){return call('shortcut',[key,shift]);},editKeys:function(action,opts){return call('editKeys',[action,opts]);},
+      readKeyTimeline:function(){return call('readKeyTimeline',[]);},readKeyTimelines:function(){return call('readKeyTimelines',[]);},
+      captureSelectedKeys:function(info){
+        if(!disposed&&!owner&&root.state.appMode!=='motion'&&defaultProvider&&typeof defaultProvider.captureSelectedKeys==='function')return defaultProvider.captureSelectedKeys(info);
+        return call('captureSelectedKeys',[info]);
+      },dispose:function(){if(disposed)return;retire();disposed=true;}});
+  }
+  return Object.freeze({create:create,createOrdinary:createOrdinary,createSurface:createSurface});
 }));

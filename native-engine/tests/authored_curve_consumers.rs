@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-export_job => authored_curve_consumers_tests
 use crate::codec::{decode_project, encode_project};
 use crate::compositor::{CompositionResult, Compositor};
 use crate::export_job::{ExportCompositor, ExportJobManager, ExportReadback, JobStatus};

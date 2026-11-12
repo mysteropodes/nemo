@@ -116,3 +116,28 @@ pub(crate) fn remove_element(
     }
     Ok(())
 }
+
+/// `insert_element`, then move the new element down to `position` in its layer's natural stack, shifting
+/// the layer's elements at or above it up by one (G15 behind placement).
+pub(crate) fn insert_element_at(
+    plan: &mut OrderPlan,
+    target: &ObjectTarget,
+    position: usize,
+) -> Result<(), OrderEditError> {
+    insert_element(plan, target)?;
+    let position = u32::try_from(position).map_err(|_| OrderEditError::PositionOverflow)?;
+    let scope = plan
+        .contexts
+        .iter_mut()
+        .find(|context| context.context_id == target.context_id)
+        .and_then(|context| context.scopes.iter_mut().find(|scope| scope.frame_scope == target.frame_scope))
+        .ok_or(OrderEditError::ContextAbsent)?;
+    for element in scope.elements.iter_mut().filter(|e| e.layer_uid == target.layer_uid) {
+        if element.stroke_id == target.stroke_id {
+            element.natural_position = position;
+        } else if element.natural_position >= position {
+            element.natural_position += 1;
+        }
+    }
+    Ok(())
+}

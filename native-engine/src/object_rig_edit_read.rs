@@ -3,14 +3,15 @@
 //!
 //! The command layer may not depend on the evaluation layer (`commands` allows `read-queries`,
 //! `read-queries` allows `evaluation`), so the rig edit transaction reaches the kernels through the
-//! five functions below, exactly like `ObjectSnapshot::sample_property_raw` reaches the raw sampler:
+//! functions below, exactly like `ObjectSnapshot::sample_property_raw` reaches the raw sampler:
 //! - [`weigh_control`]: `rigWeighOnePointByControl` over every point of a bind pass
 //!   (`weighForPoints` of `rigBindStroke`, with its `radius || 200` and softness clamp);
 //! - [`weigh_offset`]: `rigWeighOnePoint`, the legacy offset model the weight popover's reset button
 //!   calls (`rig-bridge.js`);
 //! - [`auto_radius`]: the radius scan of `rigAutoAssignLayer`;
 //! - [`offset_for`]: the popover's add-bone row (`loc ? loc.offset : 0`);
-//! - [`ik_lengths`]: the two lengths `rigSetIK` stores.
+//! - [`ik_lengths`]: the two lengths `rigSetIK` stores;
+//! - [`ik_drag`]: the whole Alt-drag of a chain end (`findIKChain`, `rigSetIK`, `rigDragIKEnd` and the joint mirror).
 //!
 //! Plain numbers in, plain numbers out: the stored record types belong to the document layer and are
 //! converted by the plan module of `object_rig_edit.rs` (command layer). Every input is borrowed and never
@@ -71,6 +72,8 @@ pub(crate) enum KernelRefusal {
     Unresolved,
     /// A chain reference names no bone or no rest vertex (`rigSetIK` returns `false`).
     AnchorMissing,
+    /// The dragged vertex is not the far end of a two-bone chain (`findIKChain` returns `null`).
+    NoChain,
 }
 
 /// `rigWeighOnePointByControl` for every point; `radius` and `softness` are the raw bind arguments
@@ -262,6 +265,103 @@ pub(crate) fn ik_lengths(
             Err(IkError::AnchorMissing(_)) => Err(KernelRefusal::AnchorMissing),
             Err(_) => Err(KernelRefusal::Unresolved),
         }
+    }
+    #[cfg(not(feature = "evaluation"))]
+    {
+        Err(KernelRefusal::Unavailable)
+    }
+}
+
+/// The chain an Alt-drag filed and the vertex writes of its solve.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct IkDrag {
+    /// `[root, joint, end]`, as `findIKChain` names them.
+    pub(crate) refs: [KernelRef; 3],
+    /// `[l1, l2]` measured on the live pose at the start of the drag (`rigSetIK`).
+    pub(crate) lengths: [f64; 2],
+    /// The joint, the end, then the solved joint copied onto the end bone's coincident near vertex.
+    pub(crate) writes: Vec<(KernelRef, [f64; 2])>,
+}
+
+/// The Alt-drag of the anchor `end` toward `target`: the chain `findIKChain` finds (a typed `NoChain` when the vertex is
+/// not the far end of a two-bone chain), filed with `flip: false` and the lengths of the live pose as `rigSetIK` does at
+/// the start of the gesture, then ONE `rigDragIKEnd` solve and the joint mirror of the bridge. Nothing is applied here.
+#[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
+pub(crate) fn ik_drag(
+    bones: &[KernelBone],
+    end: &KernelRef,
+    target: [f64; 2],
+) -> Result<IkDrag, KernelRefusal> {
+    #[cfg(feature = "evaluation")]
+    {
+        use crate::evaluation::object_image_mesh_kernels::rig_ik_solve::{
+            plan_drag, IkBone, IkDragRefusal, IkError, IkRef,
+        };
+        let ik_bones: Vec<IkBone> = bones
+            .iter()
+            .map(|bone| IkBone {
+                id: bone.id.clone(),
+                closed: bone.closed,
+                segments: bone.live.iter().map(|v| v.point).collect(),
+                rest_segments: bone.rest.iter().map(|v| v.point).collect(),
+            })
+            .collect();
+        let plan = plan_drag(&ik_bones, &end.bone_id, end.vi as usize, target).map_err(|refusal| match refusal {
+            IkDragRefusal::NoChain => KernelRefusal::NoChain,
+            IkDragRefusal::Ik(IkError::AnchorMissing(_)) => KernelRefusal::AnchorMissing,
+            IkDragRefusal::Ik(_) => KernelRefusal::Unresolved,
+        })?;
+        let to_kernel = |r: &IkRef| KernelRef { bone_id: r.bone_id.clone(), vi: r.vi as u32 };
+        Ok(IkDrag {
+            refs: [to_kernel(&plan.chain.root), to_kernel(&plan.chain.joint), to_kernel(&plan.chain.end)],
+            lengths: [plan.chain.l1, plan.chain.l2],
+            writes: plan.writes.iter().map(|w| (to_kernel(&w.target), w.point)).collect(),
+        })
+    }
+    #[cfg(not(feature = "evaluation"))]
+    {
+        Err(KernelRefusal::Unavailable)
+    }
+}
+
+/// The display rect of a raster as `rasterImageRect` returns it: top-left `x`, `y`, `width`, `height` and
+/// the rotation in degrees about the centre.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct MeshPlacement {
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) width: f64,
+    pub(crate) height: f64,
+    pub(crate) rotation: f64,
+}
+
+/// The REST positions of a mesh in world space: `SMImageMesh.worldVerts` of `rigBindMesh` with every offset
+/// forced to `[0, 0]` (the bind records where the vertices sit before any posing, never the sculpt).
+#[cfg_attr(not(feature = "evaluation"), allow(unused_variables))]
+pub(crate) fn mesh_rest_world(
+    verts: &[[f64; 2]],
+    placement: MeshPlacement,
+) -> Result<Vec<[f64; 2]>, KernelRefusal> {
+    #[cfg(feature = "evaluation")]
+    {
+        use crate::evaluation::object_image_mesh_kernels::object_image_mesh_geometry::{
+            world_verts, MeshRect, MeshView,
+        };
+        let zero = vec![[0.0, 0.0]; verts.len()];
+        let view = MeshView {
+            outline: &[],
+            verts,
+            offsets: &zero,
+            tris: &[],
+        };
+        let rect = MeshRect {
+            x: placement.x,
+            y: placement.y,
+            width: placement.width,
+            height: placement.height,
+            rotation: placement.rotation,
+        };
+        Ok(world_verts(&view, &rect, None))
     }
     #[cfg(not(feature = "evaluation"))]
     {

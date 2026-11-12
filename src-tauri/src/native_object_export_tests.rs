@@ -465,3 +465,6 @@ fn symlink_destination_cannot_redirect_original_owner_export() {
     assert_eq!(fs::read_dir(&outside).unwrap().count(), 1);
     assert_eq!(fs::read_dir(scratch.0.join("stage")).unwrap().count(), 0);
 }
+
+#[path = "native_object_export_solo_tests.rs"]
+mod solo;

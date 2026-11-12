@@ -9,6 +9,8 @@
 //! - `object.vector.replace`: `record` replaces the record with the same full target, in place.
 //! - `object.vector.delete`: `stableTarget` names the record to remove.
 //! - `object.vector.mask.edit`: `stableTarget` and `maskEdit` change only original Path mask tags.
+//! - `object.vector.createMany`: `records` (2..=32 create records on one layer and frame) land in ONE
+//!   revision and one undo entry, ids allocated in order (G23: one symmetry stroke undo removes all copies).
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
     object_deserialize, FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, Presence,
@@ -18,30 +20,54 @@ use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::HashSet;
 
 #[path = "object_mask_edit.rs"]
 mod mask_edit;
 #[path = "object_vector_edit_order.rs"]
 pub(crate) mod order;
+#[path = "object_vector_batch.rs"]
+mod batch_ops;
+#[path = "object_vector_create.rs"]
+mod create_ops;
+#[path = "object_vector_edit_context.rs"]
+pub(crate) mod context;
+#[path = "object_vector_edit_cells.rs"]
+pub(crate) mod cells;
+use create_ops::{create, create_many, Placement};
 use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
 use order::OrderEditError;
 
 /// Operation-specific bound on the FULL serialized request envelope of the vector edit operation only
 /// (identifiers and metadata included). Every other object operation keeps its 4096-byte bound.
 pub(crate) const MAX_VECTOR_REQUEST_BYTES: usize = 65_536;
-const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
+pub(super) const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
+/// Bound on one atomic multi-create (symmetry copies): enough for an 8-way radial with mirrors.
+pub(crate) const MAX_CREATE_MANY: usize = 32;
 
 #[derive(Debug)]
 struct VectorPayload {
     command: String,
     record: Presence<ObjectRecord>,
+    records: Presence<Vec<ObjectRecord>>,
+    placement: Presence<String>,
+    trim_ends: Presence<serde_json::Number>,
+    trim_clip: Presence<create_ops::TrimClipWire>,
+    keyframe: Presence<String>,
+    skip_unavailable: Presence<bool>,
+    ops: Presence<Vec<batch_ops::BatchOp>>,
     stable_target: Presence<ObjectTarget>,
     mask_edit: Presence<mask_edit::MaskEdit>,
 }
 object_deserialize!(VectorPayload {
     command: String,
     #[serde(default)] record: Presence<ObjectRecord>,
+    #[serde(default)] records: Presence<Vec<ObjectRecord>>,
+    #[serde(default)] placement: Presence<String>,
+    #[serde(default)] trim_ends: Presence<serde_json::Number>,
+    #[serde(default)] trim_clip: Presence<create_ops::TrimClipWire>,
+    #[serde(default)] keyframe: Presence<String>,
+    #[serde(default)] skip_unavailable: Presence<bool>,
+    #[serde(default)] ops: Presence<Vec<batch_ops::BatchOp>>,
     #[serde(default)] stable_target: Presence<ObjectTarget>,
     #[serde(default)] mask_edit: Presence<mask_edit::MaskEdit>
 });
@@ -49,17 +75,21 @@ object_deserialize!(VectorPayload {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum VectorEditKind {
     Create,
+    CreateMany,
     Replace,
     Delete,
     Mask,
+    Batch,
 }
 impl VectorEditKind {
     fn label(self) -> &'static str {
         match self {
             Self::Create => "create",
+            Self::CreateMany => "createMany",
             Self::Replace => "replace",
             Self::Delete => "delete",
             Self::Mask => "mask.edit",
+            Self::Batch => "batch",
         }
     }
 }
@@ -69,16 +99,26 @@ impl VectorEditKind {
 pub(crate) struct VectorEditResult {
     kind: VectorEditKind,
     stroke_id: String,
+    stroke_ids: Vec<String>,
     applied: bool,
+    skipped: u32,
 }
 impl VectorEditResult {
     pub(crate) fn result(&self) -> Value {
-        json!({
+        let mut value = json!({
             "applied": self.applied,
             "historyEntriesAdded": u64::from(self.applied),
             "operation": self.kind.label(),
             "strokeId": self.stroke_id,
-        })
+        });
+        if matches!(self.kind, VectorEditKind::CreateMany | VectorEditKind::Batch) {
+            value["strokeIds"] = json!(self.stroke_ids);
+        }
+        // Only an opted-in batch that actually skipped steps reports them; every other receipt keeps its exact shape.
+        if self.skipped > 0 {
+            value["skippedSteps"] = json!(self.skipped);
+        }
+        value
     }
 }
 
@@ -89,6 +129,8 @@ pub(crate) struct PreparedVectorEdit {
     origin: ObjectSnapshot,
     document: ObjectDocument,
     result: VectorEditResult,
+    /// The candidate project when the edit re-baked or dropped a bitmap brush companion (its image joins the asset catalog in the same revision).
+    project: Option<crate::object_document::ProjectEnvelope>,
 }
 impl PreparedVectorEdit {
     /// The result the commit will report (`applied` is false for an exact no-op).
@@ -97,14 +139,17 @@ impl PreparedVectorEdit {
     }
 }
 
-struct Edit {
-    document: ObjectDocument,
-    kind: VectorEditKind,
-    stroke_id: String,
-    changed: bool,
+pub(super) struct Edit {
+    pub(super) document: ObjectDocument,
+    pub(super) kind: VectorEditKind,
+    pub(super) stroke_id: String,
+    pub(super) stroke_ids: Vec<String>,
+    pub(super) changed: bool,
+    /// Restyle steps an opted-in batch (`skipUnavailable`) left untouched because the engine cannot restyle them (#2372).
+    pub(super) skipped: u32,
 }
 
-fn order_code(error: OrderEditError) -> DispatchErrorCode {
+pub(super) fn order_code(error: OrderEditError) -> DispatchErrorCode {
     match error {
         OrderEditError::ContextAbsent => DispatchErrorCode::NotFound,
         OrderEditError::ReferenceScope | OrderEditError::PositionOverflow => {
@@ -152,48 +197,6 @@ pub(super) fn check_drawing_layer(
 
 pub(super) fn is_vector_record(record: &ObjectRecord) -> bool {
     record.schema_version == 1 && record.family == VECTOR_FAMILY
-}
-
-/// Revision identity is monotonic across undo/redo; imported IDs are skipped, so neither preparation nor a
-/// refused commit consumes an ID.
-fn allocate_stroke_id(
-    document: &ObjectDocument,
-    revision: u64,
-) -> Result<String, DispatchErrorCode> {
-    let next = revision
-        .checked_add(1)
-        .filter(|next| *next <= MAX_SAFE_REVISION)
-        .ok_or(DispatchErrorCode::Unavailable)?;
-    let existing: HashSet<&str> = document
-        .objects
-        .iter()
-        .map(|record| record.target.stroke_id())
-        .collect();
-    (0..=existing.len())
-        .map(|suffix| format!("native-stroke:{next}:{suffix}"))
-        .find(|id| !existing.contains(id.as_str()))
-        .ok_or(DispatchErrorCode::Unavailable)
-}
-
-fn create(origin: &ObjectSnapshot, mut record: ObjectRecord) -> Result<Edit, DispatchErrorCode> {
-    if !is_vector_record(&record) || !record.target.stroke_id.is_empty() {
-        return Err(DispatchErrorCode::InvalidRequest);
-    }
-    let mut document = origin.document().clone();
-    let stroke_id = allocate_stroke_id(&document, origin.content_revision())?;
-    record.target.stroke_id = stroke_id.clone();
-    check_target(&document, &record.target)?;
-    check_drawing_layer(&document, &record.target)?;
-    if let Presence::Present(plan) = &mut document.composition_order {
-        order::insert_element(plan, &record.target).map_err(order_code)?;
-    }
-    document.objects.push(record);
-    Ok(Edit {
-        document,
-        kind: VectorEditKind::Create,
-        stroke_id,
-        changed: true,
-    })
 }
 
 /// Compare mixed integer/float representations only when the float is exactly that integer.
@@ -252,23 +255,23 @@ pub(super) fn same_record(before: &ObjectRecord, after: &ObjectRecord) -> bool {
     }
 }
 
-fn replace(origin: &ObjectSnapshot, record: ObjectRecord) -> Result<Edit, DispatchErrorCode> {
+/// `replace` against a document being edited (an `object.vector.batch` step).
+pub(super) fn replace_in(source: &ObjectDocument, record: ObjectRecord) -> Result<Edit, DispatchErrorCode> {
     if !is_vector_record(&record) {
         return Err(DispatchErrorCode::InvalidRequest);
     }
-    check_target(origin.document(), &record.target)?;
-    let index = origin
-        .document()
+    check_target(source, &record.target)?;
+    let index = source
         .objects
         .iter()
         .position(|existing| existing.target == record.target)
         .ok_or(DispatchErrorCode::NotFound)?;
-    if !is_vector_record(&origin.document().objects[index]) {
+    if !is_vector_record(&source.objects[index]) {
         return Err(DispatchErrorCode::Unavailable);
     }
-    check_drawing_layer(origin.document(), &record.target)?;
+    check_drawing_layer(source, &record.target)?;
     let stroke_id = record.target.stroke_id.clone();
-    let mut document = origin.document().clone();
+    let mut document = source.clone();
     let changed = !same_record(&document.objects[index], &record);
     if changed {
         document.objects[index] = record;
@@ -276,8 +279,10 @@ fn replace(origin: &ObjectSnapshot, record: ObjectRecord) -> Result<Edit, Dispat
     Ok(Edit {
         document,
         kind: VectorEditKind::Replace,
+        stroke_ids: vec![stroke_id.clone()],
         stroke_id,
         changed,
+        skipped: 0,
     })
 }
 
@@ -296,19 +301,19 @@ fn holder_depends(document: &ObjectDocument, target: &ObjectTarget) -> bool {
         })
 }
 
-fn delete(origin: &ObjectSnapshot, target: ObjectTarget) -> Result<Edit, DispatchErrorCode> {
-    check_target(origin.document(), &target)?;
-    let index = origin
-        .document()
+/// `delete` against a document being edited (an `object.vector.batch` step).
+pub(super) fn delete_in(source: &ObjectDocument, target: ObjectTarget) -> Result<Edit, DispatchErrorCode> {
+    check_target(source, &target)?;
+    let index = source
         .objects
         .iter()
         .position(|existing| existing.target == target)
         .ok_or(DispatchErrorCode::NotFound)?;
-    if !is_vector_record(&origin.document().objects[index]) {
+    if !is_vector_record(&source.objects[index]) {
         return Err(DispatchErrorCode::Unavailable);
     }
-    check_drawing_layer(origin.document(), &target)?;
-    let mut document = origin.document().clone();
+    check_drawing_layer(source, &target)?;
+    let mut document = source.clone();
     document.objects.remove(index);
     let element_remains = document.objects.iter().any(|record| {
         record.target.frame_scope.kind == FrameScopeKind::Authored
@@ -325,8 +330,10 @@ fn delete(origin: &ObjectSnapshot, target: ObjectTarget) -> Result<Edit, Dispatc
     Ok(Edit {
         document,
         kind: VectorEditKind::Delete,
+        stroke_ids: vec![target.stroke_id.clone()],
         stroke_id: target.stroke_id,
         changed: true,
+        skipped: 0,
     })
 }
 
@@ -344,45 +351,89 @@ impl ObjectFillOwner {
         let payload: VectorPayload =
             serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
         let origin = self.current_snapshot();
+        // A component target edits that component's own layers and records through a view of the document (#2256).
+        let context = context::context_of(
+            payload
+                .record
+                .value()
+                .map(|r| &r.target)
+                .into_iter()
+                .chain(payload.records.value().and_then(|r| r.first()).map(|r| &r.target))
+                .chain(payload.stable_target.value())
+                .chain(payload.ops.value().and_then(|ops| batch_ops::first_target(ops)).as_ref()),
+        );
+        let view = context::view(origin.document(), &context)?;
+        let base: &ObjectDocument = view.as_ref().unwrap_or_else(|| origin.document());
+        let revision = origin.content_revision();
         let target = payload
             .record
             .value()
             .map(|r| r.target.clone())
+            .or_else(|| payload.records.value().and_then(|r| r.first()).map(|r| r.target.clone()))
             .or_else(|| payload.stable_target.value().cloned());
+        let many = payload.command == "object.vector.createMany";
+        if many != payload.records.value().is_some()
+            || (payload.command == "object.vector.batch") != payload.ops.value().is_some()
+        {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let placement = Placement::parse(&payload.command, &payload.placement)?;
+        let trim = create_ops::trim_ends(&payload.command, &payload.trim_ends, &payload.trim_clip)?;
+        let copy_key = create_ops::copy_key(&payload.command, &payload.keyframe)?;
+        // `skipUnavailable` (#2372) is a batch member only; a batch is atomic unless it asks to skip the restyle steps the engine cannot do.
+        if payload.command != "object.vector.batch" && !payload.skip_unavailable.missing() {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let skip_unavailable = payload.skip_unavailable.value() == Some(&true);
+        let mut rebakes: Vec<batch_ops::rebake::Rebake> = Vec::new();
         let mut edit = match (
             payload.command.as_str(),
             payload.record,
             payload.stable_target,
             payload.mask_edit,
         ) {
+            ("object.vector.createMany", Presence::Missing, Presence::Missing, Presence::Missing) => {
+                let Presence::Present(records) = payload.records else {
+                    return Err(DispatchErrorCode::InvalidRequest);
+                };
+                create_many(base, revision, records, placement, trim, copy_key)?
+            }
             (
                 "object.vector.create",
                 Presence::Present(record),
                 Presence::Missing,
                 Presence::Missing,
-            ) => create(&origin, record)?,
+            ) => create(base, revision, record, placement, trim, copy_key)?,
             (
                 "object.vector.replace",
                 Presence::Present(record),
                 Presence::Missing,
                 Presence::Missing,
-            ) => replace(&origin, record)?,
+            ) => replace_in(base, record)?,
             (
                 "object.vector.delete",
                 Presence::Missing,
                 Presence::Present(target),
                 Presence::Missing,
-            ) => delete(&origin, target)?,
+            ) => delete_in(base, target)?,
             (
                 "object.vector.mask.edit",
                 Presence::Missing,
                 Presence::Present(target),
                 Presence::Present(intent),
-            ) => mask_edit::apply(&origin, target, intent)?,
+            ) => mask_edit::apply(base, target, intent)?,
+            ("object.vector.batch", Presence::Missing, Presence::Missing, Presence::Missing) => {
+                let Presence::Present(ops) = payload.ops else {
+                    return Err(DispatchErrorCode::InvalidRequest);
+                };
+                let (edit, steps) = batch_ops::batch(&origin, base, &context, ops, copy_key, trim, skip_unavailable)?;
+                rebakes = steps;
+                edit
+            }
             _ => return Err(DispatchErrorCode::InvalidRequest),
         };
-        // Mask tags do not move source geometry or invalidate fill provenance.
-        if edit.changed && edit.kind != VectorEditKind::Mask {
+        // Mask tags do not move source geometry or invalidate fill provenance; a batch regenerated after each step.
+        if edit.changed && !matches!(edit.kind, VectorEditKind::Mask | VectorEditKind::Batch) {
             let target = target.ok_or(DispatchErrorCode::InvalidRequest)?;
             let scope =
                 crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope {
@@ -390,23 +441,33 @@ impl ObjectFillOwner {
                     layer_uid: target.layer_uid,
                     frame: target.frame_scope.frame,
                 };
-            edit.document = regenerate(
-                edit.document,
-                &scope,
-                &edit.stroke_id,
-                origin.content_revision(),
-            )
-            .map_err(|error| Self::fill_plan_error(&error))?;
+            for stroke_id in &edit.stroke_ids {
+                edit.document = regenerate(edit.document, &scope, stroke_id, origin.content_revision())
+                    .map_err(|error| Self::fill_plan_error(&error))?;
+            }
+        }
+        // The companions are document items, not part of a component's view: they are re-baked against the restored full document,
+        // where the anchor and its companion are addressed by their full target (context id included).
+        if view.is_some() {
+            edit.document = context::restore(edit.document, origin.document(), &context)?;
         }
         ObjectSnapshot::validate_drawing(&edit.document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        let project = if rebakes.is_empty() || !edit.changed {
+            None
+        } else {
+            Some(batch_ops::rebake::apply(&origin, edit.document.clone(), &rebakes)?)
+        };
         Ok(PreparedVectorEdit {
             origin,
+            project,
             document: edit.document,
             result: VectorEditResult {
                 kind: edit.kind,
                 stroke_id: edit.stroke_id,
+                stroke_ids: edit.stroke_ids,
                 applied: edit.changed,
+                skipped: edit.skipped,
             },
         })
     }
@@ -432,9 +493,12 @@ impl ObjectFillOwner {
         if !candidate.result.applied {
             return Ok(self.content_revision());
         }
-        self.revisions
-            .publish(candidate.document)
-            .map_err(|_| DispatchErrorCode::Unavailable)
+        // A re-baked companion publishes with its image: the one candidate project is the revision.
+        match candidate.project {
+            Some(project) => self.revisions.publish_tween_resources(project),
+            None => self.revisions.publish(candidate.document),
+        }
+        .map_err(|_| DispatchErrorCode::Unavailable)
     }
 }
 

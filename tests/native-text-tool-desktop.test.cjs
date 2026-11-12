@@ -29,10 +29,10 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
  const baseInfo=f.session.info;f.session.info=()=>({...baseInfo(),canvasW:320,canvasH:180,totalFrames:8,layers:[{layerUid:'L0',locked:false}]});root.state.cameraView=options.cameraView?.mode==='stored-camera';
  const pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
  let running=0,presentation=null,presentationKey=null,lastLease=null;
- function shown(){const pin=f.session.info(),key=JSON.stringify([pinKeys.map(k=>pin[k]),root.state.currentFrame,root.state.cameraView,options.cameraView]);
-  if(key!==presentationKey){presentationKey=key;presentation={...pin,owner:'native',status:'presented',contextId:'scene-root',frame:root.state.currentFrame,workId:'work-'+pin.contentRevision,viewGeneration:1,...(options.cameraView?{view:options.cameraView}:{})};}
+ function shown(){const pin=f.session.info(),key=JSON.stringify([pinKeys.map(k=>pin[k]),root.state.currentFrame,root.state.cameraView,options.cameraView,options.contextId]);
+  if(key!==presentationKey){presentationKey=key;presentation={...pin,owner:'native',status:'presented',contextId:options.contextId||'scene-root',frame:root.state.currentFrame,workId:'work-'+pin.contentRevision,viewGeneration:1,...(options.cameraView?{view:options.cameraView}:{})};}
   return {...pin,presentation};}
- f.session.readPresentedObjectSession=()=>running?null:shown();
+ f.session.readPresentedObjectSession=why=>{if(running){if(why)why('queue-pending');return null;}return shown();};
  const runResource=f.session.runResourceCommand;
  f.session.runResourceCommand=action=>{const origin=f.session.readPresentedObjectSession();running++;
   return runResource(async ctx=>{let live=true;const lease={...ctx,readPresentedObjectSession(){
@@ -45,6 +45,7 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
    if(options.actionReader==='missing')delete lease.readPresentedObjectSession;lastLease=lease;
    try{return await action(lease);}finally{live=false;}
   }).finally(()=>{running--;});};
+ f.session.runComponentCommand=f.session.runResourceCommand; // #2267: the entered component's route is the same queue, presented in that context
  root.NemoNativeObjectProject={desktop:()=>f.session};
  // Controlled immutable native Perspective projection; never read legacy Perspective fields.
  let perspectiveMode='disabled',perspectiveOwner=f.session;const perspectiveListeners=new Set();
@@ -58,13 +59,14 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
   perspectiveProofs.set(value,typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0);return value;
  },readForCommand(value){
   const owner=perspectiveOwner,info=owner.info(),ticket=typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0;
-  return (perspectiveMode==='disabled'||perspectiveMode==='publication-wait')&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
+  return (perspectiveMode==='disabled'||perspectiveMode==='publication-wait'||perspectiveMode==='enabled')&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
  },onRead(listener){perspectiveListeners.add(listener);return ()=>perspectiveListeners.delete(listener);}});
 
  const logs={legacy:0,zoom:0,selected:0};let intent;zoom.addEventListener('pointerdown',()=>logs.zoom++);canvas.addEventListener('pointerdown',()=>logs.legacy++);
  doc.getElementById('text-apply').addEventListener('click',()=>logs.legacy++);
+ root.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');root.setTimeout=fn=>setImmediate(fn);
  root.NemoNativeTextToolDesktop=desktopModule;root.NemoNativeOpacityCutover={blocksLegacy:()=>true};root.NemoSelectCanvasIntent={create(){if(!selectionIntent)throw new Error('Text reached generic native selection route');intent=require('../src/js/adapters/select-canvas-intent.js').create({context:()=> 'stable',probe:()=>Object.freeze({mode:'clear'}),select:()=>logs.selected++});return intent;}};
- const binding=desktopModule.mount(root,container,{currentSession:()=>f.session,fontResources:()=>({list:async()=>[{assetId:'document font / 雪',name:'Imported',available:true}]})});await turn();
+ const binding=desktopModule.mount(root,container,{currentSession:()=>f.session,fontResources:()=>({list:async()=>options.fontRows||[{assetId:'document font / 雪',name:'Imported',available:true}]})});await turn();
  const script=fs.readFileSync(path.join(__dirname,'../src/js/select-bridge.js'),'utf8');
  vm.runInNewContext(script,{window:root,document:doc,state:root.state,console,selectedPaths:[],userLayers:[],project:{layers:[]},view:{zoom:1},setTimeout,clearTimeout},{filename:'actual-select-bridge.js'});
  const get=id=>doc.getElementById(id);
@@ -87,7 +89,7 @@ test('stage chrome controls stay live while Text mode is active',async()=>{
 test('existing and reopened native text rows bind exact document font identity through the existing font control',async()=>{
  const f=await fixture(),t=target('reopened text / 雪');f.seed(t,block('Saved text'));await f.binding.refresh(undefined,true);
  const select=f.get('native-text-controls').children.find(n=>n.tagName==='SELECT');select.value='0';select.fire('change');await f.turn();
- assert.equal(f.get('text-input').value,'Saved text');const font=f.get('text-font');const asset=font.children.find(n=>n.textContent.includes('document font / 雪'));assert.ok(asset);
+ assert.equal(f.get('text-input').value,'Saved text');const font=f.get('text-font');const asset=font.children.find(n=>n.title==='document font / 雪');assert.doesNotMatch(asset.textContent,/document font/);assert.ok(asset);
  f.input('text-font',asset.value);f.apply();await f.turn();assert.equal(f.owner.log.executed.length,1);assert.deepEqual(f.owner.log.received[0].payload.patch,{font:{kind:'asset',assetId:'document font / 雪'}});
  assert.deepEqual(f.owner.log.received[0].payload.stableTarget,t);assert.deepEqual(f.owner.items.get(t.strokeId).anchorTopLeft,{x:10,y:20});assert.equal(f.owner.items.get(t.strokeId).bold,true);
 });
@@ -150,7 +152,7 @@ for(const cancel of ['Escape','pointercancel'])test(cancel+' retires pending dis
 
 test('late document font enumeration cannot overwrite the user-selected bundled font',async()=>{
  const f=await fixture(),gate=deferred();f.binding.ports.fontResources=()=>({list:()=>gate.promise});await f.click();
- const font=f.get('text-font'),bold=font.children.find(n=>n.textContent==='Roboto-Bold');assert.ok(bold);f.input('text-font',bold.value);
+ const font=f.get('text-font'),bold=font.children.find(n=>n.title==='Roboto-Bold'&&n.textContent==='Roboto Bold');assert.ok(bold);f.input('text-font',bold.value);
  gate.resolve([{assetId:'document font / 雪',name:'Imported',available:true}]);await f.turn();f.input('text-input','User chose Bold');f.apply();await f.turn();
  assert.equal(f.owner.log.executed.length,1);assert.deepEqual(f.owner.log.received[0].payload.block.font,{kind:'bundled',fontKey:'Roboto-Bold'});
 });
@@ -365,6 +367,17 @@ test('area draft refuses invalid hex on blur then publishes #336699 by the exist
  f.input('native-text-color-hex','#336699');area.fire('keydown',{key:'Enter',ctrlKey:true});await f.turn();assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.log.received[0].payload.block.color,'#336699');assert.equal(f.owner.log.received[0].payload.block.fixedWidth,100);assert.equal(f.owner.log.received[0].payload.block.text,'Hex area');assert.equal(f.logs.legacy,0);
 });
 
+test('area draft blur after a pointerdown inside the popover chrome does not commit; blur after a stage pointerdown still commits',async()=>{
+ for(const inside of [true,false]){
+  const f=await fixture();f.canvas.fire('pointerdown',{clientX:100,clientY:110});f.canvas.fire('pointermove',{clientX:300,clientY:190});f.canvas.fire('pointerup',{clientX:300,clientY:190});await f.turn();
+  const area=f.get('native-text-area-draft');assert.ok(area);area.value='Chrome text';area.fire('input');
+  (inside?f.get('text-popover'):f.canvas).fire('pointerdown',{clientX:5,clientY:5});area.fire('blur',{relatedTarget:null});await f.turn();
+  if(inside){assert.equal(f.owner.log.executed.length,0,'popover padding click must not commit');assert.ok(f.binding.core.snapshot().draft);
+   f.canvas.fire('pointerdown',{clientX:5,clientY:5});area.fire('blur',{relatedTarget:null});await f.turn();assert.equal(f.owner.log.executed.length,1,'a later outside blur commits');}
+  else assert.equal(f.owner.log.executed.length,1,'stage blur commits');
+ }
+});
+
 test('native hex layout preserves existing controls and restores prior inline wrapping across remounts',async()=>{
  const f=await fixture(),parent=f.get('text-color').parentNode,controls=parent.children.filter(n=>n!==f.get('native-text-color-hex').parentNode);
  f.binding.retire();assert.deepEqual(parent.children,controls);parent.style.flexWrap='wrap-reverse';
@@ -390,8 +403,8 @@ test('actual Text inspector mounts late animator capability once and retires its
  f.binding.retire();assert.equal(retires,1);
 });
 
-test('actual native Text admission refuses unavailable, stale and enabled Perspective projections',async()=>{
- for(const mode of ['unavailable','stale','enabled']){
+test('actual native Text admission refuses unavailable and stale Perspective projections; an enabled guide does not gate Text (baseline)',async()=>{
+ for(const mode of ['unavailable','stale']){
   const f=await fixture();f.perspectiveMode(mode);
   Object.defineProperty(f.root.state,'perspectiveEnabled',{get(){throw new Error('legacy Perspective read');},set(){throw new Error('legacy Perspective write');}});
   await f.click();assert.equal(f.binding.core.snapshot().draft,null,mode);assert.equal(f.owner.log.executed.length,0,mode);assert.equal(f.logs.legacy,0,mode);
@@ -447,4 +460,251 @@ test('navigated Canvas area Text draft uses the actual full affine and commits t
  assert.equal(area.style.width,'50px');assert.equal(area.style.left,'100px');assert.equal(area.style.top,'110px');
  area.value='Canvas affine';area.fire('input');area.fire('keydown',{key:'Enter',ctrlKey:true});await f.turn();
  const q=f.owner.log.received[0];assert.equal(f.owner.log.executed.length,1);assert.deepEqual(q.payload.block.anchorTopLeft,{x:100,y:65});assert.equal(q.payload.block.fixedWidth,50);assert.equal(f.root.state.cameraView,false);assert.equal(f.logs.legacy,0);
+});
+
+test('held Text drag shows one live dashed guide with baseline look and exact client geometry',async()=>{
+ const f=await fixture();assert.equal(f.get('native-text-drag-guide'),null);
+ f.canvas.fire('pointerdown',{buttons:1,clientX:100,clientY:110});assert.equal(f.get('native-text-drag-guide'),null,'down alone creates none');
+ f.canvas.fire('pointermove',{buttons:1,clientX:300,clientY:190});
+ const g=f.get('native-text-drag-guide');assert.ok(g);
+ assert.deepEqual([g.style.left,g.style.top,g.style.width,g.style.height],['100px','110px','200px','80px']);
+ assert.equal(g.style.position,'fixed');assert.equal(g.style.pointerEvents,'none');assert.equal(g.style.zIndex,'200');
+ assert.equal(g.style.border,'1px dashed rgba(255,184,108,.9)');assert.equal(g.style.background,'rgba(255,184,108,.06)');
+ f.canvas.fire('pointermove',{buttons:1,clientX:40,clientY:112});
+ assert.equal(f.get('native-text-drag-guide'),g,'same single element is updated');assert.equal(f.doc.body.children.filter(n=>n.id==='native-text-drag-guide').length,1);
+ assert.deepEqual([g.style.left,g.style.top,g.style.width,g.style.height],['40px','110px','60px','24px'],'min height 24, left follows min(x)');
+ f.canvas.fire('pointerup',{buttons:0,clientX:40,clientY:112});await f.turn();assert.equal(f.get('native-text-drag-guide'),null);
+});
+test('Text drag guide needs more than 4px of horizontal travel',async()=>{
+ const f=await fixture();f.canvas.fire('pointerdown',{buttons:1,clientX:100,clientY:110});
+ for(const x of [100,102,104,96])f.canvas.fire('pointermove',{buttons:1,clientX:x,clientY:150}),assert.equal(f.get('native-text-drag-guide'),null,String(x));
+ f.canvas.fire('pointermove',{buttons:1,clientX:105,clientY:150});assert.ok(f.get('native-text-drag-guide'));
+ f.canvas.fire('pointermove',{buttons:1,clientX:103,clientY:150});assert.equal(f.get('native-text-drag-guide'),null,'shrinking back inside slop removes it');
+});
+test('Text drag guide is removed on up, Escape, blur, tool switch and retire',async()=>{
+ for(const end of ['up','Escape','blur','tool','retire','cancelEvent']){
+  const f=await fixture(true);f.canvas.fire('pointerdown',{buttons:1,clientX:100,clientY:110});f.canvas.fire('pointermove',{buttons:1,clientX:300,clientY:190});assert.ok(f.get('native-text-drag-guide'),end);
+  if(end==='up')f.canvas.fire('pointerup',{buttons:0,clientX:300,clientY:190});
+  else if(end==='Escape')f.doc.fire('keydown',{key:'Escape'});
+  else if(end==='blur')f.root.fire('blur');
+  else if(end==='tool'){f.root.state.tool='select';f.canvas.fire('pointermove',{buttons:1,clientX:310,clientY:190});}
+  else if(end==='cancelEvent')f.canvas.fire('pointercancel',{pointerId:1});
+  else f.binding.retire();
+  await f.turn();assert.equal(f.get('native-text-drag-guide'),null,end);assert.equal(f.doc.body.children.some(n=>n.id==='native-text-drag-guide'),false,end);
+ }
+});
+test('zero-mask clickOnly Text pair never creates a drag guide',async()=>{
+ const f=await fixture();f.canvas.fire('pointerdown',{buttons:0,clientX:100,clientY:110});
+ f.canvas.fire('pointermove',{buttons:0,clientX:300,clientY:190});f.canvas.fire('pointermove',{buttons:1,clientX:320,clientY:190});
+ assert.equal(f.get('native-text-drag-guide'),null);f.canvas.fire('pointerup',{buttons:0,clientX:320,clientY:190});await f.turn();assert.equal(f.get('native-text-drag-guide'),null);
+});
+
+const px=v=>parseFloat(v);
+const rectOf=n=>({l:px(n.style.left),t:px(n.style.top),r:px(n.style.left)+(n.style.width?px(n.style.width):240),b:px(n.style.top)+(n.offsetHeight||px(n.style.height))});
+const overlaps=(a,b)=>a.l<b.r&&b.l<a.r&&a.t<b.b&&b.t<a.b;
+async function dragOpen(f,x0,y0,x1,y1){
+ f.get('text-popover').offsetHeight=200;
+ f.canvas.fire('pointerdown',{buttons:1,clientX:x0,clientY:y0});f.canvas.fire('pointermove',{buttons:1,clientX:x1,clientY:y1});f.canvas.fire('pointerup',{buttons:0,clientX:x1,clientY:y1});await f.turn();
+}
+test('area Text draft is dock-positioned below the dragged box and styled like the guide',async()=>{
+ const f=await fixture();await dragOpen(f,100,110,300,190);
+ const area=f.get('native-text-area-draft'),pop=f.get('text-popover');assert.ok(area);
+ assert.equal(area.style.width,'200px','fixedWidth*scale');assert.equal(area.style.height,'80px','dragged client height');
+ assert.equal(area.style.border,'1px dashed rgba(255,184,108,.9)');assert.equal(area.style.background,'rgba(255,184,108,.06)');assert.equal(area.style.resize,'none');
+ assert.equal(pop.style.left,'100px');assert.equal(pop.style.top,'198px','at.y + height + 8');
+ assert.equal(overlaps({l:100,t:110,r:300,b:190},rectOf(pop)),false);
+});
+test('area Text draft popover flips above, or beside, when there is no room below',async()=>{
+ const f=await fixture();f.doc.documentElement.clientHeight=500;await dragOpen(f,100,330,300,380);
+ const pop=f.get('text-popover'),area=f.get('native-text-area-draft');
+ assert.equal(pop.style.top,'122px','flipped to at.y - popH - 8');assert.equal(overlaps(rectOf(area),rectOf(pop)),false);
+ const g=await fixture();g.doc.documentElement.clientHeight=400;await dragOpen(g,100,110,300,190);
+ assert.equal(overlaps(rectOf(g.get('native-text-area-draft')),rectOf(g.get('text-popover'))),false,'side dock when neither below nor above fits');
+});
+test('area Text draft height has a 24px floor and click placement keeps the baseline +10,+10 popover',async()=>{
+ const f=await fixture();await dragOpen(f,100,110,300,112);assert.equal(f.get('native-text-area-draft').style.height,'24px');
+ const c=await fixture();c.get('text-popover').offsetHeight=200;await c.click(100,110);
+ assert.equal(c.get('native-text-area-draft'),null);assert.equal(c.get('text-popover').style.left,'110px');assert.equal(c.get('text-popover').style.top,'120px');
+});
+test('stashed drag height is cleared by cancel and commit so a later API-opened area draft uses the default height',async()=>{
+ for(const end of ['cancel','commit']){
+  const f=await fixture();await dragOpen(f,100,110,300,190);assert.equal(f.get('native-text-area-draft').style.height,'80px',end);
+  if(end==='cancel')f.get('text-cancel').fire('click');else{const a=f.get('native-text-area-draft');a.value='x';a.fire('input');a.fire('keydown',{key:'Enter',ctrlKey:true});}
+  await f.turn();assert.equal(f.get('native-text-area-draft'),null,end);
+  await f.binding.core.openNew({anchorTopLeft:{x:20,y:20},fixedWidth:100});
+  assert.equal(f.get('native-text-area-draft').style.height,'120px',end+': default max(24,size*1.25*scale)');
+ }
+});
+
+test('#2267 editing a block with stored rotation 30 turns the in-place overlay about the anchor screen point; rotation 0 and absent are unchanged',async()=>{
+ const f=await fixture(),t=target('rot-30');f.seed(t,{...block('Turned'),rotation:30});await f.binding.core.openExisting(t);
+ const area=f.get('native-text-area-draft');assert.ok(area,'turned existing block edits in an overlay, not only the popover');
+ assert.equal(area.style.left,'40px','anchor (10,20) -> screen (40,70) at scale 2');assert.equal(area.style.top,'70px');
+ assert.equal(area.style.transform,'rotate(30deg)');assert.equal(area.style.transformOrigin,'0 0');
+ assert.equal(area.value,'Turned');area.value='Turned!';area.fire('input');area.fire('keydown',{key:'Enter',ctrlKey:true});await f.turn();
+ const sent=f.owner.log.received.at(-1).payload;assert.equal(sent.patch.text,'Turned!');assert.equal('rotation' in sent.patch,false,'a patch never carries rotation');
+ for(const stored of [{rotation:0},{}]){const g=await fixture(),u=target('rot-none');g.seed(u,{...block('Flat'),...stored});await g.binding.core.openExisting(u);
+  assert.equal(g.get('native-text-area-draft'),null,'unturned existing text keeps the popover editor');}
+});
+test('#2267 turned overlay composes the turn with the presented view affine and docks the popover outside the turned frame',async()=>{
+ const cameraView={mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]};
+ const f=await fixture(false,Desktop,{cameraView}),t=target('rot-90');f.seed(t,{...block('Cam'),rotation:90,fixedWidth:40});await f.binding.core.openExisting(t);
+ const area=f.get('native-text-area-draft');assert.ok(area);const v=area.style.transform.match(/-?[\d.e-]+/g).map(Number);
+ const want=[0,4,-4,0,0,0];v.forEach((x,i)=>assert.ok(Math.abs(x-want[i])<1e-9,'matrix '+v+' vs '+want));
+ assert.equal(area.style.width,'40px');assert.equal(area.style.transformOrigin,'0 0');
+ const pop=f.get('text-popover'),rect=n=>({l:parseFloat(n.style.left),t:parseFloat(n.style.top)});
+ assert.ok(rect(pop).t>=parseFloat(area.style.top)||rect(pop).l>=parseFloat(area.style.left),'popover is not parked on the anchor');
+});
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+async function hideQueue(f){let release;const hold=new Promise(r=>release=r),busy=f.session.runResourceCommand(()=>hold);await f.turn();
+ assert.equal(f.session.readPresentedObjectSession(),null,'the queue hides the presentation');return async()=>{release();await busy;};}
+const settleTurns=async(f,n=12)=>{for(let i=0;i<n;i++)await f.turn();};
+test('a Text click during the queue-pending window waits for the presentation and opens the editor once, with no unavailable notice',async()=>{
+ const f=await fixture(),notices=[];f.root.showToast=m=>notices.push(m);const free=await hideQueue(f);
+ f.canvas.fire('pointerdown',{button:0,buttons:0,clientX:100,clientY:110});f.canvas.fire('pointerup',{button:0,buttons:0,clientX:100,clientY:110});
+ await settleTurns(f,3);assert.equal(f.binding.core.snapshot().draft,null,'held while hidden');assert.equal(f.get('text-popover').style.display,'none');
+ await free();await settleTurns(f);
+ assert.equal(f.get('text-popover').style.display,'block');assert.deepEqual(f.binding.core.snapshot().draft.block.anchorTopLeft,{x:40,y:40});
+ assert.deepEqual(notices,[]);assert.equal(f.owner.items.size,0,'opening writes nothing');
+});
+test('a Text drag whose release lands in the busy window still opens its area once',async()=>{
+ const f=await fixture(),notices=[];f.root.showToast=m=>notices.push(m);
+ f.canvas.fire('pointerdown',{button:0,buttons:1,clientX:100,clientY:110});f.canvas.fire('pointermove',{button:0,buttons:1,clientX:260,clientY:150});
+ const free=await hideQueue(f);f.canvas.fire('pointerup',{button:0,buttons:0,clientX:260,clientY:150});await settleTurns(f,3);
+ assert.equal(f.get('text-popover').style.display,'none','the release is held while hidden');
+ await free();await settleTurns(f);assert.equal(f.get('text-popover').style.display,'block');assert.deepEqual(notices,[]);assert.ok(f.binding.core.snapshot().draft.block.fixedWidth>0);
+});
+test('a Text click is dropped silently when the tool left or the playhead moved during the wait',async()=>{
+ for(const change of [r=>r.state.tool='draw',r=>r.state.currentFrame=1]){
+  const f=await fixture(),notices=[];f.root.showToast=m=>notices.push(m);const free=await hideQueue(f);
+  f.canvas.fire('pointerdown',{button:0,buttons:0,clientX:100,clientY:110});f.canvas.fire('pointerup',{button:0,buttons:0,clientX:100,clientY:110});change(f.root);
+  await free();await settleTurns(f);assert.equal(f.get('text-popover').style.display,'none');assert.equal(f.binding.core.snapshot().draft,null);assert.deepEqual(notices,[]);
+ }
+});
+test('a queue that never frees gives a Text click one clear notice and no editor',async()=>{
+ const f=await fixture(),notices=[];f.root.showToast=m=>notices.push(m);const free=await hideQueue(f);
+ f.canvas.fire('pointerdown',{button:0,buttons:0,clientX:100,clientY:110});f.canvas.fire('pointerup',{button:0,buttons:0,clientX:100,clientY:110});
+ await settleTurns(f,40);assert.deepEqual(notices,['The canvas is still busy - try again.']);assert.equal(f.get('text-popover').style.display,'none');await free();
+});
+
+// #2267 row D2: Text tool click on an existing native block edits it; imported fonts read by name; the popover select stays inside the popover.
+const pickText=(f,t,log=[])=>{f.root.NemoSelectCanvasIntent.pick=async(root,x,y,only)=>{log.push([x,y,only]);return t?{data:{nativeRole:'text',nativeStableTarget:{...t}}}:null;};return log;};
+test('#2267 click on an existing text block opens the popover pre-filled and Apply commits ONE edit with only the changed member',async()=>{
+ const f=await fixture(),t=target('existing-1');f.seed(t,block('Hands-on text'));const log=pickText(f,t);
+ await f.click(100,110);await f.turn();
+ assert.deepEqual(log,[[100,110,undefined]]);assert.equal(f.get('text-popover').style.display,'block');
+ assert.equal(f.get('text-input').value,'Hands-on text');assert.equal(f.get('text-size').value,'48');assert.equal(f.get('text-color').value,'#112233');assert.equal(f.get('text-align').value,'left');
+ const sel=f.get('text-font').children.find(n=>n.value===f.get('text-font').value);assert.equal(sel.textContent,'Roboto Regular');
+ assert.equal(f.owner.items.size,1);assert.equal(f.owner.log.executed.length,0);
+ f.input('text-size','60');f.apply();await f.turn();
+ assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.items.size,1);assert.equal(f.owner.log.received[0].payload.command,'object.text.edit');
+ assert.deepEqual(f.owner.log.received[0].payload.patch,{size:60});assert.deepEqual(f.owner.log.received[0].payload.stableTarget,t);assert.equal(f.owner.items.get(t.strokeId).text,'Hands-on text');assert.equal(f.logs.legacy,0);
+});
+test('#2267 editing the content of an existing block through the click path sends only text; Escape and Cancel publish nothing',async()=>{
+ const f=await fixture(),t=target('existing-2');f.seed(t,block('Before'));pickText(f,t);await f.click();await f.turn();
+ f.input('text-input','After');f.get('text-input').fire('keydown',{key:'Enter',metaKey:true});await f.turn();
+ assert.equal(f.owner.log.executed.length,1);assert.deepEqual(f.owner.log.received[0].payload.patch,{text:'After'});
+ const g=await fixture(),u=target('existing-3');g.seed(u,block('Keep'));pickText(g,u);await g.click();await g.turn();assert.equal(g.get('text-popover').style.display,'block');
+ g.input('text-input','Changed');g.get('text-input').fire('keydown',{key:'Escape'});await g.turn();
+ assert.equal(g.get('text-popover').style.display,'none');assert.equal(g.owner.log.executed.length,0);assert.equal(g.binding.core.snapshot().draft,null);
+ const h=await fixture(),w=target('existing-4');h.seed(w,block('Keep'));pickText(h,w);await h.click();await h.turn();h.input('text-size','70');h.get('text-cancel').fire('click');await h.turn();assert.equal(h.owner.log.executed.length,0);
+});
+test('#2267 a click that hits no text still places new text, and a drag over existing text places an area without picking',async()=>{
+ const f=await fixture(),t=target('existing-5');f.seed(t,block('Under'));const log=pickText(f,null);await f.click(100,110);await f.turn();
+ assert.equal(log.length,1);assert.equal(f.get('text-input').value,'');f.input('text-input','New');f.apply();await f.turn();
+ assert.equal(f.owner.log.received[0].payload.command,'object.text.create');
+ const g=await fixture(),u=target('existing-6');g.seed(u,block('Under'));const glog=pickText(g,u);
+ g.canvas.fire('pointerdown',{clientX:100,clientY:110});g.canvas.fire('pointermove',{clientX:300,clientY:190});g.canvas.fire('pointerup',{clientX:300,clientY:190});await g.turn();
+ assert.equal(glog.length,0);assert.ok(g.get('native-text-area-draft'));
+});
+test('#2267 a pick that cannot be proven current is a notice, never a stray new block',async()=>{
+ const f=await fixture();f.root.NemoSelectCanvasIntent.pick=async()=>undefined;await f.click();await f.turn();
+ assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.owner.log.executed.length,0);
+});
+test('#2267 popover font choices read by family/style name; the opaque asset id is the tooltip/value, never the label',async()=>{
+ const id='native-font-4e7c7544b3d9f8b8363226b33e445b01',f=await fixture(false,Desktop,{fontRows:[{assetId:id,name:'Manrope-Regular',available:true}]});
+ await f.click();await f.turn();const opts=f.get('text-font').children;
+ const imported=opts.find(n=>n.title===id);assert.ok(imported);assert.equal(imported.textContent,'Manrope Regular');
+ assert.ok(opts.every(n=>!/native-font-/.test(n.textContent)));assert.equal(opts[0].textContent,'Roboto Regular');
+ f.input('text-font',imported.value);f.input('text-input','Hello');f.apply();await f.turn();
+ assert.deepEqual(f.owner.log.received[0].payload.block.font,{kind:'asset',assetId:id});
+});
+test('#2267 applying an imported document font to an existing block sends only the font member',async()=>{
+ const id='native-font-aaaaaaaaaaaaaaaa',f=await fixture(false,Desktop,{fontRows:[{assetId:id,name:'Manrope-Regular',available:true}]}),t=target('existing-7');
+ f.seed(t,block('Existing'));pickText(f,t);await f.click();await f.turn();
+ f.input('text-font',f.get('text-font').children.find(n=>n.title===id).value);f.apply();await f.turn();
+ assert.deepEqual(f.owner.log.received[0].payload.patch,{font:{kind:'asset',assetId:id}});assert.equal(f.owner.log.received[0].payload.command,'object.text.edit');
+});
+test('#2267 the popover font select is constrained to the popover width (stylesheet rule, no inline width override)',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'../src/css/style.css'),'utf8'),html=fs.readFileSync(path.join(__dirname,'../src/index.html'),'utf8');
+ const rule=css.match(/#text-popover #text-font\{([^}]*)\}/);assert.ok(rule,'font select rule');
+ assert.match(rule[1],/min-width:0/);assert.match(rule[1],/max-width:100%/);assert.match(rule[1],/overflow:hidden/);
+ const general=css.match(/#text-popover select[^{]*\{([^}]*)\}/);assert.ok(general);assert.match(general[1],/text-overflow:ellipsis/);assert.match(css,/#text-popover \.pr\{min-width:0;\}/);
+ const tag=html.match(/<select id="text-font"[^>]*>/)[0];assert.doesNotMatch(tag,/width/);
+ assert.match(html,/<div id="text-popover"[^>]*width:230px/);
+});
+
+// #2267 row D step 3: an UNSELECTED block on another layer is picked like Select picks (active layer first, then the rest), and its layer is activated first.
+const twoLayers=(f,project)=>{const base=f.session.info;f.session.info=()=>({...base(),layers:[{layerUid:'L0',locked:false},{layerUid:'L1',locked:false}]});f.root.NemoNativeObjectProject={...f.root.NemoNativeObjectProject,...project};};
+test('#2267 Text click on an unselected text block on another layer activates that layer and opens it pre-filled (one read, no create)',async()=>{
+ const f=await fixture(),t={...target('other-1'),layerUid:'L1'};f.seed(t,block('Hands-on text'));const acts=[];
+ twoLayers(f,{selectLayerUI:(root,idx,preserve,uid)=>{acts.push([idx,preserve,uid]);root.state.activeLayerIdx=idx;root._layerSel=[idx];return true;}});
+ f.root.NemoSelectCanvasIntent.pick=async(root,x,y,only)=>({data:{nativeRole:'text',nativeStableTarget:{...t},nativeLayerIndex:1,nativeLayerUid:'L1'},only});
+ await f.click(100,110);await f.turn();
+ assert.deepEqual(acts,[[1,false,'L1']]);assert.equal(f.root.state.activeLayerIdx,1);assert.equal(f.get('text-popover').style.display,'block');assert.equal(f.get('text-input').value,'Hands-on text');
+ assert.equal(f.owner.items.size,1);assert.equal(f.owner.log.executed.length,0);
+ f.input('text-size','60');f.apply();await f.turn();assert.equal(f.owner.log.received[0].payload.command,'object.text.edit');assert.deepEqual(f.owner.log.received[0].payload.stableTarget,t);assert.equal(f.logs.legacy,0);
+});
+test('#2267 a hit on the already-active layer does not re-select it; a refused layer activation is a notice with no editor and no new block',async()=>{
+ const f=await fixture(),t=target('same-layer');f.seed(t,block('Here'));let calls=0;
+ f.root.NemoNativeObjectProject.selectLayerUI=()=>{calls++;return true;};
+ f.root.NemoSelectCanvasIntent.pick=async()=>({data:{nativeRole:'text',nativeStableTarget:{...t},nativeLayerIndex:0,nativeLayerUid:'L0'}});
+ await f.click();await f.turn();assert.equal(calls,0);assert.equal(f.get('text-popover').style.display,'block');
+ const g=await fixture(),u={...target('refused'),layerUid:'L1'};g.seed(u,block('Elsewhere'));twoLayers(g,{selectLayerUI:()=>false});
+ g.root.NemoSelectCanvasIntent.pick=async()=>({data:{nativeRole:'text',nativeStableTarget:{...u},nativeLayerIndex:1,nativeLayerUid:'L1'}});
+ await g.click();await g.turn();assert.equal(g.root.state.activeLayerIdx,0);assert.equal(g.get('text-popover').style.display,'none');assert.equal(g.binding.core.snapshot().draft,null);assert.equal(g.owner.log.executed.length,0);
+});
+test('#2267 a hit that is not text (or a locked/hidden layer the pick skips) places new text on the active layer, never edits the other',async()=>{
+ const f=await fixture();let acts=0;f.root.NemoNativeObjectProject.selectLayerUI=()=>{acts++;return true;};
+ f.root.NemoSelectCanvasIntent.pick=async()=>({data:{nativeRole:'stroke',nativeLayerIndex:1,nativeLayerUid:'L1'}});
+ await f.click();await f.turn();assert.equal(acts,0);assert.equal(f.get('text-input').value,'');f.input('text-input','New');f.apply();await f.turn();
+ assert.equal(f.owner.log.received[0].payload.command,'object.text.create');assert.equal(f.owner.log.received[0].payload.layerUid||'L0','L0');
+});
+
+test('#2267 Motion mode places text like Animation 2D, with the Perspective guide on', async () => {
+  const f = await fixture();
+  f.root.state.appMode = 'motion'; f.perspectiveMode('enabled');
+  await f.click(100, 110);
+  assert.equal(f.get('text-popover').style.display, 'block');
+  f.input('text-input', 'In Motion'); f.apply(); await f.turn();
+  assert.equal(f.owner.log.executed.length, 1);
+  assert.equal(f.owner.log.received[0].payload.block.text, 'In Motion');
+  assert.equal(f.owner.log.received[0].payload.keyframe, 'copy', 'a new block keys a held cell with a copy first');
+});
+test('#2267 inside an entered component the Text tool places text in THAT component, on its own layer and frame range', async () => {
+  const options = {};
+  const f = await fixture(false, Desktop, options);
+  options.contextId = 'comp-a'; f.root.state.activeSymbolId = 'comp-a';
+  f.root.NemoNativeComponentContext = { contextId: () => 'comp-a', layerRows: () => [{ layerUid: 'inner', locked: false, visible: true }], frameBound: () => 6, selectLayer: () => true };
+  await f.click(100, 110);
+  assert.equal(f.get('text-popover').style.display, 'block');
+  f.input('text-input', 'Inside'); f.apply(); await f.turn();
+  assert.equal(f.owner.log.executed.length, 1);
+  const q = f.owner.log.received[0].payload;
+  assert.equal(q.command, 'object.text.create');
+  assert.deepEqual(q.target, { contextId: 'comp-a', frameScope: { kind: 'authored', frame: 0 }, layerUid: 'inner', strokeId: '' });
+  // The playhead past the component's own frame count draws nothing.
+  const g = await fixture(false, Desktop, options);
+  g.root.state.activeSymbolId = 'comp-a'; g.root.state.currentFrame = 6;
+  g.root.NemoNativeComponentContext = { contextId: () => 'comp-a', layerRows: () => [{ layerUid: 'inner', locked: false }], frameBound: () => 6, selectLayer: () => true };
+  await g.click(100, 110);
+  assert.equal(g.binding.core.snapshot().draft, null);
+  assert.equal(g.owner.log.executed.length, 0);
+  // A locked component layer is refused the same way a locked scene layer is.
+  const h = await fixture(false, Desktop, options);
+  h.root.state.activeSymbolId = 'comp-a';
+  h.root.NemoNativeComponentContext = { contextId: () => 'comp-a', layerRows: () => [{ layerUid: 'inner', locked: true }], frameBound: () => 6, selectLayer: () => true };
+  await h.click(100, 110);
+  assert.equal(h.binding.core.snapshot().draft, null);
 });

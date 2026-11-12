@@ -58,7 +58,7 @@ test('all eight bundled choices submit explicit original source keys and preserv
     const id = 'id:' + key; f.import(async () => { f.rows([row(id, key)]); f.setInfo({...f.info(), contentRevision: f.info().contentRevision + 1, documentSnapshotId: id}); return {assetId: id, font: {}}; });
     f.get('bundled').value = key; await f.get('import-bundled').click();
     assert.equal(f.calls.filter(c => c[0] === 'import').at(-1)[1].fontKey, key);
-    assert.match(f.get('status').textContent, new RegExp(id)); await f.get('load').click(); assert.deepEqual(f.calls.at(-1), ['load', id]);
+    assert.match(f.get('status').textContent, /^Imported resource: /); assert.doesNotMatch(f.get('status').textContent, new RegExp(id)); await f.get('load').click(); assert.deepEqual(f.calls.at(-1), ['load', id]);
   }
 });
 test('Google controls request exactly Regular400 and Bold700, never warm up or infer an ID from the family', async () => {
@@ -168,4 +168,22 @@ test('actual native Document inspector mounts ordinary Fonts controls and retire
   await f.get('toggle').click(); assert.equal(f.get('list').children[0].getAttribute('data-asset-id'), 'native asset ID');
   UI.render(root, metadata, true, ports); assert.equal(f.calls.length, 1);
   UI.restoreInspector(root); assert.equal(f.get('toggle'), null); assert.equal(legacy.hidden, false);
+});
+
+test('#2267 panel shows the human family/style name, never the raw native-font-<hash> id (kept as tooltip and value)', async () => {
+  const id = 'native-font-4e7c7544b3d9f8b8363226b33e445b01', f = fixture();
+  await f.open(); f.import(async () => { f.rows([row(id, 'Manrope-Regular')]); f.setInfo({...f.info(), contentRevision: f.info().contentRevision + 1, documentSnapshotId: 'after-import'}); return {assetId: id, font: {}}; });
+  f.get('bundled').value = 'Manrope-Regular'; await f.get('import-bundled').click();
+  assert.equal(f.get('status').textContent, 'Imported resource: Manrope Regular');
+  const item = f.get('list').children[0];
+  assert.equal(item.getAttribute('data-asset-id'), id); assert.equal(item.title, id);
+  assert.equal(item.children[0].textContent, 'Manrope Regular'); assert.doesNotMatch(item.children[0].textContent, /native-font-/);
+  f.choose(id); assert.equal(f.get('status').textContent, 'Selected resource: Manrope Regular');
+  await f.get('load').click(); assert.equal(f.get('status').textContent, 'Loaded resource: Manrope Regular'); assert.deepEqual(f.calls.at(-1), ['load', id]);
+});
+test('#2267 font labels: known keys, file names and raw ids', () => {
+  const {label} = Panel;
+  assert.equal(label('DejaVuSerif-Bold'), 'DejaVu Serif Bold'); assert.equal(label('Inter-Regular'), 'Inter Regular');
+  assert.equal(label('Poppins'), 'Poppins'); assert.equal(label('My_Font-Italic.ttf'), 'My Font Italic');
+  assert.equal(label('native-font-4e7c7544b3d9f8b8'), 'Imported font'); assert.equal(label(''), 'Imported font');
 });

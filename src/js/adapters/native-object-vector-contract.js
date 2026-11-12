@@ -11,14 +11,15 @@
   'use strict';
 
   const VECTOR = 'command.document.object.vector.edit';
-  const PARAMETRIC = 'command.document.object.parametric.edit';
-  const EFFECTS = 'command.document.object.path.effects.edit';
+  const PARAMETRIC = 'command.document.object.parametric.edit', EFFECTS = 'command.document.object.path.effects.edit';
   const OPS = new Set([VECTOR, PARAMETRIC, EFFECTS]);
   const FAMILY = 'editable-vector-path';
-  // Full encoded request envelopes: vector edits may carry a complete 256-anchor record;
-  // every other operation keeps the default bound. Replies remain bounded separately.
-  const MAX_REQUEST_BYTES = 4096, ENGINE_VECTOR_REQUEST_BYTES = 65536;
-  const requestByteLimit = (operation) => operation === VECTOR ? ENGINE_VECTOR_REQUEST_BYTES : MAX_REQUEST_BYTES;
+  // Full encoded request envelopes: vector edits may carry a complete 256-anchor record, and the Fill Brush commit
+  // (an edit-contract operation) a 256-segment outline; every other operation keeps the default bound. Replies remain bounded separately.
+  const MAX_REQUEST_BYTES = 4096, ENGINE_VECTOR_REQUEST_BYTES = 65536, FILL_BRUSH = 'command.document.object.fill.brush';
+  // #2361: a bitmap-brush Draw stroke carries a whole anchor record (its PNG is a staged file, never request bytes).
+  const BITMAP_STROKE = 'command.document.object.brush.bitmap.stroke';
+  const requestByteLimit = (operation) => operation === VECTOR || operation === FILL_BRUSH || operation === BITMAP_STROKE ? ENGINE_VECTOR_REQUEST_BYTES : MAX_REQUEST_BYTES;
   const MAX_ANCHORS = 256, MAX_FRAME = 4294967295;
   const CAPS = ['butt', 'round', 'square'], JOINS = ['miter', 'round', 'bevel'], ORDERS = ['fillFirst', 'strokeFirst'];
   const PROFILES = ['taper-in', 'taper-out', 'taper-both', 'bulge', 'even'];
@@ -42,6 +43,10 @@
   function nonNegative(value, label) { if (num(value, label) < 0) fail(`${label} must not be negative`); return value; }
   function unit(value, label) { const v = num(value, label); if (v < 0 || v > 1) fail(`${label} must be within 0..1`); return v; }
   function oneOf(value, list, label) { if (!list.includes(value)) fail(`${label} is not admitted`); return value; }
+  // #2372 restyle members (SEL-STYLE2: switches, stroke details, preset, feather; native-fill-gradient: a stored two-stop gradient, or null for the flat fill): a paint switched on names its colour; a preset or a feather stands alone.
+  const HEX = (v, l) => { if (!/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)) fail(`${l} must be a hex colour`); }, FLAG = (v, l) => { if (typeof v !== 'boolean') fail(`${l} must be a boolean`); }, ENUM = (list) => (v, l) => oneOf(v, list, l), RANGE = (lo, hi) => (v, l) => { if (num(v, l) < lo || v > hi) fail(`${l} is out of range`); };
+  const STYLE = { fill: HEX, stroke: HEX, width: RANGE(1e-9, 10000), opacity: unit, fillEnabled: FLAG, strokeEnabled: FLAG, cap: ENUM(CAPS), join: ENUM(JOINS), miter: RANGE(1, 1000), dashOffset: RANGE(-1e6, 1e6), paintOrder: ENUM(ORDERS), strokeStyle: ENUM(['solid', 'dashed', 'dotted']), maskFeather: RANGE(0, 500), maskMode: ENUM(['add', 'subtract', 'intersect']), xformAnchorKey: (v, l) => { if (v !== null) oneOf(v, ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'], l); }, xformAnchorCustom: (v, l) => { if (v !== null) pair(v, l); }, unmask: (v, l) => { if (v !== true) fail(`${l} must be true`); }, brushPreset: (v, l) => { if (typeof v !== 'string' || !v.length || v.length > 96 || /[\u0000-\u001f\u007f]/.test(v)) fail(`${l} is invalid`); }, fillGradient: (v, l) => { if (v === null) return; gradient(v, l); if (v.stops.some((stop) => stop.color.length === 4)) fail(`${l} stop colours are #rrggbb[aa]`); } };
+  const restyleStyle = (st, label) => { const keys = Object.keys(st); if (!keys.length || st.fillEnabled === true && !has(st, 'fill') || st.strokeEnabled === true && !has(st, 'stroke') || keys.length > 1 && (has(st, 'brushPreset') || has(st, 'maskFeather') || has(st, 'maskMode') || has(st, 'unmask') || has(st, 'fillGradient')) || keys.some((k) => k.startsWith('xformAnchor')) && !keys.every((k) => k.startsWith('xformAnchor'))) fail(`${label} is invalid`); keys.forEach((k) => STYLE[k](st[k], `${label}.${k}`)); };
   function opaque(value, label) { if (typeof value !== 'string' || !value.length) fail(`${label} must be a non-empty string`); return value; }
   function frame(value, label) { if (!Number.isSafeInteger(value) || value < 0 || value > MAX_FRAME) fail(`${label} must be a native u32 frame`); return value; }
   function pair(value, label) {
@@ -49,20 +54,18 @@
     value.forEach((part, at) => num(part, `${label}[${at}]`));
   }
 
+  function heldContext(id) { try { const c = typeof globalThis === 'object' ? globalThis.NemoNativeComponentContext : undefined; return typeof id === 'string' && !!id && !!c && typeof c.contextId === 'function' && c.contextId(globalThis) === id; } catch (_) { return false; } } // #2256: only the component the workspace holds
   function target(value, label, create) {
     exact(value, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], label);
-    if (value.contextId !== 'scene-root') fail(`${label}.contextId is not admitted`);
-    exact(value.frameScope, ['kind', 'frame'], [], `${label}.frameScope`);
-    oneOf(value.frameScope.kind, ['authored', 'reference'], `${label}.frameScope.kind`);
-    frame(value.frameScope.frame, `${label}.frameScope.frame`);
-    opaque(value.layerUid, `${label}.layerUid`);
+    if (value.contextId !== 'scene-root' && !heldContext(value.contextId)) fail(`${label}.contextId is not admitted`); // #2256: the scene root or the component the workspace holds
+    exact(value.frameScope, ['kind', 'frame'], [], `${label}.frameScope`); oneOf(value.frameScope.kind, ['authored', 'reference'], `${label}.frameScope.kind`);
+    frame(value.frameScope.frame, `${label}.frameScope.frame`); opaque(value.layerUid, `${label}.layerUid`);
     // A created record names no stroke id: the owner allocates it and the caller cannot choose it.
     if (create === true) { if (value.strokeId !== '') fail(`${label}.strokeId must be empty for a create`); } else opaque(value.strokeId, `${label}.strokeId`);
   }
   function point(value, label) { exact(value, ['x', 'y'], [], label); num(value.x, `${label}.x`); num(value.y, `${label}.y`); }
   function solid(value, label) {
-    exact(value, ['kind', 'r', 'g', 'b', 'a'], [], label);
-    if (value.kind !== 'solid') fail(`${label}.kind must be solid`);
+    exact(value, ['kind', 'r', 'g', 'b', 'a'], [], label); if (value.kind !== 'solid') fail(`${label}.kind must be solid`);
     ['r', 'g', 'b', 'a'].forEach((key) => unit(value[key], `${label}.${key}`));
   }
   function geometry(value, label) {
@@ -91,8 +94,7 @@
       dashes.forEach((dash, at) => { total += nonNegative(dash, `${label}.dashArray[${at}]`); });
       if (!(total > 0 && Number.isFinite(total))) fail(`${label}.dashArray needs a positive finite length`);
     }
-    if (has(value, 'dashOffset')) num(value.dashOffset, `${label}.dashOffset`);
-    if (has(value, 'paintOrder')) oneOf(value.paintOrder, ORDERS, `${label}.paintOrder`);
+    if (has(value, 'dashOffset')) num(value.dashOffset, `${label}.dashOffset`); if (has(value, 'paintOrder')) oneOf(value.paintOrder, ORDERS, `${label}.paintOrder`);
     unit(value.opacity, `${label}.opacity`);
   }
   function pressure(value, label) {
@@ -143,15 +145,34 @@
       num(stop.offset, label); if (Math.abs(stop.offset) > 3.4028234663852886e38 || typeof stop.color !== 'string' || !/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(stop.color)) fail(label + ' invalid stop');
     }
   }
+  // G16: serP's brush-texture members as stored (an anchor's preset and hidden paint, or a dab's copy flag).
+  function brushTexture(value, label) {
+    exact(value, [], ['brushGroupId', 'isBrushTextureCopy', 'brushTexturePreset', 'preTextureOpacity', 'preTextureStroke', 'strokeSeed'], label);
+    const text = (v) => typeof v === 'string' && v.length > 0 && bytes(v) <= 255 && !v.includes('\0');   // UTF-8 bytes, as native counts
+    if (!Object.keys(value).length) fail(`${label} must not be empty`);
+    if (has(value, 'brushGroupId') && !text(value.brushGroupId)) fail(`${label}.brushGroupId is invalid`);
+    if (has(value, 'brushTexturePreset') && !text(value.brushTexturePreset)) fail(`${label}.brushTexturePreset is invalid`);
+    if (has(value, 'isBrushTextureCopy') && value.isBrushTextureCopy !== true) fail(`${label}.isBrushTextureCopy must be true`);
+    if (has(value, 'preTextureOpacity') && !(typeof value.preTextureOpacity === 'number' && Number.isFinite(value.preTextureOpacity))) fail(`${label}.preTextureOpacity must be finite`);
+    if (has(value, 'preTextureStroke') && value.preTextureStroke !== null && !/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value.preTextureStroke)) fail(`${label}.preTextureStroke is invalid`);
+    if (has(value, 'isBrushTextureCopy') && has(value, 'brushTexturePreset')) fail(`${label} is not both an anchor and a dab`);
+    // G16 option C: an anchor's stamping seed, a uint32.
+    if (has(value, 'strokeSeed') && !(Number.isInteger(value.strokeSeed) && value.strokeSeed >= 0 && value.strokeSeed <= 0xFFFFFFFF && has(value, 'brushTexturePreset'))) fail(`${label}.strokeSeed is invalid`);
+  }
   function ext(value, label, hasStroke) {
-    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient', 'fillTrace', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion'], label);
+    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'xformAnchorKey', 'xformAnchorCustom', 'fillGradient', 'fillTrace', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion', 'brushTexture', 'shadow', 'isFillShape'], label);
+    if (has(value, 'isFillShape') && value.isFillShape !== true) fail(`${label}.isFillShape must be true`);
+    if (has(value, 'brushTexture')) brushTexture(value.brushTexture, `${label}.brushTexture`);
+    // Shadow Brush (applyShadowBrushTag): channelTag is only ever 'shadow'; the swatch id is non-empty.
+    if (has(value, 'shadow')) { exact(value.shadow, ['channelTag'], ['shadowSwatchId'], `${label}.shadow`);
+      if (value.shadow.channelTag !== 'shadow' || has(value.shadow, 'shadowSwatchId') && !(typeof value.shadow.shadowSwatchId === 'string' && value.shadow.shadowSwatchId.length > 0 && bytes(value.shadow.shadowSwatchId) <= 256)) fail(`${label}.shadow is invalid`); }
     if (!Object.keys(value).length) fail(`${label} must be omitted when empty`);
     if (has(value, 'pressure')) {
       pressure(value.pressure, `${label}.pressure`);
       if (hasStroke) fail(`${label}.pressure: a pressure stroke is painted through its fill and has no real stroke`);
     }
     if (has(value, 'paramShape')) shapeBody(value.paramShape, `${label}.paramShape`, false);
-    if (has(value, 'boxAngle')) num(value.boxAngle, `${label}.boxAngle`);
+    if (has(value, 'boxAngle')) num(value.boxAngle, `${label}.boxAngle`); if (has(value, 'xformAnchorKey')) oneOf(value.xformAnchorKey, ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'], `${label}.xformAnchorKey`); if (has(value, 'xformAnchorCustom')) pair(value.xformAnchorCustom, `${label}.xformAnchorCustom`);
     if (has(value, 'linkedFillId') && (typeof value.linkedFillId !== 'string' || !value.linkedFillId.length || bytes(value.linkedFillId) > 128 || /[\u0000-\u001f\u007f-\u009f]/.test(value.linkedFillId))) fail(`${label}.linkedFillId must be a bounded identity`);
     if (has(value, 'isLinkedFillCompanion') && typeof value.isLinkedFillCompanion !== 'boolean') fail(`${label}.isLinkedFillCompanion must be a boolean`);
     if (value.isLinkedFillCompanion === true && (!has(value, 'linkedFillId') || has(value, 'pressure'))) fail(`${label} has an invalid linked-fill companion`);
@@ -230,9 +251,11 @@
   // command -> [operation, wire members]. Member order is the wire order.
   const COMMANDS = {
     'object.vector.create': [VECTOR, ['record']],
+    'object.vector.createMany': [VECTOR, ['records']],
     'object.vector.replace': [VECTOR, ['record']],
     'object.vector.delete': [VECTOR, ['stableTarget']],
     'object.vector.mask.edit': [VECTOR, ['stableTarget', 'maskEdit']],
+    'object.vector.batch': [VECTOR, ['ops']],
     'object.parametric.set': [PARAMETRIC, ['stableTarget', 'paramShape']],
     'object.parametric.translate': [PARAMETRIC, ['stableTarget', 'delta']],
     'object.parametric.scale': [PARAMETRIC, ['stableTarget', 'scale', 'anchor']],
@@ -241,7 +264,42 @@
   function member(command, key, payloadValue) {
     const label = `${command}.${key}`;
     if (key === 'record') record(payloadValue, command === 'object.vector.create');
+    else if (key === 'records') {
+      // G23: 2..32 creates on one layer and frame, one revision and one undo entry.
+      if (!Array.isArray(payloadValue) || payloadValue.length < 2 || payloadValue.length > 32) fail(`${label} must hold 2 to 32 records`);
+      payloadValue.forEach((entry) => record(entry, true));
+      const first = payloadValue[0].target;
+      if (payloadValue.some((entry) => entry.target.layerUid !== first.layerUid || entry.target.contextId !== first.contextId ||
+        entry.target.frameScope.kind !== first.frameScope.kind || entry.target.frameScope.frame !== first.frameScope.frame)) fail(`${label} must share one layer and frame`);
+    }
     else if (key === 'stableTarget') target(payloadValue, label, false);
+    else if (key === 'ops') {
+      // #2361/#2362: 1..64 ordered create/replace/delete steps (and #2372 `order` steps: Bring to front / Send to back by `placement` front or back) on the layers of one context (#2372: a Select may span layers; a trimEnds batch is one layer), one revision and one undo entry.
+      if (!Array.isArray(payloadValue) || payloadValue.length < 1 || payloadValue.length > 64) fail(`${label} must hold 1 to 64 steps`);
+      const targets = payloadValue.map((op, at) => {
+        const where = `${label}[${at}]`;
+        if (!plain(op)) fail(`${where} must be an object`);
+        if (op.op === 'create' || op.op === 'copy') {
+          const copy = op.op === 'copy'; exact(op, copy ? ['op', 'fromStep', 'frame'] : ['op', 'record'], ['placement', 'keyframe'], where); if (!copy) record(op.record, true);
+          // #2362 multiframe: a copy is an earlier create's (or copy's) record again on `frame`, without resending it.
+          if (copy && !(Number.isSafeInteger(op.fromStep) && op.fromStep >= 0 && op.fromStep < at && ['create', 'copy'].includes(payloadValue[op.fromStep].op) && Number.isSafeInteger(op.frame) && op.frame >= 0 && op.frame <= 4294967295)) fail(`${where} must copy an earlier create to a frame`);
+          if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`);
+          // A create's own keyframe: 'copy' keys its held cell with a copy even when the batch's does not (multiframe draw).
+          if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`);
+          return copy ? null : op.record.target;
+        }
+        if (op.op === 'replace') { exact(op, ['op', 'record'], [], where); record(op.record, false); if (op.record.target.frameScope.kind !== 'authored') fail(`${where} replace targets an authored frame`); return op.record.target; }
+        // #2362 knife: reshape gives a named stroke new geometry, clone creates one from it on `frame`; the style stays native.
+        // A geometry-less clone copies any stroke shifted by `offset` (a pose stamp); by `center` rebuilds a ribbon (sculpt); by `matrix` maps any record by a record-space affine (#2372 Select).
+        if (op.op === 'reshape' || op.op === 'clone') { const clone = op.op === 'clone'; exact(op, ['op', 'stableTarget'].concat(clone ? ['frame'] : []), clone ? ['geometry', 'offset', 'placement', 'keyframe'] : ['geometry', 'center', 'matrix', 'frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); if (has(op, 'geometry')) geometry(op.geometry, `${where}.geometry`); if (!clone && [has(op, 'geometry'), has(op, 'center'), has(op, 'matrix')].filter(Boolean).length !== 1) fail(`${where} needs geometry, a center or a matrix`); if (has(op, 'matrix') && (!Array.isArray(op.matrix) || op.matrix.length !== 6 || !op.matrix.every(Number.isFinite))) fail(`${where}.matrix must be six finite numbers`); if (has(op, 'center')) { if (!Array.isArray(op.center) || op.center.length < 2 || op.center.length > 256) fail(`${where}.center must have 2..256 anchors`); pressure({ centerSegments: op.center }, where); } if (has(op, 'offset') && (has(op, 'geometry') || !Array.isArray(op.offset) || op.offset.length !== 2 || !op.offset.every(Number.isFinite))) fail(`${where}.offset is invalid`);
+          if (has(op, 'frame') && !(Number.isSafeInteger(op.frame) && op.frame >= 0 && op.frame <= 4294967295)) fail(`${where}.frame must be a frame`); if (has(op, 'placement')) oneOf(op.placement, ['front', 'behind'], `${where}.placement`); if (has(op, 'keyframe')) oneOf(op.keyframe, ['copy'], `${where}.keyframe`); return op.stableTarget; }
+        if (op.op === 'restyle') { exact(op, ['op', 'stableTarget', 'style'], ['frame'], where); target(op.stableTarget, `${where}.stableTarget`, false); restyleStyle(exact(op.style, [], Object.keys(STYLE), `${where}.style`), `${where}.style`); if (has(op, 'frame')) frame(op.frame, `${where}.frame`); return op.stableTarget; }
+        if (op.op === 'delete' || op.op === 'order') { const ord = op.op === 'order'; exact(op, ['op', 'stableTarget'].concat(ord ? ['placement'] : []), ord ? ['frame'] : [], where); target(op.stableTarget, `${where}.stableTarget`, false); if (ord) { oneOf(op.placement, ['front', 'back'], `${where}.placement`); if (has(op, 'frame')) frame(op.frame, `${where}.frame`); } return op.stableTarget; }
+        return fail(`${where}.op must be create, copy, replace, reshape, clone, restyle, order or delete`);
+      });
+      targets.forEach((t, at) => { if (!t) targets[at] = targets[payloadValue[at].fromStep]; });
+      if (targets.some((t) => t.contextId !== targets[0].contextId)) fail(`${label} must stay on one context`);
+    }
     else if (key === 'maskEdit') {
       if (!plain(payloadValue)) fail(`${label} must be an object`);
       if (payloadValue.kind === 'mode') {
@@ -265,7 +323,16 @@
     if (!OPS.has(operation)) fail('native vector operation is not declared');
     if (!plain(value) || !has(COMMANDS, value.command) || COMMANDS[value.command][0] !== operation) fail(`${operation} command is invalid`);
     const entry = COMMANDS[value.command];
-    exact(value, ['command', ...entry[1]], [], operation);
+    // G15: the two creates take an optional placement (absent = front; behind = under the layer's artwork) and an optional trimEnds limit (the baseline trimStrokeEndsMax; finite, above zero).
+    const trimClipOk = (v) => { const c = v.trimClip, p = plain(c) ? c.mirrors : null, u = Array.isArray(p) ? [].concat(...p.map((q) => (Array.isArray(q) && q.length === 2 ? q : [null]))) : []; return has(v, 'trimEnds') && plain(c) && Object.keys(c).every((k) => k === 'axis' || k === 'mirrors') && Array.isArray(c.axis) && c.axis.length === 4 && c.axis.every((n) => typeof n === 'number' && Number.isFinite(n)) && Array.isArray(p) && p.length >= 1 && p.length <= 32 && u.every((n) => Number.isInteger(n) && n >= 0 && n < 2 ** 32) && new Set(u).size === u.length; }; // #2361 trimClip (a mirror's stop-at-axis clip after the trim): the axis [x1, y1, x2, y2] and 1..32 [drawn, mirror] record indices, each used once; needs trimEnds.
+    const creates = value.command === 'object.vector.create' || value.command === 'object.vector.createMany';
+    exact(value, ['command', ...entry[1]], creates ? ['placement', 'trimEnds', 'trimClip', 'keyframe'] : value.command === 'object.vector.batch' ? ['keyframe', 'trimEnds', 'trimClip', 'skipUnavailable'] : [], operation);
+    if (has(value, 'placement')) oneOf(value.placement, ['front', 'behind'], `${value.command}.placement`);
+    if (has(value, 'trimEnds') && !(typeof value.trimEnds === 'number' && Number.isFinite(value.trimEnds) && value.trimEnds > 0)) fail(`${value.command}.trimEnds is invalid`);
+    if (has(value, 'trimClip') && !trimClipOk(value)) fail(`${value.command}.trimClip is invalid`); // A batch trims only when every step creates (the drawn stroke, its copies and its multi-frame stamps share one cut), below.
+    if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && value.ops.some((op) => !plain(op) || (op.op !== 'create' && op.op !== 'copy'))) fail('object.vector.batch.trimEnds needs create steps only'); if (has(value, 'trimEnds') && value.command === 'object.vector.batch' && Array.isArray(value.ops) && new Set(value.ops.filter((op) => op.record && op.record.target).map((op) => op.record.target.layerUid)).size > 1) fail('object.vector.batch.trimEnds stays on one layer');
+    // keyframe: 'copy' keys a held cell with what it showed (the Labs creators' ensureKeyframe()); absent is Draw's empty key.
+    if (has(value, 'keyframe') && value.keyframe !== 'copy') fail(`${value.command} keyframe must be 'copy'`); if (has(value, 'skipUnavailable') && typeof value.skipUnavailable !== 'boolean') fail(`${value.command} skipUnavailable must be a boolean`); // #2372: a batch is atomic unless this opts in
     entry[1].forEach((key) => member(value.command, key, value[key]));
     // A replace names an existing record; a record of a reference scope is readable storage, never a drawing edit target.
     if (value.command === 'object.vector.replace' && value.record.target.frameScope.kind !== 'authored') fail('a replace targets an authored frame');
@@ -273,9 +340,14 @@
   function result(operation, value) {
     if (!OPS.has(operation)) fail('native vector operation is not declared');
     const edit = operation === VECTOR;
-    exact(value, edit ? ['applied', 'historyEntriesAdded', 'operation', 'strokeId'] : ['applied', 'historyEntriesAdded'], [], 'vector edit result');
+    const many = edit && plain(value) && (value.operation === 'createMany' || value.operation === 'batch');
+    exact(value, edit ? ['applied', 'historyEntriesAdded', 'operation', 'strokeId'].concat(many ? ['strokeIds'] : []) : ['applied', 'historyEntriesAdded'], value.operation === 'batch' ? ['skippedSteps'] : [], 'vector edit result');
     if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) fail('invalid vector edit disposition');
-    if (edit) { oneOf(value.operation, ['create', 'replace', 'delete', 'mask.edit'], 'result.operation'); opaque(value.strokeId, 'result.strokeId'); }
+    if (edit) { oneOf(value.operation, ['create', 'createMany', 'replace', 'delete', 'mask.edit', 'batch'], 'result.operation'); opaque(value.strokeId, 'result.strokeId'); }
+    if (many) {
+      if (!Array.isArray(value.strokeIds) || value.strokeIds.length < (value.operation === 'batch' ? 1 : 2)) fail('result.strokeIds must list every created stroke');
+      value.strokeIds.forEach((id, at) => opaque(id, `result.strokeIds[${at}]`)); if (has(value, 'skippedSteps') && !(Number.isSafeInteger(value.skippedSteps) && value.skippedSteps >= 1 && value.skippedSteps < value.strokeIds.length)) fail('result.skippedSteps must count some, not all, steps');
+    }
   }
   function correlate(request, response) {
     // Native refusals report the actual owner; no successful or unrelated reply gains this exception.
@@ -291,11 +363,25 @@
     const stroke = response.result.strokeId;
     // A create reports the id the owner allocated; replace and delete report the stable target they named.
     const allocation = 'native-stroke:' + (request.expectedRevision + 1) + ':';
-    if (command === 'object.vector.create' ? !(response.result.applied === true && stroke.startsWith(allocation) && /^(0|[1-9][0-9]*)$/.test(stroke.slice(allocation.length)))
+    const allocated = (id) => typeof id === 'string' && id.startsWith(allocation) && /^(0|[1-9][0-9]*)$/.test(id.slice(allocation.length));
+    if (command === 'object.vector.batch') {
+      // One id per step, in order: allocated for a create, the named target for a replace or delete.
+      const ids = response.result.strokeIds, ops = request.payload.ops; if (has(response.result, 'skippedSteps') && request.payload.skipUnavailable !== true) fail('vector receipt skipped steps of an atomic batch');
+      if (!(ids.length === ops.length && ids[0] === stroke && ops.every((op, at) => (['create', 'copy', 'clone'].includes(op.op) ? allocated(ids[at])
+        : ids[at] === (op.op === 'replace' ? op.record.target.strokeId : op.stableTarget.strokeId))))) fail('vector receipt stroke mismatch');
+      return;
+    }
+    if (command === 'object.vector.createMany') {
+      const ids = response.result.strokeIds;
+      if (!(response.result.applied === true && ids.length === request.payload.records.length && ids[0] === stroke &&
+        ids.every(allocated) && new Set(ids).size === ids.length)) fail('vector receipt stroke mismatch');
+      return;
+    }
+    if (command === 'object.vector.create' ? !(response.result.applied === true && allocated(stroke))
       : stroke !== (command === 'object.vector.replace' ? request.payload.record.target.strokeId : request.payload.stableTarget.strokeId)) fail('vector receipt stroke mismatch');
   }
   // Authored identities may legitimately start with data: or blob:; the SDK only inspects them as text.
-  const OPAQUE = Object.freeze({ has: (at) => /^payload\.(?:record\.target|stableTarget)\.(?:layerUid|strokeId)$/.test(at) || at === 'payload.layerUid' || at === 'result.strokeId' });
+  const OPAQUE = Object.freeze({ has: (at) => /^payload\.(?:record\.target|records\.[0-9]+\.target|stableTarget|ops\.[0-9]+\.(?:record\.target|stableTarget))\.(?:layerUid|strokeId)$/.test(at) || at === 'payload.layerUid' || at === 'result.strokeId' || /^result\.strokeIds\.[0-9]+$/.test(at) });
   const paths = (operation) => (OPS.has(operation) ? OPAQUE : null);
   const own = Object.freeze({ admitted: (op) => OPS.has(op), requiresRevision: (op) => OPS.has(op), payload, result, correlate, paths });
 

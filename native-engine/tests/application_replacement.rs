@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-application => application_replacement_tests
 //! Independent core replacement oracles against the committed opacity-v2 fixture.
 use crate::application::{
     ExportResourceResolver, NativeApplication, ReplacementFailureKind, ReplacementPhase,

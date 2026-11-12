@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => property_expression_runtime_tests
 //! Oracle tests for the property expression result kernel (D15/#2074).
 //!
 //! `fixtures/property-expression-runtime/oracle.txt` (`ROWS`) was produced by running `normalizeExprResult` and the

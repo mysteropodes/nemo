@@ -1,0 +1,547 @@
+{
+ "two layers, no selection, no policy owner": {
+  "layer-list": {
+   "tag": "div",
+   "text": "",
+   "children": [
+    {
+     "tag": "div",
+     "text": "",
+     "className": "native-object-layer",
+     "style.display": "flex",
+     "dataset": {
+      "layerUid": "opaque A:雪"
+     },
+     "children": [
+      {
+       "tag": "button",
+       "text": "<b>A</b> — Visible",
+       "type": "button",
+       "style.flex": "1",
+       "style.textAlign": "left",
+       "attributes": {
+        "aria-label": "<b>A</b> (opaque A:雪)",
+        "aria-pressed": "false"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Hide",
+       "type": "button",
+       "attributes": {
+        "aria-label": "Hide <b>A</b> (opaque A:雪)"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Lock",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Lock <b>A</b>",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "locked"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Mark shy",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Mark shy <b>A</b>",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "shy"
+       }
+      }
+     ]
+    },
+    {
+     "tag": "div",
+     "text": "",
+     "className": "native-object-layer",
+     "style.display": "flex",
+     "dataset": {
+      "layerUid": "B"
+     },
+     "children": [
+      {
+       "tag": "button",
+       "text": "B — Hidden",
+       "type": "button",
+       "style.flex": "1",
+       "style.textAlign": "left",
+       "attributes": {
+        "aria-label": "B (B)",
+        "aria-pressed": "false"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Show",
+       "type": "button",
+       "attributes": {
+        "aria-label": "Show B (B)"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Lock",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Lock B",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "locked"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Mark shy",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Mark shy B",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "shy"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "frame-hdr": {
+   "tag": "div",
+   "text": "",
+   "children": [
+    {
+     "tag": "div",
+     "text": "Frame 1 / 24"
+    }
+   ]
+  },
+  "frame-grid": {
+   "tag": "div",
+   "text": "",
+   "children": [
+    {
+     "tag": "div",
+     "text": "Native timing is unavailable.",
+     "className": "native-object-timing-unavailable",
+     "attributes": {
+      "role": "status"
+     }
+    }
+   ]
+  }
+ },
+ "three layers with flags, multi-selection, policy owner": {
+  "layer-list": {
+   "tag": "div",
+   "text": "",
+   "children": [
+    {
+     "tag": "div",
+     "text": "",
+     "className": "native-object-layer",
+     "style.display": "flex",
+     "dataset": {
+      "layerUid": "opaque A:雪"
+     },
+     "children": [
+      {
+       "tag": "button",
+       "text": "<b>A</b> — Visible",
+       "type": "button",
+       "style.flex": "1",
+       "style.textAlign": "left",
+       "attributes": {
+        "aria-label": "<b>A</b> (opaque A:雪)",
+        "aria-pressed": "true"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Hide",
+       "type": "button",
+       "attributes": {
+        "aria-label": "Hide <b>A</b> (opaque A:雪)"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Unlock",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Unlock <b>A</b>",
+        "aria-pressed": "true"
+       },
+       "dataset": {
+        "policyFlag": "locked"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Mark shy",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Mark shy <b>A</b>",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "shy"
+       }
+      }
+     ]
+    },
+    {
+     "tag": "div",
+     "text": "",
+     "className": "native-object-layer",
+     "style.display": "flex",
+     "dataset": {
+      "layerUid": "B"
+     },
+     "children": [
+      {
+       "tag": "button",
+       "text": "B — Hidden",
+       "type": "button",
+       "style.flex": "1",
+       "style.textAlign": "left",
+       "attributes": {
+        "aria-label": "B (B)",
+        "aria-pressed": "false"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Show",
+       "type": "button",
+       "attributes": {
+        "aria-label": "Show B (B)"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Lock",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Lock B",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "locked"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Unmark shy",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Unmark shy B",
+        "aria-pressed": "true"
+       },
+       "dataset": {
+        "policyFlag": "shy"
+       }
+      }
+     ]
+    },
+    {
+     "tag": "div",
+     "text": "",
+     "className": "native-object-layer",
+     "style.display": "flex",
+     "dataset": {
+      "layerUid": "C"
+     },
+     "children": [
+      {
+       "tag": "button",
+       "text": "C — Visible",
+       "type": "button",
+       "style.flex": "1",
+       "style.textAlign": "left",
+       "attributes": {
+        "aria-label": "C (C)",
+        "aria-pressed": "true"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Hide",
+       "type": "button",
+       "attributes": {
+        "aria-label": "Hide C (C)"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Lock",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Lock C",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "locked"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Mark shy",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Mark shy C",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "shy"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "frame-hdr": {
+   "tag": "div",
+   "text": "",
+   "children": [
+    {
+     "tag": "div",
+     "text": "Frame 1 / 24"
+    }
+   ]
+  },
+  "frame-grid": {
+   "tag": "div",
+   "text": "",
+   "children": [
+    {
+     "tag": "div",
+     "text": "Native timing is unavailable.",
+     "className": "native-object-timing-unavailable",
+     "attributes": {
+      "role": "status"
+     }
+    }
+   ]
+  }
+ },
+ "shy mode hides shy rows": {
+  "layer-list": {
+   "tag": "div",
+   "text": "",
+   "children": [
+    {
+     "tag": "div",
+     "text": "",
+     "className": "native-object-layer",
+     "style.display": "flex",
+     "dataset": {
+      "layerUid": "opaque A:雪"
+     },
+     "children": [
+      {
+       "tag": "button",
+       "text": "<b>A</b> — Visible",
+       "type": "button",
+       "style.flex": "1",
+       "style.textAlign": "left",
+       "attributes": {
+        "aria-label": "<b>A</b> (opaque A:雪)",
+        "aria-pressed": "false"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Hide",
+       "type": "button",
+       "attributes": {
+        "aria-label": "Hide <b>A</b> (opaque A:雪)"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Unlock",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Unlock <b>A</b>",
+        "aria-pressed": "true"
+       },
+       "dataset": {
+        "policyFlag": "locked"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Mark shy",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Mark shy <b>A</b>",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "shy"
+       }
+      }
+     ]
+    },
+    {
+     "tag": "div",
+     "text": "",
+     "className": "native-object-layer",
+     "hidden": true,
+     "style.display": "none",
+     "dataset": {
+      "layerUid": "B"
+     },
+     "children": [
+      {
+       "tag": "button",
+       "text": "B — Hidden",
+       "type": "button",
+       "style.flex": "1",
+       "style.textAlign": "left",
+       "attributes": {
+        "aria-label": "B (B)",
+        "aria-pressed": "true"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Show",
+       "type": "button",
+       "attributes": {
+        "aria-label": "Show B (B)"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Lock",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Lock B",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "locked"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Unmark shy",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Unmark shy B",
+        "aria-pressed": "true"
+       },
+       "dataset": {
+        "policyFlag": "shy"
+       }
+      }
+     ]
+    },
+    {
+     "tag": "div",
+     "text": "",
+     "className": "native-object-layer",
+     "style.display": "flex",
+     "dataset": {
+      "layerUid": "C"
+     },
+     "children": [
+      {
+       "tag": "button",
+       "text": "C — Visible",
+       "type": "button",
+       "style.flex": "1",
+       "style.textAlign": "left",
+       "attributes": {
+        "aria-label": "C (C)",
+        "aria-pressed": "false"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Hide",
+       "type": "button",
+       "attributes": {
+        "aria-label": "Hide C (C)"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Lock",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Lock C",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "locked"
+       }
+      },
+      {
+       "tag": "button",
+       "text": "Mark shy",
+       "type": "button",
+       "disabled": true,
+       "attributes": {
+        "aria-label": "Mark shy C",
+        "aria-pressed": "false"
+       },
+       "dataset": {
+        "policyFlag": "shy"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "frame-hdr": {
+   "tag": "div",
+   "text": "",
+   "children": [
+    {
+     "tag": "div",
+     "text": "Frame 1 / 24"
+    }
+   ]
+  },
+  "frame-grid": {
+   "tag": "div",
+   "text": "",
+   "children": [
+    {
+     "tag": "div",
+     "text": "Native timing is unavailable.",
+     "className": "native-object-timing-unavailable",
+     "attributes": {
+      "role": "status"
+     }
+    }
+   ]
+  }
+ }
+}

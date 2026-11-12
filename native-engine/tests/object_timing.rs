@@ -357,7 +357,7 @@ fn real_project_reference_fill_undo_redo_and_old_pins_preserve_exact_timing() {
         let info = owner.project_file_info().unwrap();
         assert_eq!(
             info["layers"],
-            json!([{"layerUid":"L"}]),
+            json!([{"layerUid":"L","kind":"draw"}]),
             "existing UI projection excludes new stored timing"
         );
     }

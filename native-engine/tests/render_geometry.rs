@@ -1,3 +1,5 @@
+//! nemo-test-harness: test-compositor => render_geometry_tests
+//! nemo-test-harness: test-export_job => export_geometry_tests
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use crate::render_scene::{GeometryPaintInput, LayerGeometry, OpaqueSrgbPaint};
 use vello::kurbo::PathEl;

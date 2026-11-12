@@ -32,4 +32,34 @@ impl NativeObjectHost {
         }
         Ok(response)
     }
+    /// #2361: the bitmap-brush Draw stroke (anchor, companion and its staged PNG) on the same owner.
+    pub(crate) fn bitmap_stroke_status(
+        &mut self,
+        request: &OpacityRequest,
+    ) -> Result<Option<ResponseEnvelope>, String> {
+        if self.released.is_some() {
+            return Err("native image owner released".into());
+        }
+        self.history
+            .bitmap_stroke_status(request)
+            .map_err(|_| "native bitmap stroke request refused".into())
+    }
+    pub(crate) fn bitmap_stroke(
+        &mut self,
+        request: &OpacityRequest,
+        bytes: &[u8],
+    ) -> Result<ResponseEnvelope, String> {
+        if self.released.is_some() {
+            return Err("native image owner released".into());
+        }
+        let before = self.content_revision();
+        let response = self
+            .history
+            .dispatch_bitmap_stroke(request, bytes)
+            .map_err(|_| "native bitmap stroke request refused".to_owned())?;
+        if self.content_revision() != before {
+            self.preview.invalidate();
+        }
+        Ok(response)
+    }
 }

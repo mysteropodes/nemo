@@ -24,7 +24,13 @@
     flipped = on;
     if (on) { target = t; t.style.transform = 'scaleX(-1)'; }
     else if (target) { target.style.transform = ''; target = null; }
+    // Desktop: the drawing is a native surface under the page, which CSS cannot
+    // flip; the next native preview carries the mirror to its final pass (#2374).
+    var project = window.__TAURI__ && window.NemoNativeObjectProject;
+    var session = project && typeof project.desktop === 'function' && project.desktop(window);
+    if (session && session.isActive()) session.renderPreview(window.state.currentFrame);
   }
+  window.SMLabs.isMirrored = function () { return flipped; };
 
   document.addEventListener('keydown', function (e) {
     if (!window.SMLabs.isOn('mirror-check')) return;

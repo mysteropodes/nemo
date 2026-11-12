@@ -54,6 +54,8 @@
         documentSnapshotId:value.documentSnapshotId,contentRevision:value.contentRevision,originSnapshotId:value.origin.documentSnapshotId,
         originRevision:value.origin.contentRevision,
         digest:value.documentDigest,byteCount:value.byteCount,canvasW:value.canvasW,canvasH:value.canvasH,fps:value.fps,totalFrames:value.totalFrames};
+      // A converted baseline project is a new document: its tab never carries the baseline file's path.
+      if(object(value.legacyImport))meta.legacy=true;
       if(typeof value.documentId==='string'&&ID.test(value.documentId)&&value.documentId!==req.documentId){
         meta.documentId=value.documentId;
         meta.layerUids=Object.freeze(value.layers.map(function(layer){return layer.layerUid;}));
@@ -63,7 +65,7 @@
       return Object.freeze(meta);
     }
     function tabMeta(project,path){var name=path?ports.baseName(path):'Inactive project';
-      return Object.freeze(Object.assign({},project,{path:path||null,name:name}));}
+      return Object.freeze(Object.assign({},project,{path:project.legacy?null:path||null,name:name}));}
     function add(project,path){
       var meta=tabMeta(project,path);
       held=meta;
@@ -125,7 +127,10 @@
       return recover(pending,p);
     }
     async function openPath(path){
-      if(busy)return {status:'busy'};busy=true;
+      if(busy)return {status:'busy'};
+      // A file that is already open is focused, not prepared a second time.
+      var focused=typeof ports.focusOpen==='function'?ports.focusOpen(path):null;if(focused)return focused;
+      busy=true;
       try{
         if(typeof path!=='string'||!(/^(\/|[A-Za-z]:[\\/])/.test(path)))throw new Error('Native project path must be absolute');
         var p=pins();
@@ -147,7 +152,7 @@
           var prepared=safeProject(v.project,req,req.requestId);
           if(prepared.preparationToken!==v.preparationToken||prepared.originSnapshotId!==req.documentSnapshotId||
             prepared.originRevision!==req.expectedRevision)throw new Error('Inactive prepare token or owner mismatch');
-          add(prepared,path);uncertain=null;show(ports.canActivate&&ports.canActivate()===true?'Project prepared. Select its tab to switch.':'Project prepared; switching remains unavailable in this build.');return {status:'prepared',meta:held};
+          add(prepared,path);uncertain=null;show((prepared.legacy?'Imported as a new project; the original file is not modified. ':'')+(ports.canActivate&&ports.canActivate()===true?'Project prepared. Select its tab to switch.':'Project prepared; switching remains unavailable in this build.'));return {status:'prepared',meta:held};
         }catch(error){
           if(error&&error.details&&['notDispatched','closed'].includes(error.details.disposition)){
             uncertain=null;show('Inactive project was not prepared: '+(error.message||'request refused'));return {status:'refused'};

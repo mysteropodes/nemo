@@ -53,7 +53,7 @@ impl PreparedImageImport {
 fn refusal() -> DispatchErrorCode {
     DispatchErrorCode::Unavailable
 }
-fn canonical(
+pub(crate) fn canonical(
     origin: &ObjectSnapshot,
     edit: AssetEdit,
     bytes: &[u8],

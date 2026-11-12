@@ -219,7 +219,8 @@ test('Kitsu UI suppresses editor entry and success toast when replacement reject
   const ui = kitsuUiHarness((...args) => h.context.SMKitsu.openShot(...args));
 
   await ui.context.pickShotUnderTest(project, sequence, shot);
-  assert.deepEqual(ui.continuationCalls, []);
+  // The only toast is the failure message itself (#2381 names the refused step); no editor entry and no success toast.
+  assert.deepEqual(ui.continuationCalls, [['showToast', 'project replacement refused']]);
   assert.match(ui.list.innerHTML, /project replacement refused/);
 });
 

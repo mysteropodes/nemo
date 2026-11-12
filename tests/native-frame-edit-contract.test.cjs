@@ -16,7 +16,13 @@ const P = 'command.document.object.';
 const OPS = Contract.OPERATIONS;
 const request = (operation, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'frame-edit-7', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 7, operation, payload }, extra);
 const reply = (q, applied) => ({ apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId, contentRevision: q.expectedRevision + (applied ? 1 : 0), ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, q.operation === P + 'frames.move' ? { selection: applied ? [] : null } : q.operation === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : /frames\.clipboard\.(copy|cut)$/.test(q.operation) ? { clipboard: {instanceId:q.instanceId,documentId:q.documentId,cells:[]} } : {}) });
-const OPTIONAL = { 'object.frames.insert': ['layerUids'], 'object.layer.key.promote': ['layerUids'], 'object.layer.key.move': ['activeLayerUid'] };
+// #2256: contextId (the entered component) is optional on the timing, move, repeat and clipboard edits that have a component route.
+const CONTEXT = ['contextId'];
+const OPTIONAL = { 'object.frames.insert': ['layerUids', 'contextId'], 'object.layer.key.promote': ['layerUids', 'contextId'], 'object.layer.key.move': ['activeLayerUid', 'contextId'],
+  'object.frames.move': CONTEXT, 'object.frames.repeat': CONTEXT, 'object.frames.clipboard.copy': CONTEXT, 'object.frames.clipboard.cut': CONTEXT,
+  'object.frames.clipboard.paste': CONTEXT, 'object.frames.clipboard.duplicate': CONTEXT,
+  'object.frames.extend': CONTEXT, 'object.frames.duplicate': CONTEXT, 'object.frames.remove': CONTEXT, 'object.layer.key.blank': CONTEXT,
+  'object.layer.key.clear': CONTEXT, 'object.layer.key.clear_cells': CONTEXT, 'object.layer.tween.remove': CONTEXT };
 
 test('the descriptor, the schema and the contract declare the same seventeen operations', () => {
   assert.equal(OPS.length, 17);
@@ -230,6 +236,20 @@ test('F7 success always checkpoints once, including an already blank key; no-op 
   assert.throws(() => SDK.validateRequest(request(op, { command: 'object.layer.key.blank', layerUid: 'x'.repeat(4096), cell: 2 })), /4096/);
 });
 
+
+test('clipboard cells admit raster and text items strictly (#2248)', () => {
+  const op=P+'frames.clipboard.paste';
+  const cell={relLayer:0,relFrame:0,keyframe:true,records:[],rasterItems:[{target:{contextId:'scene-root',layerUid:'a',strokeId:'i',frameScope:{kind:'authored',frame:0}},item:{assetId:'img-1'}}],textItems:[]};
+  const payload=function(c){return {command:'object.frames.clipboard.paste',instanceId:'instance-A',documentId:'document-A',layerUid:'L0',frame:0,cells:[c]};};
+  assert.doesNotThrow(()=>SDK.validateRequest(request(op,payload(cell))));
+  for(const field of ['rasterItems','textItems']){
+    for(const bad of [null,{},[null],[[]],['x']])
+      assert.throws(()=>SDK.validateRequest(request(op,payload(Object.assign({},cell,{[field]:bad})))),TypeError,field);
+  }
+  assert.throws(()=>SDK.validateRequest(request(op,payload(Object.assign({},cell,{items:[]})))),TypeError);
+  const big=Object.assign({},cell,{textItems:[{block:{text:'x'.repeat(Contract.DATA_BYTES)}}]});
+  assert.throws(()=>SDK.validateRequest(request(op,payload(big))),/4MiB/);
+});
 
 test('clipboard shells preserve native ownership, records/order presence and every fixed message bound', async () => {
   for(const kind of ['copy','cut']){

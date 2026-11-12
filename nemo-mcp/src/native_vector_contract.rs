@@ -50,6 +50,16 @@ fn pair(value: &Value) -> bool {
         .is_some_and(|parts| parts.len() == 2 && parts.iter().all(finite))
 }
 
+/// #2256: the scene root or the id of a component context. Only the native owner knows which components the document
+/// declares and refuses any other id (`not_found`); this contract bounds the shape, so a context is an id and never text.
+pub(crate) fn context(value: &Value) -> bool {
+    value.as_str().is_some_and(|text| {
+        !text.is_empty()
+            && text.len() <= 128
+            && text.chars().all(|c| c.is_ascii_alphanumeric() || "._:/-".contains(c))
+    })
+}
+
 fn target(value: &Value, create: bool) -> bool {
     let stroke = if create {
         value["strokeId"] == ""
@@ -62,7 +72,7 @@ fn target(value: &Value, create: bool) -> bool {
         &[],
     )
     .is_some()
-        && value["contextId"] == "scene-root"
+        && context(&value["contextId"])
         && opaque(&value["layerUid"])
         && stroke
         && exact(&value["frameScope"], &["kind", "frame"], &[]).is_some()
@@ -72,6 +82,8 @@ fn target(value: &Value, create: bool) -> bool {
 
 #[path = "native_vector_contract_shapes.rs"]
 mod shapes;
+#[path = "native_vector_batch_contract.rs"]
+mod batch;
 use shapes::{record_shape, shape};
 
 #[path = "native_vector_bitmap_read.rs"]
@@ -105,6 +117,24 @@ fn mask_edit(value: &Value) -> bool {
     }
 }
 
+/// `trimClip` (#2361): the stop-at-axis clip a mirror takes after Trim Stroke Ends, as `{axis, mirrors}`: four finite axis
+/// numbers and 1..=32 `[drawn, mirror]` pairs of record indices, each index used once. Valid only beside `trimEnds`; absent is
+/// valid. The one native owner checks the indices against the records.
+pub(crate) fn trim_clip(payload: &Value) -> bool {
+    let Some(clip) = payload.get("trimClip") else {
+        return true;
+    };
+    let pairs = clip["mirrors"].as_array();
+    let index = |v: &Value| v.as_u64().filter(|n| u32::try_from(*n).is_ok());
+    let used: Vec<Option<u64>> = pairs.into_iter().flatten().flat_map(|p| p.as_array().filter(|p| p.len() == 2).into_iter().flatten().map(index)).collect();
+    exact(clip, &["axis", "mirrors"], &[]).is_some()
+        && payload.get("trimEnds").is_some()
+        && clip["axis"].as_array().is_some_and(|axis| axis.len() == 4 && axis.iter().all(finite))
+        && pairs.is_some_and(|p| (1..=32).contains(&p.len()) && p.iter().all(|pair| pair.as_array().is_some_and(|pair| pair.len() == 2)))
+        && used.iter().all(Option::is_some)
+        && used.iter().collect::<std::collections::HashSet<_>>().len() == used.len()
+}
+
 pub(crate) fn request(operation: &str, payload: &Value) -> bool {
     let Some(command) = payload["command"].as_str() else {
         return false;
@@ -114,10 +144,40 @@ pub(crate) fn request(operation: &str, payload: &Value) -> bool {
         keys.extend_from_slice(extra);
         exact(payload, &keys, &[]).is_some()
     };
+    // G15: the two creates take an optional `placement` (front by default, or behind), an optional
+    // `trimEnds` overshoot limit (finite, above zero; the baseline trimStrokeEndsMax) and an optional
+    // `keyframe: "copy"` (a held cell keys with what it showed; absent keys it empty, as Draw does).
+    let creates = |extra: &[&str]| {
+        let mut keys = vec!["command"];
+        keys.extend_from_slice(extra);
+        exact(payload, &keys, &["placement", "trimEnds", "trimClip", "keyframe"]).is_some()
+            && trim_clip(payload)
+            && payload
+                .get("placement")
+                .is_none_or(|p| p == "front" || p == "behind")
+            && payload
+                .get("trimEnds")
+                .is_none_or(|t| t.as_f64().is_some_and(|v| v.is_finite() && v > 0.))
+            && payload.get("keyframe").is_none_or(|k| k == "copy")
+    };
     match (operation, command) {
         (VECTOR, "object.vector.create") => {
-            named(&["record"]) && record_shape(&payload["record"], true)
+            creates(&["record"]) && record_shape(&payload["record"], true)
         }
+        // G23: 2..=32 creates sharing one layer and frame, as one revision and one undo entry.
+        (VECTOR, "object.vector.createMany") => {
+            creates(&["records"])
+                && payload["records"].as_array().is_some_and(|records| {
+                    (2..=32).contains(&records.len())
+                        && records.iter().all(|r| record_shape(r, true))
+                        && records.iter().all(|r| {
+                            r["target"]["layerUid"] == records[0]["target"]["layerUid"]
+                                && r["target"]["contextId"] == records[0]["target"]["contextId"]
+                                && r["target"]["frameScope"] == records[0]["target"]["frameScope"]
+                        })
+                })
+        }
+        (VECTOR, "object.vector.batch") => batch::request(payload),
         (VECTOR, "object.vector.replace") => {
             named(&["record"])
                 && record_shape(&payload["record"], false)
@@ -174,9 +234,33 @@ pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
             else {
                 return false;
             };
+            if ran == "batch" {
+                return batch::result(payload, value);
+            }
             let Some(stroke) = value["strokeId"].as_str() else {
                 return false;
             };
+            if ran == "createMany" {
+                let Some(ids) = value["strokeIds"].as_array() else {
+                    return false;
+                };
+                let count = payload["records"].as_array().map_or(0, Vec::len);
+                return exact(
+                    value,
+                    &["applied", "historyEntriesAdded", "operation", "strokeId", "strokeIds"],
+                    &[],
+                )
+                .is_some()
+                    && command_receipt(value)
+                    && value["applied"] == true
+                    && value["operation"] == "createMany"
+                    && ids.len() == count
+                    && ids.first().and_then(Value::as_str) == Some(stroke)
+                    && ids
+                        .iter()
+                        .all(|id| id.as_str().is_some_and(|id| id.starts_with("native-stroke:")))
+                    && ids.iter().collect::<std::collections::HashSet<_>>().len() == ids.len();
+            }
             let stroke_matches = match ran {
                 "create" => value["applied"] == true && stroke.starts_with("native-stroke:"),
                 "replace" => payload["record"]["target"]["strokeId"].as_str() == Some(stroke),
@@ -228,6 +312,10 @@ pub(crate) fn response_matches(
 #[cfg(test)]
 #[path = "native_vector_contract_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_vector_create_many_tests.rs"]
+mod create_many_tests;
 
 #[cfg(test)]
 #[path = "native_vector_bitmap_read_tests.rs"]

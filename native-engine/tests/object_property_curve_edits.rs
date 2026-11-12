@@ -156,6 +156,9 @@ fn literal_influence_reach_y_clamps_and_promotes_short_curves() {
         for (side, percent, x, y) in [
             (InfluenceSide::Out, -25., 0.02, 0.02),
             (InfluenceSide::Out, 50., 0.25, 0.125),
+            // Baseline setSegmentInfluence (motion.js @1065e9d8): reach = 0.02 + amount*0.46,
+            // out y = x*(1 - amount), so exactly 100% lands on the far margin with y = 0.
+            (InfluenceSide::Out, 100., 0.48000000000000004, 0.),
             (InfluenceSide::Out, 150., 0.48000000000000004, 0.),
             (InfluenceSide::In, 0., 0.98, 0.98),
             (InfluenceSide::In, 50., 0.75, 0.875),

@@ -102,6 +102,14 @@ impl VideoTiming {
                 }
                 track.scalar_intent_key(frame, vec![value], curve);
             }
+            // The commands owner resolves `Keys` against the stored track; reaching the kernel unresolved is a malformed edit.
+            RemapIntent::Keys { .. } => return Err(RemapRefusal::Invalid),
+            RemapIntent::SetTrack(next) => {
+                if self.time_remap.is_none() {
+                    return Err(RemapRefusal::Invalid);
+                }
+                self.time_remap = next;
+            }
         }
         Ok(())
     }
@@ -134,6 +142,21 @@ pub(crate) enum RemapIntent {
         value: Number,
         curve: Option<Vec<OrderCurvePoint>>,
     },
+    /// Edit the selected keys of the stored remap track with one key action (the property track-edit actions). Only the
+    /// commands owner builds the result; it turns this into `SetTrack`.
+    Keys {
+        selections: Vec<RemapSelection>,
+        action: serde_json::Value,
+    },
+    /// Replace the stored track; `None` turns the remap off (every key deleted). Built by the commands owner only.
+    SetTrack(Option<OrderTrack>),
+}
+
+/// The keys one `Keys` entry names: the key at `frame`, or every key whose frame lies in one inclusive range of `ranges`.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct RemapSelection {
+    pub(crate) frame: Option<Number>,
+    pub(crate) ranges: Option<Vec<[Number; 2]>>,
 }
 
 /// Why a remap intent was refused before admission.
@@ -147,6 +170,9 @@ pub(crate) enum RemapRefusal {
 #[cfg(feature = "evaluation")]
 #[path = "object_media_video_remap.rs"]
 mod remap;
+/// The Time Remap sampler over a stored track (a component instance reads the same one).
+#[cfg(feature = "evaluation")]
+pub(crate) use remap::sample_remap_track;
 
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_media_video_timing.rs"]

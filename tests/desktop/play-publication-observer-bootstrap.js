@@ -1,6 +1,9 @@
 /* TEST PACKAGE ONLY: embedded by the cfg-gated isolated Tauri main-window builder.
  * This transports metadata; O2 supplies the real publication observations.
- * No call here drives a frame, Play, retry, document command or product timer.
+ * No call here drives a frame, Play, retry or document command. The only timer hook is the
+ * opt-in P24 fixed clock (config.fixedClock === true, from NEMO_TEST_PLAY_FIXED_CLOCK=1): the
+ * product's own playback scheduler asks it for time, and it steps exactly one frame period per
+ * accepted tick, never while a presentation is outstanding. Absent, product time is untouched.
  */
 (function () {
   'use strict';
@@ -14,6 +17,7 @@
     'sessionOrdinal', 'hostCallOrdinal', 'intent', 'runGeneration', 'hostGeneration', 'currentFrame', 'priorFrame'];
   var statuses = ['presented', 'deferred-occluded', 'deferred-timeout', 'stale-discarded',
     'failed-validation', 'failed-device-lost', 'failed-retry-lost', 'failed-retry-outdated', 'failed-recreate', 'failed-reconfigure'];
+  var objectDocument = 'native-object-document-';
   var identifier = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
   var uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   function snapshot(event) {
@@ -29,7 +33,8 @@
       else if (key === 'documentSnapshotId' || key === 'contextId') valid = typeof value === 'string' && identifier.test(value) && !value.endsWith('\n');
       else if (key === 'instanceId') valid = typeof value === 'string' && uuid.test(value);
       else if (key === 'documentId' || key === 'workId') {
-        var prefix = key === 'documentId' ? 'native-document-' : 'native-work-';
+        // Opacity projects publish 'native-document-N'; native object projects publish 'native-object-document-N'.
+        var prefix = key === 'workId' ? 'native-work-' : typeof value === 'string' && value.startsWith(objectDocument) ? objectDocument : 'native-document-';
         valid = typeof value === 'string' && value.startsWith(prefix) &&
           /^[1-9][0-9]{0,19}$/.test(value.slice(prefix.length)) && !value.endsWith('\n') &&
           BigInt(value.slice(prefix.length)) <= 18446744073709551615n;
@@ -143,8 +148,18 @@
       catch (_) { return false; } }
     function restoreWork(pins) { return typeof pins.workId === 'string' && /^native-work-[1-9][0-9]{0,19}$/.test(pins.workId) &&
       BigInt(pins.workId.slice(12)) <= 18446744073709551615n && Number.isSafeInteger(pins.viewGeneration) && pins.viewGeneration > 0; }
+    // A native object project's identity is its whole project info (layers, canvas, ...): only the identity
+    // pins are telemetry. Any other member would make snapshot() drop the event, and one drop refuses the rest.
+    var identityKeys = ['instanceId', 'documentId', 'contentRevision', 'documentSnapshotId', 'contextId', 'workId',
+      'lifecycleGeneration', 'jsLifecycleGeneration', 'hostLifecycleGeneration', 'viewGeneration', 'sessionOrdinal',
+      'hostGeneration', 'hostCallOrdinal'];
+    function identityPins(identity) {
+      var out = {};
+      if (identity && typeof identity === 'object') identityKeys.forEach(function (key) { if (Object.hasOwn(identity, key)) out[key] = identity[key]; });
+      return out;
+    }
     function navigationRequest(intent, frame, identity) {
-      var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ intent: intent, frame: frame }, identity));
+      var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ intent: intent, frame: frame }, identityPins(identity)));
       navigations.set(ticket, { pins: pins, finished: false, afterCallOrdinal: callSequence }); productPendingNavigation++;
       record(Object.assign({ event: 'navigate-request' }, pins)); return ticket;
     }
@@ -196,7 +211,7 @@
       record(observed);
     }
     function schedulerRequest(run, frame, identity) {
-      var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ runGeneration: run, frame: frame }, identity));
+      var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ runGeneration: run, frame: frame }, identityPins(identity)));
       steps.set(ticket, { pins: pins, finished: false }); productPendingPlayback++;
       record(Object.assign({ event: 'play-step' }, pins)); return ticket;
     }
@@ -205,7 +220,7 @@
       step.finished = true; productPendingPlayback--; if (typeof result !== 'boolean') dropped++;
       record(Object.assign({ event: 'play-step', result: result === true }, step.pins));
     }
-    function schedulerState(event, run, identity) { if (identity) record(Object.assign({ event: event, runGeneration: run }, identity)); }
+    function schedulerState(event, run, identity) { if (identity) record(Object.assign({ event: event, runGeneration: run }, identityPins(identity))); }
     function playState(playing, frame) {
       productPlaying = playing === true; record({ event: 'play-state', playing: playing, currentFrame: frame });
     }
@@ -322,12 +337,28 @@
           generated: generated, dropped: dropped, failed: failed, pending: pendingCount });
       } catch (_) { failed++; }
     }
+    // Virtual time for the product scheduler (P24). The 1e-6 ms bias keeps floor((now-clock)/frameMs)
+    // at exactly 1 despite float rounding; ticks wait while a scheduler step is still presenting.
+    var fixedClock = config.fixedClock !== true ? null : (function () {
+      var t = 0, ids = 0, timers = new Map();
+      function request(step, frameMs) {
+        var id = ++ids;
+        function fire() {
+          timers.delete(id);
+          if (productPendingPlayback > 0) { timers.set(id, setTimeout(fire, 1)); return; }
+          t += (frameMs > 0 ? frameMs : 1000 / 24) + 1e-6; step(t);
+        }
+        timers.set(id, setTimeout(fire, 0)); return id;
+      }
+      function cancel(id) { clearTimeout(timers.get(id)); timers.delete(id); }
+      return Object.freeze({ now: function () { return t; }, request: request, cancel: cancel });
+    })();
     var ready = Promise.resolve().then(function () { return ports.listen(seal); }).then(async function () {
       listening = true;
       record({ event: 'ready' });
       await queue;
     }).catch(function () { failed++; });
-    return Object.freeze({ record: record, ready: ready, bindPreview: bindPreview, beginHost: beginHost,
+    return Object.freeze({ fixedClock: fixedClock, record: record, ready: ready, bindPreview: bindPreview, beginHost: beginHost,
       rawReceipt: rawReceipt, associateReceipt: associateReceipt, rejectReceipt: rejectReceipt,
       presentedReturn: presentedReturn, receiptContext: function (receipt) { return receipts.get(receipt); },
       navigationRequest: navigationRequest, navigationSuperseded: navigationSuperseded, navigationReturn: navigationReturn,

@@ -84,6 +84,57 @@
         }
       }
     },
+    "TextTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "frameScope": {
+          "$ref": "#/$defs/FrameScope"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "strokeId": {
+          "$ref": "#/$defs/Opaque"
+        }
+      }
+    },
+    "TextCreateTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "frameScope": {
+          "$ref": "#/$defs/FrameScope"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "strokeId": {
+          "const": ""
+        }
+      }
+    },
+    "TextCopyKey": {
+      "const": "copy"
+    },
     "RasterItem": {
       "type": "object",
       "additionalProperties": false,
@@ -115,6 +166,44 @@
         },
         "rotation": {
           "type": "number"
+        },
+        "flipX": {
+          "type": "boolean",
+          "description": "A stored mirror about the item's centre (anchor for a text block); absent reads false."
+        },
+        "flipY": {
+          "type": "boolean",
+          "description": "A stored mirror about the item's centre (anchor for a text block); absent reads false."
+        },
+        "skew": {
+          "type": "number",
+          "exclusiveMinimum": -90,
+          "exclusiveMaximum": 90,
+          "description": "A stored x-shear in degrees about the item's centre (anchor for a text block); absent reads 0."
+        },
+        "xformAnchorKey": {
+          "type": "string",
+          "enum": [
+            "tl",
+            "tc",
+            "tr",
+            "ml",
+            "mc",
+            "mr",
+            "bl",
+            "bc",
+            "br"
+          ],
+          "description": "The Select rotate/scale pivot preset the artist last chose for this item; a stored xformAnchorCustom wins over it."
+        },
+        "xformAnchorCustom": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          },
+          "description": "The Select rotate/scale pivot as a custom world point [x, y]."
         },
         "isBitmapBrush": {
           "type": "boolean"
@@ -264,6 +353,49 @@
               "type": "number"
             }
           }
+        },
+        "rotation": {
+          "type": "number",
+          "minimum": -360,
+          "maximum": 360
+        },
+        "flipX": {
+          "type": "boolean",
+          "description": "A stored mirror about the item's centre (anchor for a text block); absent reads false."
+        },
+        "flipY": {
+          "type": "boolean",
+          "description": "A stored mirror about the item's centre (anchor for a text block); absent reads false."
+        },
+        "skew": {
+          "type": "number",
+          "exclusiveMinimum": -90,
+          "exclusiveMaximum": 90,
+          "description": "A stored x-shear in degrees about the item's centre (anchor for a text block); absent reads 0."
+        },
+        "xformAnchorKey": {
+          "type": "string",
+          "enum": [
+            "tl",
+            "tc",
+            "tr",
+            "ml",
+            "mc",
+            "mr",
+            "bl",
+            "bc",
+            "br"
+          ],
+          "description": "The Select rotate/scale pivot preset the artist last chose for this item; a stored xformAnchorCustom wins over it."
+        },
+        "xformAnchorCustom": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          },
+          "description": "The Select rotate/scale pivot as a custom world point [x, y]."
         }
       }
     },
@@ -476,10 +608,13 @@
               "const": "object.text.create"
             },
             "target": {
-              "$ref": "#/$defs/CreateTarget"
+              "$ref": "#/$defs/TextCreateTarget"
             },
             "block": {
               "$ref": "#/$defs/TextBlock"
+            },
+            "keyframe": {
+              "$ref": "#/$defs/TextCopyKey"
             }
           }
         },
@@ -496,11 +631,24 @@
               "const": "object.text.edit"
             },
             "stableTarget": {
-              "$ref": "#/$defs/Target"
+              "$ref": "#/$defs/TextTarget"
             },
             "patch": {
               "$ref": "#/$defs/TextPatch"
+            },
+            "frame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "keyframe": {
+              "$ref": "#/$defs/TextCopyKey"
             }
+          },
+          "dependentRequired": {
+            "frame": [
+              "keyframe"
+            ]
           }
         },
         {
@@ -515,8 +663,21 @@
               "const": "object.text.delete"
             },
             "stableTarget": {
-              "$ref": "#/$defs/Target"
+              "$ref": "#/$defs/TextTarget"
+            },
+            "frame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "keyframe": {
+              "$ref": "#/$defs/TextCopyKey"
             }
+          },
+          "dependentRequired": {
+            "frame": [
+              "keyframe"
+            ]
           }
         },
         {
@@ -532,6 +693,9 @@
               "const": "object.text.animator.upsert"
             },
             "layerUid": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "contextId": {
               "$ref": "#/$defs/Opaque"
             },
             "animator": {
@@ -554,6 +718,9 @@
             "layerUid": {
               "$ref": "#/$defs/Opaque"
             },
+            "contextId": {
+              "$ref": "#/$defs/Opaque"
+            },
             "animatorId": {
               "$ref": "#/$defs/Opaque"
             }
@@ -573,6 +740,9 @@
               "const": "object.text.animator.edit"
             },
             "layerUid": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "contextId": {
               "$ref": "#/$defs/Opaque"
             },
             "animatorId": {

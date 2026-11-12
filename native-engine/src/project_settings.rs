@@ -6,6 +6,7 @@ mod annotations;
 #[path = "project_metadata_fields.rs"]
 mod visual;
 pub(crate) use annotations::{ProjectCommentRecord, ProjectWorkspaceRecord};
+pub(crate) use visual::SymmetrySettings;
 #[path = "project_metadata_presets.rs"]
 mod presets;
 pub(crate) use presets::{BrushPresetRecord, ProjectPresetCatalog};
@@ -20,6 +21,7 @@ pub(crate) enum ProjectMetadataError {
     InvalidVisualMetadata,
     InvalidAnnotations,
     InvalidPresets,
+    InvalidRetainedTail,
 }
 
 /// Exact accepted spelling plus straight sRGB RGBA8, including the source alpha.
@@ -88,6 +90,8 @@ pub(crate) struct ProjectMetadata {
     annotations: annotations::Annotations,
     custom_brush_presets: Option<std::sync::Arc<ProjectPresetCatalog>>,
     camera: crate::object_document::ProjectCameraState,
+    /// Cells cut past the project length by the Frames field; absent when none are kept.
+    retained_tail: Option<std::sync::Arc<crate::object_document::RetainedTail>>,
 }
 impl ProjectMetadata {
     /// The existing constructor API and positive finite storage FPS are preserved.
@@ -117,6 +121,7 @@ impl ProjectMetadata {
             annotations: annotations::Annotations::default(),
             custom_brush_presets: None,
             camera: crate::object_document::ProjectCameraState::default(),
+            retained_tail: None,
         })
     }
     pub(crate) fn with_canvas_dimensions(
@@ -234,6 +239,22 @@ impl ProjectMetadata {
         let camera = crate::object_document::ProjectCameraState::new(keys, layer_on)
             .map_err(|_| ProjectMetadataError::InvalidCompositionMetadata)?;
         Ok(Self { camera, ..self })
+    }
+    pub(crate) fn with_retained_tail(
+        self,
+        tail: Option<crate::object_document::RetainedTail>,
+    ) -> Result<Self, ProjectMetadataError> {
+        let tail = crate::object_document::canonical_tail(tail);
+        if tail.as_ref().is_some_and(|tail| !tail.well_formed()) {
+            return Err(ProjectMetadataError::InvalidRetainedTail);
+        }
+        Ok(Self {
+            retained_tail: tail.map(std::sync::Arc::new),
+            ..self
+        })
+    }
+    pub(crate) fn retained_tail(&self) -> Option<&crate::object_document::RetainedTail> {
+        self.retained_tail.as_deref()
     }
     pub(crate) fn camera_keys(&self) -> Option<&[crate::object_document::ProjectCameraKey]> {
         self.camera.keys.as_deref()

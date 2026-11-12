@@ -44,9 +44,8 @@ pub(super) fn chain(
             stroke_id: Presence::Missing,
         };
         let layer = &packet.source_layers()[index];
-        if !common_layer_motion_target(packet.snapshot().document(), &target)
-            || layer.three_d.value() == Some(&true)
-        {
+        // A 3D ancestor contributes its 2D Motion like any other (baseline `computeMotionMat`).
+        if !common_layer_motion_target(packet.snapshot().document(), &target) {
             return Err("ordinary vector parent has no complete native content consumer");
         }
         let values = packet

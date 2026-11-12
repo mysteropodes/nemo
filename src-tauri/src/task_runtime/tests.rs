@@ -204,6 +204,21 @@ fn play_metadata_has_no_free_text_payload_or_coerced_identity() {
     let event = json!({"event":"host-receipt", "documentId":"native-document-3",
         "workId":"native-work-159", "frame":10, "contentRevision":2, "status":"presented"});
     assert!(TestPlayLog::valid_event(&event));
+    // Native object projects publish `native-object-document-N`; malformed ones stay refused.
+    for id in ["native-object-document-7", "native-object-document-18446744073709551615"] {
+        assert!(TestPlayLog::valid_event(&json!({"event":"play-start", "documentId":id})), "{id}");
+    }
+    for id in [
+        "native-object-document-0",
+        "native-object-document-01",
+        "native-object-document-",
+        "native-object-document-18446744073709551616",
+        "native-objects-document-1",
+        "native-object-document-1\n",
+    ] {
+        assert!(!TestPlayLog::valid_event(&json!({"event":"play-start", "documentId":id})), "{id}");
+    }
+    assert!(!TestPlayLog::valid_event(&json!({"event":"play-start", "workId":"native-object-document-7"})));
 }
 
 #[cfg(feature = "test-play-publication-observer")]

@@ -90,12 +90,14 @@
       }
     }
     async function importFile(file) {
-      const begun = core.begin();
+      let begun = core.begin();
+      if (!begun.ok && begun.reason === 'no_presented_native_session' && typeof core.beginSettled === 'function') begun = await core.beginSettled();
       if (!begun.ok) return { status: begun.status, reason: begun.reason };
       let psd;
       try { psd = await ports.readPsd(file); } catch (err) { notify(failureToast(err, t)); return { status: 'failed', message: String(err && err.message || err) }; }
       // The context is read again after the (asynchronous) parse: the pin used for the batch is the one the submit sees.
-      const ready = core.begin();
+      let ready = core.begin();
+      if (!ready.ok && ready.reason === 'no_presented_native_session' && typeof core.beginSettled === 'function') ready = await core.beginSettled();
       if (!ready.ok) return { status: ready.status, reason: ready.reason };
       const ctx = ready.ctx;
       const decided = plan(psd, { w: ctx.before.canvasW, h: ctx.before.canvasH });

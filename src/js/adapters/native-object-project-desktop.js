@@ -23,7 +23,7 @@
       if(['p-cw','p-ch','proj-fps','p-cbg','btn-dims-lock'].includes(own('field')))row.field=own('field');
       if(['input','change'].includes(own('sourceEvent')))row.sourceEvent=own('sourceEvent');
       var kind=own('kind'),status=own('status');
-      if(['setCanvasSize','setFps','setCanvasBackground','setWorkArea','user','native-settings-intent','native-settings-publication'].includes(kind))row.kind=kind;
+      if(['setCanvasSize','setFps','setCanvasBackground','setWorkArea','setTotalFrames','trimToWorkArea','user','native-settings-intent','native-settings-publication'].includes(kind))row.kind=kind;
       if(['applied-presented','unchanged','superseded','unavailable','unconfirmed','applied-unconfirmed','succeeded','failed','cancelled'].includes(status))row.status=status;
       var log=settingsLogs.get(root);if(!log){log={startedAt:Date.now(),serial:0,events:[],writing:false,pending:null};settingsLogs.set(root,log);}
       row.sequence=++log.serial;row.at=Date.now();log.events.push(row);log.events=log.events.slice(-128);
@@ -249,7 +249,7 @@
     if(root.SMCamera&&typeof root.SMCamera.renderNativeViewLock==='function')root.SMCamera.renderNativeViewLock();
   }
   function createPorts(root){
-    var nativeInvoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0;
+    var nativeInvoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0,widgetRevision=null,widgetPending=null,widgetTries=0;
     function invokeProjectObserved(command,args){
       var pin;
       if(command==='nemo_native_object_export')try{pin=JSON.parse(args.requestJson);settingsDiagnostic(root,'export-request',pin);}catch(_){}
@@ -257,7 +257,7 @@
       if(pin)Promise.resolve(response).then(function(receipt){settingsDiagnostic(root,'export-result',receipt);},function(){});
       return response;
     }
-    function settingsNotice(kind,info){[root.NemoNativeProjectSettingsController,root.NemoNativeCompositionController,root.NemoNativePaletteController,root.NemoNativeGuideController,root.NemoNativeShadowController,root.NemoNativePerspectiveController,root.NemoNativeWorkspaceController,root.NemoNativeCustomBrushController,root.NemoNativeCommentsController].forEach(function(c){if(c&&typeof c[kind]==='function')c[kind](info);});}
+    function settingsNotice(kind,info){[root.NemoNativeProjectSettingsController,root.NemoNativeCompositionController,root.NemoNativePaletteController,root.NemoNativeGuideController,root.NemoNativeShadowController,root.NemoNativePerspectiveController,root.NemoNativeSymmetryController,root.NemoNativeWorkspaceController,root.NemoNativeCustomBrushController,root.NemoNativeCommentsController].forEach(function(c){if(c&&typeof c[kind]==='function')c[kind](info);});}
     function presentationStamp(info){
       var project=root.NemoNativeObjectProject;
       if(!project||typeof project.desktop!=='function')return null;
@@ -268,9 +268,12 @@
       if(presentation!==null&&(!presentation||typeof presentation!=='object'))return null;
       return {session:session,info:info,ticket:session.readSubscriptionGeneration(),document:root.document,presentation:presentation};
     }
-    function publishRevision(info){
+    function publishRevision(info,lease){
       settingsDiagnostic(root,'metadata',info);
       settingsNotice('willProject',info);
+      // #2256: inside an entered component the scene rows are not the projected rows; the context re-reads itself through the lease the
+      // publication runs in (its context, frame count and layers are settled BEFORE the frame of this revision is presented).
+      var entered=root.NemoNativeComponentContext;if(entered&&entered.presented(root))return entered.revision(root,info,lease).then(function(){root.updateUI();return true;});
       if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshLayerTable(root,info))
         throw new Error('Native object row projection is uncorrelated');
       if(typeof root.updateUI!=='function')throw new Error('Native document UI publication is unavailable');
@@ -280,8 +283,21 @@
       return true;
     }
     return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invokeProjectObserved,publishRevision:publishRevision,
+      context:function(){var c=root.NemoNativeComponentContext;return c?c.presented(root):null;},
       viewMode:function(){return root.state&&root.state.cameraView===true?'stored-camera':'canvas';},
-      displayFilter:function(){return root.SMLabs&&typeof root.SMLabs.getViewFilter==='function'?root.SMLabs.getViewFilter():'none';},
+      // The held mirror check (#2374) rides the same final-surface transform as the color check.
+      // #2358: onion skin / Ghost All composed under the live frame by the native renderer; the selection rides every preview request.
+      ghosts:function(info){var ui=root.NemoNativeObjectGhostUI;return ui&&typeof ui.selection==='function'?ui.selection(root,info):null;},
+      // "Show transparency" (#2373): a view flag the renderer reads, so the checker is engine pixels behind the artwork.
+      alphaChecker:function(){return !!(root.state&&root.state.previewAlphaBg===true);},
+      // "Current frame outline" (#2372): likewise a view flag the renderer reads; the checkbox only flips state.currentFrameOutline.
+      currentOutline:function(){return !!(root.state&&root.state.currentFrameOutline===true);},
+      // "Shadow guides" off (#2373): the flag is the inverse of state.showShadowGuides (shown by default, as in the baseline).
+      hideShadowGuides:function(){return !!(root.state&&root.state.showShadowGuides===false);},
+      // Layer Solo (#2371): the soloed layer uids of this lifecycle, a view fact the renderer reads and the export honours (as the baseline).
+      soloLayers:function(info){var solo=root.NemoNativeLayerSolo;return solo&&typeof solo.read==='function'?solo.read(root,info):[];},
+      displayFilter:function(){var labs=root.SMLabs,color=labs&&typeof labs.getViewFilter==='function'?labs.getViewFilter():'none';
+        return labs&&typeof labs.isMirrored==='function'&&labs.isMirrored()?(color==='none'?'mirrored':color+'-mirrored'):color;},
       subscribeWindowOcclusion:root.__TAURI__.event&&typeof root.__TAURI__.event.listen==='function'?async function(hint,cancel){
         var closing=function(){cancel(new Error('Native project window closed'));},remove,detached=false;
         var observesClose=typeof root.addEventListener==='function'&&typeof root.removeEventListener==='function';
@@ -347,7 +363,21 @@
           if(shown&&root.state&&root.state.playing!==true)settingsDiagnostic(root,'preview-presented',shown);
           settingsNotice('presented',info);
           renderCameraViewLock(root);
+          // A timing read refused while this queue was busy needs the settled
+          // presentation signal; its existing readiness pin deduplicates reads.
+          if(shown&&root.state&&shown.frame===root.state.currentFrame&&
+            root.NemoNativeObjectUI&&typeof root.NemoNativeObjectUI.refreshTiming==='function')
+            root.NemoNativeObjectUI.refreshTiming(root);
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
+          if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
+          // #2255: the widget pads are re-read until one read lands per document revision, or a widget made elsewhere (MCP, another tab's
+          // undo) stays undrawn. Never per presentation once landed: the read itself re-presents, so an unconditional refresh never settles.
+          var widgets=root.NemoNativeObjectWidgetUI,revision=[info.instanceId,info.lifecycleGeneration,info.documentSnapshotId].join('|');
+          if(widgets&&typeof widgets.desktop==='function'&&revision!==widgetRevision){
+            // A read refused while the queue is busy is "not yet": retry on the next presentations (at most 5) until one lands.
+            if(revision!==widgetPending){widgetPending=revision;widgetTries=0;}
+            if(widgetTries++<5)Promise.resolve(widgets.desktop(root).refresh()).then(function(read){if(read&&read.info&&read.info.documentSnapshotId===info.documentSnapshotId&&widgetPending===revision)widgetRevision=revision;},function(){});
+          }
           // A frame paint can precede native completion and leave Motion unavailable.
           // Refresh its existing inspector only after the current frame is presented.
           if(shown&&root.state&&root.state.appMode==='motion'&&shown.frame===root.state.currentFrame&&
@@ -356,7 +386,7 @@
           if(shown)openDiagnostic(root,'camera-presented',cameraPresentedCode(shown));
         }catch(_){}},0);
       },
-      changed:function(info){if(root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.hasProjection(root))publishRevision(info);
+      changed:function(info,lease){if(root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.hasProjection(root))return publishRevision(info,lease);
         else{if(root.SMReference)root.SMReference.refreshNative();if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();}},
       notice:function(message){if(root.showToast)root.showToast(message);},
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});

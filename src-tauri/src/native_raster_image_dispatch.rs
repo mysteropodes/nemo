@@ -11,9 +11,12 @@ pub(super) enum ImagePhase<'a> {
     Probe,
     Commit(&'a [u8]),
 }
+/// #2361: a bitmap-brush Draw stroke resolves its staged PNG through this same scoped route.
+const BITMAP_STROKE: &str = "command.document.object.brush.bitmap.stroke";
 pub(super) fn is_image_import(request: &NativeApplicationRequest) -> bool {
     request.operation == "command.document.object.asset.attach"
         && request.payload.get("placement").is_some()
+        || request.operation == BITMAP_STROKE
 }
 pub(super) fn invoke_image(
     application: &mut dyn NativeDispatch,
@@ -28,8 +31,11 @@ pub(super) fn invoke_image(
         serde_json::to_value(request).map_err(|_| "native image request invalid")?,
     )
     .map_err(|_| "native image request invalid")?;
+    let stroke = request.operation() == BITMAP_STROKE;
     let response = match phase {
+        ImagePhase::Commit(bytes) if stroke => Some(owner.bitmap_stroke(&request, bytes)?),
         ImagePhase::Commit(bytes) => Some(owner.image_import(&request, bytes)?),
+        ImagePhase::Probe | ImagePhase::Regular if stroke => owner.bitmap_stroke_status(&request)?,
         ImagePhase::Probe | ImagePhase::Regular => owner.image_status(&request)?,
     };
     response
@@ -50,6 +56,11 @@ impl RevisionSync {
         external: bool,
         allowed: Option<ImageReadPermission>,
     ) -> Result<Delivery, String> {
+        if crate::application_mcp::revision_sync::video_dispatch::is_video_link(&request) {
+            return self
+                .dispatch_video_scoped(instance, native, request, external, allowed)
+                .await;
+        }
         if crate::application_mcp::revision_sync::import_batch_dispatch::is_import_batch_sources(
             &request,
         ) {
@@ -101,9 +112,14 @@ impl RevisionSync {
         }
         let source: ImageSource = serde_json::from_value(request.payload["source"].clone())
             .map_err(|_| "native image source descriptor invalid")?;
-        let bytes = match tokio::time::timeout(Duration::from_secs(30), resolve(source)).await {
-            Ok(Ok(bytes)) => bytes,
-            _ => {
+        let refusal = match tokio::time::timeout(Duration::from_secs(30), resolve(source)).await {
+            Ok(Ok(bytes)) => Ok(bytes),
+            Ok(Err(reason)) => Err(Some(reason)),
+            Err(_) => Err(None),
+        };
+        let bytes = match refusal {
+            Ok(bytes) => bytes,
+            Err(reason) => {
                 if let Some(known) = self.dispatch_image_step(
                     instance,
                     native,
@@ -113,16 +129,24 @@ impl RevisionSync {
                 )? {
                     return Ok(known);
                 }
+                // A source the port itself refused read nothing and published nothing: the client may correct the
+                // source and send again (#2242). Only a timeout leaves the blocking read unproven.
+                let message = match &reason {
+                    Some(reason) => format!("native image source unavailable before publication: {reason}"),
+                    None => "native image source unavailable before publication".to_owned(),
+                };
                 let mut response = unavailable(
                     &request,
                     instance,
                     request.expected_revision.unwrap_or(0),
-                    "native image source unavailable before publication",
+                    &message,
                     false,
                 );
-                response.error.as_mut().unwrap().details = Some(
-                    serde_json::json!({"disposition":"indeterminate","committed":null,"retryExecution":false}),
-                );
+                if reason.is_none() {
+                    response.error.as_mut().unwrap().details = Some(
+                        serde_json::json!({"disposition":"indeterminate","committed":null,"retryExecution":false}),
+                    );
+                }
                 return Ok(Delivery {
                     response,
                     notification: None,

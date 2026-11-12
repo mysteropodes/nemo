@@ -462,7 +462,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     // selection/drag/delete consumer of trackFor(...).keys (deleteSelectedKeys,
     // onDragMove's group-drag, sortKeys) work on these two props exactly
     // like any numeric one, with zero changes to any of them.
-    if (prop === 'blendKeys') return holder.blendKeys ? { keys: holder.blendKeys } : null;
+    if (prop === 'blendKeys') { var nbg = nativeBlendGrid(); return nbg ? nbg.track(holder) : holder.blendKeys ? { keys: holder.blendKeys } : null; }
     if (prop === 'parentKeys') return holder.parentKeys ? { keys: holder.parentKeys } : null;
     return (holder.motion && holder.motion[prop]) || null;
   }
@@ -803,8 +803,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   function discreteRowVisible(ld, kind) {
     if (isPropFiltered(kind)) return false;
     if (!_hideUnanimated) return true;
-    var keys = kind === 'parent' ? ld.parentKeys : ld.blendKeys;
-    return !!(keys && keys.length);
+    var nbk = kind === 'blend' && window.nativeCompositing && nativeCompositing(); // #2257: native keys live in the engine
+    var keys = kind === 'parent' ? ld.parentKeys : nbk ? nbk.blendKeysOf(state.layers.indexOf(ld)) : ld.blendKeys; return !!(keys && keys.length);
   }
   function handleRevealAnimatedShortcut() {
     if (state.appMode !== 'motion') return false;
@@ -3665,9 +3665,12 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     for (var k = 0; k < chain.length; k++) pt = transformSegments(pt, chain[k].pivot, chain[k].mat);
     return pt[0].point;
   }
+  // #2372 U12: Parent A on a native project is the adapter's native edit (timeline.js menus, pickwhip, cell right-click); Parent B,
+  // Follow Path and Parent in Time have no native owner, and none of these legacy setters may write a layer row there.
   function setLayerParent(li, parentUid) {
     var ld = state.layers[li];
     if (!ld) return;
+    if (window.nativeLayerParent && window.nativeLayerParent()) { if (window.showToast) showToast('Parent A is not available on a native project yet.'); return; }
     // Mirrors setLayerParentB's own guard below — the context menu already
     // disables "Parent A : X (déjà Parent B)", but the pickwhip drag (still
     // Parent-A-only) calls straight through to this function and bypassed
@@ -3723,6 +3726,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   function setLayerParentB(li, parentUid) {
     var ld = state.layers[li];
     if (!ld) return;
+    if (window.nativeLayerParent && window.nativeLayerParent()) { if (window.showToast) showToast('Parent B is not available on a native project yet.'); return; }
     if (parentUid && parentUid === ld.parentLayerUid) {
       if (window.showToast) showToast(SM.t('toastParentBMustDifferFromA'));
       return;
@@ -3742,6 +3746,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   function setLayerFollowPath(li, targetUid) {
     var ld = state.layers[li];
     if (!ld) return;
+    var natP = window.nativeLayerParent && window.nativeLayerParent();
+    if (natP) { natP.api.followPathSet(window, natP.adapter, li, targetUid || null, function () { renderLayerList(); renderTimeline(); }); return; }
     if (!targetUid) { ld.followPath = null; if (window.SMEngineBridge) SMEngineBridge.renderNow(); return; }
     if (targetUid === ensureLayerUid(ld)) return; // can't follow itself
     ld.followPath = { targetLayerUid: targetUid, align: (ld.followPath && ld.followPath.align) || false };
@@ -7751,14 +7757,17 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     // still what most other consumers of ld.blendMode read, see
     // layerBlendModeAt's own comment), ON seeds a single key at the
     // playhead with whatever mode was showing.
-    var keyed = !!(ld.blendKeys && ld.blendKeys.length);
-    var hasKeyHere = keyed && ld.blendKeys.some(function (k) { return k.frame === state.currentFrame; });
+    var nb = window.nativeCompositing && nativeCompositing(); // #2257: a native project keeps the keys in the engine
+    var keyed = nb ? nb.blendKeysOf(li).length > 0 : !!(ld.blendKeys && ld.blendKeys.length);
+    var hasKeyHere = keyed && (nb ? nb.blendKeysOf(li) : ld.blendKeys).some(function (k) { return k.frame === state.currentFrame; });
     var sw = document.createElement('div');
     sw.className = 'lico motion-stopwatch' + (keyed ? ' on' : '');
     sw.title = stopwatchTitle('motionAnimateProp', keyed, hasKeyHere);
     sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
     sw.addEventListener('click', function (e) {
-      e.stopPropagation(); pushUndo();
+      e.stopPropagation();
+      if (nb) { nb.toggleBlendStopwatch(li, state.currentFrame).then(nativeCompositingRefresh, nativeCompositingRefused); return; }
+      pushUndo();
       if (!keyed) {
         ld.blendKeys = [{ frame: state.currentFrame, mode: ld.blendMode || 'normal' }];
       } else if (hasKeyHere) {
@@ -7785,7 +7794,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     label.textContent = SM.t('fieldBlend'); label.style.minWidth = '70px';
     row.appendChild(label);
     var pill = document.createElement('div');
-    var mode = layerBlendModeAt(li, state.currentFrame) || 'normal';
+    var mode = (nb ? nb.blendOf(li, state.currentFrame) : layerBlendModeAt(li, state.currentFrame)) || 'normal';
     pill.className = 'lparent motion-parent-pill' + (mode === 'normal' ? ' none' : '');
     var lab = document.createElement('span'); lab.className = 'mp-label';
     lab.textContent = (typeof BLEND_MODE_LABELS !== 'undefined' && BLEND_MODE_LABELS[mode]) || mode;
@@ -8488,6 +8497,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   function setLayerTimeLink(li, targetIdx, mode, srcAnchor) {
     var ld = state.layers[li], src = state.layers[targetIdx];
     if (!ld || !src || targetIdx === li) return false;
+    var natP = window.nativeLayerParent && window.nativeLayerParent();
+    if (natP) { natP.api.timeLinkSet(window, natP.adapter, li, targetIdx, mode || 'both', srcAnchor, function () { renderLayerList(); renderTimeline(); }); return true; }
     if (timeLinkWouldCycle(li, targetIdx)) { if (window.showToast) showToast(SM.t('toastLinkImpossibleCycle')); return false; }
     pushUndo();
     mode = mode || 'both';
@@ -10398,10 +10409,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // entries, so the marker row only needs a frame list, not a full
   // property/holder pair the way renderTracksFor's generic numeric-track
   // machinery expects. Click navigates to that frame (same as every other
-  // keyframe row's left-click); right-click removes it. No drag-to-retime
-  // in v1 — unlike Position/Path, neither Blend nor Parent benefit from a
-  // "move several keys together" gesture, since each row here is its own
-  // single, independent track.
+  // keyframe row's left-click); right-click removes it. Drag retimes the selection.
   // feedback #214 ("impossible de select et déplacer des keyframes de
   // parent et blend et si j'essaye de faire une selection... et touche
   // supp ça fait bug l'app") — this row's diamonds used to only navigate
@@ -10422,6 +10430,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // — none of that cares what prop string it's given, so extending
   // trackFor (below) to resolve 'blendKeys'/'parentKeys' is the one piece
   // that makes all of it work for these rows too, unmodified.
+  // #2257: on a native project the Blend keys live in the engine; the grid adapter hands out stable key objects and commits gestures.
+  function nativeBlendGrid() { var c = window.nativeCompositing && nativeCompositing(), g = window.NemoNativeBlendKeyGrid; return c && g ? g.desktop(window, c) : null; }
   function renderDiscreteKeyGridRow(grid, holder, prop, label, keys, removeAt) {
     // 'motion-group-row' is kept because the key-selection machinery finds
     // this row by that class (applyMarqueeSelection and the Shift-range
@@ -10437,6 +10447,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     // the geometry matches the panel again — CLAUDE.md §11.
     var row = document.createElement('div'); row.className = 'frow motion-group-row motion-discrete-row';
     row._smHolder = holder; row._smProp = prop;
+    var nbg = prop === 'blendKeys' && nativeBlendGrid();
     var byFrame = {};
     keys.forEach(function (k) { byFrame[k.frame] = k; });
     for (var fi = 0; fi < state.totalFrames; fi++) {
@@ -10494,7 +10505,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
               renderTimeline();
               return;
             }
-            pushUndo();
+            if (!nbg) pushUndo(); // a native Blend key is written by the engine on release (one history entry), never by the legacy checkpoint
             if (isKeySelected(holder, prop, k)) {
               // Already part of the current selection — drag the WHOLE
               // group together, same convention a numeric row's own
@@ -10520,7 +10531,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
             if (!window.showContextMenu) return;
             window.showContextMenu(e.clientX, e.clientY, [
               { label: SM.t('ctxDeleteThisKey'), action: function () {
-                pushUndo();
+                if (!nbg) pushUndo();
                 removeAt(frame);
                 setKeySel(_motionKeySel.filter(function (s) { return !(s.holder === holder && s.prop === prop && s.key === k); }));
                 renderLayerList(); renderTimeline();
@@ -11153,7 +11164,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
       // alignment invariant.
       // Same gate as the panel half (discreteRowVisible) — §11.
       if (discreteRowVisible(ld, 'parent')) renderDiscreteKeyGridRow(grid, ld, 'parentKeys', SM.t('fieldParent') || 'Parent', ld.parentKeys || [], function (frame) { SMMotion.removeParentKeyAt(ld, frame); });
-      if (discreteRowVisible(ld, 'blend')) renderDiscreteKeyGridRow(grid, ld, 'blendKeys', SM.t('fieldBlend'), ld.blendKeys || [], function (frame) { SMMotion.removeBlendKeyAt(ld, frame); });
+      var nbk = window.nativeCompositing && nativeCompositing(); // #2257: the native keys, removed natively
+      if (discreteRowVisible(ld, 'blend')) renderDiscreteKeyGridRow(grid, ld, 'blendKeys', SM.t('fieldBlend'), (trackFor(ld, 'blendKeys') || { keys: [] }).keys, function (frame) { if (nbk) nbk.removeBlendKey(li, frame).then(nativeCompositingRefresh, nativeCompositingRefused); else SMMotion.removeBlendKeyAt(ld, frame); });
       if (showsGroupHeader()) {
         // 'motion-group-row' too, not just 'frow' (2026-07-30 fix, Cyril:
         // "encore des problème de calage d'ui"): .motion-group-row carries
@@ -13097,6 +13109,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     window._motionKeyDrag = null;
     clearMotionSnapGuide();
     flushMotionDragTimelineRender();
+    var nbgDrag = nativeBlendGrid(); if (nbgDrag && nbgDrag.commitDrag(dragged)) return; // native Blend keys: one engine edit per layer
     // Second half of the #774 fix: retiming a Time Remap key changes which
     // source frame the playhead exposes just as much as retyping its value
     // does, and renderNow alone can't show it — the video's frame sync and
@@ -13900,6 +13913,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     copySelectedKeys: copySelectedKeys,
     pasteKeys: pasteKeys,
     hasKeySelection: hasKeySelection,
+    keySelection: function () { return _motionKeySel; }, setKeySelection: function (sel) { setKeySel(sel); },
     hasKeyClipboard: hasKeyClipboard,
   };
   if (window.NemoNativeOpacityMotionSurface) window.SMMotion = window.NemoNativeOpacityMotionSurface.publishWriters(window.SMMotion, function (kind) { return n20AllowLegacyWrite(kind); });
@@ -13911,6 +13925,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     var modes=['all','animated','modified','expressions','errors','effects','mattes'];
     ui.bindMotion(window,binding.createOrdinary(window,{
       labelProperty:function(property){return PROP_LABEL[property]||property;},
+      dimLabels:function(property){return typeof PROP_DIM_LABELS==='object'&&PROP_DIM_LABELS&&PROP_DIM_LABELS[property]||null;},
       readPreference:function(key){return key==='nemo-motion-filter'?_motionFilterMode:null;},
       writePreference:function(key,value){if(key!=='nemo-motion-filter'||modes.indexOf(value)<0)return;_motionFilterMode=value;try{localStorage.setItem(key,value);}catch(_){}},
       acceptsTarget:function(event){

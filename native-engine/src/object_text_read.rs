@@ -39,6 +39,9 @@ enum Fields {
     Animators {
         #[serde(rename = "layerUid")]
         layer_uid: String,
+        /// #2267: the declared component whose layer holds the animators (absent = the scene).
+        #[serde(rename = "contextId", default)]
+        context_id: Option<String>,
         frame: f64,
         offset: u32,
         limit: u16,
@@ -84,16 +87,22 @@ fn unavailable() -> DispatchErrorCode {
 }
 impl ObjectSnapshot {
     fn text_target_valid(&self, target: &ObjectTarget) -> Result<(), DispatchErrorCode> {
-        if target.context_id != "scene-root" {
-            return Err(unavailable());
-        }
-        if !self.document().valid_target(target) || target.frame() >= self.document().total_frames()
-        {
+        // The scene or a declared component (a placed component paints its held text): the
+        // layers and frames are that context's own.
+        let (layers, total_frames) = if target.context_id == "scene-root" {
+            (self.document().layers(), self.document().total_frames())
+        } else {
+            let component = self
+                .document()
+                .component_set()
+                .and_then(|set| set.component(&target.context_id))
+                .ok_or_else(unavailable)?;
+            (component.layers(), component.total_frames())
+        };
+        if !self.document().valid_target(target) || target.frame() >= total_frames {
             return Err(invalid());
         }
-        if self
-            .document()
-            .layers()
+        if layers
             .iter()
             .filter(|l| l.layer_uid() == target.layer_uid())
             .count()
@@ -136,19 +145,32 @@ impl ObjectSnapshot {
         match s.view.0 {
             Fields::Animators {
                 layer_uid,
+                context_id,
                 frame,
                 offset,
                 limit,
             } => {
-                let layer = self
-                    .document()
-                    .layers()
+                let context = context_id.as_deref().unwrap_or("scene-root");
+                if context.is_empty() {
+                    return Err(invalid());
+                }
+                // A declared component's layers and frame count are its own; an undeclared context is not a target.
+                let (layers, total_frames) = if context == "scene-root" {
+                    (self.document().layers(), self.document().total_frames())
+                } else {
+                    self.document()
+                        .component_set()
+                        .and_then(|set| set.component(context))
+                        .map(|c| (c.layers.as_slice(), c.total_frames))
+                        .ok_or_else(invalid)?
+                };
+                let layer = layers
                     .iter()
                     .find(|l| l.layer_uid() == layer_uid)
                     .ok_or(NotFound)?;
                 if !frame.is_finite()
                     || frame < 0.0
-                    || frame >= f64::from(self.document().total_frames())
+                    || frame >= f64::from(total_frames)
                 {
                     return Err(invalid());
                 }
@@ -167,11 +189,14 @@ impl ObjectSnapshot {
                     .collect::<Vec<_>>();
                 #[cfg(not(feature="evaluation"))]
                 let facts=records.iter().map(|_|json!({"available":false,"reason":"native selector evaluation unavailable"})).collect::<Vec<_>>();
-                let text = serde_json::to_string(&json!({"animators":records,"selectors":facts,"hasText":entries.iter().any(|e|e.target.layer_uid()==layer_uid&&e.target.context_id()=="scene-root")}))
+                let text = serde_json::to_string(&json!({"animators":records,"selectors":facts,"hasText":entries.iter().any(|e|e.target.layer_uid()==layer_uid&&e.target.context_id()==context)}))
                     .map_err(|_| unavailable())?;
                 out["kind"] = json!("animators");
                 out["frame"] = json!(frame);
                 out["layerUid"] = json!(layer_uid);
+                if let Some(context) = &context_id {
+                    out["contextId"] = json!(context);
+                }
                 out["textBytes"] = json!(text.len());
                 chunk(&mut out, &text, offset, limit)?;
             }

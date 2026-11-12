@@ -5,6 +5,10 @@ mod object_history;
 #[cfg(feature = "project_media_codec")]
 pub use object_history::object_shot_kernels::native_import_transaction::session::ImportAssetSource;
 pub use object_history::NativeObjectHistory;
+// Whole-project reader for baseline project files; converts into the one native project wire and proves it admissible.
+#[cfg(feature = "project_media_codec")]
+#[path = "legacy_project_import/mod.rs"]
+pub mod legacy_project_import;
 #[cfg(feature = "project_media_codec")]
 pub use object_history::{InactiveProject, PreparedProjectReplacement};
 

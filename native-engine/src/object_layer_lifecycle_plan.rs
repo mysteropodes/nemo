@@ -61,13 +61,24 @@ pub(crate) trait LayerEditPolicy {
     fn permit(&self, op: LayerOp, layer: &ObjectLayer) -> Result<(), PolicyRefusal>;
 }
 
-/// The stand-in until F06 lands: every decision it is asked for is unavailable.
+/// A provider-less stand-in: every decision it is asked for is unavailable (kept for the kernel's policy tests).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct UnavailableLayerEditPolicy;
 
 impl LayerEditPolicy for UnavailableLayerEditPolicy {
     fn permit(&self, _op: LayerOp, _layer: &ObjectLayer) -> Result<(), PolicyRefusal> {
         Err(PolicyRefusal::Unavailable)
+    }
+}
+
+/// The baseline policy: `deleteLayer`, `duplicateLayer` and `reorderLayersAtGap` (1065e9d8) never gated a lock or a
+/// transform parent, so every decision is permitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BaselineLayerEditPolicy;
+
+impl LayerEditPolicy for BaselineLayerEditPolicy {
+    fn permit(&self, _op: LayerOp, _layer: &ObjectLayer) -> Result<(), PolicyRefusal> {
+        Ok(())
     }
 }
 
@@ -87,6 +98,28 @@ pub(crate) enum LifecycleError {
     RevisionOutOfRange,
     IdUnavailable,
     TooManyLayers,
+    /// #2372 U12: a layer cannot be its own parent.
+    ParentSelf(String),
+    /// #2372 U12: the parent would sit below the layer in its own chain.
+    ParentCycle {
+        layer_uid: String,
+        parent_uid: String,
+    },
+    /// #2372 U12: folders and the layers outside the edited context are not parents.
+    ParentRefused(String),
+    /// #2372 U12: keeping the world pose is not exactly computable; the reason is a fixed phrase.
+    PoseUnavailable(&'static str),
+    /// #2372: a layer cannot take its own time or follow its own path.
+    LinkSelf(String),
+    /// #2372: the source's time-link chain already runs through the layer.
+    LinkCycle {
+        layer_uid: String,
+        source_uid: String,
+    },
+    /// #2372: the link names a target the baseline menu would not list (context, kind, document version, mode).
+    LinkRefused(&'static str),
+    /// #2372: the range to seed or bake is not exactly computable; the reason is a fixed phrase.
+    LinkUnavailable(&'static str),
     Policy {
         op: LayerOp,
         layer_uid: String,

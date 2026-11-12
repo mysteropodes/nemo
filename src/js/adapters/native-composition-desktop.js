@@ -51,7 +51,7 @@
     }
     async function refresh(expected){
       cache=null;var stamp=capture();if(expected&&!same(expected,stamp.info))throw fault('stale_revision');
-      var data=await stamp.session.runResourceCommand(async function(ctx){
+      var data=await (stamp.session.runResourceQuery || stamp.session.runResourceCommand).call(stamp.session, async function(ctx){
         var settings=await query(stamp,ctx,{kind:'settings'}),items=[],cursor=0;
         do {
           var page=await query(stamp,ctx,{kind:'markerPage',cursor:cursor,limit:16});

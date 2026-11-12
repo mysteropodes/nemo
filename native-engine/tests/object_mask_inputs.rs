@@ -67,6 +67,8 @@ fn document() -> Value {
         "properties":[{"property":"position","static":[7,-3]}]}]);
     v
 }
+#[path = "object_mask_hit_listing.rs"]
+mod hit_listing;
 fn scene(s: &ObjectSnapshot) -> ObjectRenderScene {
     let p = prepare_object_frame(s, &pins(s, 7)).unwrap();
     prepare_object_render_scene(&p, &pins(s, 7)).unwrap()

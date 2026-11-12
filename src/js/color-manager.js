@@ -34,7 +34,31 @@
     map[key].count++;
   }
 
+  // Native object project (#2372 insp-recolour): the document is the engine's, so the panel reads the colours the engine LISTED for the selected items
+  // and recolours them as one native restyle batch; there is no Paper item to read, no pushUndo (it refuses a native project) and no layer-wide write.
+  function nativeSelection() { return window.NemoNativeSelectionStyle && window.NemoNativeSelectionStyle.native(window) ? window.NemoNativeSelectionStyle : null; }
+  function nativeToast(text) { if (window.showToast) showToast(text); }
+  function nativeColors(A) {
+    var listed = A.colours(window);
+    if (listed) return listed;
+    var map = {};
+    if (window.state && state.canvasBg) addColor(map, state.canvasBg); // the one project colour a native project can still change without a selection
+    return Object.keys(map).map(function (k) { return map[k]; });
+  }
+  // Returns the commit's promise when a selection recolour was handed to the engine (the row then moves on, see recolorRow), else null.
+  function nativeRecolor(A, oldHex, newHex) {
+    if (window.selectedPaths && selectedPaths.length) {
+      if (!A.handles(window)) { nativeToast('Recolouring is not available right now.'); return null; }
+      return A.applyRecolor(window, oldHex, newHex);
+    }
+    if (window.state && state.canvasBg && state.canvasBg.toUpperCase() === oldHex.toUpperCase() && window.SM && SM.setCanvasBg) { SM.setCanvasBg(newHex); return null; }
+    nativeToast('Select the items to recolour \u2014 recolouring a whole layer is not available on native projects yet.');
+    return null;
+  }
+
   function computeUsedColors() {
+    var A = nativeSelection();
+    if (A) return nativeColors(A);
     var map = {};
     if (window.selectedPaths && selectedPaths.length) {
       selectedPaths.forEach(function (p) {
@@ -87,6 +111,8 @@
   // selection if one exists, project-wide (persisted data + every live
   // on-canvas layer) otherwise.
   function recolorColor(oldHex, newHex) {
+    var A = nativeSelection();
+    if (A) return nativeRecolor(A, oldHex, newHex);
     pushUndo();
     var oldNorm = oldHex.toUpperCase();
     if (window.selectedPaths && selectedPaths.length) {
@@ -191,7 +217,7 @@
       // the popover is open (first draft copied the guard reflexively and
       // the row's text visibly lagged the swatch during a picker drag).
       window.ColorPicker.open(sw, row.dataset.hex, function (newHex) {
-        recolorColor(row.dataset.hex, newHex);
+        recolorRow(newHex);
       });
     });
     var hexInput = document.createElement('input');
@@ -202,6 +228,16 @@
     var selBtn = document.createElement('div'); selBtn.className = 'lico color-select-btn'; selBtn.title = SM.t('colorSelectShapes');
     selBtn.innerHTML = ICON_CROSSHAIR;
 
+    // One recolour from this row. On a legacy project recolorColor re-renders the panel before it returns, so the row already shows the new colour. On a
+    // native project the edit is pending until its debounced commit re-reads the selection, so the row moves its from-colour (and its swatch) to the colour it
+    // just sent, as baseline 1065e9d8 did: the next event of the same drag or scrub then starts from it and still matches, after the first commit as well.
+    // A recolour that did not go through, or whose commit did not apply, puts the row back to what the selection really holds.
+    function recolorRow(newHex) {
+      var sent = recolorColor(row.dataset.hex, newHex);
+      if (!sent || typeof sent.then !== 'function') return;
+      updateColorRow(row, { hex: newHex });
+      sent.then(function (r) { if (!r || r.status !== 'applied') updateSelectedColorsPanelIfVisible(); }, function () { updateSelectedColorsPanelIfVisible(); });
+    }
     // `row.dataset.liveEditing` brackets the recolorColor() call so that
     // the NESTED render it triggers (recolorColor -> updateUI ->
     // renderSelectedColorsPanel -> updateColorRow, all synchronous) knows
@@ -211,7 +247,7 @@
       var parsed = window.parseHexInput ? parseHexInput(this.value) : null;
       if (!parsed) { this.value = hexDisplayValue(row.dataset.hex); return; }
       row.dataset.liveEditing = 'hex';
-      recolorColor(row.dataset.hex, parsed);
+      recolorRow(parsed);
       row.dataset.liveEditing = '';
     });
     hexInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') this.blur(); });
@@ -220,7 +256,7 @@
       var rgb = row.dataset.hex.replace('#', '').slice(0, 6);
       var a = Math.round(p / 100 * 255).toString(16).padStart(2, '0');
       row.dataset.liveEditing = 'opacity';
-      recolorColor(row.dataset.hex, '#' + rgb + (p < 100 ? a : ''));
+      recolorRow('#' + rgb + (p < 100 ? a : ''));
       row.dataset.liveEditing = '';
     });
     selBtn.addEventListener('click', function () { selectPathsWithColor(row.dataset.hex); });
@@ -327,6 +363,8 @@
     }
     _hadSel = hasSelNow;
   }
+
+  window.NemoSelectedColors = { computeUsedColors: computeUsedColors, recolorColor: recolorColor };
 
   function init() {
     var sec = document.getElementById('selected-colors-sec');

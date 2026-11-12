@@ -1,0 +1,415 @@
+//! Closed subselect intents and immutable geometry pages on the existing object routes.
+use crate::native_contract::{exact, revision};
+use serde_json::Value;
+pub(crate) const EDIT: &str = "command.document.object.subselect.edit";
+pub(super) fn view_request(p: &Value) -> bool {
+    let v = &p["view"];
+    exact(p, &["atRevision", "documentSnapshotId", "view"], &[]).is_some()
+        && revision(p.get("atRevision")).is_some()
+        && p["documentSnapshotId"]
+            .as_str()
+            .is_some_and(|s| !s.is_empty())
+        && exact(
+            v,
+            &[
+                "kind",
+                "contextId",
+                "layerUid",
+                "frame",
+                "workId",
+                "viewGeneration",
+                "cursor",
+                "limit",
+            ],
+            &["preview", "hitTest"],
+        )
+        .is_some()
+        // #2362: a hit-test listing (every painted record with bounds and role) never carries a preview.
+        && v.get("hitTest").is_none_or(|h| h == true && v.get("preview").is_none())
+        && v.get("preview").is_none_or(|p| {
+            exact(p, &["stableTarget", "intent"], &[]).is_some()
+                && super::target(&p["stableTarget"])
+                && intent(&p["intent"])
+        })
+        && v["kind"] == "subselect"
+        && crate::native_contract::vector::context(&v["contextId"])
+        && v["layerUid"].as_str().is_some_and(|s| !s.is_empty())
+        && v["workId"]
+            .as_str()
+            .is_some_and(crate::contract::bounded_identifier)
+        && v["frame"]
+            .as_u64()
+            .is_some_and(|n| n <= u64::from(u32::MAX))
+        && revision(v.get("viewGeneration")).is_some_and(|n| n > 0)
+        && v["cursor"].as_u64().is_some_and(|n| n <= 1024)
+        && v["limit"].as_u64().is_some_and(|n| (1..=8).contains(&n))
+}
+pub(super) fn view_result(document_id: &str, p: &Value, r: &Value) -> bool {
+    if !view_request(p)
+        || exact(
+            r,
+            &[
+                "kind",
+                "atRevision",
+                "documentSnapshotId",
+                "contextId",
+                "layerUid",
+                "frame",
+                "workId",
+                "viewGeneration",
+                "cursor",
+                "total",
+                "nextCursor",
+                "items",
+                "preview",
+            ],
+            &["hitTest", "layerMatrix"],
+        )
+        .is_none()
+        || r["preview"].as_bool() != Some(p["view"].get("preview").is_some())
+        || r.get("hitTest").is_some() != p["view"].get("hitTest").is_some()
+        || r.get("hitTest").is_some_and(|h| h != true)
+        // The layer's own pose (Motion and parent chain) rides a hit-test listing only: six finite numbers, never singular.
+        || r.get("layerMatrix").is_some_and(|m| r.get("hitTest").is_none() || !m.as_array().is_some_and(|m| {
+            m.len() == 6 && m.iter().all(|v| v.as_f64().is_some_and(f64::is_finite)) && {
+                let n: Vec<f64> = m.iter().filter_map(serde_json::Value::as_f64).collect();
+                (n[0] * n[3] - n[1] * n[2]).abs() >= 1e-12
+            }
+        }))
+        || r["atRevision"] != p["atRevision"]
+        || r["documentSnapshotId"] != p["documentSnapshotId"]
+        || r["documentSnapshotId"].as_str()
+            != Some(format!("native-object:{document_id}:{}", p["atRevision"]).as_str())
+        || [
+            "kind",
+            "contextId",
+            "layerUid",
+            "frame",
+            "workId",
+            "viewGeneration",
+            "cursor",
+        ]
+        .iter()
+        .any(|k| r[*k] != p["view"][*k])
+    {
+        return false;
+    }
+    let Some(total) = r["total"].as_u64().filter(|n| *n <= 1024) else {
+        return false;
+    };
+    let Some(items) = r["items"].as_array() else {
+        return false;
+    };
+    let cursor = r["cursor"].as_u64().unwrap();
+    let end = cursor + items.len() as u64;
+    end <= total
+        // A page may be shorter than the limit: the engine shortens it to fit the byte cap, and nextCursor follows the items sent.
+        && items.len() as u64 <= (total - cursor).min(p["view"]["limit"].as_u64().unwrap())
+        && (end == total || !items.is_empty())
+        && (if end == total {
+            r["nextCursor"].is_null()
+        } else {
+            r["nextCursor"].as_u64() == Some(end)
+        })
+        && items.iter().all(|i| {
+            let hit = r.get("hitTest").is_some();
+            exact(
+                i,
+                &["stableTarget", "closed", "count", "matrix"],
+                if hit { &["bounds", "role", "filled", "strokeWidth", "owner", "brush", "group", "boxAngle", "xformAnchorKey", "xformAnchorCustom", "style", "paramShape", "groupPath", "vertexOffsets"] } else { &["paintCount"] },
+            )
+            .is_some()
+                && (!hit
+                    || (i["bounds"].as_array().is_some_and(|b| {
+                        b.len() == 4 && b.iter().all(|v| v.as_f64().is_some_and(f64::is_finite))
+                    }) && ["plain", "ribbon", "fill", "shape", "brush", "raster", "text", "mask"].contains(&i["role"].as_str().unwrap_or(""))
+                        && i.get("role").is_some()
+                        && i["filled"].is_boolean()
+                        && i.get("strokeWidth").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w >= 0.0))
+                        && i.get("boxAngle").is_none_or(|a| a.as_f64().is_some_and(f64::is_finite))
+                        && i.get("xformAnchorKey").is_none_or(|k| k.as_str().is_some_and(|k| ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"].contains(&k)))
+                        && i.get("xformAnchorCustom").is_none_or(|p| p.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(|v| v.as_f64().is_some_and(f64::is_finite))))
+                        && i.get("style").is_none_or(listed_style)
+                        && i.get("paramShape").is_none_or(listed_param_shape)
+                        && i.get("groupPath").is_none_or(listed_group_path)
+                        && i.get("vertexOffsets").is_none_or(|o| {
+                            o.as_array().is_some_and(|o| {
+                                Some(o.len() as u64) == i["count"].as_u64()
+                                    && o.iter().all(|p| p.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(|v| v.as_f64().is_some_and(f64::is_finite))))
+                            })
+                        })
+                        && i.get("bounds").is_some()
+                        && i.get("owner").is_none_or(|o| i["role"] == "fill" && o.as_str().is_some_and(|s| !s.is_empty()))
+                        && i.get("brush").is_none_or(|b| ["anchor", "copy", "bitmap"].contains(&b.as_str().unwrap_or("")))
+                        && i.get("group").is_none_or(|g| i.get("brush").is_some() && g.as_str().is_some_and(|s| !s.is_empty()))))
+                && super::view_target(&i["stableTarget"])
+                && i["stableTarget"]["contextId"] == r["contextId"]
+                && i["stableTarget"]["layerUid"] == r["layerUid"]
+                && i["closed"].is_boolean()
+                && i["count"].as_u64().is_some_and(|n| n <= 256)
+                && i.get("paintCount").is_none_or(|n| {
+                    i["closed"] == false && n.as_u64().is_some_and(|n| (2..=256).contains(&n))
+                })
+                && i["matrix"].as_array().is_some_and(|m| {
+                    m.len() == 6 && m.iter().all(|v| v.as_f64().is_some_and(f64::is_finite)) && {
+                        let det = m[0].as_f64().unwrap() * m[3].as_f64().unwrap()
+                            - m[1].as_f64().unwrap() * m[2].as_f64().unwrap();
+                        det.is_finite() && det.abs() >= 1e-12
+                    }
+                })
+        })
+}
+fn index(v: &Value) -> bool {
+    v.as_u64().is_some_and(|n| n < 256)
+}
+fn point(v: &Value) -> bool {
+    v.as_array()
+        .is_some_and(|a| a.len() == 2 && a.iter().all(|n| n.as_f64().is_some_and(f64::is_finite)))
+}
+fn indices(v: &Value) -> bool {
+    v.as_array().is_some_and(|a| {
+        !a.is_empty()
+            && a.len() <= 256
+            && a.iter().all(index)
+            && a.iter().enumerate().all(|(i, n)| !a[..i].contains(n))
+    })
+}
+pub(super) fn intent(v: &Value) -> bool {
+    let (required, valid): (&[&str], bool) = match v["kind"].as_str() {
+        Some("move") => (
+            &["kind", "indices", "delta"],
+            indices(&v["indices"]) && point(&v["delta"]),
+        ),
+        Some("scale") => (
+            &["kind", "indices", "scale", "anchor"],
+            indices(&v["indices"]) && point(&v["scale"]) && point(&v["anchor"]),
+        ),
+        Some("rotate") => (
+            &["kind", "indices", "degrees", "center"],
+            indices(&v["indices"])
+                && v["degrees"].as_f64().is_some_and(f64::is_finite)
+                && point(&v["center"]),
+        ),
+        Some("pointType") => (
+            &["kind", "indices", "pointType"],
+            indices(&v["indices"])
+                && matches!(
+                    v["pointType"].as_str(),
+                    Some("corner" | "smooth" | "symmetric" | "collapse")
+                ),
+        ),
+        Some("handle") => (
+            &["kind", "index", "handle", "point", "breakPair"],
+            index(&v["index"])
+                && matches!(v["handle"].as_str(), Some("handleIn" | "handleOut"))
+                && point(&v["point"])
+                && v["breakPair"].is_boolean()
+                && v.get("pairedPoint")
+                    .is_none_or(|p| v["breakPair"] == true && point(p)),
+        ),
+        Some("toggle") => (&["kind", "index"], index(&v["index"])),
+        Some("insert") => (
+            &["kind", "curve", "time"],
+            index(&v["curve"])
+                && v["time"]
+                    .as_f64()
+                    .is_some_and(|t| (1e-8..=1.0 - 1e-8).contains(&t)),
+        ),
+        Some("delete") => (&["kind", "indices"], indices(&v["indices"])),
+        _ => return false,
+    };
+    let optional: &[&str] = if v["kind"] == "handle" {
+        &["pairedPoint"]
+    } else {
+        &[]
+    };
+    valid && exact(v, required, optional).is_some()
+}
+pub(crate) fn edit_request(v: &Value) -> bool {
+    exact(v, &["command", "stableTarget", "intent"], &["atFrame"]).is_some()
+        && v["command"] == "object.subselect.edit"
+        // #2356: the record's own context (the scene root, or the id of a component context the native owner declares).
+        && super::view_target(&v["stableTarget"])
+        && intent(&v["intent"])
+        && v.get("atFrame")
+            .is_none_or(|n| n.as_u64().is_some_and(|n| n <= u64::from(u32::MAX)))
+}
+pub(super) fn request(v: &Value) -> bool {
+    exact(
+        v,
+        &[
+            "atRevision",
+            "documentSnapshotId",
+            "stableTarget",
+            "subselect",
+        ],
+        &[],
+    )
+    .is_some()
+        && revision(v.get("atRevision")).is_some()
+        && v["documentSnapshotId"]
+            .as_str()
+            .is_some_and(|s| !s.is_empty())
+        && super::view_target(&v["stableTarget"])
+        && exact(&v["subselect"], &["cursor", "limit"], &["preview", "paint", "hitTest", "center"]).is_some()
+        // #2362 sculpt: `center` reads a ribbon's centreline and widths, on a hit-test read only.
+        && v["subselect"].get("center").is_none_or(|c| c == true && v["subselect"]["hitTest"] == true)
+        // #2362: hit-test geometry is the painted outline of any record, never with a preview or the paint mode.
+        && v["subselect"].get("hitTest").is_none_or(|h| {
+            h == true && v["subselect"].get("preview").is_none() && v["subselect"].get("paint").is_none()
+        })
+        && v["subselect"]["cursor"].as_u64().is_some_and(|n| n <= 256)
+        && v["subselect"]["limit"]
+            .as_u64()
+            .is_some_and(|n| (1..=16).contains(&n))
+        && v["subselect"].get("preview").is_none_or(intent)
+        && v["subselect"]
+            .get("paint")
+            .is_none_or(|p| p.as_bool() == Some(true))
+}
+pub(super) fn result(document_id: &str, p: &Value, r: &Value) -> bool {
+    if !request(p)
+        || exact(r, &["atRevision", "documentSnapshotId", "subselect"], &[]).is_none()
+        || r["atRevision"] != p["atRevision"]
+        || r["documentSnapshotId"] != p["documentSnapshotId"]
+        || r["documentSnapshotId"].as_str()
+            != Some(format!("native-object:{document_id}:{}", p["atRevision"]).as_str())
+    {
+        return false;
+    }
+    let s = &r["subselect"];
+    if exact(
+        s,
+        &[
+            "stableTarget",
+            "closed",
+            "total",
+            "cursor",
+            "nextCursor",
+            "segments",
+            "preview",
+        ],
+        &["paint", "hitTest", "center", "widths", "pointTypes"],
+    )
+    .is_none()
+        || s.get("hitTest").is_some() != p["subselect"].get("hitTest").is_some()
+        || s.get("center").is_some() != p["subselect"].get("center").is_some()
+        || s.get("center").is_some_and(|c| c != true)
+        || s.get("widths").is_some() != s.get("center").is_some()
+        || s.get("widths").is_some_and(|w| {
+            !w.as_array().is_some_and(|w| w.len() == s["segments"].as_array().map_or(usize::MAX, Vec::len)
+                && w.iter().all(|v| v.as_f64().is_some_and(f64::is_finite)))
+        })
+        // #2356: the plain editable read lists the type each vertex shows, one per segment, never on a paint/hit-test/centreline page.
+        || s.get("pointTypes").is_some_and(|t| {
+            s.get("paint").is_some()
+                || s.get("hitTest").is_some()
+                || !t.as_array().is_some_and(|t| {
+                    t.len() == s["segments"].as_array().map_or(usize::MAX, Vec::len)
+                        && t.iter().all(|v| matches!(v.as_str(), Some("corner" | "smooth" | "symmetric")))
+                })
+        })
+        || s.get("hitTest").is_some_and(|h| h != true)
+        || s["stableTarget"] != p["stableTarget"]
+        || !s["closed"].is_boolean()
+        || s.get("paint").is_some() != p["subselect"].get("paint").is_some()
+        || s.get("paint")
+            .is_some_and(|paint| paint.as_bool() != Some(true) || s["closed"] != true)
+        || s["cursor"] != p["subselect"]["cursor"]
+        || s["preview"].as_bool() != Some(p["subselect"].get("preview").is_some())
+    {
+        return false;
+    }
+    let Some(total) = s["total"].as_u64().filter(|n| *n <= 256) else {
+        return false;
+    };
+    let Some(items) = s["segments"].as_array() else {
+        return false;
+    };
+    let end = s["cursor"].as_u64().unwrap() + items.len() as u64;
+    end <= total
+        && items.len() as u64
+            == (total - s["cursor"].as_u64().unwrap())
+                .min(p["subselect"]["limit"].as_u64().unwrap())
+        && (if end == total {
+            s["nextCursor"].is_null()
+        } else {
+            s["nextCursor"].as_u64() == Some(end)
+        })
+        && items.iter().all(|a| {
+            exact(a, &["point", "handleIn", "handleOut"], &[]).is_some()
+                && ["point", "handleIn", "handleOut"]
+                    .iter()
+                    .all(|k| point(&a[*k]))
+        })
+}
+
+#[cfg(test)]
+#[path = "native_subselect_contract_tests.rs"]
+mod tests;
+
+/// #2372: the style a panel shows for a listed item, each member optional: hex `fill` / `stroke`, a positive `width`, an `opacity` in 0..1,
+/// and (SEL-STYLE2) the stroke details `cap`, `join`, `miter`, `dashOffset`, `paintOrder`, `strokeStyle` and (INSP-READBACK) a texture anchor's `brushPreset`.
+fn listed_style(v: &Value) -> bool {
+    let hex = |s: &Value| s.as_str().and_then(|s| s.strip_prefix('#')).is_some_and(|d| [6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()));
+    let one_of = |s: &Value, set: &[&str]| s.as_str().is_some_and(|s| set.contains(&s));
+    let number = |n: &Value| n.as_f64().is_some_and(f64::is_finite);
+    exact(v, &[], &["fill", "stroke", "width", "opacity", "cap", "join", "miter", "dashOffset", "paintOrder", "strokeStyle", "brushPreset", "maskMode", "maskFeather", "fillGradient"]).is_some_and(|o| !o.is_empty())
+        && v.get("fill").is_none_or(hex)
+        && v.get("stroke").is_none_or(hex)
+        && v.get("width").is_none_or(|w| w.as_f64().is_some_and(|w| w.is_finite() && w > 0.0))
+        && v.get("opacity").is_none_or(|o| o.as_f64().is_some_and(|o| (0.0..=1.0).contains(&o)))
+        && v.get("cap").is_none_or(|c| one_of(c, &["butt", "round", "square"]))
+        && v.get("join").is_none_or(|j| one_of(j, &["miter", "round", "bevel"]))
+        && v.get("miter").is_none_or(|m| m.as_f64().is_some_and(|m| m.is_finite() && m >= 0.0))
+        && v.get("dashOffset").is_none_or(number)
+        && v.get("paintOrder").is_none_or(|p| one_of(p, &["fillFirst", "strokeFirst"]))
+        && v.get("strokeStyle").is_none_or(|s| one_of(s, &["solid", "dashed", "dotted"]))
+        && v.get("brushPreset").is_none_or(|p| p.as_str().is_some_and(|p| !p.is_empty() && p.len() <= 96))
+        && v.get("maskMode").is_none_or(|m| one_of(m, &["add", "subtract", "intersect"]))
+        && v.get("maskFeather").is_none_or(|f| f.as_f64().is_some_and(|f| f.is_finite() && f >= 0.0))
+        && v.get("fillGradient").is_none_or(listed_gradient)
+}
+
+/// #2372 native-fill-gradient: a record's stored two-stop gradient as listed (linear or radial, two finite record-space ends, two stops each
+/// with a finite offset and a `#rrggbb[aa]` colour), the body a `restyle` step's `fillGradient` takes back.
+fn listed_gradient(v: &Value) -> bool {
+    let number = |n: &Value| n.as_f64().is_some_and(|n| n.is_finite() && (n as f32).is_finite());
+    exact(v, &["kind", "from", "to", "stops"], &[]).is_some()
+        && v["kind"].as_str().is_some_and(|k| k == "linear" || k == "radial")
+        && ["from", "to"].iter().all(|k| v[*k].as_array().is_some_and(|p| p.len() == 2 && p.iter().all(number)))
+        && v["stops"].as_array().is_some_and(|stops| {
+            stops.len() == 2
+                && stops.iter().all(|s| {
+                    exact(s, &["offset", "color"], &[]).is_some()
+                        && number(&s["offset"])
+                        && s["color"].as_str().and_then(|c| c.strip_prefix('#')).is_some_and(|d| [3, 6, 8].contains(&d.len()) && d.bytes().all(|b| b.is_ascii_hexdigit()))
+                })
+        })
+}
+
+/// #2372: the `paramShape` a listed dynamic rectangle, ellipse or star carries: a `kind` and only the finite numeric members its kind owns
+/// (the generator `box` is never listed), the body `object.parametric.set` takes back.
+fn listed_param_shape(v: &Value) -> bool {
+    let members: &[&str] = match v.get("kind").and_then(Value::as_str) {
+        Some("rect") => &["tl", "tr", "br", "bl"],
+        Some("ellipse") => &["startAngle", "sweep", "innerRadius"],
+        Some("star") => &["pointCount", "innerRatio", "cornerRadius"],
+        _ => return false,
+    };
+    exact(v, &["kind"], members).is_some_and(|o| o.iter().all(|(k, n)| k == "kind" || n.as_f64().is_some_and(f64::is_finite)))
+}
+
+/// #2376: the `groupPath` of a listed record: one to four enclosing groups, outermost first, each a bounded `id` with an optional bounded
+/// `name`, an optional combine `mode` and nothing else (the Elements panel builds its tree from it).
+fn listed_group_path(v: &Value) -> bool {
+    v.as_array().is_some_and(|path| {
+        (1..=4).contains(&path.len())
+            && path.iter().all(|g| {
+                exact(g, &["id"], &["name", "mode"]).is_some()
+                    && g["id"].as_str().is_some_and(|id| !id.is_empty() && id.len() <= 128)
+                    && g.get("name").is_none_or(|n| n.as_str().is_some_and(|n| n.len() <= 256))
+                    && g.get("mode").is_none_or(|m| m.as_str().is_some_and(|m| ["none", "unite", "subtract", "intersect", "exclude"].contains(&m)))
+            })
+    })
+}

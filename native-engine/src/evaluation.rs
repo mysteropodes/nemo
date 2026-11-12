@@ -52,9 +52,11 @@ pub(crate) mod property_expression_runtime;
 #[allow(dead_code)]
 pub(crate) mod property_expression_views;
 // D28-K1: private contribution kernel over explicit resolved selector inputs.
-#[path = "property_follow_path_sample.rs"]
+pub(crate) use crate::object_document::property_follow_path_sample;
+// G16 option C (#2361): the baseline vector-brush dab stamper (presets, Paper dab geometry, seeded stamping walk).
+#[path = "brush_dab_core.rs"]
 #[allow(dead_code)]
-pub(crate) mod property_follow_path_sample;
+pub(crate) mod brush_dab;
 #[path = "property_projection_3d.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_projection_3d;
@@ -93,6 +95,8 @@ pub(crate) mod object_component_kernels;
 // (#2112), where the text block record is stored; this re-export keeps every `crate::evaluation::...` consumer path valid.
 #[allow(unused_imports)]
 pub(crate) use crate::object_document::object_text_layout_kernels;
+// #2372 A-image-text-flip-skew: the stored mirror / shear math of an image and a text block, reached by the render-scene layer through here.
+pub(crate) use crate::object_document::object_raster_asset_kernels::object_item_local_form;
 // L07-A (#2141): lane-7 typed scene/style family aggregator.
 #[path = "object_scene_style_kernels.rs"]
 #[allow(dead_code)]

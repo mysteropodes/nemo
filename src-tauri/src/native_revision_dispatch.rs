@@ -99,6 +99,7 @@ impl RevisionSync {
         let application = authority.active_mut(generation)?;
         if (request.operation == crate::application_mcp::font_source::IMPORT
             || is_image_import(&request)
+            || is_video_link(&request)
             || is_import_batch_sources(&request))
             && request
                 .payload
@@ -115,6 +116,8 @@ impl RevisionSync {
                         "native import batch lifecycle generation is stale"
                     } else if is_image_import(&request) {
                         "native image lifecycle generation is stale"
+                    } else if is_video_link(&request) {
+                        "native video lifecycle generation is stale"
                     } else {
                         "native font lifecycle generation is stale"
                     },
@@ -217,6 +220,10 @@ impl RevisionSync {
                 None => return Ok(None),
             },
             ResourcePhase::Image(phase) => match invoke_image(application, &request, phase)? {
+                Some(response) => response,
+                None => return Ok(None),
+            },
+            ResourcePhase::Video(phase) => match invoke_video(application, &request, phase)? {
                 Some(response) => response,
                 None => return Ok(None),
             },
@@ -369,6 +376,14 @@ mod property_edit_tests;
 mod property_bake_tests;
 
 #[cfg(test)]
+#[path = "native_property_expression_dispatch_tests.rs"]
+mod property_expression_tests;
+
+#[cfg(test)]
+#[path = "native_property_control_dispatch_tests.rs"]
+mod property_control_tests;
+
+#[cfg(test)]
 #[path = "native_image_mesh_binding_public_tests.rs"]
 mod image_mesh_binding_public_tests;
 
@@ -399,3 +414,19 @@ mod comments_tests;
 #[cfg(test)]
 #[path = "native_import_batch_dispatch_tests.rs"]
 mod import_batch_tests;
+
+#[cfg(test)]
+#[path = "native_key_lock_dispatch_tests.rs"]
+mod key_lock_tests;
+
+#[cfg(test)]
+#[path = "native_key_batch_dispatch_tests.rs"]
+mod key_batch_tests;
+
+#[cfg(test)]
+#[path = "native_key_warp_color_dispatch_tests.rs"]
+mod key_warp_color_tests;
+
+#[cfg(test)]
+#[path = "native_three_d_dispatch_tests.rs"]
+mod three_d_tests;

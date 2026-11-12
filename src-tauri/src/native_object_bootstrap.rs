@@ -39,9 +39,27 @@ pub(crate) use save::{
     nemo_native_object_save_as,
 };
 
+#[path = "native_object_recovery.rs"]
+mod recovery;
+#[allow(unused_imports)]
+pub(crate) use recovery::{
+    __cmd__nemo_native_object_recovery_discard, __cmd__nemo_native_object_recovery_list,
+    __cmd__nemo_native_object_recovery_quarantine, __cmd__nemo_native_object_recovery_write,
+    __tauri_command_name_nemo_native_object_recovery_discard,
+    __tauri_command_name_nemo_native_object_recovery_list,
+    __tauri_command_name_nemo_native_object_recovery_quarantine,
+    __tauri_command_name_nemo_native_object_recovery_write, nemo_native_object_recovery_discard,
+    nemo_native_object_recovery_list, nemo_native_object_recovery_quarantine,
+    nemo_native_object_recovery_write,
+};
+
 #[cfg(test)]
 #[path = "native_object_save_tests.rs"]
 mod save_tests;
+
+#[cfg(test)]
+#[path = "native_object_recovery_tests.rs"]
+mod recovery_tests;
 
 #[cfg(test)]
 #[path = "native_object_v2_persistence_tests.rs"]
@@ -52,8 +70,23 @@ mod v2_tests;
 mod project_tests;
 
 #[cfg(test)]
+#[path = "native_object_project_info_tests.rs"]
+mod project_info_tests;
+
+#[cfg(test)]
 #[path = "native_object_new_project_tests.rs"]
 mod new_project_tests;
+
+#[cfg(test)]
+#[path = "native_object_legacy_import_tests.rs"]
+mod legacy_import_tests;
+
+/// Installed once by the shell: converts the media of a baseline project the engine cannot read directly.
+pub(crate) fn install_legacy_media_transcoder(
+    transcoder: &'static dyn native_engine::history::legacy_project_import::MediaTranscoder,
+) {
+    reopen::install_transcoder(transcoder);
+}
 
 // This bounds the complete original wrapper, including escaped document bytes.
 const MAX_OBJECT_BOOTSTRAP_BYTES: usize = 1_048_576;
@@ -79,13 +112,22 @@ pub(crate) struct ObjectBootstrapReceipt {
     content_revision: u64,
     resource_count: usize,
     viewport_available: bool,
+    /// Present only when the file was a baseline project converted into this new document; carries the loss report.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    legacy_import: Option<serde_json::Value>,
 }
 
 /// A commit receipt, not a claim about a later UI, dispatch or presentation state.
+/// Every refusal here precedes the single atomic install, so it leaves the slot as it
+/// was and is reported not dispatched: the caller may retry instead of fencing (#2511).
 pub(crate) fn bootstrap_raw(
     state: &ApplicationMcp,
     request_json: &str,
 ) -> HostResult<ObjectBootstrapReceipt> {
+    raw_checked(state, request_json).map_err(reopen::not_dispatched)
+}
+
+fn raw_checked(state: &ApplicationMcp, request_json: &str) -> HostResult<ObjectBootstrapReceipt> {
     if let Some(request) = admission::new_request(request_json) {
         return admission::bootstrap_new(state, request);
     }
@@ -129,6 +171,14 @@ pub(super) fn bootstrap_file_bytes(
     request_id: String,
     bytes: &[u8],
 ) -> HostResult<ObjectBootstrapReceipt> {
+    file_bytes_checked(state, request_id, bytes).map_err(reopen::not_dispatched)
+}
+
+fn file_bytes_checked(
+    state: &ApplicationMcp,
+    request_id: String,
+    bytes: &[u8],
+) -> HostResult<ObjectBootstrapReceipt> {
     #[derive(Deserialize)]
     struct Format {
         format: String,
@@ -164,6 +214,7 @@ pub(super) fn bootstrap_file_bytes(
         content_revision,
         resource_count,
         viewport_available: false,
+        legacy_import: None,
     })
 }
 
@@ -175,6 +226,7 @@ pub(crate) async fn nemo_native_object_bootstrap(
     request_json: String,
 ) -> HostResult<ObjectBootstrapReceipt> {
     require_main(&window)?;
+    reopen::admit_source(&app, &state, &request_json);
     let admitted = if let Some(request) =
         admission::new_request(&request_json).filter(|request| request.replace.is_some())
     {
@@ -196,6 +248,7 @@ pub(crate) async fn nemo_native_object_bootstrap(
             request_id,
             fingerprint,
             prepared,
+            legacy,
         } = admitted
         else {
             let replace::Admission::Replay(receipt) = admitted else {
@@ -222,9 +275,14 @@ pub(crate) async fn nemo_native_object_bootstrap(
             Ok(waiter) => waiter.await.map_err(|_| ()),
             Err(_) => Err(()),
         };
-        return result.unwrap_or_else(|_| {
-            replace::reconcile_executor(&native, generation, &request_id, &fingerprint)
-        });
+        return result
+            .unwrap_or_else(|_| {
+                replace::reconcile_executor(&native, generation, &request_id, &fingerprint)
+            })
+            .map(|mut receipt| {
+                receipt.legacy_import = legacy;
+                receipt
+            });
     }
     reopen::bootstrap_request(&state, &request_json, |path| {
         window

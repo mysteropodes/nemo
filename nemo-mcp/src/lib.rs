@@ -3,6 +3,7 @@ pub mod capabilities;
 pub(crate) mod capability_contract;
 pub mod contract;
 pub(crate) mod native_contract;
+pub(crate) mod project_contract;
 pub mod registry;
 pub mod server;
 pub mod wire;

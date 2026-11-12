@@ -217,6 +217,7 @@ function nativeHarness(source, options = {}) {
   }
   const controller = OpacityApplication.createNative({
     surface: options.surface,
+    surfaceChanged: options.surfaceChanged,
     document: ProjectDocument, editor: NativeEditor, selection: NativeSelection,
     createPreview() {
       const value = NativePreview.createNativeOpacityPreviewAdapter();
@@ -488,9 +489,12 @@ test('classic startup loads frozen guard modules before the production first-lay
     'js/application/native-object-save-as-workflow.js',
     'js/application/native-object-saved-acknowledgement.js',
     'js/adapters/native-font-panel.js',
+    'js/adapters/native-subselect-contract.js',
     'js/adapters/native-frame-edit-contract.js',
     'js/adapters/native-viewport-underlay.js',
     'js/adapters/native-object-project-metadata.js',
+    'js/adapters/native-object-query-contract.js',
+    'js/adapters/native-object-project-reads.js',
     'js/adapters/native-object-project-properties.js',
     'js/adapters/native-object-project-desktop.js',
     'js/adapters/native-object-open-exposure.js',
@@ -514,7 +518,7 @@ test('classic startup loads frozen guard modules before the production first-lay
   for (const file of sequence) vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src', file), 'utf8'), scope, { filename: file });
   const app = fs.readFileSync(path.join(ROOT, 'src/js/app.js'), 'utf8');
   vm.runInNewContext(extractFunction(app, 'nextLayerColor') + '\n' + extractFunction(app, 'createUserLayer') + '\n' +
-    app.match(/^createUserLayer\('Layer 1'\);$/m)[0], scope);
+    app.match(/^createUserLayer\('Layer 1','boot-scaffold'\);.*$/m)[0], scope);
   assert.equal(scope.state.layers.length, 1); assert.equal(scope.state.layers[0].name, 'Layer 1');
   assert.equal(scope.userLayers.length, 1);
   scope.n20AllowLegacyWrite = () => false;
@@ -2450,7 +2454,7 @@ test('production core, lexical, and public Motion writers stop before touching J
     pushUndoLayers() { throw new Error('pushUndoLayers must not be reached'); } };
   lexical.window = lexical;
   const lexicalBytes = JSON.stringify(selectedPath);
-  vm.runInNewContext(`${extractFunction(tweenSource, 'pushUndo')}\n${extractFunction(timelineSource, 'commitCornerEdit')}\n` +
+  vm.runInNewContext(`${extractFunction(tweenSource, 'pushUndo')}\n${extractFunction(timelineSource, 'nativeParamOwned')}\n${extractFunction(timelineSource, 'commitCornerEdit')}\n` +
     `${extractFunction(motionSource, 'setSelectedEaseInfluence')}\n` +
     `${extractFunction(motionSource, 'colorSelectedKeys')}\n${extractFunction(motionSource, 'subdivideKeys')}\n` +
     'this.__writers = { commitCornerEdit, setSelectedEaseInfluence, colorSelectedKeys, subdivideKeys };',
@@ -3296,10 +3300,12 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
     localStorage: { getItem() { return null; } }, addEventListener(type) { events.push(['listen', type]); },
     state: { currentFrame: 10 },
     SM: { importJSON(value, silent) { imports.push([value, silent]); return true; },
-      setTotalFrames() { serializedDocument.totalFrames = 99; paperProject.itemCount = 99; } },
+      setSafetyZones() { serializedDocument.totalFrames = 99; paperProject.itemCount = 99; } },
     SMMotion: { setLayerValue() { serializedDocument.layers[0].opacity = 99; paperProject.activeLayer.opacity = 0.99; } },
     SMScript: {
-      run() { activity.scriptRuns++; serializedDocument.layers[0].opacity = 88; paperProject.activeLayer.opacity = 0.88; },
+      // CS8-SDK (#2354): the real runner is no longer wrapped; on desktop without a native
+      // object document it refuses by itself (tests/script-runner-native.test.cjs).
+      run() { activity.scriptRuns++; return { ok: false, error: 'Scripts run on an open native document only.', log: [] }; },
       openFile() { delayedScript = () => { serializedDocument.layers[0].opacity = 77; paperProject.activeLayer.opacity = 0.77; }; },
       api() { return { layer() { return { set(_prop, value) {
         serializedDocument.layers[0].opacity = value[0]; paperProject.activeLayer.opacity = value[0] / 100;
@@ -3399,37 +3405,36 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   const documentBytes = JSON.stringify(serializedDocument);
   const paperBytes = JSON.stringify(paperProject);
   assert.equal(desktop.SMScript.api(), false);
-  assert.equal(desktop.SMScript.run('nemo.layer(0).set("opacity", [99])'), false);
+  // CS8-SDK (#2354): run is no longer a legacy writer; without a native object document it refuses.
+  assert.deepEqual(desktop.SMScript.run('nemo.layer(0).set("opacity", [99])'), { ok: false, error: 'Scripts run on an open native document only.', log: [] });
   assert.equal(desktop.SMScript.openFile(), false);
   assert.equal(desktop.SMPlugin.openFile(), false);
   assert.equal(desktop.SMPlugin.loadArchive({}), false);
   assert.equal(desktop.SMPlugin.loadFiles({}), false);
-  assert.equal(desktop.SM.setTotalFrames(99), false);
+  assert.equal(desktop.SM.setSafetyZones(99), false);
   assert.equal(desktop.SMMotion.setLayerValue(0, 'opacity', [99]), false);
   assert.equal(JSON.stringify(serializedDocument), documentBytes, 'serialized document bytes remain unchanged');
   assert.equal(JSON.stringify(paperProject), paperBytes, 'Paper project bytes remain unchanged');
   assert.equal(delayedScript, null); assert.equal(delayedPlugin, null); assert.equal(delayedArchive, null);
-  assert.deepEqual(deniedEntries, ['script-api', 'script-run', 'script-openFile',
+  assert.deepEqual(deniedEntries, ['script-api', 'script-openFile',
     'plugin-openFile', 'plugin-loadArchive', 'plugin-loadFiles',
-    'timeline-setTotalFrames', 'motion-setLayerValue']);
+    'timeline-setSafetyZones', 'motion-setLayerValue']);
 
+  // CS4/#2343: the desktop host admits no implicit legacy write in either phase.
+  // With the guard no longer blocking, script and plugin entries still refuse,
+  // schedule nothing and leave both document byte images unchanged.
   nativeBlocked = false;
-  const retained = desktop.SMScript.api();
-  desktop.SMScript.run('retained timer setup');
-  desktop.SMScript.openFile();
-  desktop.SMPlugin.openFile();
-  desktop.SMPlugin.loadArchive({});
-  desktop.SMPlugin.loadFiles({});
-  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported-after-extension', false), false);
-  assert.equal(events.filter(([kind]) => kind === 'activate').length, 1,
-    'page-lifetime extension exposure prevents another activation attempt');
-  retained.layer(0).set('opacity', [66]);
-  delayedScript();
-  delayedPlugin();
-  delayedArchive();
-  assert.equal(serializedDocument.layers[0].opacity, 75,
-    'retained and delayed script/plugin capabilities only run while page stays legacy');
-  assert.match(toasts.at(-1), /Reload or restart Nemo/);
+  assert.equal(desktop.SMScript.api(), false);
+  assert.deepEqual(desktop.SMScript.run('retained timer setup'), { ok: false, error: 'Scripts run on an open native document only.', log: [] });
+  assert.equal(desktop.SMScript.openFile(), false);
+  assert.equal(desktop.SMPlugin.openFile(), false);
+  assert.equal(desktop.SMPlugin.loadArchive({}), false);
+  assert.equal(desktop.SMPlugin.loadFiles({}), false);
+  assert.equal(desktop.SM.setSafetyZones(99), false);
+  assert.equal(desktop.SMMotion.setLayerValue(0, 'opacity', [99]), false);
+  assert.equal(delayedScript, null); assert.equal(delayedPlugin, null); assert.equal(delayedArchive, null);
+  assert.equal(JSON.stringify(serializedDocument), documentBytes, 'no desktop extension wrote the legacy document');
+  assert.equal(JSON.stringify(paperProject), paperBytes, 'no desktop extension wrote the Paper project');
 
   assert.equal(await desktop.NemoNativeOpacityProject.importJSON('unsupported', true), false);
   assert.deepEqual(imports, []);
@@ -3565,4 +3570,163 @@ test('N20V absent ResizeObserver does not touch optional DOM lookup and keeps OS
   assert.equal(fixture.invocations.length, 1);
   assert.equal(fixture.invocations[0].viewport.physicalExtent.width, 1360);
   dispose(); assert.equal(fixture.listenerCount, 0);
+});
+
+test('a post-Open occluded preview waits for the next exposure instead of failing or fencing (#2268)', async () => {
+  for (const published of [true, false]) {
+    let exposed = false;
+    const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+      return state.previews.length === 1 || exposed ? receipt : { ...receipt, status: 'deferred-occluded' };
+    } });
+    assert.equal(await harness.controller.activate(harness.prepared), true);
+    const ports = occlusionPorts();
+    const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => false, () => published);
+    await viewport.presentPreview(0);
+    let settled = false;
+    const pending = viewport.presentPreview(10).finally(() => { settled = true; });
+    await turn(); await turn();
+    for (let i = 0; i < 5; i++) ports.tick();
+    assert.equal(settled, false, `published ${published}`);
+    assert.equal(harness.state.previews.length, 3, 'one retry once the subscription is registered, then only hints');
+    assert.equal(harness.controller.status(), 'native', 'an occluded window never fences the document');
+    ports.hint({ visible: false });
+    for (let i = 0; i < 5; i++) ports.tick();
+    assert.equal(harness.state.previews.length, 3, 'an occluded hint never retries');
+    exposed = true;
+    ports.hint({ visible: true });
+    const presented = await pending;
+    assert.equal(presented.status, 'presented');
+    assert.equal(presented.frame, 10);
+    assert.equal(harness.state.previews.length, 4);
+    assert.equal(ports.disposed, 1);
+    assert.equal(ports.timerCount, 0);
+  }
+});
+
+test('a post-Open occluded preview exposed before its subscription registers presents on the registered retry', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    return state.previews.length === 2 ? { ...receipt, status: 'deferred-occluded' } : receipt;
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const ports = occlusionPorts();
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => false, () => true);
+  await viewport.presentPreview(0);
+  const presented = await viewport.presentPreview(10);
+  assert.equal(presented.status, 'presented');
+  assert.equal(harness.state.previews.length, 3);
+  assert.equal(ports.disposed, 1);
+});
+
+test('a post-Open exposure wait stops when the document is released', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    return state.previews.length === 1 ? receipt : { ...receipt, status: 'deferred-occluded' };
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const ports = occlusionPorts();
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => false, () => true);
+  await viewport.presentPreview(0);
+  const pending = viewport.presentPreview(10);
+  const rejected = assert.rejects(pending, /changed while waiting for a visible viewport/);
+  await turn(); await turn();
+  await harness.controller.releaseCurrent('occluded-preview-cancelled');
+  ports.tick();
+  await rejected;
+  ports.hint({ visible: true });
+  assert.equal(harness.state.previews.length, 3, 'no presentation after the release');
+  assert.equal(ports.disposed, 1);
+});
+
+test('a busy owner keeps a post-Open exposure wait alive and an identity change supersedes it without a fence', async () => {
+  let exposed = false, busy = false, revision = null;
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    return state.previews.length === 1 || exposed ? receipt : { ...receipt, status: 'deferred-occluded' };
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const real = harness.state.lifecycle;
+  const lifecycle = Object.assign(Object.create(null), real, { inspect() {
+    const value = real.inspect();
+    const identity = value.identity && revision !== null ? { ...value.identity, contentRevision: revision } : value.identity;
+    return { ...value, busy: busy || value.busy, identity };
+  } });
+  const ports = occlusionPorts();
+  const viewport = NativeOpacityViewport.create(lifecycle, ports, () => false, () => true);
+  await viewport.presentPreview(0);
+  let settled = false;
+  const pending = viewport.presentPreview(10).finally(() => { settled = true; });
+  await turn(); await turn();
+  busy = true;
+  exposed = true;
+  ports.hint({ visible: true });
+  for (let i = 0; i < 3; i++) ports.tick();
+  await turn();
+  assert.equal(settled, false, 'a busy owner never retries and never rejects');
+  busy = false;
+  ports.tick();
+  assert.equal((await pending).status, 'presented');
+  exposed = false;
+  const parked = viewport.presentPreview(12);
+  await turn(); await turn();
+  revision = 99;
+  ports.tick();
+  await assert.rejects(parked, error => error && error.code === 'native_preview_superseded');
+  assert.equal(harness.controller.status(), 'native', 'a superseded wait never fences');
+});
+
+test('a failed occlusion subscription and an in-progress Open keep the prompt deferral', async () => {
+  for (const variant of ['subscription', 'opening']) {
+    const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+      return state.previews.length === 1 ? receipt : { ...receipt, status: 'deferred-occluded' };
+    } });
+    assert.equal(await harness.controller.activate(harness.prepared), true);
+    const ports = occlusionPorts();
+    if (variant === 'subscription') ports.subscribeWindowOcclusion = async () => { throw new Error('no events'); };
+    let opening = false;
+    const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => opening, () => true);
+    await viewport.presentPreview(0);
+    opening = variant === 'opening';
+    await assert.rejects(viewport.presentPreview(10), error =>
+      error && error.code === 'native_preview_deferred', variant);
+    assert.equal(harness.controller.status(), 'native', variant);
+  }
+});
+
+test('N20 desktop presentation opens the native underlay only after a current presented receipt, then restores it on release', async () => {
+  const root = { devicePixelRatio: 2, SM: { importJSON() {} },
+    document: { getElementById() { return { getBoundingClientRect() {
+      return { left: 40, top: 60, width: 640, height: 360 };
+    } }; } }, __TAURI__: { core: { async invoke() { return { status: 'resized' }; } } } };
+  require('./helpers/native-viewport-underlay.cjs').install(root);
+  const ports = NativeLegacySurface.desktopPorts(root, {});
+  const h = nativeHarness(keyedSource(), { surfaceChanged: ports.surfaceChanged });
+  await h.controller.activate(h.prepared);
+  await ports.surface.resize(h.controller.identity());
+  assert.equal(root.stageLayer.visible, true, 'activation alone cannot expose the underlay');
+  await h.state.lifecycle.presentPreview(0);
+  assert.equal(root.stageLayer.visible, false, 'the Paper stage must not cover the native rectangle');
+  const html = root.document.documentElement;
+  assert.equal(html.classList.contains('nemo-native-underlay'), true);
+  assert.equal(html.style.getPropertyValue('--nemo-native-right'), '680px');
+  h.controller.renderPreview(10); await h.state.lifecycle.flush();
+  assert.equal(root.stageLayer.visible, false, 'ordinary render uses the same presentation seam');
+  await h.controller.releaseCurrent('underlay-complete');
+  assert.equal(root.stageLayer.visible, true);
+  assert.equal(html.classList.contains('nemo-native-underlay'), false);
+});
+
+test('N20 deferred and stale previews cannot expose a fresh underlay; fatal receipts clear an existing one', async () => {
+  for (const status of ['deferred-occluded', 'deferred-timeout', 'stale-discarded']) {
+    const changes = [], h = nativeHarness(keyedSource(), {
+      surfaceChanged: value => changes.push(value), previewReceipt: r => ({ ...r, status }) });
+    await h.controller.activate(h.prepared);
+    assert.equal((await h.state.lifecycle.presentPreview(0)).status, status);
+    assert.deepEqual(changes, [], status);
+  }
+  let fail = false;
+  const changes = [], h = nativeHarness(keyedSource(), { surfaceChanged: value => changes.push(value),
+    previewReceipt: r => fail ? { ...r, viewGeneration: 0 } : r });
+  await h.controller.activate(h.prepared); await h.state.lifecycle.presentPreview(0);
+  assert.equal(changes.length, 1);
+  fail = true; await assert.rejects(h.state.lifecycle.presentPreview(10));
+  assert.equal(changes.at(-1), null);
+  assert.equal(h.controller.status(), 'indeterminate');
 });

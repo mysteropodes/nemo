@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => property_expression_views_tests
 //! Oracle tests for the detached expression context views (D17/#2076).
 //!
 //! `fixtures/property-expression-views/oracle.txt` (`ORACLE`) was produced by
@@ -108,6 +109,7 @@ pub(crate) fn document(
         items: Presence::Missing,
         component_tables: Presence::Missing,
         motion_arcs: Presence::Missing,
+        tweens: Presence::Missing,
         audio_tracks: Presence::Missing,
     }
 }

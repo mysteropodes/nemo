@@ -22,6 +22,8 @@
   function view(v){if(!object(v))return null;var t;
     if(v.kind==='targets'&&keys(v,['kind','offset','limit'])&&uint(v.offset)&&uint(v.limit)&&v.limit>=1&&v.limit<=8)return {kind:v.kind,offset:v.offset,limit:v.limit};
     if(v.kind==='properties'&&keys(v,['kind','target','offset','limit'])&&(t=target(v.target))&&uint(v.offset)&&uint(v.limit)&&v.limit>=1&&v.limit<=8)return {kind:v.kind,target:t,offset:v.offset,limit:v.limit};
+    // Vertex discovery is an explicit opt-in (C-motion-canvas-4): the Path group of an element lists its `vtxN` rows after the standard ones.
+    if(v.kind==='properties'&&keys(v,['kind','target','offset','limit','includeVertices'])&&v.includeVertices===true&&(t=target(v.target))&&uint(v.offset)&&uint(v.limit)&&v.limit>=1&&v.limit<=8)return {kind:v.kind,target:t,offset:v.offset,limit:v.limit,includeVertices:true};
     if(v.kind==='storedProperty'&&keys(v,['kind','target','property'])&&(t=target(v.target))&&text(v.property))return {kind:v.kind,target:t,property:v.property};
     return null;
   }
@@ -57,9 +59,9 @@
       if(seen.has(key))return refused('duplicate-page-item');seen.add(key);if(stored&&item.property!==q.view.property)return refused('foreign-property');items.push(item);}
     var categories=[],names=new Set();for(var rawCategory of value.unavailableCategories){var c=category(rawCategory);if(!c||names.has(c.category))return refused('malformed-availability');names.add(c.category);categories.push(c);}
     if(!names.has('propertyWrites'))return refused('missing-read-only-disposition');
-    var copied={};identity.forEach(function(k){copied[k]=p[k];});return freeze({available:true,readOnly:true,identity:copied,kind:value.kind,target:t,items:items,nextOffset:next,requestOffset:offset,requestLimit:limit,unavailableCategories:categories});
+    var copied={};identity.forEach(function(k){copied[k]=p[k];});return freeze({available:true,readOnly:true,identity:copied,kind:value.kind,target:t,items:items,nextOffset:next,requestOffset:offset,requestLimit:limit,includeVertices:q.view.includeVertices===true,unavailableCategories:categories});
   }catch(_){return refused('malformed-native-page');}}
-  function continuation(page){if(!page||page.available!==true||page.nextOffset===null||page.kind==='storedProperty')return null;var v={kind:page.kind,offset:page.nextOffset,limit:page.requestLimit};if(page.target)v.target=target(page.target);return freeze(v);}
+  function continuation(page){if(!page||page.available!==true||page.nextOffset===null||page.kind==='storedProperty')return null;var v={kind:page.kind,offset:page.nextOffset,limit:page.requestLimit};if(page.target)v.target=target(page.target);if(page.includeVertices===true)v.includeVertices=true;return freeze(v);}
   function createConsumer(ports){var serial=0,retired=false;
     async function load(input){var ticket=++serial;if(retired||!ports||typeof ports.readContext!=='function'||typeof ports.query!=='function')return refused('provider-unavailable');
       var before,q;try{before=capture(ports.readContext());var w=view(input);if(!before||!w)return refused('unavailable');q=freeze({instanceId:before.pin.instanceId,documentId:before.pin.documentId,atRevision:before.pin.contentRevision,documentSnapshotId:before.pin.documentSnapshotId,view:w});if(size(q)>4096)return refused('invalid-selector');}catch(_){return refused('unavailable');}

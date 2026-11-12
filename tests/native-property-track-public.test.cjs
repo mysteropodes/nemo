@@ -38,10 +38,12 @@ test('D12 descriptor declares the exact existing native operation and closed sel
   assert.equal(shape.additionalProperties, false);
   assert.deepEqual(shape.required, ['command', 'selections', 'action']);
   assert.equal(shape.properties.selections.minItems, 1);
-  assert.equal(shape.properties.selections.maxItems, 32);
+  assert.equal(shape.properties.selections.maxItems, 128);
+  assert.deepEqual(shape.properties.selections.items.required, ['target', 'property']);
+  assert.equal(shape.properties.selections.items.properties.ranges.maxItems, 512);
   assert.equal(shape.properties.selections.items.additionalProperties, false);
   assert.equal(shape.properties.selections.items.properties.target.additionalProperties, false);
-  assert.deepEqual(shape.properties.action.oneOf.map(a => a.properties.kind.const), ['preset', 'influence', 'subdivide']);
+  assert.deepEqual(shape.properties.action.oneOf.map(a => a.properties.kind.const), ['preset', 'influence', 'subdivide', 'lockTo', 'shift', 'delete', 'flip', 'distribute', 'warp', 'color']);
   for (const example of descriptor.examples) {
     assert.doesNotThrow(() => SDK.validateRequest(example.request));
     assert.doesNotThrow(() => SDK.validateResponse(example.response, example.request.requestId, OP));
@@ -52,6 +54,12 @@ test('SDK reaches the authority with every preset, influence edge, subdivision a
   const actions = ['linear', 'ease', 'easeIn', 'easeOut', 'hold'].map(preset => ({kind:'preset', preset}));
   for (const side of ['in', 'out']) for (const percent of [-1, 0, 50.5, 100, 101]) actions.push({kind:'influence', side, percent});
   actions.push({kind:'subdivide'});
+  for (const mode of ['in', 'out', 'layer', null]) actions.push({kind:'lockTo', mode});
+  for (const delta of [-1000000, -1, 0, 3, 1000000]) actions.push({kind:'shift', delta});
+  for (const kind of ['delete', 'flip', 'distribute']) actions.push({kind});
+  for (const mode of ['top', 'bottom', 'left', 'right']) actions.push({kind:'warp', mode, total:-7.25});
+  actions.push({kind:'warp', mode:'liquify', total:3, grab:12.5});
+  for (const color of [null, '#e8b64c', '#4EA9FFcc']) actions.push({kind:'color', color});
   for (const action of actions) {
     const q = request(action);
     q.payload.selections[0].target.strokeId = 'blob:authored element 雪';
@@ -82,6 +90,13 @@ test('SDK rejects open, missing, null and positional shapes before any dispatch'
     q => q.payload.selections[0].target.contextId = 2,
     q => q.payload.selections[0].property = '', q => q.payload.selections[0].property = null,
     q => delete q.payload.selections[0].frame,
+    q => { q.payload.selections[0].ranges = [[0, 1]]; },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = []; },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = [[3, 2]]; },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = [[0, '1']]; },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = [[0, 1, 2]]; },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = Array(513).fill([0, 1]); },
+    q => { delete q.payload.selections[0].frame; q.payload.selections[0].ranges = [[0, 1]]; q.payload.selections[0].extra = 1; },
     q => q.payload.selections[0].frame = '0', q => q.payload.selections[0].frame = NaN,
     q => q.payload.action = {kind:'preset', preset:'smooth'},
     q => q.payload.action = {kind:'preset', preset:'ease', extra:0},
@@ -90,6 +105,32 @@ test('SDK rejects open, missing, null and positional shapes before any dispatch'
     q => q.payload.action = {kind:'influence', side:'out', percent:'50'},
     q => q.payload.action = {kind:'subdivide', values:[]},
     q => q.payload.action = {kind:'subdivide', steps:2},
+    q => q.payload.action = {kind:'lockTo'},
+    q => q.payload.action = {kind:'lockTo', mode:'both'},
+    q => q.payload.action = {kind:'lockTo', mode:''},
+    q => q.payload.action = {kind:'lockTo', mode:true},
+    q => q.payload.action = {kind:'lockTo', mode:'in', extra:0},
+    q => q.payload.action = {kind:'shift'},
+    q => q.payload.action = {kind:'shift', delta:1.5},
+    q => q.payload.action = {kind:'shift', delta:'2'},
+    q => q.payload.action = {kind:'shift', delta:1000001},
+    q => q.payload.action = {kind:'shift', delta:1, extra:0},
+    q => q.payload.action = {kind:'delete', keep:true},
+    q => q.payload.action = {kind:'flip', times:2},
+    q => q.payload.action = {kind:'distribute', mode:'even'},
+    q => q.payload.action = {kind:'warp', mode:'top'},
+    q => q.payload.action = {kind:'warp', mode:'diagonal', total:1},
+    q => q.payload.action = {kind:'warp', mode:'liquify', total:1},
+    q => q.payload.action = {kind:'warp', mode:'top', total:1, grab:2},
+    q => q.payload.action = {kind:'warp', mode:'top', total:'1'},
+    q => q.payload.action = {kind:'warp', mode:'top', total:1000001},
+    q => q.payload.action = {kind:'warp', mode:'top', total:Infinity},
+    q => q.payload.action = {kind:'warp', mode:'top', total:1, extra:0},
+    q => q.payload.action = {kind:'color'},
+    q => q.payload.action = {kind:'color', color:'red'},
+    q => q.payload.action = {kind:'color', color:'#12345'},
+    q => q.payload.action = {kind:'color', color:7},
+    q => q.payload.action = {kind:'color', color:'#e8b64c', extra:0},
   ];
   let calls = 0;
   const port = adapter(() => { calls++; });
@@ -284,4 +325,20 @@ test('D12 real SDK cannot dispatch with a missing helper or a helper loaded only
     assert.throws(() => vm.runInContext(browserPropertyCall, context), {name:'TypeError'});
     assert.equal(context.calls, 0, 'malordered helper must fail before authority dispatch');
   }
+});
+
+test('SDK reaches the authority with runs of frames per track, above the 32 single-key addresses', async () => {
+  const q = request({kind:'delete'});
+  const track = property => ({target:{contextId:'scene-root', layerUid:'layer'}, property, ranges:[[0, 99], [101, 250.5]]});
+  q.payload.selections = [track('position'), track('opacity'), q.payload.selections[0]];
+  const before = structuredClone(q);
+  let sent;
+  const r = await adapter(value => { sent = value; return reply(value); }).editPropertyTrack(q);
+  assert.deepEqual(sent, before);
+  assert.deepEqual(r, reply(q));
+  const wide = request({kind:'delete'});
+  wide.payload.selections = Array.from({length:12}, (_, i) => track('p' + i));
+  await assert.doesNotReject(adapter(value => reply(value)).editPropertyTrack(wide));
+  wide.payload.selections = Array.from({length:60}, (_, i) => track('p' + i));
+  await assert.rejects(async () => adapter(value => reply(value)).editPropertyTrack(wide), /4096/);
 });

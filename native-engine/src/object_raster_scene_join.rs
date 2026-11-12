@@ -11,7 +11,33 @@ pub(crate) struct RasterSource {
     pub(crate) source_index: usize,
     pub(crate) layer_index: usize,
     mesh_id: Option<String>,
+    /// Rig-posed offsets of the mesh (one per stored vertex), from the one pose evaluation of the scene join.
+    rig_offsets: Option<Vec<[f64; 2]>>,
+    /// An image of a placed component: `layer_index` is its host, `source.rect` is already the
+    /// baseline's instance placement, no scene chain applies, and it paints at the host slot. A
+    /// component placed twice gives two sources with the same `source_index`; only the pair with
+    /// `layer_index` is unique.
+    pub(crate) placed: bool,
     pub(crate) source: RasterSceneSource,
+    /// #2372: the item's stored mirror and shear (the identity for a placed component image).
+    pub(crate) form: crate::evaluation::object_item_local_form::LocalForm,
+}
+impl RasterSource {
+    pub(crate) fn placed(source_index: usize, host: usize, source: RasterSceneSource) -> Self {
+        Self {
+            source_index,
+            layer_index: host,
+            mesh_id: None,
+            rig_offsets: None,
+            placed: true,
+            source,
+            form: Default::default(),
+        }
+    }
+    /// The rig-posed offsets of this mesh-bound raster, or `None` when no linked bind poses it.
+    pub(crate) fn rig_offsets(&self) -> Option<&[[f64; 2]]> {
+        self.rig_offsets.as_deref()
+    }
 }
 pub(super) fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
     ObjectSceneError::UnsupportedGeometry {
@@ -26,6 +52,8 @@ pub(super) fn sources_excluding(
     packet: &ObjectFramePacket,
     claimed: &std::collections::BTreeSet<usize>,
 ) -> Result<Vec<RasterSource>, ObjectSceneError> {
+    // One evaluation per rigged layer that carries a meshed raster, through the scene join's single call site.
+    let mut poses = std::collections::BTreeMap::new();
     packet
         .raster_records()
         .filter(|record| !claimed.contains(&record.source_index()))
@@ -42,22 +70,34 @@ pub(super) fn sources_excluding(
                 ));
             }
             let layer = &packet.source_layers()[record.layer_index()];
-            if item.mesh_id().is_some() && layer.rig().is_some() {
-                return Err(unavailable(
-                    record.source_index(),
-                    "native mesh rig pose is unavailable",
-                ));
-            }
+            let rig_offsets = match (item.mesh_id(), layer.rig()) {
+                (Some(mesh_id), Some(_)) => {
+                    let index = record.layer_index();
+                    let evaluation = poses
+                        .entry(index)
+                        .or_insert_with(|| crate::object_render_scene::rig_packet_pose::layer_pose(packet, index));
+                    crate::object_render_scene::rig_packet_pose::mesh_offsets(
+                        packet, index, mesh_id, evaluation,
+                    )
+                    .map_err(|reason| unavailable(record.source_index(), reason))?
+                }
+                _ => None,
+            };
             if layer.path_fx().is_some_and(|effects| !effects.is_empty()) {
                 return Err(unavailable(
                     record.source_index(),
                     "raster path effects are unavailable",
                 ));
             }
-            let opacity = item.opacity()
-                * packet.layer_opacity(record.layer_index()).map_err(|_| {
+            // A 3D layer suppresses its 2D Motion opacity (baseline `motionMat = null`); its image keeps its own.
+            let layer_opacity = if layer.three_d.value() == Some(&true) {
+                1.0
+            } else {
+                packet.layer_opacity(record.layer_index()).map_err(|_| {
                     unavailable(record.source_index(), "raw layer opacity is unavailable")
-                })?;
+                })?
+            };
+            let opacity = item.opacity() * layer_opacity;
             if !(opacity as f32).is_finite() {
                 return Err(unavailable(
                     record.source_index(),
@@ -69,6 +109,9 @@ pub(super) fn sources_excluding(
                 source_index: record.source_index(),
                 layer_index: record.layer_index(),
                 mesh_id: item.mesh_id().map(str::to_owned),
+                rig_offsets,
+                placed: false,
+                form: item.local_form(),
                 source: RasterSceneSource {
                     asset_id: item.asset_id().as_str().to_owned(),
                     rect: crate::evaluation::motion_parent_chain::ImageRect {
@@ -224,17 +267,21 @@ mod retained {
                         },
                     );
                 }
-                let chain = plan
-                    .native_parent_chains()
-                    .chain(source.layer_index)
-                    .map_err(|error| unavailable(source.source_index, error.reason()))?;
-                let image = prepare_raster_scene_image(&source.source, &chain, &Pixels(&assets))
+                let (placed_source, chain) = if source.placed {
+                    (source.source.clone(), Vec::new())
+                } else {
+                    plan.native_parent_chains()
+                        .place_image(source.layer_index, source.source.clone())
+                        .map_err(|error| unavailable(source.source_index, error.reason()))?
+                };
+                let image = prepare_raster_scene_image(&placed_source, &chain, &Pixels(&assets))
                     .map_err(|_| {
                         unavailable(
                             source.source_index,
                             "native raster placement is unavailable",
                         )
-                    })?;
+                    })?
+                    .with_form(&source.form);
                 let mesh = source
                     .mesh_id
                     .as_deref()
@@ -244,7 +291,7 @@ mod retained {
                             &MeshSceneSource {
                                 mesh_id,
                                 view: Affine::IDENTITY.as_coeffs(),
-                                offsets: None,
+                                offsets: source.rig_offsets.as_deref(),
                                 pose: None,
                             },
                             plan.packet().snapshot().document().image_meshes(),
@@ -299,6 +346,12 @@ mod retained {
         pub(crate) fn images(&self) -> impl Iterator<Item = &ImageData> {
             self.assets.values().map(|asset| &asset.image)
         }
+        pub(crate) fn final_rect(
+            &self,
+            index: usize,
+        ) -> Option<crate::evaluation::motion_parent_chain::ImageRect> {
+            Some(self.draws.get(index)?.rect())
+        }
         pub(crate) fn matches(&self, plan: &ObjectPaintPlan) -> bool {
             let expected: std::collections::BTreeSet<_> = plan
                 .raster_sources()
@@ -352,6 +405,51 @@ pub(super) fn attach(
 
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 impl crate::object_render_scene::ObjectCompositionWitness {
+    /// Read the exact raster target and final D30 rectangle used by this retained preview.
+    /// Source indices only join native provenance; they never become an external identity.
+    pub fn image_mesh_read_projection(
+        &self,
+        layer_uid: &str,
+    ) -> Result<
+        crate::object_snapshot::ImageMeshReadProjection,
+        crate::object_snapshot::ImageMeshReadFailure,
+    > {
+        use crate::object_snapshot::{ImageMeshReadFailure as Failure, ImageMeshReadProjection};
+        if !self.is_viewport() {
+            return Err(Failure::Unsupported);
+        }
+        let packet = self.plan().packet();
+        let mut selected =
+            self.plan()
+                .raster_sources()
+                .iter()
+                .enumerate()
+                .filter_map(|(index, source)| {
+                    packet
+                        .raster_records()
+                        .find(|record| {
+                            record.source_index() == source.source_index
+                                && record.entry().target.layer_uid() == layer_uid
+                        })
+                        .map(|record| (index, source, record))
+                });
+        let (index, source, record) = selected.next().ok_or(Failure::Missing)?;
+        if selected.next().is_some() {
+            return Err(Failure::Ambiguous);
+        }
+        let rect = self
+            .rasters
+            .as_ref()
+            .and_then(|images| images.final_rect(index))
+            .ok_or(Failure::Unsupported)?;
+        Ok(ImageMeshReadProjection::raster(
+            packet.snapshot(),
+            packet.frame(),
+            record.entry().target.clone(),
+            source.mesh_id.clone(),
+            [rect.x, rect.y, rect.width, rect.height, rect.rotation],
+        ))
+    }
     pub fn has_scene_images(&self) -> bool {
         self.reference.is_some() || self.rasters.is_some() || self.plan.has_brushes()
     }

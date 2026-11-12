@@ -66,6 +66,9 @@ struct ObjectExportRequest {
     maximum_encoded_bytes: usize,
     #[serde(default)]
     format: ObjectExportFormat,
+    /// The Solo view of the layers (#2371): the baseline export paints only the soloed layers. Sorted, unique, bounded.
+    #[serde(default)]
+    solo_layers: Vec<String>,
     #[serde(default)]
     cancelled_before_dispatch: bool,
 }
@@ -120,6 +123,7 @@ fn admit_request(
         || request.scope_kind != FrameScopeKind::Authored
         || request.maximum_encoded_bytes == 0
         || request.maximum_encoded_bytes > MAX_PNG_BYTES
+        || !crate::native_object_desktop_preview::valid_solo(&request.solo_layers)
         || !sequence::valid_range(&request)
         || request.frames.as_ref().is_some_and(|frames| {
             frames.is_empty()
@@ -329,6 +333,7 @@ fn with_export_consumer<T>(
                     return Err("native object export snapshot is stale".into());
                 }
                 owner.require_project_output(admitted.output.dimensions())?;
+                owner.set_export_solo(admitted.request.solo_layers.clone());
                 if let Some(range) = admitted.request.frame_range {
                     let info = owner.project_file_info()?;
                     if info

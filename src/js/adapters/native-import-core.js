@@ -182,8 +182,19 @@
       return out;
     }
 
+    // #2372: an import started right after another command finds the presentation hidden by the queue (queue-pending): wait for it (bounded) and read the context
+    // then, instead of reporting no presented session. Every later currency check stays strict (begin), so a real change still refuses.
+    async function beginSettled() {
+      const first = begin(), W = typeof globalThis === 'object' ? globalThis.NemoNativePresentationWait : null;
+      if (first.ok || first.reason !== 'no_presented_native_session' || !W) return first;
+      const session = ports.currentSession();
+      if (!session || typeof session.readPresentedObjectSession !== 'function' || !W.busy((f) => session.readPresentedObjectSession(f))) return first;
+      await W.await(null, { read: (f) => session.readPresentedObjectSession(f), holds: () => !retired && !pending && ports.currentSession() === session });
+      return begin();
+    }
+
     return Object.freeze({
-      begin, submit, supportsInvocationMarker: true,
+      begin, beginSettled, submit, supportsInvocationMarker: true,
       dispose() { retired = true; generation++; },
       isPending() { return pending; },
     });

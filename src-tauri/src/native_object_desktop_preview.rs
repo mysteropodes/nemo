@@ -5,7 +5,7 @@ use crate::native_application_contract::{
     NativePreviewReceipt, OutputSpecInput, ViewportInput,
 };
 use crate::native_application_viewport::{self as viewport_host, NativeViewportConsumer};
-use crate::native_dispatch::NativeObjectHost;
+use crate::native_dispatch::{NativeObjectHost, ObjectPreviewObserver, ObservedObjectPreview};
 use native_engine::{
     compositor::Compositor,
     desktop_viewport::{
@@ -14,6 +14,7 @@ use native_engine::{
     },
     object_document::FrameScopeKind,
     object_frame_packet::ObjectFrameSelector,
+    object_render_scene::{GhostReceipt, GhostUnderlayRequest},
     scheduler::OutputSpec,
 };
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,21 @@ pub(crate) struct ObjectPreviewReceipt {
     pub(crate) preview: NativePreviewReceipt,
     pub(crate) view: ObjectViewProjection,
     pub(crate) display_filter: ViewportDisplayFilter,
+    /// The checker was painted behind the artwork; absent when not asked for.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) alpha_checker: bool,
+    /// The items were drawn as outlines (#2372); absent when not asked for.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) current_outline: bool,
+    /// The Shadow Brush guide lines were left out (#2373); absent when not asked for.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) hide_shadow_guides: bool,
+    /// The layers the renderer painted alone (#2371); absent when none were asked for.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) solo_layers: Vec<String>,
+    /// What the renderer did with the request's onion / Ghost All settings; absent when none were asked for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) ghosts: Option<GhostReceipt>,
 }
 impl std::ops::Deref for ObjectPreviewReceipt {
     type Target = NativePreviewReceipt;
@@ -77,6 +93,26 @@ pub(crate) struct ObjectPreviewRequest {
     pub(crate) navigation: ObjectPreviewNavigation,
     #[serde(default)]
     pub(crate) display_filter: ViewportDisplayFilter,
+    /// "Show transparency" (#2373): the renderer paints the baseline checker behind the artwork in place of the document
+    /// background (viewport only, never an export).
+    #[serde(default)]
+    pub(crate) alpha_checker: bool,
+    /// "Current frame outline" (#2372): the renderer draws the items of the presented frame as outlines (viewport only, never an
+    /// export, never persisted).
+    #[serde(default)]
+    pub(crate) current_outline: bool,
+    /// "Shadow guides" switched off (#2373): the renderer leaves the shadow-tagged items out of the presented frame (viewport only,
+    /// never an export, never persisted).
+    #[serde(default)]
+    pub(crate) hide_shadow_guides: bool,
+    /// The Solo view of the layers (#2371, baseline `layerIsEffectivelyVisible`): while any listed layer belongs to the shown
+    /// context only the listed layers (and the children of a listed folder layer) are painted. A session view fact, sorted and
+    /// unique, bounded; never a command, never persisted (viewport only here, an export carries its own copy).
+    #[serde(default)]
+    pub(crate) solo_layers: Vec<String>,
+    /// Onion skin / Ghost All composed under the live frame by the native renderer (viewport only, never an export).
+    #[serde(default)]
+    pub(crate) ghosts: Option<GhostUnderlayRequest>,
     pub(crate) revision_sync: Option<PreviewRevisionProof>,
     #[serde(default)]
     pub(crate) cancelled_before_dispatch: bool,
@@ -93,6 +129,11 @@ impl ObjectPreviewRequest {
             frame: self.frame,
         }
     }
+}
+/// The Solo set of a request (#2371): bounded, strictly ascending (so unique), every entry a bounded id.
+pub(crate) const MAX_SOLO_LAYERS: usize = 512;
+pub(crate) fn valid_solo(layers: &[String]) -> bool {
+    layers.len() <= MAX_SOLO_LAYERS && layers.iter().all(|id| bounded_id(id)) && layers.windows(2).all(|pair| pair[0] < pair[1])
 }
 pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPreviewRequest> {
     if raw.len() > MAX_BYTES || !raw.trim_start().starts_with('{') {
@@ -157,8 +198,19 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
         .navigation
         .validate()
         .map_err(|message| host_error("invalid_request", message))?;
+    if let Some(ghosts) = &request.ghosts {
+        ghosts
+            .validate()
+            .map_err(|message| host_error("invalid_request", message))?;
+    }
+    if !valid_solo(&request.solo_layers) {
+        return Err(host_error("invalid_request", "invalid object preview solo layers"));
+    }
     let output = request.output_spec.admit_object()?;
     request.viewport.admit_object(&output)?;
+    if (request.alpha_checker || request.current_outline) && !(request.viewport.display_scale().is_finite() && request.viewport.display_scale() > 0.) {
+        return Err(host_error("invalid_request", "invalid object preview checker scale"));
+    }
     Ok(request)
 }
 
@@ -166,6 +218,14 @@ pub(crate) struct ObjectPreviewConsumer<'a> {
     owner: &'a mut NativeObjectHost,
     selector: ObjectFrameSelector<'a>,
     display_filter: ViewportDisplayFilter,
+    /// Screen px per composition px of the shown canvas when the transparency checker is asked for.
+    alpha_checker: Option<f64>,
+    /// Screen px per composition px of the shown canvas when the Current frame outline is asked for.
+    current_outline: Option<f64>,
+    /// The Shadow guides switch is off (#2373).
+    hide_shadow_guides: bool,
+    /// The soloed layers (#2371).
+    solo_layers: Vec<String>,
 }
 impl ObjectPreviewConsumer<'_> {
     pub(crate) fn present<P: SurfacePort>(
@@ -173,12 +233,34 @@ impl ObjectPreviewConsumer<'_> {
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
     ) -> Result<ObjectPresentedFrame, String> {
-        self.owner.present_prepared_object_preview_filtered(
+        let mut diagnostic = viewport_host::ObjectPreviewDiagnostic::default();
+        let presented = self.owner.present_prepared_object_preview_filtered(
             &self.selector,
             compositor,
             viewport,
             self.display_filter,
-        )
+            self.alpha_checker,
+            self.current_outline,
+            self.hide_shadow_guides,
+            &self.solo_layers,
+            &mut diagnostic,
+        )?;
+        diagnostic.finish(presented.receipt.status());
+        Ok(presented)
+    }
+}
+impl ObjectPreviewObserver for viewport_host::ObjectPreviewDiagnostic {
+    fn begin(&mut self, preview: ObservedObjectPreview<'_>) {
+        self.open(
+            preview.instance_id,
+            &viewport_host::ScheduledPreview {
+                document_id: preview.document_id,
+                content_revision: preview.content_revision,
+                frame: preview.frame,
+                work_id: preview.work_id,
+                view_generation: preview.view_generation,
+            },
+        );
     }
 }
 impl NativeViewportConsumer for ObjectPreviewConsumer<'_> {
@@ -219,11 +301,18 @@ pub(crate) fn preview_with_target(
             revision_sync,
             |owner| {
                 owner.require_project_output(output.dimensions())?;
+                // #2371: the Solo view holds from the packet's preparation through its presentation, so a layer the Solo
+                // view shows is built into the packet even when its eye is off (baseline `layerIsEffectivelyVisible`).
+                let _solo_view = native_engine::object_frame_packet::solo_view::enter(selector.context_id, &request.solo_layers);
                 let consume = |owner: &mut NativeObjectHost| {
                     Ok(target(ObjectPreviewConsumer {
                         owner,
                         selector: selector.clone(),
                         display_filter: request.display_filter,
+                        alpha_checker: request.alpha_checker.then(|| request.viewport.display_scale()),
+                        current_outline: request.current_outline.then(|| request.viewport.display_scale()),
+                        hide_shadow_guides: request.hide_shadow_guides,
+                        solo_layers: request.solo_layers.clone(),
                     }))
                 };
                 owner.with_prepared_object_preview_for_navigation(
@@ -231,6 +320,7 @@ pub(crate) fn preview_with_target(
                     output,
                     request.view_mode,
                     request.navigation,
+                    request.ghosts.clone(),
                     revision_sync.is_some(),
                     consume,
                 )
@@ -245,6 +335,11 @@ pub(crate) fn preview_with_target(
         },
         view: receipt.view,
         display_filter: request.display_filter,
+        alpha_checker: request.alpha_checker,
+        current_outline: request.current_outline,
+        hide_shadow_guides: request.hide_shadow_guides,
+        solo_layers: request.solo_layers.clone(),
+        ghosts: receipt.ghosts,
     })
 }
 

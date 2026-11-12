@@ -6,8 +6,10 @@
 //! here, and a font asset that the retained font provider cannot supply is reported by that provider at evaluation.
 use crate::commands::object_fill_owner::item_commands::{
     allocate_id, asset_code, check_layer, check_target, inventory_of, lists, order_insert,
-    order_remove, other_family, store, ItemEdit, ItemPayload,
+    order_remove, other_family, scope_of, store, ItemEdit, ItemPayload,
 };
+use crate::commands::object_fill_owner::object_frame_edit_document::DocumentEdit;
+use crate::commands::object_fill_owner::vector_edit::{cells, context};
 use crate::object_document::object_text_layout_kernels::object_text_layout_record::pin::GlyphPin;
 use crate::object_document::{
     font_asset_issue, text_holder_id, ObjectDocument, ObjectTarget, TextEntry,
@@ -33,15 +35,15 @@ pub(crate) fn apply(
         | "object.text.animator.remove"
         | "object.text.animator.edit" => animator::apply(origin, payload),
         "object.text.create" => {
-            payload.expects(&["target", "block"])?;
+            payload.expects_with(&["target", "block"], &["keyframe"])?;
             create(origin, payload)
         }
         "object.text.edit" => {
-            payload.expects(&["stableTarget", "patch"])?;
+            payload.expects_with(&["stableTarget", "patch"], &["frame", "keyframe"])?;
             edit(origin, payload)
         }
         "object.text.delete" => {
-            payload.expects(&["stableTarget"])?;
+            payload.expects_with(&["stableTarget"], &["frame", "keyframe"])?;
             delete(origin, payload)
         }
         _ => Err(DispatchErrorCode::InvalidRequest),
@@ -53,6 +55,55 @@ fn stable(payload: &ItemPayload) -> Result<&ObjectTarget, DispatchErrorCode> {
         .stable_target
         .value()
         .ok_or(DispatchErrorCode::InvalidRequest)
+}
+
+/// The document an edit works on and the target it lands on. With `keyframe: "copy"` (#2267: the baseline's ensureKeyframe before a
+/// text commit) a HELD or unexposed cell is first keyed with a copy of what it showed -- its records, text blocks and images under their
+/// own ids -- in the same revision, and the target moves to that cell (`frame`, the playhead cell; a create already names it), so the key
+/// every held frame carries is never edited. Without it the document and target are the origin's.
+fn landing(
+    origin: &ObjectSnapshot,
+    payload: &ItemPayload,
+    target: &ObjectTarget,
+) -> Result<(ObjectDocument, ObjectTarget, bool), DispatchErrorCode> {
+    let mut document = origin.document().clone();
+    let copy = match payload.keyframe.value() {
+        None => false,
+        Some(word) if word == "copy" => true,
+        Some(_) => return Err(DispatchErrorCode::InvalidRequest),
+    };
+    let frame = match payload.frame.value() {
+        None => target.frame(),
+        Some(number) => number.as_u64().and_then(|n| u32::try_from(n).ok()).ok_or(DispatchErrorCode::InvalidRequest)?,
+    };
+    if !copy {
+        if payload.frame.value().is_some() {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        return Ok((document, target.clone(), false));
+    }
+    let mut landed = target.clone();
+    landed.frame_scope.frame = frame;
+    let scope = scope_of(&document, &landed).ok_or(DispatchErrorCode::Unavailable)?;
+    if frame >= scope.1 {
+        return Err(DispatchErrorCode::InvalidRequest);
+    }
+    let held = Some(scope.0)
+        .and_then(|layers| layers.iter().find(|layer| layer.layer_uid() == landed.layer_uid()))
+        .and_then(|layer| layer.timing.value())
+        .is_some_and(|timing| matches!(timing.exposure(frame).0, "held" | "unexposed"));
+    let mut promoted = false;
+    if held {
+        // A component's held cell is keyed through a view of the document (its layers and frame count are the component's), as its vector edits are.
+        let context = landed.context_id().to_string();
+        let view = context::view(&document, &context)?;
+        let base = view.as_ref().unwrap_or(&document);
+        if let DocumentEdit::Changed(next) = cells::promote(base, &context, landed.layer_uid(), &[frame]).map_err(|_| DispatchErrorCode::Unavailable)? {
+            document = if view.is_some() { context::restore(next, &document, &context)? } else { next };
+            promoted = true;
+        }
+    }
+    Ok((document, landed, promoted))
 }
 
 fn index_of(document: &ObjectDocument, target: &ObjectTarget) -> Result<usize, DispatchErrorCode> {
@@ -77,9 +128,9 @@ fn create(origin: &ObjectSnapshot, payload: &ItemPayload) -> Result<ItemEdit, Di
     if let Some(issue) = font_asset_issue(block.font(), inventory_of(origin)) {
         return Err(asset_code(issue));
     }
-    let mut document = origin.document().clone();
+    let (mut document, target, _) = landing(origin, payload, target)?;
     let stroke_id = allocate_id(&document, origin.content_revision(), ID_PREFIX)?;
-    let mut target = target.clone();
+    let mut target = target;
     target.stroke_id = stroke_id.clone();
     check_target(&document, &target)?;
     check_layer(&document, &target)?;
@@ -107,7 +158,8 @@ fn edit(origin: &ObjectSnapshot, payload: &ItemPayload) -> Result<ItemEdit, Disp
         .patch
         .value()
         .ok_or(DispatchErrorCode::InvalidRequest)?;
-    let document = origin.document();
+    let (document, target, promoted) = landing(origin, payload, target)?;
+    let (document, target) = (&document, &target);
     check_target(document, target)?;
     let index = index_of(document, target)?;
     check_layer(document, target)?;
@@ -122,7 +174,7 @@ fn edit(origin: &ObjectSnapshot, payload: &ItemPayload) -> Result<ItemEdit, Disp
             document: document.clone(),
             kind: "text.edit",
             stroke_id,
-            changed: false,
+            changed: promoted,
         });
     };
     if let Some(issue) = font_asset_issue(edited.font(), inventory_of(origin)) {
@@ -142,7 +194,8 @@ fn edit(origin: &ObjectSnapshot, payload: &ItemPayload) -> Result<ItemEdit, Disp
 
 fn delete(origin: &ObjectSnapshot, payload: &ItemPayload) -> Result<ItemEdit, DispatchErrorCode> {
     let target = stable(payload)?;
-    let document = origin.document();
+    let (document, target, _) = landing(origin, payload, target)?;
+    let (document, target) = (&document, &target);
     check_target(document, target)?;
     let index = index_of(document, target)?;
     check_layer(document, target)?;

@@ -465,3 +465,33 @@ test('range Intent admits one strict native gesture with action-local predispatc
  const held=rig({write(s,op,p,receipt){s.layerSel=[2];s.rev++;return receipt(true,op);}});held.ports.rangeCurrent=()=>true;
  assert.equal((await held.intent.run({kind:'rangeDrag',gesture,capture})).status,'applied-unconfirmed');assert.deepEqual(held.s.layerSel,[2]);
 });
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+function hideQueue(r) {
+  const real = r.session.readPresentedObjectSession, q = { hidden: true };
+  r.session.readPresentedObjectSession = function (why) { if (q.hidden) { if (why) why('queue-pending'); return null; } return real.call(this); };
+  return q;
+}
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+test('a frame action issued while the queue hides the presentation waits for it and writes exactly once', async () => {
+  globalThis.NemoNativePresentationWait = require('../src/js/adapters/native-presentation-wait.js');
+  try {
+    const r = rig(), q = hideQueue(r), pending = r.intent.run({ kind: 'insertFrame' });
+    await sleep(150);
+    assert.equal(r.s.writes.length, 0, 'nothing is written while the presentation is hidden');
+    q.hidden = false;
+    assert.deepEqual({ ...await pending }, { status: 'applied-presented', applied: true, playhead: 3 });
+    assert.equal(r.s.writes.length, 1);
+  } finally { delete globalThis.NemoNativePresentationWait; }
+});
+test('a frame action whose native session was replaced during the wait still refuses and writes nothing', async () => {
+  globalThis.NemoNativePresentationWait = require('../src/js/adapters/native-presentation-wait.js');
+  try {
+    const r = rig(), q = hideQueue(r), pending = r.intent.run({ kind: 'insertFrame' });
+    await sleep(80);
+    r.s.replacement = null; r.ports.currentSession = () => null; q.hidden = false;
+    const result = await pending;
+    assert.equal(result.status, 'unavailable');
+    assert.equal(r.s.writes.length, 0);
+  } finally { delete globalThis.NemoNativePresentationWait; }
+});

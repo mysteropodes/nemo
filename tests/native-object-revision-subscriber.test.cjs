@@ -281,3 +281,17 @@ test('bounded object tracking cannot invoke an arbitrary endpoint or inspect rou
   await assert.rejects(transport.dispatchObject('nemo_native_object_reference',{action:{kind:'inspect'}}),/Unsupported/);
   assert.equal(calls.length,before);
 });
+
+test('the next revision is admitted while the previous ACK reply is still in transit (#2510)',async()=>{
+  // The host settles a revision when the ACK reaches it and may emit the next one before the ACK's reply returns.
+  const h=scenario();await h.open();const gate=deferred();h.holdAck(gate);
+  const first=h.external(false);
+  for(let i=0;i<20&&!h.log.includes('acknowledge');i++)await turn();
+  assert.equal(h.log.filter(a=>a==='acknowledge').length,1);
+  const second=h.external(true);
+  for(let i=0;i<20&&h.log.filter(a=>a==='acknowledge').length<2;i++)await turn();
+  gate.resolve();await Promise.all([first,second]);
+  assert.equal(h.log.filter(a=>a==='acknowledge').length,2);assert.equal(h.log.includes('disconnect'),false);
+  assert.equal(h.session.isActive(),true);assert.equal(h.session.info().contentRevision,2);
+  assert.equal(h.root.state.layers[0].visible,true);
+});

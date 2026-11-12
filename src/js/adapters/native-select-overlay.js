@@ -1,0 +1,224 @@
+/* Native Select presentation (#2372): the selection outline, oriented box with its 8 handles and the hover box, drawn as a
+ * disposable SVG over the canvas. A native object project builds no Paper items and the native renderer has no Select overlay
+ * producer, so a successful pick was invisible. This mirrors subselect-bridge's draw(): position:fixed, pointer-events:none,
+ * viewBox canvasW x canvasH, world points mapped through NemoNativeViewportUnderlay.canvasMapping. Presentation only: it reads
+ * root.selectedPaths (transient, never-inserted Paper paths) and owns no document state and no writer. Baseline look (1065e9d8
+ * engine-bridge buildTransformBoxItems / buildHoverBoxItems): blue [74,158,255] box 1px at 0.8 alpha, 8 white handles with a
+ * blue 1.2px edge and a 3.5px half-size, hover box 1.5px at 0.86 alpha, all sizes in screen pixels. */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.NemoNativeSelectOverlay = api;
+}(typeof globalThis === 'object' ? globalThis : this, function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg', BLUE = 'rgb(74,158,255)', HANDLE = 3.5;
+  var states = new WeakMap();
+  function state(root) {
+    var s = states.get(root);
+    if (!s) {
+      s = { svg: null, sel: null, hov: null, prev: null, sig: '', scheduled: false, busy: false, next: null }; states.set(root, s);
+      // A window resize moves the canvas rectangle; it is an event, not something to poll for (#2372 REV-7).
+      if (typeof root.addEventListener === 'function') root.addEventListener('resize', function () { notify(root); });
+    }
+    return s;
+  }
+  // What the overlay maps through, or null when no native presentation is current. `ctx` is the pick context (tool, mode,
+  // frame, layer, document revision): a part drawn under another context is stale and is dropped.
+  function capture(root) {
+    try {
+      var I = root.NemoSelectCanvasIntent, M = root.NemoNativeViewportUnderlay && root.NemoNativeViewportUnderlay.canvasMapping;
+      var shown = I && M && I.presentedState(root), el = shown && root.document.getElementById('drawing-canvas');
+      if (!el) return null;
+      var r = el.getBoundingClientRect();
+      if (!(r.width > 0 && r.height > 0) || !(shown.pin.canvasW > 0) || !(shown.pin.canvasH > 0)) return null;
+      return { ctx: I.pickContext(root), pin: shown.pin, bounds: { left: r.left, top: r.top, width: r.width, height: r.height },
+        V: M.transform({ presentation: shown.presentation }, false) };
+    } catch (_) { return null; }
+  }
+  function at(V, x, y) { return [V[0] * x + V[2] * y + V[4], V[1] * x + V[3] * y + V[5]]; }
+  function node(root, tag, attrs) {
+    var n = root.document.createElementNS(NS, tag);
+    Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    return n;
+  }
+  function line(root, extra) {
+    return Object.assign({ fill: 'none', 'vector-effect': 'non-scaling-stroke' }, extra);
+  }
+  // The selection's oriented box (tools.js orientedSelBox): the union of the paths' bounds, or, when every path carries the
+  // same data.boxAngle, the tight box in the de-rotated space mapped back to world around the union's centre. A mixed
+  // selection falls back to the axis-aligned union, as in the baseline. Returns the four world corners and the 8 handles.
+  function orientedBox(root, paths) {
+    var list = (paths || []).filter(function (p) { return p && p.bounds; });
+    if (!list.length) return null;
+    var union = function (rects) {
+      return rects.reduce(function (u, r) {
+        return u ? { left: Math.min(u.left, r.left), top: Math.min(u.top, r.top), right: Math.max(u.right, r.right), bottom: Math.max(u.bottom, r.bottom) } : { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+      }, null);
+    };
+    var b = union(list.map(function (p) { return p.bounds; }));
+    var angle = (list[0].data && list[0].data.boxAngle) || 0;
+    var pivot = { x: (b.left + b.right) / 2, y: (b.top + b.bottom) / 2 };
+    var mixed = list.some(function (p) { return Math.abs(((p.data && p.data.boxAngle) || 0) - angle) > 0.01; });
+    var Point = root.Point || (root.paper && root.paper.Point);
+    if (angle && !mixed && Point && typeof list[0].clone === 'function') {
+      b = union(list.map(function (p) {
+        var c = p.clone({ insert: false }), r;
+        c.rotate(-angle, new Point(pivot.x, pivot.y)); r = c.bounds; c.remove();
+        return r;
+      }));
+    } else angle = 0;
+    var rad = angle * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+    var pt = function (x, y) {
+      var dx = x - pivot.x, dy = y - pivot.y;
+      return angle ? [pivot.x + dx * cos - dy * sin, pivot.y + dx * sin + dy * cos] : [x, y];
+    };
+    var mx = (b.left + b.right) / 2, my = (b.top + b.bottom) / 2;
+    var mid = pt(mx, my);
+    return { center: { x: mid[0], y: mid[1] }, width: b.right - b.left, height: b.bottom - b.top, angle: angle,
+      corners: [pt(b.left, b.top), pt(b.right, b.top), pt(b.right, b.bottom), pt(b.left, b.bottom)],
+      handles: [pt(b.left, b.top), pt(mx, b.top), pt(b.right, b.top), pt(b.right, my), pt(b.right, b.bottom), pt(mx, b.bottom), pt(b.left, b.bottom), pt(b.left, my)] };
+  }
+  function outline(V, p) {
+    var segs = p && p.segments;
+    if (!segs || segs.length < 2) return '';
+    var w = function (x, y) { return at(V, x, y).join(' '); }, start = segs[0].point, d = 'M ' + w(start.x, start.y);
+    var curve = function (a, c) {
+      d += ' C ' + w(a.point.x + a.handleOut.x, a.point.y + a.handleOut.y) + ' ' + w(c.point.x + c.handleIn.x, c.point.y + c.handleIn.y) + ' ' + w(c.point.x, c.point.y);
+    };
+    for (var i = 1; i < segs.length; i++) curve(segs[i - 1], segs[i]);
+    if (p.closed) { curve(segs[segs.length - 1], segs[0]); d += ' Z'; }
+    return d;
+  }
+  function polygon(root, V, box, extra) {
+    return node(root, 'polygon', line(root, Object.assign({ points: box.corners.map(function (c) { return at(V, c[0], c[1]).join(','); }).join(' ') }, extra)));
+  }
+  function remove(s) { if (s.svg) { s.svg.remove(); s.svg = null; } s.sig = ''; }
+  // The pick context now. Unlike capture() it needs no readable presentation, so a selection's end (tool, frame, layer or revision
+  // change) is told apart from the presentation merely being unreadable for a moment.
+  function ctxNow(root) { try { return root.NemoSelectCanvasIntent.pickContext(root); } catch (_) { return null; } }
+  // The single (re)draw. A part whose context no longer holds is dropped here, so show/hover/the watcher cannot disagree.
+  // The native queue reports no presentation while any command is pending (the pick's own repaint, a hover read): that is
+  // "cannot draw yet", never "selection ended" - the parts are kept, the svg is hidden and a bounded retry redraws it once readable.
+  function refresh(root, force) {
+    var s = state(root), c = capture(root), paths = root.selectedPaths, ctx = ctxNow(root);
+    if (s.sel && (ctx !== s.sel.ctx || s.sel.paths !== paths || s.sel.count !== paths.length)) {
+      s.sel = null; force = true;
+      // The context the selection was drawn for ended (frame, layer, tool): an edit of it still waiting in the style panel commits now (RV6-STYLE).
+      var style = root.NemoNativeSelectionStyle;
+      if (style && typeof style.flush === 'function') style.flush(root);
+    }
+    if (s.hov && ctx !== s.hov.ctx) { s.hov = null; force = true; }
+    if (s.prev && ctx !== s.prev.ctx) { s.prev = null; force = true; }
+    if (!s.sel && !s.hov && !s.prev) { remove(s); s.retry = 0; return; }
+    if (!c) { remove(s); if ((s.retry = (s.retry || 0) + 1) <= 40) notify(root); return; }
+    s.retry = 0;
+    var sig = JSON.stringify([c.V, c.bounds, c.pin.canvasW, c.pin.canvasH]);
+    if (!force && s.svg && sig === s.sig) return;
+    remove(s); s.sig = sig;
+    var svg = node(root, 'svg', { viewBox: '0 0 ' + c.pin.canvasW + ' ' + c.pin.canvasH, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+    Object.assign(svg.style, { position: 'fixed', pointerEvents: 'none', zIndex: '20', left: c.bounds.left + 'px', top: c.bounds.top + 'px', width: c.bounds.width + 'px', height: c.bounds.height + 'px' });
+    if (s.hov) {
+      var hover = orientedBox(root, [s.hov.path]);
+      if (hover) svg.appendChild(polygon(root, c.V, hover, { stroke: BLUE, 'stroke-opacity': '0.86', 'stroke-width': '1.5' }));
+    }
+    var shown = s.prev && s.prev.paths ? s.prev.paths : s.sel && s.sel.paths;
+    if (shown) {
+      shown.forEach(function (p) {
+        var d = outline(c.V, p);
+        if (d) svg.appendChild(node(root, 'path', line(root, { d: d, stroke: BLUE, 'stroke-opacity': '0.8', 'stroke-width': '1' })));
+      });
+      var box = orientedBox(root, shown), r = HANDLE * c.pin.canvasW / c.bounds.width;
+      if (box) {
+        // The rotate ring (baseline buildTransformBoxItems): centred on the box, 36 screen px at most, 30% of the box otherwise.
+        // Motion (#2520/#2525): the shape's box alone - its scale and rotate belong to its Motion properties, not to the geometry handles.
+        // #2372: the ring turns about the pivot (the box centre unless a preset or an Alt+clicked point was chosen), where the crosshair sits.
+        var motion = !!root.state && root.state.appMode === 'motion', pivot = !motion && root.NemoNativeSelectPivot ? root.NemoNativeSelectPivot.pointOf(root, box) : box.center, mid = at(c.V, pivot.x, pivot.y);
+        if (!motion) svg.appendChild(node(root, 'circle', line(root, { cx: mid[0], cy: mid[1], stroke: BLUE, 'stroke-opacity': '0.63', 'stroke-width': '1',
+          r: Math.min(36 * c.pin.canvasW / c.bounds.width, Math.max(box.width, box.height) * 0.3 * Math.hypot(c.V[0], c.V[1])) })));
+        svg.appendChild(polygon(root, c.V, box, { stroke: BLUE, 'stroke-opacity': '0.8', 'stroke-width': '1' }));
+        (motion ? [] : box.handles).forEach(function (h) {
+          var p = at(c.V, h[0], h[1]);
+          svg.appendChild(node(root, 'rect', line(root, { x: p[0] - r, y: p[1] - r, width: 2 * r, height: 2 * r, fill: '#ffffff', stroke: BLUE, 'stroke-width': '1.2' })));
+        });
+        if (!motion && root.NemoNativeSelectSkew) root.NemoNativeSelectSkew.draw(root, svg, c, box); // the skew zones' tick marks
+        if (!motion && root.NemoNativeSelectPivot) root.NemoNativeSelectPivot.draw(root, svg, c, box); // the pivot crosshair
+      }
+    }
+    // #2372 native-fill-gradient: the Fill row's gradient gizmo (line, end handles, stop diamonds) joins the selection's drawing.
+    var gizmo = root.NemoNativeFillGradient;
+    if (shown && gizmo && typeof gizmo.draw === 'function') gizmo.draw(root, svg, c, shown);
+    var vertices = root.NemoNativeMotionVertices; // Motion: the dots of an element's open Path group
+    if (shown && vertices && typeof vertices.draw === 'function') vertices.draw(root, svg, c, shown);
+    var unified = root.NemoNativeMotionUnified; // Motion: the violet path of a multi-element selection
+    if (shown && unified && typeof unified.draw === 'function') unified.draw(root, svg, c, shown);
+    if (s.prev && s.prev.lasso && s.prev.lasso.length > 1) { // the Alt lasso's freehand path, closed back to its start
+      svg.appendChild(node(root, 'polygon', line(root, { points: s.prev.lasso.map(function (q) { return at(c.V, q[0], q[1]).join(','); }).join(' '), fill: 'rgba(74,158,255,0.08)', stroke: BLUE, 'stroke-opacity': '0.9', 'stroke-width': '1' })));
+    }
+    if (s.prev && s.prev.marquee) {
+      var m = s.prev.marquee;
+      svg.appendChild(polygon(root, c.V, { corners: [[m[0], m[1]], [m[2], m[1]], [m[2], m[3]], [m[0], m[3]]] }, { fill: 'rgba(74,158,255,0.08)', stroke: BLUE, 'stroke-opacity': '0.9', 'stroke-width': '1' }));
+    }
+    root.document.body.appendChild(svg); s.svg = svg;
+  }
+  // Something the overlay maps through may have changed (a new presentation or view from the viewport underlay, a UI repaint
+  // after a tool, layer, frame or mode change, a window resize): redraw in place, or drop what no longer holds. Event driven
+  // and one-shot: a single frame callback is queued only while something is drawn and is never re-armed, so an idle selection
+  // costs no per-frame work (a presentation still unreadable re-arms it, at most 40 frames). The callback runs after the presenting call has returned.
+  function notify(root) {
+    var s = state(root);
+    if (s.scheduled || (!s.svg && !s.sel && !s.hov && !s.prev) || !root.requestAnimationFrame) return;
+    s.scheduled = true;
+    root.requestAnimationFrame(function () { s.scheduled = false; refresh(root, false); });
+  }
+  // The selection changed (applyPick): redraw from root.selectedPaths; an empty selection draws nothing.
+  function show(root) {
+    var s = state(root), paths = root.selectedPaths, ctx = ctxNow(root);
+    s.sel = ctx !== null && Array.isArray(paths) && paths.length ? { paths: paths, count: paths.length, ctx: ctx } : null; // kept while the presentation is unreadable; refresh draws it when it is
+    s.hov = null;
+    if (root.NemoNativeSelectPivot) root.NemoNativeSelectPivot.restore(root); // the picked stroke's remembered pivot comes back
+    refresh(root, true);
+  }
+  // The pick context the drawn selection (box, handles, ring) belongs to, or null when none is drawn for the current selection (#2372).
+  function selectionContext(root) { var s = state(root); return s.sel && s.sel.paths === root.selectedPaths && s.sel.count === (root.selectedPaths || []).length ? s.sel.ctx : null; }
+  function clear(root) { var s = state(root); s.sel = null; s.hov = null; s.prev = null; s.next = null; remove(s); }
+  // A drag in flight (#2372): `spec` is { paths } (the transformed copies of the selection, drawn with their box and handles)
+  // and/or { marquee: [x0, y0, x1, y1] } in world space; null ends it. Nothing here writes the document.
+  function preview(root, spec) {
+    var s = state(root), ctx = ctxNow(root);
+    s.prev = spec && ctx !== null ? { paths: spec.paths || null, marquee: spec.marquee || null, lasso: spec.lasso || null, ctx: ctx } : null;
+    refresh(root, true);
+  }
+  // Hover box of one picked path (null clears). A path already selected shows its selection box instead.
+  function hover(root, path) {
+    var s = state(root), sid = path && path.data && path.data.strokeId;
+    if (!path && !s.hov) return;
+    var c = capture(root);
+    var held = sid && (root.selectedPaths || []).some(function (p) { return p && p.data && p.data.strokeId === sid; });
+    var next = c && path && !held ? { path: path, ctx: c.ctx } : null;
+    if (next && s.hov && sid && s.hov.path.data.strokeId === sid && s.hov.ctx === next.ctx) return;
+    s.hov = next;
+    try { refresh(root, true); } catch (e) { s.hov = null; remove(s); throw e; } // a failed draw must not leave a hover that suppresses the retry
+  }
+  // Pointer hover over the active layer's presented strokes. Picks are coalesced: one read at a time, the latest position wins,
+  // and a read whose context changed before it returned is discarded.
+  function hoverAt(root, e) {
+    var s = state(root), I = root.NemoSelectCanvasIntent, st = root.state;
+    if (e && !e.buttons && root.NemoNativeSelectSkew && st && st.tool === 'select' && st.appMode !== 'motion' && I && I.objectProject(root)) root.NemoNativeSelectSkew.hover(root, e); // handle cursors, hovered skew edge
+    if (!e || e.buttons || !I || !st || st.tool !== 'select' || !I.objectProject(root)) { s.next = null; hover(root, null); return; }
+    s.next = { x: e.clientX, y: e.clientY };
+    if (s.busy) return;
+    s.busy = true;
+    (async function () {
+      // A throw anywhere in a read (context, pick, redraw) must not leave busy set: that disabled hover for good (#2372 REV-7).
+      try {
+        while (s.next) {
+          var job = s.next, ctx = I.pickContext(root), item;
+          s.next = null;
+          try { item = await I.pick(root, job.x, job.y); } catch (_) { item = undefined; }
+          if (item !== undefined && !s.next && I.pickContext(root) === ctx) hover(root, item);
+        }
+      } catch (_) { s.next = null; } finally { s.busy = false; }
+    }());
+  }
+  return Object.freeze({ show: show, clear: clear, hover: hover, hoverAt: hoverAt, preview: preview, boxOf: orientedBox, selectionContext: selectionContext, notify: notify, refresh: function (root) { refresh(root, false); } });
+}));

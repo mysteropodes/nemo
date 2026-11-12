@@ -126,7 +126,7 @@ function caller(h){let available=true,current=h.session;
     selection:()=>h.root._layerSel.map(i=>h.root.state.layers[i]?.layerUid),
     select:(uid,info)=>Project.selectLayerUI(h.root,info.layers.findIndex(r=>r.layerUid===uid),false,uid,info)};
   const add=Add.create(ports);h.root.NemoNativeDrawingAddController=add;
-  const start=timeline.indexOf('  addLayer:function('),end=timeline.indexOf('\n  // Null layer',start);
+  const start=timeline.indexOf('  addLayer:function('),end=timeline.indexOf('\n  // Layer kinds and folder membership',start);
   assert.ok(start>=0&&end>start);
   h.root.SM.addLayer=vm.runInNewContext('('+timeline.slice(start,end).trim().replace('addLayer:','').replace(/,\s*$/,'')+')',{
     window:h.root,state:h.root.state,Promise,

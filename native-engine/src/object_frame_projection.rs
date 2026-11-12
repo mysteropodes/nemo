@@ -40,12 +40,11 @@ pub(crate) fn layer_bounds(
     geometry::bounds(vectors)
 }
 
-/// Whole-layer Motion, after the caller's existing pathFX/rebuild/element stages.
-/// Opacity and stroke-scale paint semantics remain with the actual paint producer.
-pub(crate) fn transform_layer_2d(
+/// The exact own-layer transform, shared by paint and immutable edit projections.
+pub(crate) fn layer_chain_entry(
     vectors: &[EvaluatedVector],
     motion: &MotionValues,
-) -> Result<Vec<EvaluatedVector>, ProjectionError> {
+) -> Result<Option<crate::evaluation::motion_parent_chain::ChainEntry>, ProjectionError> {
     if motion
         .position
         .iter()
@@ -64,10 +63,10 @@ pub(crate) fn transform_layer_2d(
         motion.scale,
         motion.opacity,
     ) else {
-        return Ok(vectors.to_vec());
+        return Ok(None);
     };
     let Some(bounds) = bounds else {
-        return Ok(vectors.to_vec());
+        return Ok(None);
     };
     let pivot = [
         bounds.x + bounds.width / 2. + mat.ax,
@@ -76,6 +75,32 @@ pub(crate) fn transform_layer_2d(
     if pivot.iter().any(|n| !n.is_finite()) {
         return Err(ProjectionError::NonFinite);
     }
+    Ok(Some(crate::evaluation::motion_parent_chain::ChainEntry {
+        mat,
+        pivot,
+    }))
+}
+
+/// Whole-layer Motion, after the caller's existing pathFX/rebuild/element stages.
+/// Opacity and stroke-scale paint semantics remain with the actual paint producer.
+pub(crate) fn transform_layer_2d(
+    vectors: &[EvaluatedVector],
+    motion: &MotionValues,
+) -> Result<Vec<EvaluatedVector>, ProjectionError> {
+    let entry = layer_chain_entry(vectors, motion)?;
+    apply_layer_entry(vectors, entry)
+}
+
+/// The geometry half of `transform_layer_2d`, for a caller that also needs the entry itself (paint coordinates).
+pub(crate) fn apply_layer_entry(
+    vectors: &[EvaluatedVector],
+    entry: Option<crate::evaluation::motion_parent_chain::ChainEntry>,
+) -> Result<Vec<EvaluatedVector>, ProjectionError> {
+    let Some(entry) = entry else {
+        return Ok(vectors.to_vec());
+    };
+    let mat = entry.mat;
+    let pivot = entry.pivot;
     vectors
         .iter()
         .map(|vector| {
@@ -115,6 +140,18 @@ pub(crate) fn project_layer_3d(
     canvas: [f64; 2],
     extras: &[Option<ExtraDelta>],
 ) -> Result<Vec<EvaluatedVector>, ProjectionError> {
+    project_layer_3d_bounded(vectors, pose, canvas, extras, None)
+}
+
+/// [`project_layer_3d`] with the layer pivot bound supplied by the caller: a layer that also holds images pivots around the
+/// union of its geometry and its images (baseline `userLayers[i].bounds`), not around the vectors alone.
+pub(crate) fn project_layer_3d_bounded(
+    vectors: &[EvaluatedVector],
+    pose: &Pose3D,
+    canvas: [f64; 2],
+    extras: &[Option<ExtraDelta>],
+    bounds_override: Option<crate::evaluation::property_projection_3d::Bounds>,
+) -> Result<Vec<EvaluatedVector>, ProjectionError> {
     canvas_valid(canvas)?;
     if extras.len() != vectors.len() {
         return Err(ProjectionError::MismatchedExtras);
@@ -140,7 +177,10 @@ pub(crate) fn project_layer_3d(
     {
         return Err(ProjectionError::NonFinite);
     }
-    let Some(bounds) = geometry::bounds(vectors)? else {
+    let Some(bounds) = (match bounds_override {
+        Some(bounds) => Some(bounds),
+        None => geometry::bounds(vectors)?,
+    }) else {
         return Ok(vectors.to_vec());
     };
     vectors

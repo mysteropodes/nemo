@@ -4,7 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
-const { decode, pixelAt } = require('../fixtures/lib/png.cjs');
+const { decode } = require('../fixtures/lib/png.cjs');
+const { srgbPixelReader } = require('./play-png-color.cjs');
 const MAX_BYTES = 32 * 1024 * 1024;
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const safe = n => Number.isSafeInteger(n) && n >= 0;
@@ -181,7 +182,8 @@ function visualEvidence(visuals, expected, events, restoredIds) {
     const image=decode(bytes),roi=v.viewport;
     requireEvidence(roi && ['x','y','width','height'].every(k=>safe(roi[k])) && roi.width>0 && roi.height>0 &&
       roi.x+roi.width<=width && roi.y+roi.height<=height, 'visual-viewport');
-    const at=(cx,cy)=>pixelAt(image,roi.x+Math.floor(cx*roi.width/320),roi.y+Math.floor(cy*roi.height/180));
+    const pixel=srgbPixelReader(bytes,image);
+    const at=(cx,cy)=>pixel(roi.x+Math.floor(cx*roi.width/320),roi.y+Math.floor(cy*roi.height/180));
     const center=at(30+x,70),outside=at(10+x,70);
     requireEvidence(center.every((n,i)=>Math.abs(n-[255,color,color,255][i])<=4) &&
       outside.every(n=>Math.abs(n-255)<=4), 'visual-pixels');

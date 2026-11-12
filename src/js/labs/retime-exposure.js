@@ -19,11 +19,26 @@
     describe: 'labsDescribeRetimeExposure',
   });
 
+  function retimedToast(spacing) {
+    if (typeof showToast === 'function') showToast(SM.t('labsToastExposureRetimedPrefix') + spacing + ' (' + (spacing === 1 ? 'ones' : spacing === 2 ? 'twos' : spacing === 3 ? 'threes' : spacing) + ')');
+  }
+  function nativeRetime(native, b, spacing) {
+    var toast = function (key) { if (typeof showToast === 'function') showToast(SM.t(key)); };
+    var from = native.layerUid(b.minL), to = native.layerUid(b.maxL);
+    if (!from || !to) { toast('labsToastLayerInvalid'); return Promise.resolve(); }
+    return native.retime({ fromLayer: from, toLayer: to, fromFrame: b.minF, toFrame: b.maxF, spacing: spacing }).then(function () {
+      retimedToast(spacing);
+    }, function (error) { toast(error && error.code === 'not_found' ? 'labsToastNoKeyframeInRange' : 'labsToastLayerInvalid'); });
+  }
+
   window.SMLabs.retimeExposure = function (spacing) {
     if (typeof selBounds !== 'function') return;
     var b = selBounds();
     if (!b) { if (typeof showToast === 'function') showToast(SM.t('labsToastSelectFrameRangeFirst')); return; }
     spacing = Math.max(1, Math.min(12, parseInt(spacing, 10) || 2));
+    // Native authority (U35, #2362): one native transaction; the call returns a Promise. The baseline path follows.
+    var native = window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window);
+    if (native) return nativeRetime(native, b, spacing);
     pushUndoLayers();
     saveAllLayerFrames();
     var totalNeeded = 0, plans = [];
@@ -63,6 +78,6 @@
     // exposure spacing, kept untranslated in every language — same
     // convention already used for the 'Ones (1)'/'Twos (2)'/'Threes (3)'
     // option labels in labs-panel.js's own retime-exposure select.
-    if (typeof showToast === 'function') showToast(SM.t('labsToastExposureRetimedPrefix') + spacing + ' (' + (spacing === 1 ? 'ones' : spacing === 2 ? 'twos' : spacing === 3 ? 'threes' : spacing) + ')');
+    retimedToast(spacing);
   };
 })();

@@ -38,6 +38,7 @@
     "maxChunkBytes": 1536,
     "policy": "Original native owner/shared capacity ledger; positive bounded reads. Never substitute transport bytes for native ID/digest."
   },
+  "semantics": "command.document.object.asset.font.import requires the host's current lifecycleGeneration. It is not a constant: it advances on every project New/Open/replacement, so read it from nemo_discover instances[].nativeHostStatus.lifecycleGeneration immediately before the import; a stale value is refused as unavailable before any source work.",
   "ports": [
     {
       "label": "ui",

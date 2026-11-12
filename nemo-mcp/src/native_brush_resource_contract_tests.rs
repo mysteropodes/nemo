@@ -1,6 +1,5 @@
 //! Common validator cases for the lane-7 brush resource operations, authored UNRUN (no compiler by rule).
 use super::*;
-use crate::contract::RequestError;
 use serde_json::json;
 
 fn publish() -> Value {
@@ -417,16 +416,15 @@ fn a_response_keeps_the_revision_of_its_kind_and_stays_in_the_envelope() {
 }
 
 #[test]
-fn registration_declares_the_operations_and_the_missing_native_route_as_typed_unavailability() {
+fn registration_declares_the_operations_available_on_the_session_owned_store_with_no_fallback() {
     let catalog = crate::capabilities::native_catalog();
     for operation in [PUBLISH, QUERY] {
         let descriptor = catalog.capability_for_operation(operation).unwrap();
         assert_eq!(descriptor["id"], "native.object.brush-resources");
-        assert_eq!(descriptor["availability"]["state"], "unavailable");
+        assert_eq!(descriptor["availability"]["state"], "available");
         assert_eq!(descriptor["authority"]["fallback"], "none");
         assert!(crate::capabilities::validate_native_operation_registration(operation).is_ok());
-        let refused = crate::capabilities::validate_native_operation(operation).unwrap_err();
-        assert!(matches!(refused, RequestError::Unavailable(reason) if reason.contains("brush")));
+        assert!(crate::capabilities::validate_native_operation(operation).is_ok());
     }
 }
 
@@ -445,14 +443,8 @@ fn the_envelope_requires_a_revision_for_the_command_and_forbids_one_for_a_read()
     let mut open = publish();
     open["pixels"] = json!("QUJD");
     assert!(envelope(PUBLISH, open, Some(7)).validate_input().is_err());
-    assert!(matches!(
-        envelope(PUBLISH, publish(), Some(7)).validate(),
-        Err(RequestError::Unavailable(_))
-    ));
-    assert!(matches!(
-        envelope(QUERY, scene(0), None).validate(),
-        Err(RequestError::Unavailable(_))
-    ));
+    assert!(envelope(PUBLISH, publish(), Some(7)).validate().is_ok());
+    assert!(envelope(QUERY, scene(0), None).validate().is_ok());
 }
 
 #[test]

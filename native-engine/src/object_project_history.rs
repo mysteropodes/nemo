@@ -39,6 +39,8 @@ impl InactiveProject {
 
 #[path = "object_reference_dispatch.rs"]
 mod reference_dispatch;
+#[path = "object_layer_read_model.rs"]
+mod layer_read_model; // #2371: kind, folder, component, matte, blend and opacity facts
 // L06-H (lane #2112): asset attach / remove commands.
 #[path = "object_raster_asset_dispatch.rs"]
 #[allow(dead_code)]
@@ -50,6 +52,7 @@ fn blank_project(
     canvas_width: u32,
     canvas_height: u32,
     fps: f64,
+    total_frames: Option<u32>,
 ) -> Result<crate::object_document::ProjectEnvelope, DispatchErrorCode> {
     use crate::object_document::{
         AuthoredOrder, FrameScope, FrameScopeKind, ObjectDocument, ObjectLayer, OrderContext,
@@ -58,7 +61,11 @@ fn blank_project(
     };
     let metadata = ProjectMetadata::new(canvas_width, canvas_height, fps)
         .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-    let frames = (fps * 5.0).round().max(1.0);
+    let frames = match total_frames {
+        Some(0) => return Err(DispatchErrorCode::InvalidRequest),
+        Some(explicit) => f64::from(explicit),
+        None => (fps * 5.0).round().max(1.0),
+    };
     if !frames.is_finite() || frames > u32::MAX as f64 {
         return Err(DispatchErrorCode::InvalidRequest);
     }
@@ -109,6 +116,7 @@ fn blank_project(
         items: Presence::Missing,
         component_tables: Presence::Missing,
         motion_arcs: Presence::Missing,
+        tweens: Presence::Missing,
         audio_tracks: Presence::Missing,
     };
     Ok(ProjectEnvelope::no_media(metadata, drawing))
@@ -124,7 +132,19 @@ impl NativeObjectHistory {
         canvas_height: u32,
         fps: f64,
     ) -> Result<Self, DispatchErrorCode> {
-        let project = blank_project(canvas_width, canvas_height, fps)?;
+        Self::new_blank_project_frames(instance, canvas_width, canvas_height, fps, None)
+    }
+
+    /// New Project with an explicit duration (for example a Kitsu shot). `None`
+    /// keeps the five-second default; zero is refused.
+    pub fn new_blank_project_frames(
+        instance: impl Into<String>,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+        total_frames: Option<u32>,
+    ) -> Result<Self, DispatchErrorCode> {
+        let project = blank_project(canvas_width, canvas_height, fps, total_frames)?;
         let instance = instance.into();
         if instance.is_empty() {
             return Err(DispatchErrorCode::InvalidRequest);
@@ -141,6 +161,24 @@ impl NativeObjectHistory {
         canvas_height: u32,
         fps: f64,
     ) -> Result<PreparedProjectReplacement, DispatchErrorCode> {
+        self.prepare_blank_project_replacement_frames(
+            snapshot_id,
+            canvas_width,
+            canvas_height,
+            fps,
+            None,
+        )
+    }
+
+    /// As `prepare_blank_project_replacement`, with an explicit duration.
+    pub fn prepare_blank_project_replacement_frames(
+        &self,
+        snapshot_id: &str,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+        total_frames: Option<u32>,
+    ) -> Result<PreparedProjectReplacement, DispatchErrorCode> {
         let origin = self
             .acquire_snapshot(self.content_revision())
             .filter(|snapshot| snapshot.snapshot_id() == snapshot_id)
@@ -148,7 +186,7 @@ impl NativeObjectHistory {
         if origin.project().is_none() {
             return Err(DispatchErrorCode::Unavailable);
         }
-        let project = blank_project(canvas_width, canvas_height, fps)?;
+        let project = blank_project(canvas_width, canvas_height, fps, total_frames)?;
         let next = ObjectSnapshot::from_admitted_project(self.instance_id().into(), project)
             .map_err(|_| DispatchErrorCode::Unavailable)?;
         Ok(PreparedProjectReplacement { origin, next })
@@ -251,6 +289,7 @@ impl NativeObjectHistory {
             owner,
             undo: Vec::new(),
             redo: Vec::new(),
+            labels: Default::default(),
             receipts: StageReceipts::default(),
         };
         drop(incoming.take());
@@ -298,6 +337,7 @@ impl NativeObjectHistory {
         self.owner.replace_admitted_snapshot(prepared.next)?;
         self.undo.clear();
         self.redo.clear();
+        self.labels.clear();
         self.receipts = StageReceipts::default();
         Ok(())
     }
@@ -310,6 +350,7 @@ impl NativeObjectHistory {
             owner: ObjectFillOwner::from_project_file(instance.into(), bytes)?,
             undo: Vec::new(),
             redo: Vec::new(),
+            labels: Default::default(),
             receipts: StageReceipts::default(),
         })
     }
@@ -325,6 +366,22 @@ impl NativeObjectHistory {
             .filter(|s| s.snapshot_id() == snapshot_id)
             .ok_or(DispatchErrorCode::StaleRevision)?;
         snapshot.serialize_project_file()
+    }
+
+    /// The same pin and encoder as `serialize_project_file`, split so a caller can
+    /// hold its authority lock only for the O(1) acquisition of the immutable,
+    /// Arc-shared snapshot and run the encoding after releasing it.
+    pub fn detached_project_file_serializer(
+        &self,
+        at_revision: u64,
+        snapshot_id: &str,
+    ) -> Result<impl FnOnce() -> Result<Vec<u8>, DispatchErrorCode> + Send + 'static, DispatchErrorCode>
+    {
+        let snapshot = self
+            .acquire_snapshot(at_revision)
+            .filter(|s| s.snapshot_id() == snapshot_id)
+            .ok_or(DispatchErrorCode::StaleRevision)?;
+        Ok(move || snapshot.serialize_project_file())
     }
 
     /// Detached presentation metadata and a digest of the native file bytes.
@@ -419,6 +476,10 @@ fn project_snapshot_info(
             if let Some(parent) = layer.parent_layer_uid.value() {
                 info["parentLayerUid"] = serde_json::json!(parent);
             }
+            // #2255: only a widget layer carries the flag, so the layer menu can offer its settings; nothing else changes.
+            if layer.widget().is_some() {
+                info["widget"] = serde_json::json!(true);
+            }
             info
         })
         .collect();
@@ -434,6 +495,7 @@ fn project_snapshot_info(
         "byteCount":bytes.len(), "canvasW":width, "canvasH":height,
         "fps":project.project().fps(), "totalFrames":project.drawing().total_frames,
         "layers":layers, "reference":reference});
+    layer_read_model::extend_layers(project.drawing(), &mut info);
     if let Some(background) = project.project().canvas_background() {
         info["canvasBg"] = background.into();
     }

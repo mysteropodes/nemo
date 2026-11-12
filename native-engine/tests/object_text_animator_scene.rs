@@ -222,8 +222,22 @@ fn raw_text_element_motion_without_animators_still_reaches_real_svg() {
 }
 
 #[test]
-fn owner_text_sibling_does_not_admit_unconsumed_visible_vector_pose() {
-    use crate::object_expression_runtime::prepare_object_motion_exposure_frame_for_owner;
+fn text_sibling_shares_the_layer_pose_with_the_visible_vector() {
+    let first_point = |doc: &Value| {
+        let o = owner(doc);
+        let before = support::state(&o);
+        let snapshot = support::head(&o);
+        let p = plan(&snapshot, 2);
+        assert_eq!(support::state(&o), before);
+        assert!(!labels(&p).is_empty());
+        let point = p
+            .commands()
+            .next()
+            .map(|c| c.contour().segments()[0].point)
+            .expect("the layer's visible vector draws");
+        point
+    };
+    let rest = first_point(&drawing_without_raster(false));
     for key in ["rotation", "scale", "anchor"] {
         let mut doc = drawing_without_raster(false);
         let values = if key == "rotation" {
@@ -233,21 +247,8 @@ fn owner_text_sibling_does_not_admit_unconsumed_visible_vector_pose() {
         };
         doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0"},
             "properties":[{"property":key,"static":values}]}]);
-        let o = owner(&doc);
-        let before = support::state(&o);
-        let snapshot = support::head(&o);
-        let mut retained = None;
-        assert!(
-            prepare_object_motion_exposure_frame_for_owner(
-                &o,
-                &snapshot,
-                &selector(&snapshot, 2),
-                &mut retained
-            )
-            .is_err(),
-            "{key}"
-        );
-        assert_eq!(support::state(&o), before);
+        // Rotation and Scale move the vector about the union pivot; an Anchor alone moves nothing.
+        assert_eq!(first_point(&doc) == rest, key == "anchor", "{key}");
     }
 }
 

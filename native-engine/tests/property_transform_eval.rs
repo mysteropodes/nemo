@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => property_transform_eval_tests
 //! Property-transform routing provider (D30/#2075): oracle against the
 //! JavaScript in `src/js/motion.js`.
 //!

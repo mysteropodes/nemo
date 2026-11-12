@@ -166,6 +166,7 @@ impl Row {
         self.clip
             .iter()
             .map(|entry| PasteCell {
+                items: Default::default(),
                 order_elements: crate::object_document::Presence::Missing,
                 rel_layer: entry.rl,
                 rel_frame: entry.rf,

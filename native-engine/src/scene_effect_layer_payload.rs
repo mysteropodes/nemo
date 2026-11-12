@@ -12,6 +12,8 @@ use serde::Deserialize;
 pub(super) const MAX_PAYLOAD_BYTES: usize = 4096;
 pub(super) const MAX_ID_BYTES: usize = 128;
 pub(super) const MAX_NAME_BYTES: usize = 256;
+/// The most keys one group edit names (the read model lists at most as many blend keys).
+pub(super) const MAX_GROUP_KEYS: usize = 64;
 
 #[derive(Debug)]
 pub(super) struct EditPayload {
@@ -23,6 +25,8 @@ pub(super) struct EditPayload {
     pub(super) index: Presence<u32>,
     pub(super) collapsed: Presence<bool>,
     pub(super) effects: Presence<Vec<LayerEffect>>,
+    pub(super) frames: Presence<Vec<u32>>,
+    pub(super) by: Presence<i32>,
 }
 object_deserialize!(EditPayload {
     command: String,
@@ -32,7 +36,9 @@ object_deserialize!(EditPayload {
     #[serde(default)] source: Presence<String>,
     #[serde(default)] index: Presence<u32>,
     #[serde(default)] collapsed: Presence<bool>,
-    #[serde(default)] effects: Presence<Vec<LayerEffect>>
+    #[serde(default)] effects: Presence<Vec<LayerEffect>>,
+    #[serde(default)] frames: Presence<Vec<u32>>,
+    #[serde(default)] by: Presence<i32>
 });
 
 #[derive(Debug)]
@@ -52,7 +58,11 @@ object_deserialize!(CreatePayload {
 pub(super) enum Edit {
     Blend(String),
     MatteSource(String),
-    MatteMode(String),
+    /// The matte menu pick: the mode, and optionally the source it freezes in the same write.
+    MatteMode {
+        mode: String,
+        source: Option<String>,
+    },
     MatteClear,
     MatteMoreAdd {
         source: String,
@@ -64,6 +74,23 @@ pub(super) enum Edit {
         mode: Option<String>,
     },
     MatteMoreRemove(usize),
+    /// Hold-only blend key: the mode from `frame` on (an existing key at the frame is replaced).
+    BlendKeySet {
+        frame: u32,
+        mode: String,
+    },
+    BlendKeyRemove(u32),
+    /// Several keys of one layer removed in one write (the Delete key over a selection of Blend diamonds). Strictly
+    /// increasing frames, every one of them a key.
+    BlendKeysRemove(Vec<u32>),
+    /// The keys at `frames` moved by `by` frames in one write (a drag or a nudge of the selected Blend diamonds): the
+    /// modes travel with the keys, the group lands whole or not at all (baseline `onDragMove` / `nudgeSelectedKeys`).
+    BlendKeysMove {
+        frames: Vec<u32>,
+        by: i32,
+    },
+    /// The stopwatch off: drop every key; with a mode, that mode becomes the static blend in the same write.
+    BlendKeysClear(Option<String>),
     Effects(Vec<LayerEffect>),
     EffectsFromSet(String),
     EffectsFromClear,
@@ -97,17 +124,24 @@ fn allowed(present: bool, rule: u8) -> bool {
     }
 }
 
-/// Which of `mode, source, index, collapsed, effects` an edit takes.
-fn rules(edit: &str) -> Option<[u8; 5]> {
+/// Which of `mode, source, index, collapsed, effects, frames, by` an edit takes. A blend key's frame travels as `index`.
+fn rules(edit: &str) -> Option<[u8; 7]> {
+    const N: u8 = FORBIDDEN;
     Some(match edit {
-        "blend" | "matteMode" => [REQUIRED, FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN],
-        "matteSource" | "effectsFromSet" => [FORBIDDEN, REQUIRED, FORBIDDEN, FORBIDDEN, FORBIDDEN],
-        "matteClear" | "effectsFromClear" => [FORBIDDEN; 5],
-        "matteMoreAdd" => [OPTIONAL, REQUIRED, FORBIDDEN, FORBIDDEN, FORBIDDEN],
-        "matteMoreSet" => [OPTIONAL, OPTIONAL, REQUIRED, FORBIDDEN, FORBIDDEN],
-        "matteMoreRemove" => [FORBIDDEN, FORBIDDEN, REQUIRED, FORBIDDEN, FORBIDDEN],
-        "effects" => [FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN, REQUIRED],
-        "folderCollapsed" => [FORBIDDEN, FORBIDDEN, FORBIDDEN, REQUIRED, FORBIDDEN],
+        "blend" => [REQUIRED, N, N, N, N, N, N],
+        "matteMode" => [REQUIRED, OPTIONAL, N, N, N, N, N],
+        "matteSource" | "effectsFromSet" => [N, REQUIRED, N, N, N, N, N],
+        "matteClear" | "effectsFromClear" => [N; 7],
+        "matteMoreAdd" => [OPTIONAL, REQUIRED, N, N, N, N, N],
+        "matteMoreSet" => [OPTIONAL, OPTIONAL, REQUIRED, N, N, N, N],
+        "matteMoreRemove" => [N, N, REQUIRED, N, N, N, N],
+        "blendKeySet" => [REQUIRED, N, REQUIRED, N, N, N, N],
+        "blendKeyRemove" => [N, N, REQUIRED, N, N, N, N],
+        "blendKeysClear" => [OPTIONAL, N, N, N, N, N, N],
+        "blendKeysRemove" => [N, N, N, N, N, REQUIRED, N],
+        "blendKeysMove" => [N, N, N, N, N, REQUIRED, REQUIRED],
+        "effects" => [N, N, N, N, REQUIRED, N, N],
+        "folderCollapsed" => [N, N, N, REQUIRED, N, N, N],
         _ => return None,
     })
 }
@@ -128,6 +162,20 @@ fn source_of(payload: &EditPayload) -> Result<Option<String>, DispatchErrorCode>
     }
 }
 
+/// The named keys of a group edit: 1 to `MAX_GROUP_KEYS` frames, strictly increasing (no key twice).
+fn key_frames(payload: &EditPayload) -> Result<Vec<u32>, DispatchErrorCode> {
+    match payload.frames.value() {
+        Some(frames)
+            if !frames.is_empty()
+                && frames.len() <= MAX_GROUP_KEYS
+                && frames.windows(2).all(|pair| pair[0] < pair[1]) =>
+        {
+            Ok(frames.clone())
+        }
+        _ => bad(),
+    }
+}
+
 /// Reduce a decoded payload to one validated edit. Existence of the layers it names is the owner's check.
 pub(super) fn edit_of(payload: &EditPayload) -> Result<Edit, DispatchErrorCode> {
     let rule = match rules(&payload.edit) {
@@ -140,6 +188,8 @@ pub(super) fn edit_of(payload: &EditPayload) -> Result<Edit, DispatchErrorCode> 
         !payload.index.missing(),
         !payload.collapsed.missing(),
         !payload.effects.missing(),
+        !payload.frames.missing(),
+        !payload.by.missing(),
     ];
     if !present
         .iter()
@@ -157,7 +207,7 @@ pub(super) fn edit_of(payload: &EditPayload) -> Result<Edit, DispatchErrorCode> 
             _ => return bad(),
         },
         "matteMode" => match mode {
-            Some(mode) if matte_mode_ok(&mode) => Edit::MatteMode(mode),
+            Some(mode) if matte_mode_ok(&mode) => Edit::MatteMode { mode, source },
             _ => return bad(),
         },
         "matteSource" => Edit::MatteSource(source.ok_or(DispatchErrorCode::InvalidRequest)?),
@@ -185,6 +235,25 @@ pub(super) fn edit_of(payload: &EditPayload) -> Result<Edit, DispatchErrorCode> 
             }
         }
         "matteMoreRemove" => Edit::MatteMoreRemove(index.ok_or(DispatchErrorCode::InvalidRequest)?),
+        "blendKeySet" => match (mode, payload.index.value()) {
+            (Some(mode), Some(frame)) if BLEND_MODE_NAMES.contains(&mode.as_str()) => {
+                Edit::BlendKeySet { frame: *frame, mode }
+            }
+            _ => return bad(),
+        },
+        "blendKeyRemove" => Edit::BlendKeyRemove(*payload.index.value().ok_or(DispatchErrorCode::InvalidRequest)?),
+        "blendKeysRemove" => Edit::BlendKeysRemove(key_frames(payload)?),
+        "blendKeysMove" => match payload.by.value() {
+            Some(by) if *by != 0 => Edit::BlendKeysMove {
+                frames: key_frames(payload)?,
+                by: *by,
+            },
+            _ => return bad(),
+        },
+        "blendKeysClear" => match mode {
+            Some(mode) if !BLEND_MODE_NAMES.contains(&mode.as_str()) => return bad(),
+            mode => Edit::BlendKeysClear(mode),
+        },
         "effects" => Edit::Effects(payload.effects.value().cloned().unwrap_or_default()),
         "effectsFromSet" => Edit::EffectsFromSet(source.ok_or(DispatchErrorCode::InvalidRequest)?),
         "effectsFromClear" => Edit::EffectsFromClear,

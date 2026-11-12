@@ -15,7 +15,9 @@
 //! hold promotion uses the existing L05 frame kernel inside the same detached
 //! candidate, so promotion and the selected edit publish together.
 use crate::commands::object_fill_owner::object_frame_edit_document::{clone_cell, drop_cells};
+use crate::commands::object_fill_owner::object_context_projection::{embed, project};
 use crate::commands::ObjectFillOwner;
+use crate::object_document::object_group_kernels::object_clipboard_remap::DUPLICATE_OFFSET_PX;
 use crate::object_document::object_group_kernels::object_selection_edit_clones::RevisionIds;
 use crate::object_document::object_group_kernels::object_selection_edit_frames::{
     HeldFramePromotion, PromotionRefusal,
@@ -36,8 +38,8 @@ pub(crate) use clipboard::PasteDestination;
 #[path = "object_selection_edit_payload.rs"]
 mod wire;
 use wire::{
-    edit_mode, labels_ok, parse, refusal_code, strokes_ok, target_ok, SelectionPayload,
-    SplitPayload,
+    edit_mode, labels_ok, parse, refusal_code, strokes_ok, target_ok, DuplicatePayload,
+    SelectionPayload, SplitPayload, MAX_DUPLICATE_OFFSET, MAX_OTHER_LAYERS,
 };
 
 #[cfg(all(test, feature = "project_media_codec"))]
@@ -252,14 +254,34 @@ impl ObjectFillOwner {
         &self,
         bytes: &[u8],
     ) -> Result<PreparedSelectionEdit, DispatchErrorCode> {
-        let payload: SelectionPayload = parse(bytes)?;
+        let payload: DuplicatePayload = parse(bytes)?;
         let mode = edit_mode(&payload.mode)?;
+        let offset = payload
+            .offset
+            .value()
+            .copied()
+            .unwrap_or([DUPLICATE_OFFSET_PX; 2]);
+        let others: &[wire::OtherLayerPayload] = payload.others.value().map_or(&[], Vec::as_slice);
         if payload.command != "object.selection.duplicate"
             || !target_ok(&payload.context_id, &payload.layer_uid)
             || !strokes_ok(&payload.stroke_ids)
+            || !offset.iter().all(|v| v.is_finite() && v.abs() <= MAX_DUPLICATE_OFFSET)
+            // `others` is present only to say something: one to MAX_OTHER_LAYERS layers other than the destination, each named once with its shapes.
+            || (!payload.others.missing() && (others.is_empty() || others.len() > MAX_OTHER_LAYERS))
+            || others.iter().enumerate().any(|(at, other)| {
+                !target_ok(&payload.context_id, &other.layer_uid)
+                    || other.stroke_ids.is_empty()
+                    || !strokes_ok(&other.stroke_ids)
+                    || other.layer_uid == payload.layer_uid
+                    || others[..at].iter().any(|before| before.layer_uid == other.layer_uid)
+            })
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
+        let others: Vec<(&str, &[String])> = others
+            .iter()
+            .map(|other| (other.layer_uid.as_str(), other.stroke_ids.as_slice()))
+            .collect();
         let request = SelectionRequest {
             context_id: &payload.context_id,
             layer_uid: &payload.layer_uid,
@@ -273,6 +295,9 @@ impl ObjectFillOwner {
             origin.document(),
             &request,
             &RealHeldFramePromotion,
+            offset,
+            payload.offset.value().is_some(),
+            &others,
             &mut ids,
         );
         PreparedSelectionEdit::seal(origin, SelectionEditKind::Duplicate, plan)
@@ -300,7 +325,31 @@ impl ObjectFillOwner {
             },
             revision: next_revision(&origin)?,
         };
-        let plan = plan_split(origin.document(), &request);
+        // A declared component is the scene of the unchanged split kernel (`project`); the result is written back with `embed`.
+        let real = origin.document();
+        let plan = if payload.context_id == "scene-root" {
+            plan_split(real, &request)
+        } else {
+            let view = project(real, &payload.context_id)?;
+            let inner = SplitRequest {
+                context_id: "scene-root",
+                layer_uid: &payload.layer_uid,
+                frame: payload.frame,
+                labels: SplitLabels {
+                    shape: &payload.labels.shape,
+                    stroke: &payload.labels.stroke,
+                },
+                revision: request.revision,
+            };
+            match plan_split(&view, &inner) {
+                Ok(planned) if planned.changed => {
+                    let after = embed(real, &payload.context_id, &view, planned.document.clone())?;
+                    Ok(planned.rebased(real, after))
+                }
+                Ok(_) => Ok(SelectionPlan::unchanged(real, payload.frame)),
+                Err(error) => Err(error),
+            }
+        };
         PreparedSelectionEdit::seal(origin, SelectionEditKind::Split, plan)
     }
 

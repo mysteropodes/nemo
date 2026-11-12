@@ -428,3 +428,77 @@ fn typed_repeat_outcome_distinguishes_real_cycles_from_component_only_growth() {
     assert_eq!(owner.commit_frame_repeat(candidate).unwrap(), 0);
     assert_eq!(owner.history_depths(), (0, 0));
 }
+
+fn item_target(layer: &str, frame: u32, id: &str) -> serde_json::Value {
+    json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":frame},"layerUid":layer,"strokeId":id})
+}
+/// A v1 document whose layer 0 carries the given images and text blocks as `(frame, id)` pairs.
+fn doc_with_items(text: &str, images: &[(u32, &str)], blocks: &[(u32, &str)]) -> ObjectDocument {
+    let mut value = document_json(&parse_layers(text), Build::V1);
+    let uid = build::uid(0);
+    let raster: Vec<_> = images
+        .iter()
+        .map(|(frame, id)| json!({"target":item_target(&uid, *frame, id),
+            "item":{"assetId":"img-1","x":100,"y":50,"width":40,"height":20}}))
+        .collect();
+    let blocks: Vec<_> = blocks
+        .iter()
+        .map(|(frame, id)| json!({"target":item_target(&uid, *frame, id),
+            "block":{"text":"Hi","font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":24,
+                "color":"#112233","align":"left","fixedWidth":200,"letterSpacing":2,"anchorTopLeft":{"x":10,"y":20}}}))
+        .collect();
+    let mut items = serde_json::Map::new();
+    if !raster.is_empty() {
+        items.insert("raster".into(), raster.into());
+    }
+    if !blocks.is_empty() {
+        items.insert("text".into(), blocks.into());
+    }
+    value["items"] = items.into();
+    build::decode(&value)
+}
+fn item_frames(document: &ObjectDocument) -> (Vec<u32>, Vec<u32>) {
+    let items = document.item_records();
+    let frames = |entries: Vec<u32>| {
+        let mut entries = entries;
+        entries.sort_unstable();
+        entries
+    };
+    (
+        frames(items.map_or(vec![], |i| {
+            i.raster_entries().iter().map(|e| e.target.frame_scope.frame).collect()
+        })),
+        frames(items.map_or(vec![], |i| {
+            i.text_entries().iter().map(|e| e.target.frame_scope.frame).collect()
+        })),
+    )
+}
+
+#[test]
+fn a_v1_cycle_repeats_an_image_only_key_and_a_text_only_key() {
+    // Neither key holds a record or an ordered element, so the records and the elements both compare equal to the
+    // holds that follow; the items alone say the cells differ. Frames 0..=0 twice: the first copy lands on frame 1.
+    let input = doc_with_items("K;.;.", &[(0, "img0")], &[]);
+    let out = changed(&input, &request(0, 0, 0, 0, 2));
+    assert_eq!(item_frames(&out), (vec![0, 1, 2], vec![]));
+    let input = doc_with_items("K;.;.", &[], &[(0, "txt0")]);
+    let out = changed(&input, &request(0, 0, 0, 0, 2));
+    assert_eq!(item_frames(&out), (vec![], vec![0, 1, 2]));
+}
+
+#[test]
+fn a_v1_cycle_blanks_a_stale_item_where_the_source_cell_holds_none() {
+    // Frame 1 is a blank key holding only an image and a text block; the cycle of the blank frame 0 replaces it whole.
+    let input = doc_with_items("K;K;.", &[(1, "img1")], &[(1, "txt1")]);
+    let before = input.clone();
+    let out = changed(&input, &request(0, 0, 0, 0, 1));
+    assert_eq!(item_frames(&out), (vec![], vec![]));
+    assert_eq!(input, before);
+}
+
+#[test]
+fn a_v1_cycle_of_items_that_already_match_publishes_nothing() {
+    // Frames 0 and 1 both hold the image of frame 0 (same stroke id, retargeted): the copy would be identical.
+    let input = doc_with_items("K;K", &[(0, "img0"), (1, "img0")], &[]);
+    assert!(cycle(&input, &request(0, 0, 0, 0, 1)).unwrap().is_none());
+}

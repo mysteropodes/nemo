@@ -72,8 +72,29 @@
     });
     return found || NemoOpacityCapability.DESCRIPTOR.id;
   }
+  // #2510: project.* runs the app's own lifecycle flows. It is created on first use, since the lifecycle module and
+  // SMProject both load after this bootstrap, and its ports resolve at call time.
+  var projectLifecycle = null;
+  function lifecycle() { return projectLifecycle || (projectLifecycle = root.NemoProjectLifecycle.create({
+    available: function () { return !!(root.__TAURI__ && root.__TAURI__.core && root.SMProject && root.NemoNativeObjectProject); },
+    objectProject: function () { return root.SMProject && root.SMProject.nativeObjectProject(); },
+    active: function () { var s = root.NemoNativeObjectProject.desktop(root); return !!(s && s.isActive()); },
+    info: function () { var s = root.NemoNativeObjectProject.desktop(root); return s && s.info(); },
+    tabs: function () { return root.SMProject && root.SMProject.nativeTabs; },
+    lastNotice: function () { var toast = root.document && root.document.getElementById('toast'); return toast ? toast.textContent : ''; },
+    openPath: function (path) { return root.SMProject.openPath(path); },
+    newProject: function (config, isCurrent, onFailure) { return root.SMProject.newProject(config, isCurrent, onFailure); },
+    exporters: {
+      png: function (dir, range) { return root.SMExport.exportPNGSequenceToDir(dir, range); },
+      svg: function (dir, range) { return root.SMExport.exportSVGSequenceToDir(dir, range); },
+      lottie: function (path, range) { return root.SMExport.exportLottieToPath(path, range); },
+    },
+  })); }
   root.NemoApplication = {
-    handle: function (request) { return registry.handlerFor(capabilityFor(request && request.operation))(request); },
+    handle: function (request) {
+      if (root.NemoProjectLifecycle && request && root.NemoProjectLifecycle.OPERATIONS.indexOf(request.operation) >= 0) return lifecycle().handle(request);
+      return registry.handlerFor(capabilityFor(request && request.operation))(request);
+    },
     setInstanceId: app.setInstanceId,
     capabilities: function () { return registry.list(); },
   };

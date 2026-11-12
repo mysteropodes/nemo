@@ -15,6 +15,9 @@
   // UTF-8 bytes and carry no NUL; layer lists hold 1..256 identities; a seed is a native u32.
   const MAX_ID = 128, MAX_LAYERS = 256, MAX_SEED = 4294967295;
   const EXPOSED_KEY_PREFIX = 'ep_';
+  const DUP_MODES = ['grid', 'radial', 'path'], DUP_DIRECTIONS = ['forward', 'backward', 'centerOut', 'random'];
+  const DUP_CHANNELS = ['position', 'rotation', 'scale', 'opacity', 'hue'];
+  const INSTANCE_MODES = ['loop', 'once', 'pingpong', 'single'], MAX_FRAME = 4294967295, MAX_PLACED = 2147483647;
   const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const fail = (message) => { throw new TypeError(message); };
   const bytes = (text) => (typeof TextEncoder === 'function' ? new TextEncoder().encode(text).length : unescape(encodeURIComponent(text)).length);
@@ -34,6 +37,11 @@
     if (typeof value !== 'string' || !value.length || bytes(value) > MAX_ID || value.includes('\u0000')) fail(`${label} is not a bounded identity`);
     return value;
   }
+  const STATE_KINDS = ['setCameraKey', 'removeCameraKey', 'setCameraEase', 'clearCamera', 'addMarker', 'updateMarker', 'removeMarker', 'clearMarkers'];
+  const MAX_LABEL = 256;
+  const numbers = (value, count, at) => {
+    if (!Array.isArray(value) || value.length !== count || !value.every((n) => typeof n === 'number' && Number.isFinite(n))) fail(`${at} must be ${count} finite numbers`);
+  };
   const KINDS = {
     // Any string: a name or label the owner stores verbatim (the 4096-byte envelope bounds it).
     text: (value, at) => { if (typeof value !== 'string') fail(`${at} must be a string`); },
@@ -56,6 +64,35 @@
       if (value === null) return;
       if (typeof value !== 'string' || bytes(value) > MAX_ID) fail(`${at} must be null or a bounded identity`);
     },
+    // #2256 Q4: the duplicator inspector's closed members (mode label, per-channel random flags, temporal stagger).
+    dupMode: (value, at) => { if (!DUP_MODES.includes(value)) fail(`${at} is not a duplicator mode`); },
+    dupStagger: (value, at) => {
+      exact(value, [], DUP_CHANNELS, at);
+      DUP_CHANNELS.forEach((key) => { if (has(value, key) && typeof value[key] !== 'boolean') fail(`${at}.${key} must be a boolean`); });
+    },
+    // #2256 Q5: the Component Instance panel's closed members (playback label, native u32 frame, native i32 offset, positive speed).
+    instMode: (value, at) => { if (!INSTANCE_MODES.includes(value)) fail(`${at} is not a playback mode`); },
+    frame: (value, at) => { if (!Number.isSafeInteger(value) || value < 0 || value > MAX_FRAME) fail(`${at} must be a native u32 frame`); },
+    placedAt: (value, at) => { if (!Number.isSafeInteger(value) || value < -MAX_PLACED - 1 || value > MAX_PLACED) fail(`${at} must be a native i32 offset`); },
+    speed: (value, at) => { if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) fail(`${at} must be a finite number above zero`); },
+    // C-comp-owned-state: the closed members of the component camera / marker edit.
+    stateKind: (value, at) => { if (!STATE_KINDS.includes(value)) fail(`${at} is not a component state edit kind`); },
+    pair: (value, at) => numbers(value, 2, at),
+    quad: (value, at) => { numbers(value, 4, at); if (!(value[0] >= 0 && value[0] <= 1 && value[2] >= 0 && value[2] <= 1)) fail(`${at} x values must lie in 0..1`); },
+    label: (value, at) => { if (typeof value !== 'string' || bytes(value) > MAX_LABEL || value.includes('\u0000')) fail(`${at} must be a string of at most 256 bytes`); },
+    colour: (value, at) => { KINDS.label(value, at); if (!value.length) fail(`${at} must not be empty`); },
+    // The Motion canvas effector handle: the inline effector at a native u32 index takes a finite world anchor.
+    effectorPos: (value, at) => {
+      exact(value, ['index', 'x', 'y'], [], at);
+      if (!Number.isSafeInteger(value.index) || value.index < 0 || value.index > MAX_FRAME) fail(`${at}.index must be a native u32 index`);
+      KINDS.number(value.x, `${at}.x`); KINDS.number(value.y, `${at}.y`);
+    },
+    dupTime: (value, at) => {
+      exact(value, [], ['enabled', 'offsetFrames', 'direction'], at);
+      if (has(value, 'enabled') && typeof value.enabled !== 'boolean') fail(`${at}.enabled must be a boolean`);
+      if (has(value, 'offsetFrames')) KINDS.number(value.offsetFrames, `${at}.offsetFrames`);
+      if (has(value, 'direction') && !DUP_DIRECTIONS.includes(value.direction)) fail(`${at}.direction is not a stagger direction`);
+    },
   };
   // operation suffix -> [command, receipt kind, [[wire member, kind, optional]...]]. Member order is the wire order.
   // Receipt kinds: 'command' = {applied, historyEntriesAdded}; 'created' = a new layer was minted (applied, one history entry,
@@ -68,6 +105,19 @@
     'duplicator.set': ['object.duplicator.set', 'command', [['layerUid', 'id'], ['enabled', 'boolean'], ['seed', 'seed', true]]],
     'duplicator.objects': ['object.duplicator.objects', 'created', [['layerUids', 'ids'], ['seed', 'seed']]],
     'duplicator.path': ['object.duplicator.path', 'command', [['layerUid', 'id'], ['pathLayerUid', 'pathUid']]],
+    // #2256 Q4: the inspector's closed partial edit of the stored descriptor (the path layer keeps duplicator.path).
+    'duplicator.config': ['object.duplicator.config', 'command', [['layerUid', 'id'], ['mode', 'dupMode', true], ['rows', 'number', true], ['cols', 'number', true],
+      ['spacingX', 'number', true], ['spacingY', 'number', true], ['count', 'number', true], ['radius', 'number', true], ['startAngle', 'number', true],
+      ['radialOrient', 'boolean', true], ['pathAlignTangent', 'boolean', true], ['seed', 'seed', true], ['staggerRandom', 'dupStagger', true], ['timeOffset', 'dupTime', true], ['effectorPos', 'effectorPos', true]]],
+    // #2256 Q5: the Component Instance panel's closed partial edit of the stored playback record.
+    'component.instance.set': ['object.component.instance.set', 'command', [['layerUid', 'id'], ['mode', 'instMode', true], ['singleFrame', 'frame', true],
+      ['placedAt', 'placedAt', true], ['speed', 'speed', true], ['atFrame', 'frame', true]]],
+    // D-comp-break-apart: the inverse of convert (the baseline convertComponentToLayer), one instance layer baked back into an ordinary layer.
+    'component.breakApart': ['object.component.breakApart', 'command', [['contextId', 'text'], ['layerUid', 'id']]],
+    // C-comp-owned-state: the camera keys and markers a declared component owns, one closed edit per request (contextId = the component).
+    'component.state.edit': ['object.component.state.edit', 'command', [['contextId', 'id'], ['kind', 'stateKind'], ['frame', 'frame', true], ['x', 'number', true],
+      ['y', 'number', true], ['w', 'speed', true], ['rot', 'number', true], ['hOut', 'pair', true], ['hIn', 'pair', true], ['ease', 'quad', true],
+      ['name', 'label', true], ['color', 'colour', true], ['newFrame', 'frame', true]]],
   };
   const OPERATIONS = Object.freeze(Object.keys(SPEC).map((suffix) => PREFIX + suffix));
   const spec = (operation) => (typeof operation === 'string' && operation.startsWith(PREFIX) && has(SPEC, operation.slice(PREFIX.length)) ? SPEC[operation.slice(PREFIX.length)] : null);

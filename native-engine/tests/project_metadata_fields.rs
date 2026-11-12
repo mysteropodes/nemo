@@ -109,6 +109,36 @@ fn unrelated_marker_allocation_survives_visual_edits_and_invalid_values_refuse()
     );
 }
 
+#[test]
+fn symmetry_settings_store_supplied_values_and_refuse_non_finite_or_invalid_text() {
+    let before = metadata();
+    assert_eq!(before.symmetry_metadata(), &SymmetrySettings::default());
+    let settings = SymmetrySettings {
+        enabled: Some(true),
+        mode: Some("radial".into()),
+        axis: Some(None),
+        radial_center: Some(Some((-0.5, 400.25))),
+        radial_sectors: Some(30.5),
+        extend: Some(false),
+    };
+    let edited = before.clone().with_symmetry_metadata(settings.clone()).unwrap();
+    assert_eq!(edited.symmetry_metadata(), &settings);
+    assert_eq!(edited.palette_metadata(), before.palette_metadata());
+    for value in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+        for bad in [
+            SymmetrySettings { radial_sectors: Some(value), ..settings.clone() },
+            SymmetrySettings { axis: Some(Some((0.0, 0.0, value, 1.0))), ..settings.clone() },
+            SymmetrySettings { radial_center: Some(Some((value, 0.0))), ..settings.clone() },
+        ] {
+            assert_eq!(before.clone().with_symmetry_metadata(bad), Err(invalid()));
+        }
+    }
+    for mode in ["bad\0mode".to_owned(), "é".repeat(513)] {
+        let bad = SymmetrySettings { mode: Some(mode), ..settings.clone() };
+        assert_eq!(before.clone().with_symmetry_metadata(bad), Err(invalid()));
+    }
+}
+
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 mod wire {
     use crate::history::NativeObjectHistory;
@@ -136,7 +166,7 @@ mod wire {
     fn project(owner: &NativeObjectHistory) -> Value {
         serde_json::from_slice::<Value>(&save(owner)).unwrap()["project"].clone()
     }
-    const FIELDS: [&str; 9] = [
+    const FIELDS: [&str; 15] = [
         "palettes",
         "activePaletteIdx",
         "shadowPalette",
@@ -146,6 +176,12 @@ mod wire {
         "perspectiveMode",
         "perspectiveDensity",
         "perspectiveVPs",
+        "symmetryEnabled",
+        "symmetryMode",
+        "symmetryAxis",
+        "symmetryRadialCenter",
+        "symmetryRadialSectors",
+        "symmetryExtend",
     ];
 
     #[test]
@@ -153,7 +189,9 @@ mod wire {
         let fields = json!({"palettes":[{"id":"p","name":"","colors":["#AbC",""]},{"id":"p","name":"X","colors":[]}],
             "activePaletteIdx":-0.5,"shadowPalette":[{"id":"s","color":"#AA00cc"}],"shadowActiveId":"missing-id",
             "guides":{"v":[-0.5,4.25,-0.5]},"perspectiveEnabled":false,"perspectiveMode":"fisheye",
-            "perspectiveDensity":-3.5,"perspectiveVPs":null});
+            "perspectiveDensity":-3.5,"perspectiveVPs":null,"symmetryEnabled":true,"symmetryMode":"radial",
+            "symmetryAxis":{"x1":-0.5,"y1":0.0,"x2":320.25,"y2":180.0},"symmetryRadialCenter":null,
+            "symmetryRadialSectors":7.5,"symmetryExtend":false});
         for version in [1, 2] {
             let mut owner = NativeObjectHistory::from_project_file(
                 "visual-fields",
@@ -323,6 +361,79 @@ mod wire {
                 assert_eq!(save(&reopened), save(&owner));
             }
             assert_eq!(old.serialize_project_file().unwrap(), first_bytes);
+        }
+    }
+
+    // F05: opening another project must not leak any record of the previous one.
+    fn full_records(tag: &str) -> Value {
+        json!({"palettes":[{"id":tag,"name":tag,"colors":["#AbC"]}],"activePaletteIdx":1.5,
+            "shadowPalette":[{"id":tag,"color":"#AA00cc"}],"shadowActiveId":tag,
+            "guides":{"h":[-0.25],"v":[4.5]},"perspectiveEnabled":true,"perspectiveMode":"custom",
+            "perspectiveDensity":-3.5,"perspectiveVPs":[{"x":1.0,"y":2.0,"locked":true}],
+            "symmetryEnabled":true,"symmetryMode":tag,"symmetryAxis":null,
+            "symmetryRadialCenter":{"x":1.5,"y":-2.5},"symmetryRadialSectors":6.0,"symmetryExtend":true,
+            "workspace":{"panelOrder":null,"motionColumns":tag},
+            "comments":[{"id":tag,"authorName":"Writer","text":tag,"createdAt":1.5,"resolved":false}]})
+    }
+
+    #[test]
+    fn full_record_two_document_replacement_leaks_no_previous_palette_aid_workspace_or_comment() {
+        for version in [1, 2] {
+            let mut owner = NativeObjectHistory::from_project_file(
+                "records-replacement",
+                &input(version, full_records("first")),
+            )
+            .unwrap();
+            let old = owner.acquire_snapshot(owner.content_revision()).unwrap();
+            let first_bytes = save(&owner);
+            for fields in [json!({}), full_records("second"), json!({"guides":{"h":[],"v":[]}})] {
+                let current = owner.acquire_snapshot(owner.content_revision()).unwrap();
+                let next = owner
+                    .prepare_project_replacement(current.snapshot_id(), &input(version, fields.clone()))
+                    .unwrap();
+                owner.commit_project_replacement(next).unwrap();
+                let actual = project(&owner);
+                for field in FIELDS.iter().copied().chain(["workspace", "comments"]) {
+                    assert_eq!(actual.get(field), fields.get(field), "{version}:{field}:{fields}");
+                }
+                assert_eq!(owner.history_depths(), (0, 0));
+                let reopened =
+                    NativeObjectHistory::from_project_file("records-fresh", &save(&owner)).unwrap();
+                assert_eq!(save(&reopened), save(&owner));
+            }
+            assert_eq!(old.serialize_project_file().unwrap(), first_bytes);
+        }
+    }
+
+    // Baseline exportJSON (timeline.js @1065e9d8) writes `guides` but never the ruler/guide
+    // toggles, the undo stacks or the action log.
+    const SESSION_ONLY: [&str; 9] = [
+        "rulersOn", "guidesLocked", "guidesSnap", "showTweenCurves", "selectedStrokeIndices",
+        "undoStack", "redoStack", "undoLabels", "actionLog",
+    ];
+
+    #[test]
+    fn session_only_flags_never_enter_the_saved_file_and_are_not_admitted_from_one() {
+        for version in [1, 2] {
+            let owner = NativeObjectHistory::from_project_file(
+                "records-session",
+                &input(version, full_records("kept")),
+            )
+            .unwrap();
+            let saved = save(&owner);
+            let text = String::from_utf8(saved.clone()).unwrap();
+            let project = project(&owner);
+            for flag in SESSION_ONLY {
+                assert!(project.get(flag).is_none(), "{version}:{flag}");
+                assert!(!text.contains(&format!("\"{flag}\"")), "{version}:{flag}");
+                let mut fields = full_records("kept");
+                fields[flag] = json!(true);
+                assert!(
+                    NativeObjectHistory::from_project_file("records-flag", &input(version, fields))
+                        .is_err(),
+                    "{version}:{flag} must not be admitted as a persistent record"
+                );
+            }
         }
     }
 

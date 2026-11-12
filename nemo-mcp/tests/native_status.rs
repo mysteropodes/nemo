@@ -40,7 +40,7 @@ fn native_status_request_rejects_invalid_version_and_bounded_identities() {
 #[test]
 fn native_host_status_requires_valid_identity_and_a_complete_availability_state() {
     let valid = json!({"apiVersion":2,"requestId":"status-1","instanceId":"instance-a",
-        "available":true,"documentId":"document-a","contentRevision":0});
+        "available":true,"documentId":"document-a","contentRevision":0,"lifecycleGeneration":1});
     assert!(serde_json::from_value::<NativeHostStatus>(valid.clone())
         .unwrap()
         .validate()
@@ -53,6 +53,9 @@ fn native_host_status_requires_valid_identity_and_a_complete_availability_state(
         ("contentRevision", json!(9_007_199_254_740_992u64)),
         ("documentId", json!(null)),
         ("contentRevision", json!(null)),
+        ("lifecycleGeneration", json!(null)),
+        ("lifecycleGeneration", json!(0)),
+        ("lifecycleGeneration", json!(9_007_199_254_740_992u64)),
     ] {
         let mut invalid = valid.clone();
         invalid[field] = value;
@@ -64,6 +67,7 @@ fn native_host_status_requires_valid_identity_and_a_complete_availability_state(
     }
     let mut boundary = valid;
     boundary["contentRevision"] = json!(9_007_199_254_740_991u64);
+    boundary["lifecycleGeneration"] = json!(9_007_199_254_740_991u64);
     assert!(serde_json::from_value::<NativeHostStatus>(boundary)
         .unwrap()
         .validate()
@@ -81,6 +85,18 @@ fn native_host_status_requires_valid_identity_and_a_complete_availability_state(
     );
     assert!(!unavailable.available);
     assert!(unavailable.document_id.is_none() && unavailable.content_revision.is_none());
+    assert!(unavailable.lifecycle_generation.is_none());
+    // Strict wire shape: the generation is camelCase and omitted when unavailable.
+    let wire = serde_json::to_value(&unavailable).unwrap();
+    assert!(wire.get("lifecycleGeneration").is_none());
+    let mut active = unavailable.clone();
+    active.available = true;
+    active.reason = None;
+    active.document_id = Some("document-a".into());
+    active.content_revision = Some(3);
+    active.lifecycle_generation = Some(7);
+    assert!(active.validate().is_ok());
+    assert_eq!(serde_json::to_value(&active).unwrap()["lifecycleGeneration"], 7);
     for reason in [None, Some(String::new())] {
         let mut invalid = unavailable.clone();
         invalid.reason = reason;

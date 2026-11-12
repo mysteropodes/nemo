@@ -252,3 +252,112 @@ fn common_result_dispatch_routes_each_batch_eight_family_to_its_own_receipt_vali
         );
     }
 }
+
+fn declared_native_operations() -> Vec<String> {
+    crate::capabilities::native_catalog()
+        .descriptors()
+        .iter()
+        .flat_map(|descriptor| {
+            descriptor["operations"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+        })
+        .map(|operation| operation.as_str().expect("operation string").to_owned())
+        .collect()
+}
+
+#[test]
+fn request_validation_is_explicit_or_pinned_forwarded() {
+    let mut actual: Vec<_> = declared_native_operations()
+        .into_iter()
+        .filter(|operation| !has_request_validator(operation))
+        .collect();
+    actual.sort_unstable();
+    let mut pinned: Vec<_> = MCP_REQUEST_FORWARDED
+        .iter()
+        .map(|op| op.to_string())
+        .collect();
+    pinned.sort_unstable();
+    assert_eq!(
+        actual, pinned,
+        "MCP_REQUEST_FORWARDED must equal the declared operations without a request validator"
+    );
+}
+
+#[test]
+fn result_validation_is_explicit_or_pinned_unchecked() {
+    let declared = declared_native_operations();
+    let unvalidated: Vec<_> = declared
+        .iter()
+        .filter(|operation| !has_result_validator(operation))
+        .map(String::as_str)
+        .collect();
+    let mut pinned = MCP_RESULT_UNCHECKED.to_vec();
+    pinned.sort_unstable();
+    let mut actual = unvalidated.clone();
+    actual.sort_unstable();
+    assert_eq!(
+        actual, pinned,
+        "MCP_RESULT_UNCHECKED must equal the declared operations without a result validator"
+    );
+}
+
+#[test]
+fn forwarded_and_undeclared_operations_route_as_documented() {
+    // A newly declared operation with neither a validator nor a forward is caught
+    // by request_validation_is_explicit_or_pinned_forwarded; this pins the rest.
+    let declared = declared_native_operations();
+    let forwarded = declared
+        .iter()
+        .find(|op| MCP_REQUEST_FORWARDED.contains(&op.as_str()))
+        .expect("a forwarded operation");
+    assert!(!has_request_validator(forwarded));
+    assert!(validate_request(forwarded, &json!({})));
+    assert!(!MCP_REQUEST_FORWARDED.contains(&"command.document.object.cs1.unlisted"));
+    // Undeclared operations are left to the registration check.
+    assert!(validate_request(
+        "command.document.object.cs1.unlisted",
+        &json!({})
+    ));
+    assert!(crate::capabilities::native_catalog()
+        .capability_for_operation("command.document.object.cs1.unlisted")
+        .is_none());
+    // Results: no validator and not pinned unchecked is refused.
+    assert!(!has_result_validator(
+        "command.document.object.cs1.unlisted"
+    ));
+    assert!(!validate_result(
+        "command.document.object.cs1.unlisted",
+        "document",
+        &json!({}),
+        &json!({})
+    ));
+}
+
+#[test]
+fn native_catalog_sources_are_discovered_from_the_declaration_directory() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../engineering/application/capabilities-v2");
+    let mut files: Vec<String> = std::fs::read_dir(dir)
+        .expect("capabilities-v2 directory")
+        .map(|entry| {
+            entry
+                .expect("entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .filter(|name| name.ends_with(".json"))
+        .collect();
+    files.sort();
+    let generated: Vec<String> = crate::capabilities::NATIVE_CAPABILITY_FILES
+        .iter()
+        .map(|name| name.to_string())
+        .collect();
+    assert_eq!(generated, files);
+    assert_eq!(
+        crate::capabilities::NATIVE_CAPABILITY_SOURCES.len(),
+        crate::capabilities::native_catalog().descriptors().len()
+    );
+}

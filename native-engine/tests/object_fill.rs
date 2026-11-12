@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-commands => object_fill_tests
 use crate::commands::{prepare_object_fill_json, PreparedObjectFill};
 use crate::object_codec::{decode_project, encode_project, ObjectCodecErrorKind};
 use crate::object_snapshot::ObjectSnapshot;

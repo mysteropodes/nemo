@@ -207,6 +207,14 @@ test('native workflow binds one pinned job and observes Rust cancellation', asyn
   assert.deepEqual(before, []);
 });
 
+test('a native Lottie command shows the typed unavailable refusal without a Paper save (#2343 B1)', async () => {
+  const { ctx, calls } = harness(true, { format: 'lottie' });
+  ctx.SMExport.exportLottie = async () => ctx.exportNativeUnavailable('Lottie');
+  await ctx.click();
+  assert.deepEqual(calls, [], 'no legacy save, release, picker or export');
+  assert.equal(ctx.progEl.textContent, 'exportError: Lottie export is not available for native projects yet.');
+});
+
 test('legacy-owned command retains its frame-save path; browser native export is unavailable', async () => {
   const legacy = harness(false);
   legacy.ctx.SMExport.exportPNGSequence = async () => ({ ok: true });

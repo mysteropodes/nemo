@@ -9,16 +9,25 @@
   function equal(a,b){return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every(function(v,i){return v===b[i];});}
   function action(value){
     if(!value||typeof value!=='object'||Array.isArray(value))return null;
-    var fields={setCanvasSize:['width','height'],setFps:['fps'],setCanvasBackground:['color'],setWorkArea:['inFrame','outFrame']}[value.kind];
+    var fields={setCanvasSize:['width','height'],setFps:['fps'],setCanvasBackground:['color'],setWorkArea:['inFrame','outFrame'],setTotalFrames:['frames'],trimToWorkArea:[]}[value.kind];
     if(!fields||Object.keys(value).length!==fields.length+1||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(value,k);}))return null;
     var valid=value.kind==='setCanvasSize'?fields.every(function(k){return Number.isInteger(value[k])&&value[k]>0&&value[k]<=4294967295;}):
       value.kind==='setCanvasBackground'?typeof value.color==='string'&&/^#?(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/.test(value.color):
       fields.every(function(k){return Number.isFinite(value[k]);});
     return valid?Object.freeze(Object.assign({},value)):null;
   }
-  function effect(info,value){return value.kind==='setCanvasSize'?info.canvasW===value.width&&info.canvasH===value.height:
+  // Project length (timeline.js setTotalFrames / trimToWorkArea at 1065e9d8): the Frames field clamps to 1..999; Trim keeps in..out of the work area.
+  function trimTarget(info){var total=info.totalFrames,begin=Math.max(0,Math.floor(Number.isFinite(info.waIn)?info.waIn:0)),
+    end=Math.min(total-1,Math.floor(Number.isFinite(info.waOut)?info.waOut:total-1));
+    return end<=begin||begin===0&&end===total-1?{total:total,waIn:info.waIn,waOut:info.waOut}:{total:end-begin+1,waIn:0,waOut:end-begin};}
+  function expectedTotal(info,value){return value.kind==='setTotalFrames'?Math.max(1,Math.min(999,Math.floor(value.frames))):
+    value.kind==='trimToWorkArea'?trimTarget(info).total:info.totalFrames;}
+  function effect(info,value,before){return value.kind==='setCanvasSize'?info.canvasW===value.width&&info.canvasH===value.height:
     value.kind==='setFps'?info.fps===Math.max(1,Math.min(60,value.fps)):
-    value.kind==='setCanvasBackground'?info.canvasBg===value.color:info.waIn===value.inFrame&&info.waOut===value.outFrame;}
+    value.kind==='setCanvasBackground'?info.canvasBg===value.color:
+    value.kind==='setTotalFrames'?info.totalFrames===expectedTotal(before,value):
+    value.kind==='trimToWorkArea'?info.totalFrames===trimTarget(before).total&&info.waIn===trimTarget(before).waIn&&info.waOut===trimTarget(before).waOut:
+    info.waIn===value.inFrame&&info.waOut===value.outFrame;}
   function create(ports){var pending=false,retired=false,generation=0,running=null,queued=[];
     async function execute(value){
       if(retired)return {status:'unavailable'};if(pending)return {status:'busy'};
@@ -36,12 +45,16 @@
         if(ticket!==generation||ports.currentSession()!==session)return {status:'applied-unconfirmed',applied:applied};
         var after=session.info();
         if(!after||after.instanceId!==before.instanceId||after.documentId!==before.documentId||after.lifecycleGeneration!==before.lifecycleGeneration||
-          after.contentRevision!==receipt.contentRevision||after.totalFrames!==before.totalFrames||!Array.isArray(after.layers)||
+          after.contentRevision!==receipt.contentRevision||after.totalFrames!==expectedTotal(before,intent)||!Array.isArray(after.layers)||
           !equal(before.layers.map(function(row){return row.layerUid;}),after.layers.map(function(row){return row.layerUid;}))||
-          !effect(after,intent)||ports.available(session,after)!==true||ports.frame()!==frame||!equal(selection,ports.selection())||!presented(session,after,frame))
+          !effect(after,intent,before)||ports.available(session,after)!==true||ports.frame()!==Math.min(frame,after.totalFrames-1)||!equal(selection,ports.selection())||
+          !presented(session,after,Math.min(frame,after.totalFrames-1)))
           return {status:'applied-unconfirmed',applied:applied};
         return {status:applied?'applied-presented':'unchanged',applied:applied};
-      }catch(_){return applied===null?{status:'unconfirmed'}:{status:'applied-unconfirmed',applied:applied};}
+      }catch(error){var why=error&&error.refusal;
+        // A typed unavailable refusal is definite (nothing was written): its engine message names the cause.
+        if(applied===null&&why&&why.code==='unavailable'&&typeof why.message==='string'&&why.message)return {status:'unavailable',message:why.message};
+        return applied===null?{status:'unconfirmed'}:{status:'applied-unconfirmed',applied:applied};}
       finally{pending=false;}
     }
     function context(){var session=ports.currentSession(),info=session&&session.info(),selection=ports.selection();

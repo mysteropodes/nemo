@@ -122,6 +122,51 @@ test('native click, reselect, deselect and Shift selection preserve identity and
   assert.deepEqual(writes(f), []);
 });
 
+test('a native object project picks at pointer-up from the presented geometry and drops a stale pick (#2362)', async () => {
+  const f = fixture({ mode: 'anim2d' }), picks = [], applied = [];
+  let resolve;
+  f.scope.NemoSelectCanvasIntent = { ...SelectCanvasIntent, objectProject: () => ({}), pickContext: () => JSON.stringify([f.state.tool, f.state.currentFrame]),
+    pick: (_root, x, y) => { picks.push([x, y]); return new Promise((r) => { resolve = r; }); },
+    applyPick: (_root, item, shift) => applied.push([item, shift]) };
+  f.send('pointerdown', 100, 60); f.send('pointerup', 100, 60);
+  assert.deepEqual(picks, [[100, 60]], 'the click becomes one pick at its client point');
+  resolve({ data: { strokeId: 's-a' } }); await new Promise(setImmediate);
+  assert.deepEqual(applied, [[{ data: { strokeId: 's-a' } }, false]]);
+  f.send('pointerdown', 100, 60, { shiftKey: true }); f.send('pointerup', 100, 60, { shiftKey: true });
+  f.state.currentFrame = 7; resolve(null); await new Promise(setImmediate);
+  assert.equal(applied.length, 1, 'a pick that resolves after the frame moved is dropped');
+  f.send('pointerdown', 100, 60); f.send('pointermove', 140, 60); f.send('pointerup', 140, 60);
+  assert.equal(picks.length, 2, 'a drag still denies at threshold');
+  f.state.appMode = 'motion'; f.send('pointerdown', 100, 60); f.send('pointerup', 100, 60);
+  assert.equal(picks.length, 3, 'Motion picks natively too (#2520/#2525): the click becomes a pick, the shape box and the group entry follow');
+  assert.deepEqual(writes(f), []);
+});
+
+test('an unavailable or failing pick retries a bounded number of times then shows exactly one notice; an empty click still clears (#2372)', async () => {
+  const f = fixture({ mode: 'anim2d' }), applied = [], toasts = [], results = [];
+  f.scope.showToast = (m) => toasts.push(m);
+  f.scope.setTimeout = (fn) => setTimeout(fn, 1); // the retry delay, shortened
+  f.scope.NemoNativePresentationWait = require('../src/js/adapters/native-presentation-wait.js'); // the shared bounded wait the pick retries through
+  f.scope.NemoSelectCanvasIntent = { ...SelectCanvasIntent, objectProject: () => ({}), pickContext: () => JSON.stringify([f.state.tool, f.state.currentFrame]),
+    pick: () => { const r = results.shift(); return r instanceof Error ? Promise.reject(r) : Promise.resolve(r); },
+    applyPick: (_root, item, shift) => applied.push([item, shift]) };
+  const click = async (wait) => { f.send('pointerdown', 100, 60); f.send('pointerup', 100, 60); await new Promise((r) => setTimeout(r, wait)); };
+  for (let n = 0; n < 17; n++) results.push(undefined); await click(260); // the first read and 16 retries
+  assert.equal(toasts.length, 1, 'reads that stay unavailable show exactly one notice');
+  assert.deepEqual(applied, [], 'the selection is left unchanged');
+  results.push(undefined, { data: { strokeId: 's-b' } }); await click(260);
+  assert.equal(toasts.length, 1, 'a read that settles on the retry shows no notice');
+  assert.deepEqual(applied, [[{ data: { strokeId: 's-b' } }, false]]);
+  results.push(new Error('boom')); await click(40);
+  assert.equal(toasts.length, 2, 'a failed read is surfaced, not swallowed');
+  results.push(null); await click(40);
+  assert.equal(toasts.length, 2, 'an empty click is not an error');
+  assert.deepEqual(applied[1], [null, false], 'an empty click still clears');
+  results.push(undefined); f.send('pointerdown', 100, 60); f.send('pointerup', 100, 60); f.state.currentFrame = 9;
+  await new Promise((r) => setTimeout(r, 260));
+  assert.equal(toasts.length, 2, 'a superseded click raises no notice');
+});
+
 test('native pointer intent is scalar, frozen and has no gesture or writer effects', () => {
   const f = fixture();
   const down = f.send('pointerdown', 100, 60);

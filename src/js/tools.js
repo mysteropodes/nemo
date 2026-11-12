@@ -1,6 +1,6 @@
 // ---- TOOLS ----
 var currentPath=null,selectedPaths=[],stabQueue=[],shapeStart=null;
-function allowLegacySelectionEdit(e,k){var c=window.NemoNativeOpacityCutover,b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{if(c!==undefined&&(!c||typeof c.blocksLegacy!=='function'||c.blocksLegacy()!==false))a=false;else a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){a=false;}if(!a&&e){if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();if(e.stop)e.stop();}return a;}
+function allowLegacySelectionEdit(e,k){var c=window.NemoNativeOpacityCutover,b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{if(c!==undefined&&(!c||typeof c.blocksLegacy!=='function'||c.blocksLegacy()!==false))a=false;else a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){a=false;}if(k==='subselect')a=false;/* #2356: Direct Select is native-only; the Paper node writer is retired and never admitted */if(!a&&e){if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();if(e.stop)e.stop();}return a;}
 function selectionGestureActive(){return state.tool==='select'?!!(_xform.active||_marquee.active||draggingArc||_moveDragStarted):state.tool==='subselect'?!!(_nodeDrag.active||_nmq.active):state.tool==='fsselect'?!!(_fsPromoteDrag||_marquee.active||_fsBreak):false;}
 function motionGestureActive(){try{return!!(window.SMMotion&&SMMotion.debugMotionDrag&&SMMotion.debugMotionDrag());}catch(_){return false;}}
 var _textDragStart=null,_textDragRect=null;
@@ -1284,6 +1284,8 @@ function transformFillGradient(path, pointTransform){
 // backdrop, brush-texture dabs) need the same translate to avoid the
 // "parallax drift" bug already fixed once this session.
 function alignSelection(mode){
+  // #2372 insp-align-distribute: on a native project the move is ONE native reshape batch (adapters/native-selection-align.js), never the Paper writer below.
+  var _na=window.NemoNativeSelectionAlign;if(_na&&_na.native(window)){_na.align(window,mode);return;}
   if(!allowLegacySelectionEdit(null,'select'))return;
   if(selectedPaths.length<2)return;
   var b=xformSelBounds();if(!b)return;
@@ -1323,6 +1325,8 @@ function alignSelection(mode){
 // alignSelection right above, for the identical "don't tear the drawing
 // apart" reason (CLAUDE.md §1).
 function distributeSelection(mode){
+  // #2372 insp-align-distribute: on a native project the move is ONE native reshape batch (adapters/native-selection-align.js), never the Paper writer below.
+  var _na=window.NemoNativeSelectionAlign;if(_na&&_na.native(window)){_na.distribute(window,mode);return;}
   if(!allowLegacySelectionEdit(null,'select'))return;
   if(selectedPaths.length<3)return;
   pushUndo();
@@ -1624,7 +1628,7 @@ function _materializeClones(snaps,layer,offset,srcGroups){
   if(srcGroups)_remapCombineGroups(clones,srcGroups,layer,sidMap);
   return clones;
 }
-function duplicateSelection(){
+function duplicateSelection(){ var nc=window.NemoNativeSelectionClipboard;if(nc&&nc.native(window)){nc.duplicate(window);return;} // #2372: a native project's owner clones in one transaction
   if(!allowLegacySelectionEdit(null,'select'))return;
   if(!selectedPaths.length)return;
   pushUndo();
@@ -1650,7 +1654,7 @@ function duplicateSelection(){
 // "different frame/layer" (paste exactly in place — there's no source
 // directly underneath to be confused with).
 var _canvasClip=null; // {snaps, layerIdx, frameIdx}
-function copySelection(){
+function copySelection(){ var nc=window.NemoNativeSelectionClipboard;if(nc&&nc.native(window)){nc.copy(window);return;} // #2372: a native project's owner copies in one transaction
   if(!selectedPaths.length)return;
   var snaps=selectedPaths.map(_snapshotForClone).filter(Boolean);
   if(!snaps.length)return;
@@ -1662,14 +1666,14 @@ function copySelection(){
   if(typeof window!=='undefined')window._lastClipKind='canvas';
   showToast(SM.t('toastCopied')+snaps.length+')');
 }
-function cutSelection(){
+function cutSelection(){ var nc=window.NemoNativeSelectionClipboard;if(nc&&nc.native(window)){nc.cut(window);return;} // #2372: a native project's owner cuts in one transaction
   if(!allowLegacySelectionEdit(null,'select'))return;
   if(!selectedPaths.length)return;
   copySelection();
   window.SM.deleteSelStrokes(); // pushes its own undo entry
   showToast(SM.t('toastCut')+_canvasClip.snaps.length+')');
 }
-function pasteSelection(){
+function pasteSelection(){ var nc=window.NemoNativeSelectionClipboard;if(nc&&nc.native(window)){nc.paste(window);return;} // #2372: a native project's owner pastes in one transaction
   if(!allowLegacySelectionEdit(null,'select'))return;
   if(!_canvasClip||!_canvasClip.snaps.length){showToast(SM.t('toastNothingToPaste'));return;}
   pushUndo();
@@ -5499,7 +5503,9 @@ function sampleVectorBrushCenterline(cs,profile){
   var pts=[],widths=[];
   for(var k=0;k<=n;k++){
     var d=len*k/n;
-    var pt=center.getPointAt(d);if(!pt)pt=center.getPointAt(len)||cs[cs.length-1].point;
+    // A tap simplifies to ONE anchor (no curve), where getPointAt is null: fall back to a real Point, never the
+    // anchor's plain [x,y] array, which buildVariableWidthPath cannot measure (pts[i].getDistance is not a function).
+    var pt=center.getPointAt(d);if(!pt)pt=center.getPointAt(len)||new Point(cs[cs.length-1].point);
     pts.push(pt);
     // Prefer the dense raw-pressure profile (arc-length fraction along the
     // CURRENT centerline — a reasonable proxy for "fraction along the
@@ -5660,46 +5666,9 @@ function rebuildVectorBrushOutline(path){
   }
 }
 
-// ---- POINT TYPE CONVERSION (corner / smooth / symmetric) ----
-// centerSegments (pressure-brush centerline) store point/handleIn/handleOut
-// as plain [x,y] arrays, while normal Path.segments use real Paper Points —
-// these accessors paper over that so the conversion logic itself doesn't care.
-function _ptGet(isVB,seg){return isVB?new Point(seg.point[0],seg.point[1]):seg.point;}
-function _ptSet(isVB,seg,pt){if(isVB)seg.point=[pt.x,pt.y];else seg.point=pt;}
-function _ptHandleIn(isVB,seg){return isVB?new Point(seg.handleIn?seg.handleIn[0]:0,seg.handleIn?seg.handleIn[1]:0):seg.handleIn;}
-function _ptHandleOut(isVB,seg){return isVB?new Point(seg.handleOut?seg.handleOut[0]:0,seg.handleOut?seg.handleOut[1]:0):seg.handleOut;}
-function _ptSetHandleIn(isVB,seg,pt){if(isVB)seg.handleIn=[pt.x,pt.y];else seg.handleIn=pt;}
-function _ptSetHandleOut(isVB,seg,pt){if(isVB)seg.handleOut=[pt.x,pt.y];else seg.handleOut=pt;}
 function setPointType(type){
-  var path=nodeEditTargetPath();
-  if(!path||!_nodeSel.length){showToast(SM.t('toastSelectOneOrMorePointsSubselect'));return;}
-  pushUndo();
-  var isVB=!!(path.data&&path.data.isVectorBrush&&path.data.centerSegments);
-  var arr=isVB?path.data.centerSegments:path.segments;
-  var n=arr.length,closed=isVB?false:path.closed;
-  _nodeSel.forEach(function(idx){
-    var seg=arr[idx];
-    if(type==='corner'){_ptSetHandleIn(isVB,seg,new Point(0,0));_ptSetHandleOut(isVB,seg,new Point(0,0));return;}
-    var prevSeg=idx>0?arr[idx-1]:(closed?arr[n-1]:null);
-    var nextSeg=idx<n-1?arr[idx+1]:(closed?arr[0]:null);
-    var pt=_ptGet(isVB,seg);
-    var diff;
-    if(prevSeg&&nextSeg)diff=_ptGet(isVB,nextSeg).subtract(_ptGet(isVB,prevSeg));
-    else if(nextSeg)diff=_ptGet(isVB,nextSeg).subtract(pt);
-    else if(prevSeg)diff=pt.subtract(_ptGet(isVB,prevSeg));
-    else diff=new Point(1,0);
-    var dir=diff.length>0.01?diff.normalize():new Point(1,0);
-    var curOut=_ptHandleOut(isVB,seg),curIn=_ptHandleIn(isVB,seg);
-    var outLen=curOut.length||(nextSeg?_ptGet(isVB,nextSeg).getDistance(pt)/3:30);
-    var inLen=curIn.length||(prevSeg?pt.getDistance(_ptGet(isVB,prevSeg))/3:30);
-    if(type==='symmetric'){var len=(outLen+inLen)/2||30;outLen=len;inLen=len;}
-    _ptSetHandleOut(isVB,seg,dir.multiply(outLen));
-    _ptSetHandleIn(isVB,seg,dir.multiply(-inLen));
-  });
-  if(isVB)rebuildVectorBrushOutline(path);
-  renderNodeHandles();
-  fillRegenerateLinked(userLayers[state.activeLayerIdx],path);
-  saveActiveLayerFrame();updateUI();
+  if(window.NemoNativeSubselectController)return window.NemoNativeSubselectController.setPointType(type);
+  showToast('Native subselect is unavailable.');
 }
 
 // ---- BOOLEAN PATH OPERATIONS (union/subtract/intersect/exclude) ----
@@ -5902,6 +5871,12 @@ function foldBooleanOp(op,paths,layer){
   return{result:result,companions:extraRemovals};
 }
 function booleanOp(op){
+  // #2372 insp-boolean-ops: on a native object project the owner applies the boolean as ONE sealed transaction (one revision, one history
+  // entry) through the group intent; the Paper / WASM writer below and its pushUndo (refused there) are never reached.
+  var nativeBool=window.NemoNativeSelectionBoolean;
+  if(nativeBool&&nativeBool.native(window)){nativeBool.apply(window,op);return;}
+  var nativeOwner=window.NemoNativeObjectProject&&window.NemoNativeObjectProject.desktop(window);
+  if(nativeOwner&&nativeOwner.blocksLegacy()){showToast('Boolean operations are not available on native projects right now.');return;}
   if(selectedPaths.length<2){showToast(SM.t('toastSelectAtLeast2Shapes'));return;}
   pushUndo();
   var paths=selectedPaths.slice();

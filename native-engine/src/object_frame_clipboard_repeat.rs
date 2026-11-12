@@ -24,14 +24,16 @@
 use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
     finish, layer_position, scene_authored, timing_refusal,
 };
-use crate::commands::object_fill_owner::object_frame_clipboard_repeat_wire::parse_repeat_payload;
+use crate::commands::object_fill_owner::object_context_projection::through;
+use crate::commands::object_fill_owner::object_frame_clipboard_repeat_wire::parse_repeat_payload_in;
 use crate::commands::object_fill_owner::object_frame_clipboard_tracks::repeat_motion_tracks;
 use crate::commands::object_fill_owner::object_frame_edit_document::{
     clone_cell, drop_cells, DocumentEdit,
 };
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
-    ObjectDocument, ObjectRecord, OrderElement, OrderScope, Presence, ProjectMetadata, TimingEdit,
+    FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, OrderElement, OrderScope, Presence,
+    ProjectMetadata, RasterEntry, TextEntry, TimingEdit,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -97,7 +99,46 @@ fn elements_at<'a>(document: &'a ObjectDocument, layer: &str, frame: u32) -> Vec
         .filter(|element| element.layer_uid == layer)
         .collect()
 }
-/// The frames of `from..=to` where the layer already has authored records or ordered elements.
+/// A scene-root authored item (raster image or text block) target of `layer`, on `frame` when one is given.
+fn item_target(target: &ObjectTarget, layer: &str, frame: u32) -> bool {
+    target.context_id == CONTEXT
+        && target.frame_scope.kind == FrameScopeKind::Authored
+        && target.layer_uid == layer
+        && target.frame_scope.frame == frame
+}
+/// The layer's raster images and text blocks at `frame`, retargeted to `to`, in stored order.
+fn items_at(
+    document: &ObjectDocument,
+    layer: &str,
+    frame: u32,
+    to: u32,
+) -> (Vec<RasterEntry>, Vec<TextEntry>) {
+    let Some(items) = document.item_records() else {
+        return (Vec::new(), Vec::new());
+    };
+    let raster = items
+        .raster_entries()
+        .iter()
+        .filter(|entry| item_target(&entry.target, layer, frame))
+        .cloned()
+        .map(|mut entry| {
+            entry.target.frame_scope.frame = to;
+            entry
+        })
+        .collect();
+    let text = items
+        .text_entries()
+        .iter()
+        .filter(|entry| item_target(&entry.target, layer, frame))
+        .cloned()
+        .map(|mut entry| {
+            entry.target.frame_scope.frame = to;
+            entry
+        })
+        .collect();
+    (raster, text)
+}
+/// The frames of `from..=to` where the layer already has authored records, items or ordered elements.
 fn occupied(document: &ObjectDocument, layer: &str, from: u32, to: u32) -> BTreeSet<u32> {
     let inside = |frame: u32| frame >= from && frame <= to;
     let mut frames: BTreeSet<u32> = document
@@ -110,6 +151,17 @@ fn occupied(document: &ObjectDocument, layer: &str, from: u32, to: u32) -> BTree
         })
         .map(|record| record.target.frame_scope.frame)
         .collect();
+    if let Some(items) = document.item_records() {
+        frames.extend(
+            items
+                .targets()
+                .filter(|target| {
+                    item_target(target, layer, target.frame_scope.frame)
+                        && inside(target.frame_scope.frame)
+                })
+                .map(|target| target.frame_scope.frame),
+        );
+    }
     for scope in scene_scopes(document) {
         if inside(scope.frame_scope.frame)
             && scope
@@ -122,8 +174,8 @@ fn occupied(document: &ObjectDocument, layer: &str, from: u32, to: u32) -> BTree
     }
     frames
 }
-/// True when the layer's cell at `dst` already is exactly what the cycle writes there: a copy of the records and the
-/// ordered elements of `source`, or nothing when the source is a hold. Such a cell is left alone, so a cycle that writes
+/// True when the layer's cell at `dst` already is exactly what the cycle writes there: a copy of the records, the raster
+/// images, the text blocks and the ordered elements of `source`, or nothing when the source is a hold. Such a cell is left alone, so a cycle that writes
 /// what is already there changes no byte.
 fn cell_is_written(document: &ObjectDocument, layer: &str, source: Option<u32>, dst: u32) -> bool {
     let have = records_at(document, layer, dst);
@@ -141,6 +193,11 @@ fn cell_is_written(document: &ObjectDocument, layer: &str, source: Option<u32>, 
             moved == **present
         })
         && elements_at(document, layer, dst) == want_elements
+        && items_at(document, layer, dst, dst)
+            == match source {
+                Some(source) => items_at(document, layer, source, dst),
+                None => (Vec::new(), Vec::new()),
+            }
 }
 
 /// Baseline `symbolId` layers are the real scene-root native component instances.
@@ -258,7 +315,7 @@ impl PreparedFrameRepeat {
 
 /// Prepare growth-only settings against the same retained input as the drawing.
 /// Bare documents and edits without timeline growth keep their existing publication.
-fn repeat_project_metadata(
+pub(super) fn repeat_project_metadata(
     origin: &ObjectSnapshot,
     document: Option<&ObjectDocument>,
 ) -> Result<Option<ProjectMetadata>, DispatchErrorCode> {
@@ -295,22 +352,42 @@ impl ObjectFillOwner {
         &self,
         request: &RepeatRequest,
     ) -> Result<PreparedFrameRepeat, DispatchErrorCode> {
+        self.prepare_frame_repeat_in(request, CONTEXT)
+    }
+
+    /// #2256: the cycle inside `context` (a declared component is the scene of the unchanged kernel; its frame count grows on its own
+    /// record and the project settings, a scene fact, are never touched).
+    pub(crate) fn prepare_frame_repeat_in(
+        &self,
+        request: &RepeatRequest,
+        context: &str,
+    ) -> Result<PreparedFrameRepeat, DispatchErrorCode> {
         let origin = self.current_snapshot();
-        let document = match repeat_cells(origin.document(), request)? {
-            DocumentEdit::Changed(next) => Some(next),
-            DocumentEdit::NoChange => None,
+        let mut counts = None;
+        let document = through(origin.document(), context, |view| {
+            let edited = match repeat_cells(view, request)? {
+                DocumentEdit::Changed(next) => Some(next),
+                DocumentEdit::NoChange => None,
+            };
+            // repeat_cells validated these bounds before preparing the detached result.
+            let first =
+                layer_position(view, &request.from_layer).ok_or(DispatchErrorCode::NotFound)?;
+            let last =
+                layer_position(view, &request.to_layer).ok_or(DispatchErrorCode::NotFound)?;
+            let skipped = view.layers[first..=last]
+                .iter()
+                .filter(|layer| is_component_layer(view, &layer.layer_uid))
+                .count();
+            counts = Some((last - first + 1 - skipped, skipped));
+            Ok(edited)
+        })?;
+        let metadata = if context == CONTEXT {
+            repeat_project_metadata(&origin, document.as_ref())?
+        } else {
+            None
         };
-        let metadata = repeat_project_metadata(&origin, document.as_ref())?;
-        // repeat_cells validated these bounds before preparing the detached result.
-        let source = origin.document();
-        let first =
-            layer_position(source, &request.from_layer).ok_or(DispatchErrorCode::NotFound)?;
-        let last = layer_position(source, &request.to_layer).ok_or(DispatchErrorCode::NotFound)?;
-        let skipped_component_layers = source.layers[first..=last]
-            .iter()
-            .filter(|layer| is_component_layer(source, &layer.layer_uid))
-            .count();
-        let cycled_layers = last - first + 1 - skipped_component_layers;
+        let (cycled_layers, skipped_component_layers) =
+            counts.ok_or(DispatchErrorCode::Internal)?;
         Ok(PreparedFrameRepeat {
             origin,
             document,
@@ -324,7 +401,8 @@ impl ObjectFillOwner {
         &self,
         bytes: &[u8],
     ) -> Result<PreparedFrameRepeat, DispatchErrorCode> {
-        self.prepare_frame_repeat(&parse_repeat_payload(bytes)?)
+        let (request, context) = parse_repeat_payload_in(bytes)?;
+        self.prepare_frame_repeat_in(&request, &context)
     }
 
     /// Publish a prepared cycle: instance, document, snapshot and content revision must still be the candidate's

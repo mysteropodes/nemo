@@ -195,9 +195,13 @@ function build(opts) {
 
 // Names of the outputs under `dir` that are missing or differ from `outputs`,
 // ignoring the source head/describe stamps (they change on every commit
-// without a content change).
+// without a content change). CS3/#2342: line positions (`src/…:123`) and the
+// inputs digest are advisory, so an ordinary edit that only shifts lines does
+// not force a regeneration commit; any change to a row's content still does.
+const POSITION = /((?:src|tests)\/[\w./-]+\.(?:html|js|cjs|mjs|json)):\d+/g;
 function staleOutputs(outputs, dir) {
-  const norm = (s) => s.replace(/"head": "[0-9a-f]*"/, '').replace(/"describe": "[^"]*"/, '').replace(/source `[0-9a-f]*` \([^)]*\)/, '');
+  const norm = (s) => s.replace(/"head": "[0-9a-f]*"/, '').replace(/"describe": "[^"]*"/, '').replace(/source `[0-9a-f]*` \([^)]*\)/, '')
+    .replace(/"inputsDigest": "[0-9a-f]*"/, '').replace(/Inputs digest `[0-9a-f]*`/, '').replace(POSITION, '$1:N');
   const stale = [];
   for (const [name, content] of Object.entries(outputs)) {
     const p = path.join(dir, name);

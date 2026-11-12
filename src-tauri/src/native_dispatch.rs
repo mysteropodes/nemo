@@ -23,7 +23,10 @@ pub(crate) type NativeState = Arc<Mutex<NativeAuthority>>;
 mod object_host;
 #[path = "native_object_video.rs"]
 pub(crate) mod video;
-pub(crate) use object_host::{NativeObjectHost, PreparedRetainedActivation};
+pub(crate) use object_host::{
+    NativeObjectHost, PreparedRetainedActivation, PROJECT_INFO_LIMIT_BYTES,
+};
+pub(crate) use object_host::{ObjectPreviewObserver, ObservedObjectPreview};
 #[cfg(test)]
 pub(crate) use object_host::{finalizer_fixture, finalizer_svg};
 
@@ -69,6 +72,7 @@ pub(crate) struct NativeAuthority {
     inactive_project: Option<inactive_project::InactiveProject>,
     retained_releases: BTreeMap<String, ReleaseTombstone>,
     retained_replacements: BTreeMap<String, replacement::ReplacementRecord>,
+    retired_replacement_ids: replacement::RetiredIds,
     pub(crate) phase: NativePhase,
 }
 
@@ -128,6 +132,7 @@ impl Default for NativeAuthority {
             inactive_project: None,
             retained_releases: BTreeMap::new(),
             retained_replacements: BTreeMap::new(),
+            retired_replacement_ids: replacement::RetiredIds::default(),
             phase: NativePhase::Vacant,
         }
     }

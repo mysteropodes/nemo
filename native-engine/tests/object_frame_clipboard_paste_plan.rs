@@ -97,6 +97,7 @@ fn paste_with(
 }
 fn key(id: &str) -> PasteCell {
     PasteCell {
+        items: Default::default(),
         order_elements: crate::object_document::Presence::Missing,
         rel_layer: 0,
         rel_frame: 0,
@@ -289,6 +290,7 @@ fn locked_layers_are_skipped_by_paste_and_duplicate_and_kept_in_the_cut_packet()
     let wide = vec![
         key("x"),
         PasteCell {
+            items: Default::default(),
             rel_layer: 1,
             ..key("y")
         },

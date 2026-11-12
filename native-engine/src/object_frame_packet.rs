@@ -1,8 +1,10 @@
 //! Internal CPU scene inputs from one admitted immutable object snapshot.
 //! Array positions are provenance only; composition policy belongs to consumers.
 use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_consumed;
+// Detached geometry planning is a frame-source port; rendering never owns publication.
+pub(crate) use crate::object_document::subselect::record as subselect_record;
 pub(crate) use crate::object_document::{
-    AuthoredOrder, BitmapBrushFields, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget,
+    AuthoredOrder, BitmapBrushFields, FrameScopeKind, LayerEffect, ObjectLayer, ObjectRecord, ObjectTarget,
     Presence, PropertyHolderTarget, SolidFill, VECTOR_FAMILY,
 };
 use crate::revision::ObjectSnapshot;
@@ -35,10 +37,14 @@ mod order;
 pub(crate) mod text;
 #[path = "object_frame_video.rs"]
 pub(crate) mod video;
+// #2371: the Solo view's visibility rule the packet and its joins read.
+#[path = "object_solo_view.rs"]
+pub mod solo_view;
 pub use order::{NumericElementOrder, NumericLayerOrder, NumericOrderPlan};
 #[path = "object_property_sampling.rs"]
 mod property_sampling;
 pub use property_sampling::{sample_property_raw, PropertySampleError};
+pub(crate) use property_sampling::sample_scalar_keys_raw;
 
 /// All pins are mandatory, including the snapshot identity within a revision.
 #[derive(Debug, Clone)]
@@ -216,6 +222,8 @@ pub struct ObjectFramePacket {
     source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,
     motion_receipts: Vec<motion_receipts::MotionReceipt>,
+    /// `(layer uid, evaluated matteOn)` of the layers whose switch is expressed (see `capture_matte_on`).
+    matte_on_receipts: Vec<(String, f64)>,
     selector_receipts: Vec<text_selectors::SelectorReceipt>,
 }
 
@@ -288,6 +296,19 @@ impl ObjectFramePacket {
         self.frame
     }
     /// Same stored camera provider for trusted export and locked-view consumers.
+    /// The project's custom brush catalog (`state.customBrushPresets`), when the snapshot carries a project.
+    pub(crate) fn custom_brush_presets(&self) -> Option<&crate::object_document::ProjectPresetCatalog> {
+        self.snapshot.project().and_then(|p| p.project().custom_brush_presets())
+    }
+    /// `resolveBrushPreset(key)` (a built-in first, then the custom catalog) for an exporter that needs only the
+    /// preset's nib size, scatter and spacing (the Rive brush wobble).
+    pub(crate) fn brush_wobble_inputs(&self, key: &str) -> Option<(Option<f64>, Option<f64>, Option<f64>)> {
+        use crate::evaluation::brush_dab::presets::{builtin, from_catalog};
+        let preset = builtin(key).or_else(|| {
+            self.custom_brush_presets()?.entries().iter().find(|(id, _)| id == key).and_then(|(_, p)| from_catalog(p))
+        })?;
+        Some((preset.nib_size, preset.scatter, preset.spacing))
+    }
     pub(crate) fn stored_camera_matrix(&self) -> Result<Option<[f64; 6]>, ObjectFrameError> {
         self.snapshot
             .sampled_camera_matrix(f64::from(self.frame))
@@ -317,7 +338,7 @@ impl ObjectFramePacket {
     pub fn source_layers(&self) -> &[ObjectLayer] {
         self.context.layers(self.snapshot.document())
     }
-    fn source_objects(&self) -> &[ObjectRecord] {
+    pub(crate) fn source_objects(&self) -> &[ObjectRecord] {
         self.context.objects(self.snapshot.document())
     }
     /// Borrow one selected provenance position in constant time, not paint rank.
@@ -367,6 +388,29 @@ pub fn prepare_object_exposure_frame(
     selector: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectFramePacket, ObjectFrameError> {
     prepare_frame_with_order(snapshot, selector, true, order::prepare_context, None)
+}
+
+/// The desktop exposure for a read of REST geometry only (the Motion canvas boxes, #2520/#2525): the packet of
+/// `prepare_object_exposure_frame` without the document-wide "every holder is consumed" gate, and with the draw order held at its natural
+/// value when an expression drives it. Nothing here evaluates a property, so it must never feed a render or an export.
+pub(crate) fn prepare_object_rest_geometry_frame(
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+) -> Result<ObjectFramePacket, ObjectFrameError> {
+    prepare::prepare_frame_admitting(snapshot, selector, true, order::prepare_context, None, false).or_else(|_| {
+        prepare::prepare_frame_admitting(
+            snapshot,
+            selector,
+            true,
+            |snapshot, context_id, frame, sources, exposure| {
+                order::prepare_context_with_resolver(snapshot, context_id, frame, sources, exposure, |_, _, _| {
+                    Ok::<f64, ObjectFrameError>(0.0)
+                })
+            },
+            None,
+            false,
+        )
+    })
 }
 
 /// Explicit exact-scoped resolver; its authored source equals the selector frame.
@@ -426,6 +470,9 @@ mod exposure_tests;
 #[cfg(test)]
 #[path = "../tests/render_vector_eval_guard.rs"]
 mod render_vector_eval_guard;
+#[cfg(test)]
+#[path = "../tests/render_vector_eval_contentless.rs"]
+mod render_vector_eval_contentless;
 
 #[cfg(all(test, feature = "history", feature = "compositor"))]
 #[path = "../tests/object_layer_opacity_scene.rs"]

@@ -45,3 +45,15 @@ test('semantic duplicate comparison preserves missing versus supplied and arrays
     C.correlate(q, r); r.contentRevision++; assert.throws(() => C.correlate(q, r));
   }
 });
+
+test('toolsDock is optional on capture, must name a known dock or null, and stays raw on read', () => {
+  for (const toolsDock of ['top', 'right', 'bottom', 'left', null]) {
+    const value = { ...workspace(), toolsDock };
+    assert.equal(C.action({ kind: 'capture', workspace: value }).workspace.toolsDock, toolsDock);
+  }
+  for (const toolsDock of ['', 'diagonal', 'LEFT', 'left\0', 3, [], {}]) assert.throws(() => C.action({ kind: 'capture', workspace: { ...workspace(), toolsDock } }), /Invalid native workspace/);
+  const q = query(); C.payload(q.operation, q.payload);
+  const r = reply({ workspacePresent: true, workspace: { toolsDock: 'saved-by-another-build' } }); C.correlate(q, r);
+  assert(C.equal({ toolsDock: 'top' }, { toolsDock: 'top' })); assert(!C.equal({ toolsDock: 'top' }, { toolsDock: 'left' }));
+  assert(C.paths(C.EDIT).has('payload.action.workspace.toolsDock')); assert(C.paths(C.READ).has('result.result.workspace.toolsDock'));
+});

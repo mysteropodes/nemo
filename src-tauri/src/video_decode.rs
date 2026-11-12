@@ -102,6 +102,11 @@ use readahead::spawn_readahead;
 use session::open_session_core;
 pub use session::VideoSession;
 
+/// The bundled ffmpeg sidecar, for the one-shot media conversions of legacy project import.
+pub(crate) fn sidecar_path() -> std::path::PathBuf {
+    process::ffmpeg_path()
+}
+
 static NEXT_SESSION_ID: AtomicU32 = AtomicU32::new(1);
 
 /// Per-session Mutex, not one global lock — unchanged from v1 (the fix

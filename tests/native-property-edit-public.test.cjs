@@ -40,20 +40,39 @@ test('D36 declaration keeps mutation admission separate from read-only metadata 
   assert.deepEqual(payload.properties.target.required, ['contextId', 'layerUid']);
   assert.equal(payload.properties.target.additionalProperties, false);
   assert.deepEqual(payload.properties.action.oneOf.map(v => v.properties.kind.const),
-    ['setValue', 'setKey', 'removeKey', 'setAnimated', 'bake']);
+    ['setValue', 'setKeyHandle', 'setKey', 'removeKey', 'setAnimated', 'bake', 'setExpression', 'setExpressionEnabled', 'removeExpression', 'addControl', 'renameControl', 'removeControl', 'moveControl']);
   for (const action of payload.properties.action.oneOf) {
     assert.equal(action.additionalProperties, false);
-    if (action.properties.kind.const === 'bake') {
+    if (/^(?:add|rename|remove|move)Control$/.test(action.properties.kind.const)) {
+      assert.equal(action.properties.frame, undefined, 'a control declaration edit carries no frame');
+      assert.deepEqual(action.required, ['kind', ...Object.keys(action.properties).filter(k => k !== 'kind')]);
+    } else if (['bake', 'removeExpression'].includes(action.properties.kind.const)) {
       assert.deepEqual(action.required, ['kind']);
       assert.deepEqual(Object.keys(action.properties), ['kind']);
+    } else if (action.properties.kind.const === 'setExpression') {
+      assert.deepEqual(action.required, ['kind', 'code']);
+      assert.equal(action.properties.frame, undefined);
+      assert.equal(action.properties.code.type, 'string');
+      assert.equal(action.properties.code.maxLength, 4096);
+    } else if (action.properties.kind.const === 'setExpressionEnabled') {
+      assert.deepEqual(action.required, ['kind', 'enabled']);
+      assert.equal(action.properties.enabled.type, 'boolean');
     } else {
       assert.equal(action.properties.frame.type, 'number');
       assert.equal(action.properties.frame.minimum, undefined);
     }
     assert.equal(action.properties.curvePoints, undefined);
-    if (action.properties.values) {
+    if (action.properties.kind.const === 'setKeyHandle') { // #2520: one spatial handle of an existing 2-D key
+      assert.deepEqual(action.required, ['kind', 'frame', 'handle', 'values']);
+      assert.deepEqual(action.properties.handle.enum, ['hIn', 'hOut']);
+      assert.deepEqual([action.properties.values.minItems, action.properties.values.maxItems], [2, 2]);
+    } else if (action.properties.values) {
       assert.equal(action.properties.values.minItems, 1);
       assert.equal(action.properties.values.maxItems, 4);
+    }
+    if (action.properties.kind.const === 'setValue') { // `keepPose` is optional and only ever true
+      assert.deepEqual(action.required, ['kind', 'frame', 'values']);
+      assert.deepEqual(action.properties.keepPose, {const: true});
     }
   }
   const metadata = JSON.parse(fs.readFileSync(path.join(ROOT,
@@ -211,4 +230,92 @@ test('native bake sends only the strict intent through the existing public edit 
     assert.throws(()=>SDK.validateRequest(request(action)));
   }
   assert.equal(count,1);
+});
+
+test('expression authoring sends exact code, enablement and removal through the existing edit operation (#2376)', async () => {
+  const unicode = '// café 🧭\r\nconst 値 = 1;\n';
+  const actions = [{kind:'setExpression', code:''}, {kind:'setExpression', code:unicode},
+    // Authored source is data: a leading data:/blob: spelling is exempt at exactly this field.
+    {kind:'setExpression', code:'data:x\nblob:y'}, {kind:'setExpressionEnabled', enabled:true},
+    {kind:'setExpressionEnabled', enabled:false}, {kind:'removeExpression'}];
+  let count = 0;
+  const app = adapter(async sent => { count++; return reply(sent); });
+  for (const action of actions) {
+    const q = request(action);
+    assert.doesNotThrow(() => SDK.validateRequest(q));
+    const r = await app.dispatch(q);
+    assert.equal(r.ok, true);
+  }
+  assert.equal(count, actions.length);
+  const exact = {kind:'setExpression', code:'x'.repeat(4096 - Buffer.byteLength(JSON.stringify(request({kind:'setExpression', code:''}))))};
+  assert.doesNotThrow(() => SDK.validateRequest(request(exact)));
+  // Over the code ceiling, or with a frame/curve/legacy writer shape: refused before transport.
+  for (const action of [{kind:'setExpression'}, {kind:'setExpression', code:null}, {kind:'setExpression', code:7},
+    {kind:'setExpression', code:'x'.repeat(4097)}, {kind:'setExpression', code:'é'.repeat(2049)},
+    {kind:'setExpression', code:'x', enabled:true}, {kind:'setExpression', code:'x', frame:0},
+    {kind:'setExpression', expression:{enabled:true, code:'x'}}, {kind:'setExpressionEnabled'},
+    {kind:'setExpressionEnabled', enabled:1}, {kind:'setExpressionEnabled', enabled:null},
+    {kind:'setExpressionEnabled', enabled:true, code:'x'}, {kind:'removeExpression', code:null},
+    {kind:'removeExpression', frame:0}, {kind:'clearExpression'}, ['setExpression', 'x']]) {
+    assert.throws(() => SDK.validateRequest(request(action)), undefined, JSON.stringify(action));
+  }
+  assert.equal(count, actions.length);
+  // The code string is exempt from the resource-string guard ONLY at action.code.
+  const q = request({kind:'setExpressionEnabled', enabled:true}); q.payload.property = 'data:opaque property';
+  assert.doesNotThrow(() => SDK.validateRequest(q));
+  const bad = request({kind:'setExpressionEnabled', enabled:true}); bad.payload.action.enabled = 'data:x';
+  assert.throws(() => SDK.validateRequest(bad));
+});
+
+test('D18-B control declaration edits are strict frameless intents through the one property edit operation', async () => {
+  const control = (action, property = 'xc_native_a') => {const q = request(action); q.payload.property = property; return q;};
+  const accepted = [
+    control({kind:'addControl', controlType:'number', name:'Speed'}),
+    control({kind:'addControl', controlType:'color', name:'Tint 雪'}, 'xc_k_9'),
+    control({kind:'renameControl', name:'  Velocity '}),
+    control({kind:'removeControl'}),
+    control({kind:'moveControl', direction:-1}),
+    control({kind:'moveControl', direction:1}),
+  ];
+  for (const q of accepted) {
+    const before = structuredClone(q); let calls = 0, sent;
+    const response = await adapter(value => {calls++; sent = value; return reply(value);}).editProperty(q);
+    assert.equal(calls, 1); assert.deepEqual(sent, before); assert.deepEqual(response, reply(q));
+  }
+  const refused = [
+    control({kind:'addControl', controlType:'slider', name:'A'}), control({kind:'addControl', controlType:'number', name:''}),
+    control({kind:'addControl', controlType:'number', name:4}), control({kind:'addControl', controlType:'number', name:'x'.repeat(129)}),
+    control({kind:'addControl', controlType:'number'}), control({kind:'addControl', name:'A'}),
+    control({kind:'addControl', controlType:'number', name:'A', frame:0}),
+    control({kind:'addControl', controlType:'number', name:'A'}, 'speed'), control({kind:'addControl', controlType:'number', name:'A'}, 'xc_'),
+    control({kind:'addControl', controlType:'number', name:'A'}, 'xc_a-b'), control({kind:'addControl', controlType:'number', name:'A'}, 'position'),
+    control({kind:'renameControl'}), control({kind:'renameControl', name:''}), control({kind:'renameControl', name:null}),
+    control({kind:'renameControl', name:'A', controlType:'number'}),
+    control({kind:'removeControl', frame:0}), control({kind:'removeControl', name:'A'}),
+    control({kind:'moveControl'}), control({kind:'moveControl', direction:0}), control({kind:'moveControl', direction:2}),
+    control({kind:'moveControl', direction:1.5}), control({kind:'moveControl', direction:'up'}), control({kind:'moveControl', direction:true}),
+    control({kind:['removeControl']}),
+  ];
+  let calls = 0; const port = adapter(() => {calls++;});
+  for (const q of refused) assert.throws(() => port.editProperty(q), TypeError, JSON.stringify(q.payload.action));
+  assert.equal(calls, 0);
+});
+
+test('keepPose is an anchor-only setValue and setKeyHandle names one handle, both through the one edit operation (#2520)', async () => {
+  const sent = [];
+  const edit = adapter(async q => { sent.push(q); return reply(q); });
+  const on = (property, action) => { const q = request(action); q.payload.property = property; delete q.payload.target.strokeId; return q; };
+  const keep = {kind:'setValue', frame:3, values:[4, 5], keepPose:true};
+  await edit.dispatch(on('anchor', keep));
+  assert.deepEqual(sent[0].payload.action, keep);
+  const handle = {kind:'setKeyHandle', frame:-2.5, handle:'hOut', values:[-30, 5.5]};
+  await edit.dispatch(on('position', handle));
+  assert.deepEqual(sent[1].payload.action, handle);
+  for (const bad of [on('position', keep), on('opacity', keep), on('anchor', {...keep, keepPose:false}), on('anchor', {...keep, keepPose:1}),
+    on('anchor', {kind:'setKey', frame:3, values:[4, 5], keepPose:true}),
+    on('position', {...handle, handle:'tangent'}), on('position', {...handle, values:[1]}), on('position', {...handle, values:[1, 2, 3]}),
+    on('position', {kind:'setKeyHandle', handle:'hIn', values:[1, 2]}), on('position', {...handle, extra:1}), on('position', {...handle, values:[1, NaN]})]) {
+    await assert.rejects(async () => edit.dispatch(bad));
+  }
+  assert.equal(sent.length, 2, 'a refused shape never reaches the transport');
 });

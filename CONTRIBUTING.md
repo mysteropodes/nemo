@@ -77,6 +77,13 @@ Each job reports `pass`, `fail`, `blocked` or `not-run` with a reason; a missing
   exact PR. Do not dispatch the current main-only policy there or bypass review. Human
   change requests, conversations and exact-head validation still apply. Follow
   [the integration checklist](engineering/remediation/EXECUTION_PLAN.en.md#7-integration-and-branch-cleanup).
+- Record a delivery's provenance (what changed, base SHA, evidence) in the PR description;
+  git history keeps it. `engineering/boundaries/profiles/rust.coverage.json` is frozen: the
+  boundaries gate rejects any new top-level or `provenance` key not listed in
+  `rust.coverage.frozen-keys.json`. Thresholds, exclusions and ceilings of existing keys are
+  still editable, and keys may be removed. For a new source file, run
+  `node scripts/nemo/boundaries.cjs --suggest [paths...]` to print the profile entry to add
+  (read-only; it never writes).
 - Keep PRs scoped — one feature/fix per PR is much easier to review than a
   pile of unrelated changes.
 - If you're fixing a bug, a short repro (or a failing test if the area has

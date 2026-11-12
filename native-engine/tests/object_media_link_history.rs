@@ -111,6 +111,83 @@ fn video_placement_survives_save_reopen_undo_redo_with_exact_fields() {
     assert_eq!(saved(&o), bytes);
 }
 
+/// L09-H: a video placement on a named stroke with every stored timing member
+/// keeps its authored bytes through save, reopen, undo and redo, next to a
+/// placement whose optional members are absent, and an edit that makes one of
+/// them explicit is undone back to absent (never defaulted).
+#[test]
+fn video_stroke_placement_with_timing_keeps_absent_and_explicit_distinct_through_history() {
+    let remap = json!({"keys":[{"frame":0,"v":[4]},{"frame":12,"v":[16],"hold":true}]});
+    let mut explicit = entry("p1", "v1", "L", 0);
+    explicit["target"]["strokeId"] = json!("s1");
+    explicit["timeRemap"] = remap.clone();
+    explicit["interpMode"] = json!("blend");
+    explicit["frameBlend"] = json!(false);
+    let absent = entry("p2", "v2", "M", 0);
+    let mut wire = project_wire(json!([explicit.clone(), absent.clone()]));
+    let segments: Vec<Value> = [[0., 0.], [10., 0.], [10., 10.], [0., 10.]]
+        .iter()
+        .map(|p| json!({"point":{"x":p[0],"y":p[1]},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}}))
+        .collect();
+    wire["drawing"]["objects"] = json!([{"schemaVersion":1,"family":"closed-solid-fill-cubic-path",
+        "target":{"contextId":"scene-root","layerUid":"L","strokeId":"s1",
+            "frameScope":{"kind":"authored","frame":1}},
+        "geometry":{"kind":"cubic-path","closed":true,"coordinateSpace":"document-world",
+            "handleSpace":"relative","segments":segments},
+        "fill":{"kind":"solid","r":1,"g":0,"b":0,"a":1}}]);
+    let mut o =
+        NativeObjectHistory::from_project_file("timing", wire.to_string().as_bytes()).unwrap();
+    let start = json!([explicit.clone(), absent.clone()]);
+    assert_eq!(table(&o), start);
+    let bytes0 = saved(&o);
+    let reopened = NativeObjectHistory::from_project_file("timing-reopened", &bytes0).unwrap();
+    assert_eq!(saved(&reopened), bytes0);
+    assert_eq!(table(&reopened), start);
+    // Explicit zero offsets stay written; absent timing members stay absent.
+    for key in ["timeRemap", "interpMode", "frameBlend"] {
+        assert!(table(&o)[1].get(key).is_none(), "{key} absent on p2");
+        assert!(table(&o)[0].get(key).is_some(), "{key} explicit on p1");
+    }
+    assert_eq!(table(&o)[0]["offsetFrames"], json!(0));
+    assert_eq!(table(&o)[1]["offsetFrames"], json!(0));
+
+    assert_eq!(apply(&mut o, set_offset("p2", 4)).unwrap(), 1);
+    let mut moved = absent.clone();
+    moved["offsetFrames"] = json!(4);
+    let after_offset = json!([explicit.clone(), moved.clone()]);
+    assert_eq!(table(&o), after_offset);
+    let bytes1 = saved(&o);
+    let edit = PlacementEdit::SetInterpMode {
+        placement_id: "p2".to_owned(),
+        interp_mode: "none".to_owned(),
+    };
+    assert_eq!(apply(&mut o, edit).unwrap(), 2);
+    let mut made_explicit = moved.clone();
+    made_explicit["interpMode"] = json!("none");
+    made_explicit["frameBlend"] = json!(false);
+    let after_mode = json!([explicit.clone(), made_explicit]);
+    assert_eq!(table(&o), after_mode);
+    assert!(table(&o)[1].get("timeRemap").is_none());
+    let bytes2 = saved(&o);
+    let reopened = NativeObjectHistory::from_project_file("timing-reopened-2", &bytes2).unwrap();
+    assert_eq!(saved(&reopened), bytes2);
+    assert_eq!(table(&reopened), after_mode);
+    assert_eq!(o.history_depths(), (2, 0));
+
+    assert_eq!(o.undo(2).unwrap(), 3);
+    assert_eq!(saved(&o), bytes1);
+    assert_eq!(table(&o), after_offset);
+    assert!(table(&o)[1].get("interpMode").is_none() && table(&o)[1].get("frameBlend").is_none());
+    assert_eq!(o.undo(3).unwrap(), 4);
+    assert_eq!(saved(&o), bytes0);
+    assert_eq!(table(&o), start);
+    assert_eq!(o.redo(4).unwrap(), 5);
+    assert_eq!(saved(&o), bytes1);
+    assert_eq!(o.redo(5).unwrap(), 6);
+    assert_eq!(saved(&o), bytes2);
+    assert_eq!(table(&o), after_mode);
+}
+
 #[test]
 fn shift_and_remove_round_trip_through_history_and_the_file() {
     let mut o = owner_with(one());

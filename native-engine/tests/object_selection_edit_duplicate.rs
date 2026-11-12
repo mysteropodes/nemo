@@ -9,6 +9,13 @@ use super::object_selection_edit_tests::{
 };
 use serde_json::{json, Value};
 
+// The Alt-drag compound clones (ribbon + linked fill, bitmap raster) live beside these in their own file.
+#[path = "object_selection_alt_drag.rs"]
+mod object_selection_alt_drag;
+// A dragged copy of a dynamic or gradient-filled shape, and a selection that spans layers.
+#[path = "object_selection_edit_duplicate_span.rs"]
+mod object_selection_edit_duplicate_span;
+
 fn ids(values: &[&str]) -> Vec<String> {
     values.iter().map(|id| id.to_string()).collect()
 }
@@ -377,4 +384,90 @@ fn a_duplicate_survives_deleting_its_source_and_the_selection_is_the_copies() {
         strokes_at(&value(&owner), "L0", 0),
         ["a", "c", "native-stroke:1:0", "native-stroke:1:1"]
     );
+}
+
+/// The payload of an Alt-drag duplicate: the baseline duplicate request plus where the copies land.
+fn dragged(layer: &str, mode: &str, ids: &[&str], offset: Value) -> Value {
+    let mut payload = duplicate(layer, 0, mode, ids);
+    payload["offset"] = offset;
+    payload
+}
+
+#[test]
+fn an_alt_drag_duplicate_lands_the_copies_at_the_drag_distance_in_one_revision() {
+    for version in [1, 2] {
+        let mut owner = owner_of(&base(version));
+        let (before_value, before) = (value(&owner), bytes(&owner));
+        assert_eq!(
+            apply(
+                &mut owner,
+                "duplicate",
+                &dragged("L0", "animation2d", &["a", "c"], json!([30, -7.5]))
+            ),
+            Ok(true)
+        );
+        let after = value(&owner);
+        assert_eq!(
+            strokes_at(&after, "L0", 0),
+            ["a", "b", "c", "native-stroke:1:0", "native-stroke:1:1"]
+        );
+        assert_eq!(
+            corners(&record_at(&after, "L0", 0, "native-stroke:1:0")),
+            [30.0, -7.5, 40.0, -2.5],
+            "a at x=0 moves by (30, -7.5), not by the 12 px nudge"
+        );
+        assert_eq!(
+            corners(&record_at(&after, "L0", 0, "native-stroke:1:1")),
+            [70.0, -7.5, 80.0, -2.5]
+        );
+        for original in ["a", "b", "c"] {
+            assert_eq!(
+                record_at(&after, "L0", 0, original),
+                record_at(&before_value, "L0", 0, original),
+                "{original} is left untouched"
+            );
+        }
+        assert_eq!(
+            (owner.content_revision(), owner.history_depths()),
+            (1, (1, 0)),
+            "one revision, one history entry"
+        );
+        let applied = bytes(&owner);
+        owner.undo(1).unwrap();
+        assert_eq!(bytes(&owner), before, "v{version}: one undo removes the copies");
+        owner.redo(2).unwrap();
+        assert_eq!(bytes(&owner), applied, "v{version}: redo restores them exactly");
+    }
+}
+
+#[test]
+fn an_explicit_zero_offset_copies_in_place_and_the_default_stays_the_baseline_nudge() {
+    let mut owner = owner_of(&base(1));
+    apply(
+        &mut owner,
+        "duplicate",
+        &dragged("L0", "animation2d", &["a"], json!([0, 0])),
+    )
+    .unwrap();
+    assert_eq!(
+        corners(&record_at(&value(&owner), "L0", 0, "native-stroke:1:0")),
+        [0.0, 0.0, 10.0, 5.0]
+    );
+}
+
+#[test]
+fn a_malformed_or_runaway_duplicate_offset_is_refused_before_anything_is_planned() {
+    let owner = owner_of(&base(1));
+    for offset in [json!([1]), json!([1, 2, 3]), json!(["1", 2]), json!(12), json!([1.0e7, 0]), json!([0, -1.0e7])] {
+        let refused = prepare(&owner, "duplicate", &dragged("L0", "animation2d", &["a"], offset.clone()));
+        assert_eq!(
+            refused.err(),
+            Some(crate::request_receipts::DispatchErrorCode::InvalidRequest),
+            "{offset}"
+        );
+    }
+    // Only a duplicate carries a distance: a delete with one is an unknown member.
+    let mut delete_with_offset = delete("L0", 0, "animation2d", &["a"]);
+    delete_with_offset["offset"] = json!([1, 1]);
+    assert!(prepare(&owner, "delete", &delete_with_offset).is_err());
 }

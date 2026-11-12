@@ -45,7 +45,7 @@ var NemoShortcutRegistry = (function () {
     // p=pen...) so these are arbitrary placeholders, not a claimed "right"
     // answer — rebindable via the existing Réglages > Raccourcis UI
     // (shortcutOverrides/localStorage) like any other entry here.
-    {action:'text',key:'y',label:'Texte'},
+    {action:'text',key:'t',label:'Texte'},
     {action:'rotate',key:'w',label:'Rotation du canevas'},
     {action:'rig',key:'s',label:'Rig (Skeleton)'},
     // Deliberately NOT bound to 'q' (or anything): the Perspective rail
@@ -81,7 +81,10 @@ var NemoShortcutRegistry = (function () {
     {action:'cmdInsertBlankKey',key:'F7',cat:'frames',label:'shortcutCmdInsertBlankKey'},
     {action:'cmdDuplicateKey',key:'',cat:'frames',label:'shortcutCmdDuplicateKey'},
     {action:'cmdExtendExposure',key:'+',cat:'frames',label:'shortcutCmdExtendExposure'},
-    {action:'cmdTween',key:'t',cat:'frames',label:'shortcutCmdTween'},
+    // Tween is deliberately unbound by default: T is the Text tool (Illustrator/Figma
+    // convention, per installed-build validation feedback) and Tween is unavailable in native Nemo anyway.
+    // Rebindable in Réglages > Raccourcis like cmdDuplicateKey.
+    {action:'cmdTween',key:'',cat:'frames',label:'shortcutCmdTween'},
     {action:'cmdFlipPreview',key:'f',cat:'view',label:'shortcutCmdFlipPreview'},
     {action:'cmdResetView',key:'/',cat:'view',label:'shortcutCmdResetView'},
     {action:'cmdRenameLayer',key:'F2',cat:'layers',label:'shortcutCmdRenameLayer'},
@@ -137,11 +140,27 @@ var NemoShortcutRegistry = (function () {
     return null;
   }
 
+  // Keys hard-wired outside the rebind tables (Space hold/pan and play tap, arrows frame-step, F9 Easy Ease, Enter, Delete,
+  // Tab, Escape). A rebind to one of them would be shadowed or would shadow the hard-wired action, so it is refused (#2370).
+  var RESERVED_KEYS = [' ', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'enter', 'backspace', 'delete', 'tab', 'escape', 'f9'];
+  function isReserved(key) { return RESERVED_KEYS.indexOf((key || '').toLowerCase()) >= 0; }
+
   // Pure: returns a NEW overrides object rather than mutating the one passed in.
   function withOverride(overrides, action, key) {
     var next = Object.assign({}, overrides);
     if (key) next[action] = key.toLowerCase(); else delete next[action];
     return next;
+  }
+
+  var KEY_NAMES = {' ': 'Space', arrowleft: '\u2190', arrowright: '\u2192', arrowup: '\u2191', arrowdown: '\u2193', escape: 'Esc'};
+
+  // Pure: how a stored key reads in a menu or status hint (U04a #2370) — 'f5' -> 'F5', 'j' -> 'J', 'home' -> 'Home'.
+  function displayKey(key) {
+    if (!key) return '';
+    var lk = String(key).toLowerCase();
+    if (KEY_NAMES[lk]) return KEY_NAMES[lk];
+    if (lk.length === 1 || /^f\d{1,2}$/.test(lk)) return lk.toUpperCase();
+    return lk.charAt(0).toUpperCase() + lk.slice(1);
   }
 
   function loadOverrides(storage) {
@@ -161,27 +180,32 @@ var NemoShortcutRegistry = (function () {
   function create(ports) {
     var storage = ports && ports.storage;
     var onOverrideChanged = ports && ports.onOverrideChanged;
+    var onReset = ports && ports.onReset;
     var overrides = loadOverrides(storage);
 
     function setKey(action, key) {
+      if (key && isReserved(key)) return false;
       overrides = withOverride(overrides, action, key);
       try { storage.setItem(STORAGE_KEY, JSON.stringify(overrides)); } catch (e) { /* in-memory override still applies */ }
       if (typeof onOverrideChanged === 'function') onOverrideChanged(action);
     }
 
-    // Matches the original reset button handler: clears state and storage
-    // only. It never called the badge-refresh port either — the modal list
-    // re-render was the caller's own job then, and stays so now.
+    // Clears state and storage. The modal list re-render is the caller's own
+    // job; the left-rail badges are refreshed through the optional onReset
+    // port (U06 #2370: without it a reset left every rebound letter on the rail).
     function reset() {
       overrides = {};
       try { storage.removeItem(STORAGE_KEY); } catch (e) { /* ignored, same as before */ }
+      if (typeof onReset === 'function') onReset();
     }
 
     return {
       defFor: defFor,
       keyFor: function (action) { return keyFor(overrides, action); },
+      hintFor: function (action) { return displayKey(keyFor(overrides, action)); },
       clashFor: function (action, key) { return clashFor(overrides, action, key); },
       setKey: setKey,
+      isReserved: isReserved,
       reset: reset,
       toolShortcuts: function () { return TOOL_SHORTCUTS; },
       commandShortcuts: function () { return COMMAND_SHORTCUTS; },
@@ -196,9 +220,11 @@ var NemoShortcutRegistry = (function () {
     keyFor: keyFor,
     clashFor: clashFor,
     withOverride: withOverride,
+    displayKey: displayKey,
     TOOL_SHORTCUTS: TOOL_SHORTCUTS,
     COMMAND_SHORTCUTS: COMMAND_SHORTCUTS,
     READONLY_SHORTCUTS: READONLY_SHORTCUTS,
+    isReserved: isReserved,
     SHORTCUT_CATS: SHORTCUT_CATS,
   };
 })();

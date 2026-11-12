@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => motion_parent_chain_controls_tests
 //! Hand-written controls for the parent-chain kernel: walk guards and the
 //! JavaScript coercions the generated oracle reaches only incidentally.
 

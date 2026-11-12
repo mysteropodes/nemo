@@ -74,7 +74,26 @@
   // capture-phase AND registered before select-bridge.js in index.html, so
   // it stole the gesture regardless of what select-bridge.js's own onDown
   // did with the SAME pointerdown/pointermove events.
-  function shouldRotate() { return engineOn() && (state.tool === 'rotate' || (state.altDown && ['zoom', 'draw', 'fillbrush', 'fill', 'eraser', 'select'].indexOf(state.tool) < 0 && !state.spaceDown)); }
+  function shouldRotate() { return engineOn() && !nativeOwned() && (state.tool === 'rotate' || (state.altDown && ['zoom', 'draw', 'fillbrush', 'fill', 'eraser', 'select'].indexOf(state.tool) < 0 && !state.spaceDown)); }
+
+  // Native object projects: the native viewport navigation token carries only
+  // {zoom, pan} (native-object-open-exposure.js), so there is no native view
+  // rotation to drive. The Rotate tool (and the Alt-drag shortcut where Alt has
+  // no other native meaning) therefore says so explicitly instead of doing
+  // nothing, and never writes the document or the legacy view. Baseline
+  // 1065e9d8 rotated the Rust viewport here (shouldRotate above).
+  var NATIVE_ROTATE_NOTICE = 'Canvas rotation is unavailable in native projects';
+  var NATIVE_ALT_ROTATE_TOOLS = ['eyedropper'];
+  var nativeRotateGesture = false;
+  function nativeOwned() {
+    var project = window.NemoNativeObjectProject;
+    var session = project && typeof project.desktop === 'function' && project.desktop(window);
+    return !!(session && typeof session.blocksLegacy === 'function' && session.blocksLegacy());
+  }
+  function nativeWantsRotate() {
+    if (state.spaceDown) return false;
+    return state.tool === 'rotate' || (!!state.altDown && NATIVE_ALT_ROTATE_TOOLS.indexOf(state.tool) >= 0);
+  }
 
   function canvasLocal(clientX, clientY) {
     var r = document.getElementById('drawing-canvas').getBoundingClientRect();
@@ -135,6 +154,18 @@
     return (hit && hit.item instanceof Path) ? hit.item : null;
   }
 
+  var NATIVE_PICK_PORTS = {
+    setColor: setColorUI,
+    setBrushSize: function (w) { state.brushSize = w; var sw = document.getElementById('p-sw'); if (sw) sw.value = Math.round(w); },
+    selectPreset: function (key) { if (window.BrushPresetPicker) window.BrushPresetPicker.selectPreset(key); },
+    toast: function (text) { if (typeof showToast === 'function') showToast(text); }
+  };
+  function nativePick(e) {
+    var A = window.NemoNativeEyedropper;
+    if (A) A.pickAt(window, NATIVE_PICK_PORTS, e.clientX, e.clientY);
+    else NATIVE_PICK_PORTS.toast('Nothing to pick here');
+  }
+
   function pick(e) {
     var hitEp = hitPickable(e.clientX, e.clientY);
     if (!hitEp) return;
@@ -189,6 +220,20 @@
       var native=nativeViewportNavigation(state.tool==='zoom'&&!state.spaceDown?'begin-zoom':'begin-pan',e);
       if(native){e.stopImmediatePropagation();e.preventDefault();nativeNavigation=native;nativeStart={x:e.clientX,y:e.clientY};nativeMoved=false;state.isPanning=state.tool!=='zoom'||state.spaceDown;return;}
     }
+    if (!state.playing && nativeWantsRotate() && nativeOwned()) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      nativeRotateGesture = true;
+      if (typeof showToast === 'function') showToast(NATIVE_ROTATE_NOTICE);
+      return;
+    }
+    if (!state.playing && !state.spaceDown && state.tool === 'eyedropper' && nativeOwned()) {
+      // #2372: a native object project holds no Paper items; the pick reads the engine's hit-test listing (adapters/native-eyedropper.js), read-only.
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      nativePick(e);
+      return;
+    }
     if (shouldPan()) {
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -231,6 +276,7 @@
       else if(nativeMoved)nativeViewportNavigation('drag',e,nativeNavigation.token,Math.pow(2,delta/120));
       return;
     }
+    if (nativeRotateGesture) { e.stopImmediatePropagation(); e.preventDefault(); return; }
     if (rotating) {
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -270,7 +316,7 @@
       // stopImmediatePropagation/preventDefault: this isn't a gesture, just
       // a read-only "is there anything under the cursor right now" check so
       // the cursor can hint whether a click would actually pick something.
-      if (shouldPick()) {
+      if (shouldPick() && !nativeOwned()) { // native: the listing read is async, so no per-move hover hint
         var hovering = !!hitPickable(e.clientX, e.clientY);
         if (hovering !== pickHover) {
           pickHover = hovering;
@@ -292,6 +338,7 @@
       if(e.type!=='pointercancel'&&nativeNavigation.token&&nativeNavigation.token.kind==='zoom'&&!nativeMoved)nativeViewportNavigation('drag',e,nativeNavigation.token,e.altKey ? 0.8 : 1.25);
       nativeNavigation=null;nativeStart=null;state.isPanning=false;return;
     }
+    if (nativeRotateGesture) { e.stopImmediatePropagation(); e.preventDefault(); nativeRotateGesture = false; return; }
     if (rotating) {
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -329,7 +376,7 @@
     target.addEventListener('pointermove', onMove, { capture: true });
     target.addEventListener('pointerup', onUp, { capture: true });
     target.addEventListener('pointercancel', onUp, { capture: true });
-    window.addEventListener('blur',function(){nativeNavigation=null;nativeStart=null;state.isPanning=false;});
+    window.addEventListener('blur',function(){nativeRotateGesture=false;nativeNavigation=null;nativeStart=null;state.isPanning=false;});
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

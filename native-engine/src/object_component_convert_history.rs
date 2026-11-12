@@ -13,18 +13,26 @@ use crate::transaction::CompactResult;
 const OP_COMPONENT_CONVERT: &str = "command.document.object.component.convert";
 const OP_COMPONENT_EXPOSE: &str = "command.document.object.component.expose";
 const OP_COMPONENT_PLACE: &str = "command.document.object.component.place";
+const OP_COMPONENT_INSTANCE_SET: &str = "command.document.object.component.instance.set";
+const OP_COMPONENT_BREAK_APART: &str = "command.document.object.component.breakApart";
+const OP_COMPONENT_STATE_EDIT: &str = "command.document.object.component.state.edit";
 const OP_DUPLICATOR_SET: &str = "command.document.object.duplicator.set";
 const OP_DUPLICATOR_OBJECTS: &str = "command.document.object.duplicator.objects";
 const OP_DUPLICATOR_PATH: &str = "command.document.object.duplicator.path";
+const OP_DUPLICATOR_CONFIG: &str = "command.document.object.duplicator.config";
 
 fn kind_of(operation: &str) -> Option<SetupKind> {
     match operation {
         OP_COMPONENT_CONVERT => Some(SetupKind::Convert),
         OP_COMPONENT_EXPOSE => Some(SetupKind::Expose),
         OP_COMPONENT_PLACE => Some(SetupKind::Place),
+        OP_COMPONENT_INSTANCE_SET => Some(SetupKind::InstanceSet),
+        OP_COMPONENT_BREAK_APART => Some(SetupKind::BreakApart),
+        OP_COMPONENT_STATE_EDIT => Some(SetupKind::StateEdit),
         OP_DUPLICATOR_SET => Some(SetupKind::DuplicatorSet),
         OP_DUPLICATOR_OBJECTS => Some(SetupKind::DuplicatorObjects),
         OP_DUPLICATOR_PATH => Some(SetupKind::DuplicatorPath),
+        OP_DUPLICATOR_CONFIG => Some(SetupKind::DuplicatorConfig),
         _ => None,
     }
 }
@@ -96,8 +104,20 @@ impl NativeObjectHistory {
 #[path = "../tests/object_component_convert_dispatch.rs"]
 mod dispatch_tests;
 #[cfg(test)]
+#[path = "../tests/object_component_instance_set_history.rs"]
+mod instance_history_tests;
+#[cfg(test)]
+#[path = "../tests/object_duplicator_config_history.rs"]
+mod config_history_tests;
+#[cfg(test)]
 #[path = "../tests/object_component_convert_fixture.rs"]
 mod fixture;
 #[cfg(test)]
 #[path = "../tests/object_component_convert_history.rs"]
 mod history_tests;
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_component_break_apart.rs"]
+mod break_apart_tests;
+#[cfg(test)]
+#[path = "../tests/object_component_state_edit.rs"]
+mod state_edit_tests;

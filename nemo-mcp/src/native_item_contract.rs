@@ -31,6 +31,9 @@ const MEDIA: [&str; 7] = [
 ];
 #[path = "native_text_animator_contract.rs"]
 mod animator;
+/// #2361: the bitmap-brush Draw stroke attaches its baked PNG with the anchor and companion it paints.
+#[path = "native_brush_bitmap_stroke_contract.rs"]
+pub(crate) mod bitmap_stroke;
 
 const RESULT_OPERATIONS: [&str; 12] = [
     "raster.create",
@@ -48,7 +51,7 @@ const RESULT_OPERATIONS: [&str; 12] = [
 ];
 
 pub(crate) fn owns(operation: &str) -> bool {
-    matches!(operation, ITEM | ATTACH | REMOVE)
+    matches!(operation, ITEM | ATTACH | REMOVE | bitmap_stroke::OP)
 }
 
 fn opaque(value: &Value) -> bool {
@@ -62,6 +65,11 @@ fn snapshot(value: &Value) -> bool {
 }
 
 fn target(value: &Value, create: bool) -> bool {
+    target_in(value, create, false)
+}
+
+/// `declared`: the context may be a declared component (#2267 text inside an entered component); the owner resolves it and refuses an undeclared one.
+fn target_in(value: &Value, create: bool, declared: bool) -> bool {
     // A created item names no stroke id (the owner allocates it); every other target names one.
     let stroke = if create {
         value["strokeId"] == ""
@@ -74,7 +82,7 @@ fn target(value: &Value, create: bool) -> bool {
         &[],
     )
     .is_some()
-        && value["contextId"] == "scene-root"
+        && (value["contextId"] == "scene-root" || declared && opaque(&value["contextId"]))
         && opaque(&value["layerUid"])
         && stroke
         && exact(&value["frameScope"], &["kind", "frame"], &[]).is_some()
@@ -89,6 +97,11 @@ fn raster_item(value: &Value) -> bool {
     let optional = [
         "opacity",
         "rotation",
+        "flipX",
+        "flipY",
+        "skew",
+        "xformAnchorKey",
+        "xformAnchorCustom",
         "isBitmapBrush",
         "brushGroupId",
         "isBrushTextureCopy",
@@ -102,7 +115,10 @@ fn raster_item(value: &Value) -> bool {
             && ["opacity", "rotation"]
                 .iter()
                 .all(|key| members.get(*key).is_none_or(Value::is_number))
-            && ["isBitmapBrush", "isBrushTextureCopy"]
+            // #2372: the stored mirror and shear of the image (degrees of x-shear, inside a quarter turn).
+            && members.get("skew").is_none_or(|d| d.as_f64().is_some_and(|d| d.abs() < 90.0))
+            && members.iter().filter(|(k, _)| k.starts_with("xformAnchor")).all(|(k, v)| pivot_member(k, v))
+            && ["isBitmapBrush", "isBrushTextureCopy", "flipX", "flipY"]
                 .iter()
                 .all(|key| members.get(*key).is_none_or(Value::is_boolean))
             && ["brushGroupId", "meshId"]
@@ -148,6 +164,12 @@ fn text_fields(members: &Map<String, Value>) -> bool {
             value.as_str(),
             Some("none" | "upper" | "lower" | "capitalize")
         ),
+        // #2267: the stored turn of a block, degrees within one turn either way (a patch never carries it, see `text_patch`).
+        "rotation" => value.as_f64().is_some_and(|d| d.abs() <= 360.0),
+        // #2372: the stored mirror and shear of a block about its anchor (a patch never carries them either, see `text_patch`).
+        "flipX" | "flipY" => value.is_boolean(),
+        "skew" => value.as_f64().is_some_and(|d| d.abs() < 90.0),
+        "xformAnchorKey" | "xformAnchorCustom" => pivot_member(key, value),
         "anchorTopLeft" => {
             exact(value, &["x", "y"], &[]).is_some()
                 && value["x"].is_number()
@@ -157,18 +179,18 @@ fn text_fields(members: &Map<String, Value>) -> bool {
     })
 }
 
-const TEXT_OPTIONAL: [&str; 11] = [
-    "fixedWidth",
-    "fixedHeight",
-    "bold",
-    "italic",
-    "underline",
-    "strike",
-    "letterSpacing",
-    "wordSpacing",
-    "lineHeightMult",
-    "textCase",
-    "anchorTopLeft",
+/// #2372: the stored Select pivot member `key` (a preset name, or a custom world point of two finite numbers).
+fn pivot_member(key: &str, v: &Value) -> bool {
+    match key {
+        "xformAnchorKey" => v.as_str().is_some_and(|k| ["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"].contains(&k)),
+        _ => v.as_array().is_some_and(|p| p.len() == 2 && p.iter().all(|n| n.as_f64().is_some_and(f64::is_finite))),
+    }
+}
+
+const TEXT_OPTIONAL: [&str; 17] = [
+    "fixedWidth", "fixedHeight", "bold", "italic", "underline", "strike",
+    "letterSpacing", "wordSpacing", "lineHeightMult", "textCase", "anchorTopLeft", "rotation",
+    "flipX", "flipY", "skew", "xformAnchorKey", "xformAnchorCustom",
 ];
 
 fn text_block(value: &Value) -> bool {
@@ -180,11 +202,27 @@ fn text_block(value: &Value) -> bool {
     .is_some_and(text_fields)
 }
 
-/// A patch names members to replace; it never carries `anchorTopLeft` (an edit cannot re-anchor).
+/// A patch names members to replace; it never carries `anchorTopLeft` (an edit cannot re-anchor) or `rotation` / `flipX` / `flipY` / `skew` / the pivot (a Select transform owns them).
 fn text_patch(value: &Value) -> bool {
     value.as_object().is_some_and(|members| {
-        !members.is_empty() && !members.contains_key("anchorTopLeft") && text_fields(members)
+        !members.is_empty()
+            && !members.contains_key("anchorTopLeft")
+            && !members.contains_key("rotation")
+            && !["flipX", "flipY", "skew", "xformAnchorKey", "xformAnchorCustom"].iter().any(|key| members.contains_key(*key))
+            && text_fields(members)
     })
+}
+
+/// The members of a text transaction plus the copy key (#2267): `keyframe: "copy"` keys a held cell with a copy before the edit, and an edit or
+/// delete may name the cell it lands in with `frame` (only with the copy key). A create names its cell by its target. The shape of `target` and
+/// `stableTarget` is checked by the caller.
+fn text_landing(payload: &Value, required: &[&str], create: bool) -> bool {
+    let optional: &[&str] = if create { &["keyframe"] } else { &["frame", "keyframe"] };
+    let ok = exact(payload, required, optional).is_some();
+    let copy = payload.get("keyframe").is_none_or(|word| word == "copy");
+    let landing = payload.get("frame").is_none_or(|n| frame(Some(n)).is_some() && payload.get("keyframe").is_some());
+    let stable = create || target_in(&payload["stableTarget"], false, true);
+    ok && copy && landing && stable
 }
 
 fn item_request(payload: &Value) -> bool {
@@ -200,18 +238,21 @@ fn item_request(payload: &Value) -> bool {
     };
     match command {
         "object.text.animator.edit" => {
-            exact(payload, &["command", "layerUid", "animatorId", "edit"], &[]).is_some()
+            exact(payload, &["command", "layerUid", "animatorId", "edit"], &["contextId"]).is_some()
+                && payload.get("contextId").is_none_or(opaque)
                 && opaque(&payload["layerUid"])
                 && opaque(&payload["animatorId"])
                 && animator::edit(&payload["edit"])
         }
         "object.text.animator.upsert" => {
-            exact(payload, &["command", "layerUid", "animator"], &[]).is_some()
+            exact(payload, &["command", "layerUid", "animator"], &["contextId"]).is_some()
+                && payload.get("contextId").is_none_or(opaque)
                 && opaque(&payload["layerUid"])
                 && animator::record(&payload["animator"])
         }
         "object.text.animator.remove" => {
-            exact(payload, &["command", "layerUid", "animatorId"], &[]).is_some()
+            exact(payload, &["command", "layerUid", "animatorId"], &["contextId"]).is_some()
+                && payload.get("contextId").is_none_or(opaque)
                 && opaque(&payload["layerUid"])
                 && opaque(&payload["animatorId"])
         }
@@ -224,15 +265,16 @@ fn item_request(payload: &Value) -> bool {
         "object.raster.resize" => stable(&["width", "height"]),
         "object.raster.rotate" => stable(&["rotation"]),
         "object.raster.opacity" => stable(&["opacity"]),
-        "object.raster.delete" | "object.text.delete" => stable(&[]),
+        "object.raster.delete" => stable(&[]),
+        "object.text.delete" => text_landing(payload, &["command", "stableTarget"], false),
         "object.text.create" => {
-            exact(payload, &["command", "target", "block"], &[]).is_some()
-                && target(&payload["target"], true)
+            text_landing(payload, &["command", "target", "block"], true)
+                && target_in(&payload["target"], true, true)
                 && text_block(&payload["block"])
         }
         "object.text.edit" => {
-            exact(payload, &["command", "stableTarget", "patch"], &[]).is_some()
-                && target(&payload["stableTarget"], false)
+            text_landing(payload, &["command", "stableTarget", "patch"], false)
+                && target_in(&payload["stableTarget"], false, true)
                 && text_patch(&payload["patch"])
         }
         _ => false,
@@ -242,6 +284,7 @@ fn item_request(payload: &Value) -> bool {
 pub(crate) fn request(operation: &str, payload: &Value) -> bool {
     match operation {
         ITEM => item_request(payload),
+        bitmap_stroke::OP => bitmap_stroke::request(payload),
         ATTACH => {
             let placed = payload.get("placement").is_some();
             let required = if placed {
@@ -361,6 +404,7 @@ fn image_matches(request: &NativeApplicationRequest, value: &Value) -> bool {
 }
 pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
     match operation {
+        bitmap_stroke::OP => bitmap_stroke::result(value),
         ITEM => {
             let Some(command) = payload["command"].as_str() else {
                 return false;

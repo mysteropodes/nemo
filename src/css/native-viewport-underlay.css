@@ -23,3 +23,15 @@ html.nemo-native-underlay body::before {
 
 /* The retired WASM mirror remains an opaque sibling above Paper's overlay canvas. */
 html.nemo-native-underlay #rust-canvas { visibility: hidden; }
+
+/* The host draws a document-sized composition into the surface framed at #drawing-canvas (#2343 B1). While a native
+   document is presented, the canvas takes that document's aspect, centred in the canvas area, so the presentation is
+   one uniform scale whatever the window's shape. */
+html.nemo-native-fit #canvas-area { container-type: size; }
+html.nemo-native-fit #drawing-canvas {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(100cqw, calc(100cqh * var(--nemo-native-aspect))) !important;
+  height: min(100cqh, calc(100cqw / var(--nemo-native-aspect))) !important;
+}

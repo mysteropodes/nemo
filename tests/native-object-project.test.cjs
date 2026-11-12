@@ -11,7 +11,7 @@ const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 function host(){
   const calls=[];let installed=false,revision=0,edited=false,undo=false,preview='presented',failure=null;
-  let reference=null;const copies=[];
+  let reference=null,newFailure=null;const copies=[];
   const info=()=>({apiVersion:2,instanceId:'instance',documentId:'document',lifecycleGeneration:1,
     documentSnapshotId:'snapshot-'+revision,contentRevision:revision,canvasW:320,canvasH:180,fps:24,totalFrames:21,
     documentDigest:(edited?'b':'a').repeat(64),byteCount:edited?200000:10000,layers:[{layerUid:'drawing'}],reference,
@@ -19,10 +19,16 @@ function host(){
   async function invoke(command,args){
     const r=args?JSON.parse(args.requestJson):null;calls.push({command,r});
     if(command==='nemo_native_object_client_status')return {...info(),available:installed};
+    if(command==='nemo_native_object_bootstrap'&&r.newProject){
+      if(newFailure){const e=newFailure;newFailure=null;throw e;}
+      installed=true;return {...info(),requestId:r.requestId,resourceCount:0,viewportAvailable:false};
+    }
     if(command==='nemo_native_object_bootstrap'){
       assert.equal(r.projectOnly,true);assert.equal(typeof r.sourcePath,'string');assert.equal('documentJson' in r,false);
       if(r.sourcePath==='/opacity.json')throw {code:'unsupported_format'};
       if(r.sourcePath==='/bad.json')throw {code:'invalid_request'};
+      if(r.sourcePath==='/outside.json')throw {code:'unavailable',message:'object file is outside the existing filesystem scope',
+        details:{disposition:'notDispatched',retryExecution:false}};
       installed=true;return {...info(),requestId:r.requestId,resourceCount:0,viewportAvailable:false};
     }
     if(command==='nemo_native_object_reference'&&r.action.kind==='inspect'){
@@ -34,7 +40,8 @@ function host(){
       assert.equal(r.expectedRevision,revision);
       if(command==='nemo_native_object_dispatch'){
         assert.ok(['command.document.object.undo','command.document.object.redo'].includes(r.operation));
-        assert.deepEqual(r.payload,{command:r.operation==='command.document.object.undo'?'object.undo':'object.redo'});
+        const {steps,...rest}=r.payload;assert.ok(steps===undefined||Number.isSafeInteger(steps)&&steps>1);
+        assert.deepEqual(rest,{command:r.operation==='command.document.object.undo'?'object.undo':'object.redo'});
       }
       if(failure==='refused')return {apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:'document',contentRevision:revision,ok:false,error:{code:'invalid_request'}};
       if(failure==='transport-before'||failure==='inspection')throw Error('Native response lost');
@@ -54,7 +61,7 @@ function host(){
       externalEffectDisposition:'committed',errorCode:null,artifactFiles:['frame_0001.png'],published:true,cleanupComplete:true};
     throw Error('Unexpected command: '+command);
   }
-  return {invoke,info,calls,copies,preview(value){preview=value;},fail(value){failure=value;}};
+  return {invoke,info,calls,copies,preview(value){preview=value;},fail(value){failure=value;},failNew(e){newFailure=e;}};
 }
 function session(h){return Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
   physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});}
@@ -103,6 +110,19 @@ test('undo to saved bytes clears dirty even though native content revision incre
   ]);
   const count=h.calls.length;await assert.rejects(s.historyFromUi('clear'),/Unsupported history action/);assert.equal(h.calls.length,count);
 });
+test('a history jump is ONE native undo or redo carrying its step count, and the UI undo still carries none (#2376 G26)',async()=>{
+  const h=host(),s=session(h),f=files(s);await f.ui.openPath('/project.json');
+  await s.reference({kind:'attach',id:'ref',sourcePath:'/image.png'});
+  await s.jumpHistory('undo',3);await s.jumpHistory('redo',1);await s.historyFromUi('undo','request-id-is-not-a-step-count');
+  assert.deepEqual(h.calls.filter(c=>c.command==='nemo_native_object_dispatch').map(c=>[c.r.operation,c.r.payload]),[
+    ['command.document.object.undo',{command:'object.undo',steps:3}],['command.document.object.redo',{command:'object.redo'}],
+    ['command.document.object.undo',{command:'object.undo'}]
+  ]);
+  const count=h.calls.length;
+  for(const steps of [0,-1,1.5,'2',null,Infinity])await assert.rejects(s.jumpHistory('undo',steps),/Unsupported history action/);
+  await assert.rejects(s.jumpHistory('clear',2),/Unsupported history action/);
+  assert.equal(h.calls.length,count,'a refused jump reaches no native command');
+});
 for(const failure of ['refused','transport-before','transport-after']){
   test('reconciled '+failure+' re-presents current native state without retrying mutation',async()=>{
     const h=host(),s=session(h),f=files(s);await f.ui.openPath('/project.json');h.fail(failure);
@@ -137,6 +157,26 @@ test('only explicit pre-install unsupported format allows the older file route',
   const h=host(),s=session(h);assert.equal(await s.openPath('/opacity.json'),null);assert.equal(s.blocksLegacy(),false);
   await s.openPath('/project.json');assert.equal(s.blocksLegacy(),true);
   const bad=session(host());await assert.rejects(bad.openPath('/bad.json'));assert.equal(bad.blocksLegacy(),true);assert.throws(bad.getNativeIdentity);
+});
+test('a first Open refused before dispatch returns to idle, so a later Open still runs (#2511)',async()=>{
+  const s=session(host());
+  await assert.rejects(s.openPath('/outside.json'),(e)=>e.details.disposition==='notDispatched');
+  assert.equal(s.blocksLegacy(),false);assert.equal(s.isActive(),false);assert.equal(s.isIndeterminate(),false);
+  await s.openPath('/project.json');assert.equal(s.isActive(),true);
+});
+const blank={canvasW:320,canvasH:180,fps:24};
+test('a first New refused before install returns to idle, so a later New still runs (early-New fence)',async()=>{
+  const h=host(),s=session(h);
+  h.failNew({code:'unavailable',message:'native blank project installation refused',details:{disposition:'notDispatched',retryExecution:false}});
+  await assert.rejects(s.newProject(blank),(e)=>e.details.disposition==='notDispatched');
+  assert.equal(s.blocksLegacy(),false);assert.equal(s.isActive(),false);assert.equal(s.isIndeterminate(),false);
+  await s.newProject(blank);assert.equal(s.isActive(),true);
+});
+test('a first New that fails untyped stays fenced: nothing proves the slot is unchanged',async()=>{
+  const h=host(),s=session(h);h.failNew({code:'unavailable',message:'lost'});
+  await assert.rejects(s.newProject(blank));
+  assert.equal(s.isIndeterminate(),true);assert.equal(s.blocksLegacy(),true);
+  await assert.rejects(s.newProject(blank));
 });
 test('metadata is detached and immutable; malformed or foreign inspection fences admission',async()=>{
   const h=host(),s=await presented(h);assert.equal(Object.isFrozen(s.info().layers[0]),true);
@@ -744,7 +784,7 @@ test('session view change invalidates the original pending action lease before a
 });
 
 function navigationFixture(initialFilter='none'){
- const h=host(),invoke=h.invoke,hold=deferred();let filter=initialFilter,mode='canvas',frame=0,pause=false,tamper=null,rect={x:0,y:0,width:320,height:180};
+ const h=host(),invoke=h.invoke,hold=deferred();let filter=initialFilter,ghosts=null,checker=false,outline=false,hideShadow=false,mode='canvas',frame=0,pause=false,tamper=null,rect={x:0,y:0,width:320,height:180};
  const literals=new Map([
   ['1:0,0',[[2,0,0,2,-160,-90],[.5,0,0,.5,80,45]]],
   ['1:10,-5',[[2,0,0,2,-180,-80],[.5,0,0,.5,90,40]]],
@@ -754,12 +794,16 @@ function navigationFixture(initialFilter='none'){
  ]);
  h.invoke=async(command,args)=>{const result=await invoke(command,args),q=args&&JSON.parse(args.requestJson);
   if(command==='nemo_native_object_preview')result.displayFilter=q.displayFilter||'none';
+  if(command==='nemo_native_object_preview'&&q.alphaChecker)result.alphaChecker=true;
+  if(command==='nemo_native_object_preview'&&q.currentOutline)result.currentOutline=true;
+  if(command==='nemo_native_object_preview'&&q.hideShadowGuides)result.hideShadowGuides=true;
+  if(command==='nemo_native_object_preview'&&q.ghosts)result.ghosts={selected:q.ghosts,status:'composited',frames:2};
   if(command!=='nemo_native_object_preview'||q.viewMode!=='stored-camera')return result;
   const n=q.navigation||{zoom:1,pan:[0,0]},pair=literals.get(n.zoom+':'+n.pan.join(','));assert.ok(pair,'independent authored navigation literal');
   if(pause)await hold.promise;
   const reply={...result,view:{mode:'stored-camera',navigation:n,cameraAvailable:true,documentToComposition:pair[0],compositionToDocument:pair[1]}};return tamper?tamper(reply):reply;};
- const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{...rect},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>frame,viewMode:()=>mode,displayFilter:()=>filter});
- return {h,s,async open(){await s.openPath('/project.json');mode='stored-camera';await s.presentPreview(frame);},set filter(value){filter=value;},set frame(value){frame=value;},set mode(value){mode=value;},set rect(value){rect=value;},pause(){pause=true;},release(){pause=false;hold.resolve();},tamper(fn){tamper=fn;}};
+ const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{...rect},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>frame,viewMode:()=>mode,displayFilter:()=>filter,ghosts:()=>ghosts,alphaChecker:()=>checker,currentOutline:()=>outline,hideShadowGuides:()=>hideShadow});
+ return {h,s,async open(){await s.openPath('/project.json');mode='stored-camera';await s.presentPreview(frame);},set filter(value){filter=value;},set ghosts(value){ghosts=value;},set checker(value){checker=value;},set outline(value){outline=value;},set hideShadow(value){hideShadow=value;},set frame(value){frame=value;},set mode(value){mode=value;},set rect(value){rect=value;},pause(){pause=true;},release(){pause=false;hold.resolve();},tamper(fn){tamper=fn;}};
 }
 test('native session hand and zoom retain exact view intent through scrub while excluding export and source/history',async()=>{
  const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
@@ -810,7 +854,7 @@ test('native first preview carries persisted filter; toggles preserve navigation
  assert.ok(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>c.r.displayFilter==='values'));
  const hand=f.s.beginViewportNavigation('pan',{x:100,y:60});await f.s.updateViewportNavigation(hand,{x:80,y:70});
  const view=f.s.readPresentedObjectSession().presentation.view;
- for(const filter of ['dim','none','values']){
+ for(const filter of ['dim','none','mirrored','values-mirrored','values']){
   f.filter=filter;assert.equal(f.s.readPresentedObjectSession(),null);await f.s.renderPreview(0);
   const shown=f.s.readPresentedObjectSession().presentation;assert.equal(shown.displayFilter,filter);assert.deepEqual(shown.view,view);
  }
@@ -836,4 +880,156 @@ test('native filter receipts reject wrong/missing/unknown values and late direct
  const pending=f.s.presentPreview(0);await turn();f.filter='dim';f.release();
  await assert.rejects(pending,/owner/);assert.equal(f.s.readPresentedObjectSession(),null);
  await f.s.renderPreview(0);assert.equal(f.s.readPresentedObjectSession().presentation.displayFilter,'dim');
+});
+test('an edit presented while the window is not visible is no failure and re-presents on the next visible exposure',async()=>{
+  // #2343 B1 check 3: a layer edit while NSWindow occlusion said not visible produced 'Native project frame was not
+  // presented (status-deferred-occluded)' and a blank canvas. The edit stands; its frame waits for the exposure.
+  const h=host(),notices=[],listeners=[];
+  const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
+    physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0,
+    notice:m=>notices.push(m),subscribeWindowOcclusion:async hint=>{listeners.push(hint);return {detach(){},close(){}};}});
+  await s.openPath('/project.json');assert.ok(s.readPresentedObjectSession());
+  const previews=()=>h.calls.filter(c=>c.command==='nemo_native_object_preview').length,before=previews();
+  h.preview('deferred-occluded');await s.reference({kind:'remove'});
+  for(let i=0;i<6;i++)await turn();
+  // The edit's present and the one present on the wake's registration both stay deferred while occluded.
+  assert.equal(previews(),before+2);assert.equal(s.readPresentedObjectSession(),null);assert.deepEqual(notices,[]);
+  h.preview('presented');listeners.forEach(l=>l({visible:true}));
+  for(let i=0;i<6;i++)await turn();
+  assert.equal(previews(),before+3,'one re-present');assert.ok(s.readPresentedObjectSession(),'presented again');assert.deepEqual(notices,[]);
+});
+
+test('an exposure between the deferral and the listener registration is not lost (#2471 registration race)',async()=>{
+  // The desktop port replays no current visibility: a window that became visible before the listener registered sends
+  // no later hint, so the wake presents once on registration; a window still occluded defers again and waits.
+  const h=host(),notices=[],listeners=[];let release,subscriptions=0;
+  const registered=new Promise(r=>{release=r;});
+  // Open registers its own exposure scope first; only the post-Open wake's registration is held open.
+  const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
+    physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0,
+    notice:m=>notices.push(m),subscribeWindowOcclusion:async hint=>{if(++subscriptions>1)await registered;listeners.push(hint);return {detach(){},close(){}};}});
+  await s.openPath('/project.json');
+  const previews=()=>h.calls.filter(c=>c.command==='nemo_native_object_preview').length,before=previews();
+  h.preview('deferred-occluded');await s.reference({kind:'remove'});
+  assert.equal(previews(),before+1);
+  // The window turns visible while the registration is still pending: no hint will ever arrive for it.
+  h.preview('presented');release();
+  for(let i=0;i<8;i++)await turn();
+  assert.equal(previews(),before+2,'one present on registration');assert.ok(s.readPresentedObjectSession());
+  // Still occluded at the registered retry: it defers again, re-arms on the live listener and waits for a hint.
+  h.preview('deferred-occluded');await s.reference({kind:'remove'});
+  for(let i=0;i<8;i++)await turn();
+  assert.equal(previews(),before+3,'no retry without a hint once registered');
+  h.preview('presented');listeners.forEach(l=>l({visible:true}));
+  for(let i=0;i<8;i++)await turn();
+  assert.equal(previews(),before+4);assert.ok(s.readPresentedObjectSession());assert.deepEqual(notices,[]);
+});
+
+test('"Show transparency" rides every preview request as a view flag, is part of the presented view and never reaches export or history (#2373)',async()=>{
+ const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
+ assert.ok(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>!Object.hasOwn(c.r,'alphaChecker')),'checker off: nothing sent');
+ assert.equal(Object.hasOwn(f.s.readPresentedObjectSession().presentation,'alphaChecker'),false);
+ f.checker=true;assert.equal(f.s.readPresentedObjectSession(),null,'a changed checker flag is a different view, so the old presentation is no longer current');
+ const calls=f.h.calls.length;await f.s.renderPreview(0);
+ const asked=f.h.calls.slice(calls);
+ assert.deepEqual(asked.map(c=>c.command),['nemo_native_object_preview'],'only a preview request: no document command');
+ assert.equal(asked[0].r.alphaChecker,true);
+ assert.equal(f.s.readPresentedObjectSession().presentation.alphaChecker,true);
+ await f.s.exportPng('/no-checker',[0]);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_export').at(-1).r,'alphaChecker'),false);
+ assert.equal(JSON.stringify(f.s.info()),before);
+ f.checker=false;assert.equal(f.s.readPresentedObjectSession(),null);await f.s.renderPreview(0);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').at(-1).r,'alphaChecker'),false);
+ assert.equal(Object.hasOwn(f.s.readPresentedObjectSession().presentation,'alphaChecker'),false);
+});
+test('"Show transparency" receipts must echo exactly what was asked: a checker nobody asked for, or none when asked, is refused (#2373)',async()=>{
+ const unasked=navigationFixture();await unasked.open();unasked.tamper(r=>({...r,alphaChecker:true}));
+ await assert.rejects(unasked.s.presentPreview(0),/alpha-checker/);assert.equal(unasked.s.readPresentedObjectSession(),null);
+ for(const tamper of [r=>{const{alphaChecker,...rest}=r;return rest;},r=>({...r,alphaChecker:false}),r=>({...r,alphaChecker:1})]){
+  const f=navigationFixture();await f.open();f.checker=true;f.tamper(tamper);
+  await assert.rejects(f.s.presentPreview(0),/alpha-checker/);assert.equal(f.s.readPresentedObjectSession(),null);
+ }
+ const ok=navigationFixture();await ok.open();ok.checker=true;await ok.s.presentPreview(0);
+ assert.equal(ok.s.readPresentedObjectSession().presentation.alphaChecker,true);
+});
+test('"Current frame outline" rides every preview request as a view flag, is part of the presented view and never reaches export or history (#2372)',async()=>{
+ const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
+ assert.ok(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>!Object.hasOwn(c.r,'currentOutline')),'outline off: nothing sent');
+ f.outline=true;assert.equal(f.s.readPresentedObjectSession(),null,'a changed outline flag is a different view, so the old presentation is no longer current');
+ const calls=f.h.calls.length;await f.s.renderPreview(0);
+ const asked=f.h.calls.slice(calls);
+ assert.deepEqual(asked.map(c=>c.command),['nemo_native_object_preview'],'only a preview request: no document command');
+ assert.equal(asked[0].r.currentOutline,true);
+ assert.equal(f.s.readPresentedObjectSession().presentation.currentOutline,true);
+ await f.s.exportPng('/no-outline',[0]);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_export').at(-1).r,'currentOutline'),false);
+ assert.equal(JSON.stringify(f.s.info()),before);
+ f.outline=false;assert.equal(f.s.readPresentedObjectSession(),null);await f.s.renderPreview(0);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').at(-1).r,'currentOutline'),false);
+ assert.equal(Object.hasOwn(f.s.readPresentedObjectSession().presentation,'currentOutline'),false);
+});
+test('"Current frame outline" receipts must echo exactly what was asked: an outline nobody asked for, or none when asked, is refused (#2372)',async()=>{
+ const unasked=navigationFixture();await unasked.open();unasked.tamper(r=>({...r,currentOutline:true}));
+ await assert.rejects(unasked.s.presentPreview(0),/current-outline/);assert.equal(unasked.s.readPresentedObjectSession(),null);
+ for(const tamper of [r=>{const{currentOutline,...rest}=r;return rest;},r=>({...r,currentOutline:false}),r=>({...r,currentOutline:1})]){
+  const f=navigationFixture();await f.open();f.outline=true;f.tamper(tamper);
+  await assert.rejects(f.s.presentPreview(0),/current-outline/);assert.equal(f.s.readPresentedObjectSession(),null);
+ }
+ const ok=navigationFixture();await ok.open();ok.outline=true;await ok.s.presentPreview(0);
+ assert.equal(ok.s.readPresentedObjectSession().presentation.currentOutline,true);
+});
+test('"Shadow guides" off rides every preview request as the hideShadowGuides view flag, is part of the presented view and never reaches export or history (#2373)',async()=>{
+ const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
+ assert.ok(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>!Object.hasOwn(c.r,'hideShadowGuides')),'guides shown (the default): nothing sent');
+ f.hideShadow=true;assert.equal(f.s.readPresentedObjectSession(),null,'a changed guides flag is a different view, so the old presentation is no longer current');
+ const calls=f.h.calls.length;await f.s.renderPreview(0);
+ const asked=f.h.calls.slice(calls);
+ assert.deepEqual(asked.map(c=>c.command),['nemo_native_object_preview'],'only a preview request: no document command');
+ assert.equal(asked[0].r.hideShadowGuides,true);
+ assert.equal(f.s.readPresentedObjectSession().presentation.hideShadowGuides,true);
+ await f.s.exportPng('/no-shadow',[0]);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_export').at(-1).r,'hideShadowGuides'),false);
+ assert.equal(JSON.stringify(f.s.info()),before);
+ f.hideShadow=false;assert.equal(f.s.readPresentedObjectSession(),null);await f.s.renderPreview(0);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').at(-1).r,'hideShadowGuides'),false);
+ assert.equal(Object.hasOwn(f.s.readPresentedObjectSession().presentation,'hideShadowGuides'),false);
+});
+test('"Shadow guides" receipts must echo exactly what was asked: a hide nobody asked for, or none when asked, is refused (#2373)',async()=>{
+ const unasked=navigationFixture();await unasked.open();unasked.tamper(r=>({...r,hideShadowGuides:true}));
+ await assert.rejects(unasked.s.presentPreview(0),/shadow-guides/);assert.equal(unasked.s.readPresentedObjectSession(),null);
+ for(const tamper of [r=>{const{hideShadowGuides,...rest}=r;return rest;},r=>({...r,hideShadowGuides:false}),r=>({...r,hideShadowGuides:1})]){
+  const f=navigationFixture();await f.open();f.hideShadow=true;f.tamper(tamper);
+  await assert.rejects(f.s.presentPreview(0),/shadow-guides/);assert.equal(f.s.readPresentedObjectSession(),null);
+ }
+ const ok=navigationFixture();await ok.open();ok.hideShadow=true;await ok.s.presentPreview(0);
+ assert.equal(ok.s.readPresentedObjectSession().presentation.hideShadowGuides,true);
+});
+const ONION={layerUid:'native-layer:1:0',onion:true,ghostAll:false,from:1,to:8,previousOpacity:30,nextOpacity:40,mode:'tinted'};
+test('native onion skin rides every preview request, is part of the presented view and is excluded from export and history (#2358 GHOST-UNDER)',async()=>{
+ const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
+ assert.ok(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>!Object.hasOwn(c.r,'ghosts')),'no onion asked, none sent');
+ assert.equal(Object.hasOwn(f.s.readPresentedObjectSession().presentation,'ghosts'),false);
+ f.ghosts=ONION;assert.equal(f.s.readPresentedObjectSession(),null,'a changed onion selection is a different view, so the old presentation is no longer current');
+ await f.s.renderPreview(0);
+ assert.deepEqual(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').at(-1).r.ghosts,ONION);
+ const shown=f.s.readPresentedObjectSession().presentation;
+ assert.deepEqual(shown.ghosts,{selected:ONION,status:'composited',frames:2});
+ f.ghosts={...ONION,mode:'outline',shift:{x:4,y:-3,next:true}};assert.equal(f.s.readPresentedObjectSession(),null);
+ await f.s.renderPreview(0);assert.equal(f.s.readPresentedObjectSession().presentation.ghosts.selected.mode,'outline');
+ await f.s.exportPng('/no-onion',[0]);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_export').at(-1).r,'ghosts'),false);
+ assert.equal(JSON.stringify(f.s.info()),before);
+ f.ghosts=null;await f.s.renderPreview(0);assert.equal(Object.hasOwn(f.s.readPresentedObjectSession().presentation,'ghosts'),false);
+});
+test('native onion receipts must echo exactly the selection asked for and nothing when none was asked',async()=>{
+ const bad=[r=>({...r,ghosts:{...r.ghosts,selected:{...r.ghosts.selected,mode:'default'}}}),r=>({...r,ghosts:{...r.ghosts,status:'maybe'}}),r=>({...r,ghosts:{...r.ghosts,frames:-1}}),
+  r=>({...r,ghosts:{...r.ghosts,status:'unavailable'}}),r=>({...r,ghosts:{...r.ghosts,extra:1}}),r=>{const{ghosts,...rest}=r;return rest;}];
+ for(const tamper of bad){
+  const f=navigationFixture();await f.open();f.ghosts=ONION;f.tamper(tamper);
+  await assert.rejects(f.s.presentPreview(0),/ghosts/);assert.equal(f.s.readPresentedObjectSession(),null);
+ }
+ const f=navigationFixture();await f.open();f.tamper(r=>({...r,ghosts:{selected:ONION,status:'empty',frames:0}}));
+ await assert.rejects(f.s.presentPreview(0),/ghosts/);
+ const g=navigationFixture();await g.open();g.ghosts=ONION;g.tamper(r=>({...r,ghosts:{selected:ONION,status:'unavailable',frames:0,reason:'layer_not_found'}}));
+ await g.s.presentPreview(0);assert.equal(g.s.readPresentedObjectSession().presentation.ghosts.reason,'layer_not_found');
 });

@@ -142,6 +142,10 @@ impl BrushBitmapStore {
         self.touch(id);
         self.entries.get(id).map(|entry| entry.brush.clone())
     }
+    /// A read that neither ages the LRU nor pins the id (the host inspect/scene reads).
+    pub(crate) fn peek(&self, id: &str) -> Option<&BrushBitmap> {
+        self.entries.get(id).map(|entry| &entry.brush)
+    }
     pub(crate) fn contains(&self, id: &str) -> bool {
         self.entries.contains_key(id)
     }

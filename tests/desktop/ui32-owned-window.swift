@@ -18,6 +18,7 @@ func ui32FixedFixture(_ raw:String?) throws -> (name:String,size:Int,hash:String
 }
 func ui32UsesF03Fixture(_ raw:String?) throws -> Bool {try ui32FixedFixture(raw).f03}
 func ui32FixedFixtureSelfTest() throws {
+  try ui32ContentWindowsSelfTest()
   try check(try ui32UsesF03Fixture(nil) == false)
   try check(try ui32UsesF03Fixture("initial-text") == false)
   try check(try ui32UsesF03Fixture("f03-original") == true)
@@ -40,7 +41,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
   }
   let pid=pinned.pid, main=pinned.main
   var ordinal=0, originals=[String:String](), observed=false, menuOpened=false, phase2ReadUsed=false
-  var currentCommand:String?
+  var currentCommand:String?,cs4KeysUsed=false
   let entryEnabled=try ui32EntryMode(environment["NEMO_UI32_ENTRY_MODE"]);var entryStage=0,sourceCaptureStage = -1,newSettingsOpen=false
   var fixture:UI32Fixture?, syncPanel:UI32Fixture?
   let f03=try f03Operator(pinned,environment)
@@ -89,8 +90,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     return (0,rows)
   }
   func readContentCertificate(_ suppliedDeadline:UInt64?, _ expected:AXUIElement?) throws -> UI32ContentCertificate<AXUIElement> {
-    guard let windows=attr(pinned.application,kAXWindowsAttribute) as? [AXUIElement],windows.count == 1,
-      owns(windows[0],pid),CFEqual(windows[0],main) else { throw Refusal(code:"sheet-active") }
+    _ = try ui32ContentWindowContext(pinned)
     let deadline=suppliedDeadline ?? (DispatchTime.now().uptimeNanoseconds+750_000_000)
     let certificate=try ui32ContentCertificate(main,pid:Int(pid),retained:expected,deadline:deadline,
       now:{DispatchTime.now().uptimeNanoseconds},equal:{CFEqual($0,$1)},owner:owner,
@@ -246,6 +246,11 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
         if let enabled=attr(node,kAXEnabledAttribute) as? Bool { fact["enabled"]=enabled }
         if let selected=attr(node,kAXSelectedAttribute) as? Bool { fact["selected"]=selected }
         if let focused=attr(node,kAXFocusedAttribute) as? Bool { fact["focused"]=focused }
+        // Window-relative frame (points) and DOM classes: the harness takes rectangles and control state from these, never from a person.
+        if let at=xy(node), let size=wh(node), let base=xy(main), size.width > 0, size.height > 0 {
+          fact["frame"]=["x":Double(at.x-base.x),"y":Double(at.y-base.y),"w":Double(size.width),"h":Double(size.height)]
+        }
+        if let classes=attr(node,"AXDOMClassList") as? [String] { fact["classes"]=classes.prefix(12).map {String($0.prefix(40))} }
         facts.append(fact)
       }
       try identity()
@@ -258,6 +263,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
              "reportedParentRole":certificate.roles[certificate.reported[i]!],"insideContent":false]
           },"wholeWindowReciprocity":"not claimed; outside mismatches retained"]
       }
+      if let extent=wh(main) { result["windowSize"]=["w":Double(extent.width),"h":Double(extent.height)] }
       observed=true; result["nodes"]=facts; result["baselineObserved"]=true; try emit(result); continue
     }
     if command == "capture" {
@@ -291,6 +297,13 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       result["capture"]=name; try emit(result); continue
     }
     try ui32RequireObserved(observed)
+    if command == "cs4.start-keys" {
+      try cs7StartAdmission(command,entry:entryEnabled,fixture:fixture != nil,sync:syncPanel != nil,
+        f03:f03 != nil,used:cs4KeysUsed,option:request["option"],value:request["value"])
+      cs4KeysUsed=true
+      result.merge(try cs7StartKeys(pinned,resolve:resolve,visible:enabledVisible)) {_,new in new}
+      try emit(result);continue
+    }
     if command.hasPrefix("f03.") {
       try check(request["option"] == nil && request["value"] == nil)
       guard let f03 else {throw Refusal(code:"adapter-refused")}

@@ -1,0 +1,96 @@
+/* The Select tool's right-click canvas menu on a native object project (#2372/#2256, baseline 1065e9d8 select-bridge.js onContext). The legacy
+ * handler is retired there (it builds Paper clones and Paper z-order moves), so this module offers the baseline rows that have a native route and
+ * sends each one through that route; it holds no document state and writes nothing itself:
+ *   Copier / Couper / Coller / Dupliquer   -> NemoNativeSelectionClipboard (native-selection-clipboard.js)
+ *   Supprimer                              -> NemoNativeSelectionDelete.removeSelection
+ *   Grouper / Dissocier                    -> NemoNativeSelectGroup (the group intent)
+ *   Combiner (Union), Sortir du groupe, Aplatir -> NemoNativeSelectionBoolean / NemoNativeSelectGroup
+ *   Premier plan / Arrière-plan            -> NemoNativeSelectionOrder (native-selection-order.js)
+ *   Centrer le point d'ancrage             -> NemoNativeSelectPivot.center (the pivot back to the centre; a tool preference, no write)
+ * Right-click rule (baseline): an item that is already part of the selection keeps the whole selection; any other item replaces it, exactly as a
+ * plain click does (the native pick, then applyPick); an empty spot keeps the selection and offers Coller alone when a clip is held (otherwise the
+ * menu does not open). open() resolves to the rows it showed. A combine group the selection IS also gets its four modes (Union / Soustraction /
+ * Intersection / Exclusion, the current one ticked) -> NemoNativeSelectGroup.setMode. The rows the baseline has that still lack a native route (image
+ * mesh, tween opt-in, tracked roles, revision actions, stroke profiles) belong to the gaps that build those features and are added with their own
+ * routes; none is shown as a dead entry. */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.NemoNativeSelectMenu = api;
+}(typeof globalThis === 'object' ? globalThis : this, function () {
+  'use strict';
+  function selected(host) {
+    return (host.selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget && Number.isInteger(p.data.nativeLayerIndex) && p.data.strokeId; });
+  }
+  function ready(host) {
+    var C = host.NemoNativeSelectionClipboard, I = host.NemoSelectCanvasIntent, st = host.state;
+    return !!C && !!I && typeof host.showContextMenu === 'function' && !!st && st.tool === 'select' && !st.playing && C.native(host);
+  }
+  // The group state of the selection from the layer's native listing (null when it cannot be read: the group rows are then left out).
+  async function groupState(host, paths) {
+    var G = host.NemoNativeSelectGroup, I = host.NemoSelectCanvasIntent;
+    if (!G || paths.some(function (p) { return p.data.nativeLayerIndex !== paths[0].data.nativeLayerIndex; })) return null;
+    try {
+      var layers = await I.layerPaths(host, function () { return false; }, false, paths[0].data.nativeLayerIndex);
+      if (!layers) return null;
+      var info = G.groupsInfo(layers.items), ids = paths.map(function (p) { return p.data.strokeId; });
+      var active = G.activeGroup(info, ids);
+      return { grouped: ids.some(function (id) { return (info.pathOf[id] || []).length > 0; }), active: active, mode: active ? info.modes[active] : null };
+    } catch (_) { return null; }
+  }
+  function pasteRow(host, enabled) { return { label: 'Coller', shortcut: '⌘V', disabled: !enabled, action: function () { host.NemoNativeSelectionClipboard.paste(host); } }; }
+  // The menu rows for the selection the right-click left (empty: the selection is empty).
+  async function rows(host, paths) {
+    var C = host.NemoNativeSelectionClipboard, G = host.NemoNativeSelectGroup, B = host.NemoNativeSelectionBoolean, D = host.NemoNativeSelectionDelete;
+    if (!paths.length) return C.hasClip(host) ? [pasteRow(host, true)] : [];
+    var multi = paths.length > 1;
+    var items = [
+      { label: 'Copier', shortcut: '⌘C', action: function () { C.copy(host); } },
+      { label: 'Couper', shortcut: '⌘X', action: function () { C.cut(host); } },
+      pasteRow(host, C.hasClip(host)),
+      { label: 'Dupliquer', shortcut: '⌘D', action: function () { C.duplicate(host); } }
+    ];
+    if (D && typeof D.removeSelection === 'function') items.push({ label: multi ? 'Supprimer la sélection' : 'Supprimer', shortcut: 'Suppr', action: function () { D.removeSelection(host); } });
+    var state = G ? await groupState(host, paths) : null;
+    if (state) {
+      var extra = [];
+      if (state.grouped) extra.push({ label: 'Dissocier', shortcut: '⇧⌘G', action: function () { G.ungroup(host); } });
+      else if (multi) extra.push({ label: 'Grouper', shortcut: '⌘G', action: function () { G.group(host); } });
+      if (multi && !state.active && B) extra.push({ label: 'Combiner (Union) — non destructif', action: function () { B.combine(host, 'unite'); } });
+      if (state.active) {
+        // Baseline: the four combine modes of the group the selection is, the current one ticked, before the group's own rows.
+        var modeNames = { unite: 'Union', subtract: 'Soustraction', intersect: 'Intersection', exclude: 'Exclusion' };
+        Object.keys(modeNames).forEach(function (m) { extra.push({ label: (m === state.mode ? '✓ ' : '') + modeNames[m], action: function () { G.setMode(host, m); } }); });
+        extra.push({ sep: true });
+        if (!multi) extra.push({ label: 'Sortir du groupe', action: function () { G.removeMember(host); } });
+        extra.push({ label: 'Aplatir', action: function () { G.flatten(host); } });
+      }
+      if (extra.length) items = items.concat([{ sep: true }], extra);
+    }
+    // Premier plan / Arriere-plan (baseline order: after the group rows, before the pivot rows): one batch of order steps (native-selection-order.js).
+    var O = host.NemoNativeSelectionOrder;
+    if (O) items.push({ sep: true }, { label: 'Premier plan', action: function () { O.front(host); } }, { label: 'Arrière-plan', action: function () { O.back(host); } });
+    // Centrer le point d'ancrage (baseline :3112, right after the order rows): the pivot back to the selection's centre; no document write.
+    var P = host.NemoNativeSelectPivot;
+    if (P) items.push({ sep: true }, { label: 'Centrer le point d\'ancrage', action: function () { P.center(host); } });
+    return items;
+  }
+  async function build(host, x, y) {
+    var I = host.NemoSelectCanvasIntent, hit;
+    try { hit = await I.pick(host, x, y); } catch (_) { hit = undefined; }
+    var held = host.selectedPaths || [];
+    // An item already in the selection keeps the whole selection; any other item replaces it (a plain click). A spot the read could not prove
+    // (undefined) leaves the selection as it is.
+    if (hit && !held.some(function (p) { return p && p.data && p.data.strokeId === hit.data.strokeId; })) I.applyPick(host, hit, false);
+    var items = await rows(host, selected(host));
+    if (items.length) host.showContextMenu(x, y, items);
+    return items;
+  }
+  // Called from the canvas's contextmenu listener once the pointer intent has consumed the event. True when the menu took the gesture.
+  function open(host, e) {
+    if (!ready(host)) return false;
+    var x = e.clientX, y = e.clientY;
+    return build(host, x, y).catch(function () { return []; });
+  }
+  return Object.freeze({ open: open, rows: rows, ready: ready });
+}));

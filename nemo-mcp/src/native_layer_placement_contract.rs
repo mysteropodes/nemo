@@ -50,10 +50,37 @@ fn placement(value: &Value) -> bool {
                     || p["sourceFrameCount"]
                         .as_u64()
                         .is_some_and(|n| (1..=u64::from(u32::MAX)).contains(&n)))
-                && (p["timeRemap"].is_null()
-                    || exact(&p["timeRemap"], &["keyCount", "keyAtFrame"], &[])
-                        .is_some_and(|r| r["keyCount"].is_u64() && r["keyAtFrame"].is_boolean()))
+                && (p["timeRemap"].is_null() || remap(&p["timeRemap"]))
         })
+}
+fn finite(value: &Value) -> bool {
+    value.as_f64().is_some_and(f64::is_finite)
+}
+// The counted facts, the eased source frame (null without keys) and the key list,
+// null when it does not fit the read; a listed key is one finite frame and value.
+fn remap(value: &Value) -> bool {
+    exact(value, &["keyCount", "keyAtFrame", "value", "keys"], &[]).is_some_and(|r| {
+        let count = r["keyCount"].as_u64();
+        count.is_some()
+            && r["keyAtFrame"].is_boolean()
+            && (r["value"].is_null() || finite(&r["value"]))
+            && (r["keys"].is_null()
+                || r["keys"].as_array().is_some_and(|keys| {
+                    Some(keys.len() as u64) == count
+                        && keys.iter().all(|k| {
+                            exact(k, &["frame", "value"], &["color", "hold"]).is_some_and(|k| {
+                                finite(&k["frame"])
+                                    && finite(&k["value"])
+                                    && k.get("hold").is_none_or(|h| h == &Value::Bool(true))
+                                    && k.get("color").is_none_or(|c| {
+                                        c.as_str().is_some_and(
+                                            crate::native_contract::property_read::key_color,
+                                        )
+                                    })
+                            })
+                        })
+                }))
+    })
 }
 pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
     let mut fields = vec!["kind", "instanceId", "documentId", "placement"];

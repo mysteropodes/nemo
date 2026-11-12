@@ -70,11 +70,9 @@
   // misleading, not just uninformative, for an action that has nothing to
   // do with it. Every pre-existing call site (via pushUndoLayers) keeps
   // passing nothing and gets state.tool exactly as before.
-  function logAction(explicitTool) {
+  function pushAction(tool, frame, layerName) {
     if (!state.actionLog) state.actionLog = [];
-    var ld = state.layers[state.activeLayerIdx];
     var last = state.actionLog[state.actionLog.length - 1];
-    var tool = explicitTool || state.tool, frame = state.currentFrame, layerName = ld ? ld.name : null;
     if (last && last.tool === tool && last.frame === frame && last.layer === layerName) {
       last.count = (last.count || 1) + 1;
       last.t = Date.now();
@@ -82,6 +80,33 @@
     }
     state.actionLog.push({ t: Date.now(), tool: tool, frame: frame, layer: layerName, count: 1 });
     if (state.actionLog.length > ACTION_LOG_MAX) state.actionLog.shift();
+  }
+  function logAction(explicitTool) {
+    var ld = state.layers[state.activeLayerIdx];
+    pushAction(explicitTool || state.tool, state.currentFrame, ld ? ld.name : null);
+  }
+  // Native object projects (#2373): their edits never reach pushUndoLayers (n20RequireLegacyWrite), so the native
+  // transport (application-mcp.js dispatchTracked) reports every APPLIED command here — one entry per command, naming
+  // only the operation, the frame and the layer uid. Never the payload: no document content enters the trail, and
+  // state.actionLog is still never exported (CLAUDE.md §6).
+  function nativeUid(v) { return typeof v === 'string' && v.length <= 128 ? v : null; }
+  function describeNativeCommand(request) {
+    if (!request || typeof request !== 'object') return null;
+    var action = request.action && typeof request.action === 'object' ? request.action : null;
+    var op = typeof request.operation === 'string' ? request.operation : action && typeof action.kind === 'string' ? 'reference.' + action.kind : null;
+    if (!op) return null;
+    var p = request.payload && typeof request.payload === 'object' ? request.payload : action || {};
+    var sel = Array.isArray(p.selections) && p.selections[0] && typeof p.selections[0] === 'object' ? p.selections[0].target : null;
+    var t = p.target && typeof p.target === 'object' ? p.target : sel && typeof sel === 'object' ? sel : p.stableTarget && typeof p.stableTarget === 'object' ? p.stableTarget : {};
+    var scope = t.frameScope && typeof t.frameScope === 'object' ? t.frameScope.frame : undefined;
+    var frame = [scope, p.frame, p.currentFrame].filter(Number.isSafeInteger)[0];
+    return { tool: 'native:' + op.replace(/^command\.document\.(?:object\.)?/, ''),
+      frame: frame === undefined ? state.currentFrame : frame,
+      layer: nativeUid(t.layerUid) || nativeUid(p.layerUid) };
+  }
+  function logNativeCommand(request) {
+    var d = describeNativeCommand(request);
+    if (d) pushAction(d.tool, d.frame, d.layer);
   }
   function recentActionTrail(n) {
     var log = state.actionLog || [];
@@ -260,6 +285,7 @@
 
   window.SMFeedback = {
     logAction: logAction,
+    logNativeCommand: logNativeCommand,
     recentClickTrail: recentClickTrail,
     actionLogMark: actionLogMark,
     clickLogMark: clickLogMark,

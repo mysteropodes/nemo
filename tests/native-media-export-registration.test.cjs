@@ -15,10 +15,8 @@ const CORE = 'native-media-export-core.js', CONTRACT = 'native-media-export-cont
 const VECTOR = 'native-vector-export-adapter.js', MEDIA = 'native-media-export-adapter.js';
 
 test('both descriptors are registered once in the native catalog block, beside distinct ids and operations', () => {
-  const rust = read('nemo-mcp', 'src', 'capabilities.rs');
-  const start = rust.indexOf('pub const NATIVE_CAPABILITY_SOURCES:');
-  const block = rust.slice(start, rust.indexOf('];', start));
-  const files = [...block.matchAll(/include_str!\s*\(\s*"([^"]+)"\s*\)/g)].map((m) => m[1]);
+  // CS1/#2341: nemo-mcp/build.rs discovers capabilities-v2/*.json; read the same set.
+  const files = require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles().map((file) => '../../engineering/application/capabilities-v2/' + path.basename(file));
   for (const name of ['native-vector-export.json', 'native-media-export.json']) {
     assert.equal(files.filter((f) => f.endsWith('/capabilities-v2/' + name)).length, 1, name);
   }
@@ -86,8 +84,9 @@ test('the SDK seam is the single composition point and replaces one line', () =>
   assert.match(fontSeam, /const font = commonjs \? require\('\.\/native-font-contract\.js'\) : root\.NemoNativeFontContract;/);
   assert.match(fontSeam, /return edit\.compose\(font\);/, 'the base seam retains the font contract');
   assert.equal(lines[3], "  const propertyContract = typeof module === 'object' && module.exports ? require('./native-property-contract.js') : root.NemoNativePropertyContract;");
-  assert.equal(lines[4], "  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract), vectorContract, propertyContract);");
-  assert.match(sdk, /function \(fontContract, vectorContract, propertyContract\) \{/);
+  assert.equal(lines[4], "  const queryContract = typeof module === 'object' && module.exports ? require('./native-object-query-contract.js') : root.NemoNativeObjectQueryContract;");
+  assert.equal(lines[5], "  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract), vectorContract, propertyContract, queryContract);");
+  assert.match(sdk, /function \(fontContract, vectorContract, propertyContract, queryContract\) \{/);
   assert.match(sdk, /const property = propertyContract && propertyContract\.create\(/);
 });
 

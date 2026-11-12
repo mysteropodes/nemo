@@ -1,42 +1,44 @@
 //! Sealed generic property edits through the existing revision owner.
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
-    object_deserialize, ObjectDocument, OrderCurvePoint, OrderKey, OrderTrack, Presence,
-    PropertyHolder, PropertyHolderTarget, PropertyRecord,
+    object_deserialize, ObjectDocument, OrderCurvePoint, OrderExpression, OrderKey, OrderTrack,
+    Presence, PropertyHolder, PropertyHolderTarget, PropertyRecord,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
+use action::{deserialize_action, PropertyAction};
+use pose_edit::keep_pose_position;
 use serde::Deserialize;
 use serde_json::Number;
 
+#[path = "object_property_action.rs"]
+mod action;
 #[path = "object_property_bake_edit.rs"]
 mod bake_edit;
+#[path = "object_property_control_edit.rs"]
+mod control_edit;
 #[path = "object_property_curve_edits.rs"]
 mod curves;
+#[path = "object_property_expression_edit.rs"]
+mod expression_edit;
+#[path = "object_property_key_action.rs"]
+mod key_action;
+#[path = "object_property_key_batch.rs"]
+mod key_batch;
+#[path = "object_property_pose_edit.rs"]
+mod pose_edit;
+#[path = "object_property_batch_edit.rs"]
+mod batch_edit;
+#[path = "object_property_keys_paste.rs"]
+mod keys_paste;
+#[path = "object_property_preset_apply.rs"]
+mod preset_apply;
 #[path = "object_property_track_edit.rs"]
 mod track_edit;
+#[cfg(test)]
+#[path = "../tests/object_property_pose_edit.rs"]
+mod pose_edit_tests;
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
-enum PropertyAction {
-    SetValue {
-        frame: Number,
-        values: Vec<Number>,
-    },
-    SetKey {
-        frame: Number,
-        values: Vec<Number>,
-        #[serde(default, rename = "curvePoints")]
-        curve_points: Presence<Option<Vec<OrderCurvePoint>>>,
-    },
-    RemoveKey {
-        frame: Number,
-    },
-    SetAnimated {
-        frame: Number,
-        animated: bool,
-    },
-}
 #[derive(Debug)]
 struct PropertyPayload {
     command: String,
@@ -52,25 +54,18 @@ object_deserialize!(PropertyPayload {
     action: PropertyAction
 });
 
-// Internally tagged enum derives also admit positional sequences. Require a
-// map before the derive sees original fields, preserving duplicate rejection.
-fn deserialize_action<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    D: serde::Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    struct MapOnly<T>(std::marker::PhantomData<T>);
-    impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for MapOnly<T> {
-        type Value = T;
-        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.write_str("a property action object")
-        }
-        fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<T, A::Error> {
-            T::deserialize(serde::de::value::MapAccessDeserializer::new(map))
-        }
-    }
-    deserializer.deserialize_map(MapOnly(std::marker::PhantomData))
+#[derive(Debug)]
+struct ExpressionPayload {
+    target: PropertyHolderTarget,
+    property: String,
+    expression: Presence<Option<OrderExpression>>,
 }
+object_deserialize!(ExpressionPayload {
+    target: PropertyHolderTarget,
+    property: String,
+    #[serde(default)] expression: Presence<Option<OrderExpression>>
+});
+
 
 /// The origin and proposed document cannot be forged by callers.
 #[derive(Debug, Clone)]
@@ -80,6 +75,15 @@ pub(crate) struct PreparedPropertyEdit {
     changed: bool,
 }
 impl PreparedPropertyEdit {
+    /// Seal a document built from `origin` by a sibling preparer; `changed` is derived, never supplied.
+    pub(super) fn sealed(origin: ObjectSnapshot, document: ObjectDocument) -> Self {
+        let changed = &document != origin.document();
+        Self {
+            origin,
+            document,
+            changed,
+        }
+    }
     /// The proposed document, for a caller that chains further edits before sealing its own candidate.
     pub(super) fn into_document(self) -> ObjectDocument {
         self.document
@@ -114,7 +118,7 @@ fn preserve_curve(before: &[OrderCurvePoint], after: &mut [OrderCurvePoint]) {
         }
     }
 }
-fn default_curve() -> Vec<OrderCurvePoint> {
+pub(crate) fn default_curve() -> Vec<OrderCurvePoint> {
     [(0., 0.), (0.25, 0.156), (0.5, 0.5), (0.75, 0.844), (1., 1.)]
         .into_iter()
         .map(|(x, y)| OrderCurvePoint {
@@ -172,6 +176,7 @@ impl OrderTrack {
                 curve_points: Presence::Present(Some(curve.unwrap_or_else(default_curve))),
                 h_in: Presence::Present(vec![0.into(), 0.into()]),
                 h_out: Presence::Present(vec![0.into(), 0.into()]),
+                color: Presence::Missing,
             });
             keys.sort_by(|a, b| {
                 a.frame
@@ -183,6 +188,36 @@ impl OrderTrack {
     }
 }
 impl ObjectFillOwner {
+    /// Private authoring producer over a retained origin; the existing history
+    /// owner commits the sealed candidate. The public actions reach the same edit.
+    /// Null removes the expression; an empty string preserves its authored presence.
+    #[allow(dead_code)]
+    pub(crate) fn prepare_property_expression_edit_json(
+        origin: ObjectSnapshot,
+        bytes: &[u8],
+    ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
+        // The private envelope can carry every admitted 4096-byte code string,
+        // even when JSON escapes it. Public transport keeps its own 4096-byte cap.
+        if bytes.len() > 32768 {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let payload: ExpressionPayload =
+            serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        let Presence::Present(expression) = payload.expression else {
+            return Err(DispatchErrorCode::InvalidRequest);
+        };
+        let document = origin.document().clone();
+        Self::apply_property_edit(
+            origin,
+            document,
+            PropertyPayload {
+                command: "object.property.edit".into(),
+                target: payload.target,
+                property: payload.property,
+                action: PropertyAction::SetExpression { expression },
+            },
+        )
+    }
     pub(crate) fn prepare_property_edit_json(
         &self,
         bytes: &[u8],
@@ -195,7 +230,7 @@ impl ObjectFillOwner {
     /// candidate is sealed to), so a chain of edits stays one atomic candidate.
     pub(super) fn apply_property_edit_json(
         origin: ObjectSnapshot,
-        mut document: ObjectDocument,
+        document: ObjectDocument,
         bytes: &[u8],
     ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
         if bytes.len() > 4096 {
@@ -203,11 +238,27 @@ impl ObjectFillOwner {
         }
         let payload: PropertyPayload =
             serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        Self::apply_property_edit(origin, document, payload)
+    }
+    fn apply_property_edit(
+        origin: ObjectSnapshot,
+        mut document: ObjectDocument,
+        payload: PropertyPayload,
+    ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
         if payload.command != "object.property.edit" {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         if matches!(payload.property.as_str(), "order" | "timeRemap") {
             return Err(DispatchErrorCode::Unavailable);
+        }
+        if let Some(op) = payload.action.control() {
+            return Self::apply_control_edit(
+                origin,
+                document,
+                &payload.target,
+                &payload.property,
+                op,
+            );
         }
         let mut holders = document
             .property_holders
@@ -253,23 +304,59 @@ impl ObjectFillOwner {
                 expression: Presence::Missing,
             });
         let before = record.clone();
-        match payload.action {
-            PropertyAction::SetValue { frame, mut values } => {
-                finite(&frame)?;
+        // The Position write a `keepPose` anchor edit carries in the same candidate.
+        let mut pose_follow: Option<(Number, Vec<Number>)> = None;
+        let current = record.expression.value();
+        let action = match payload.action {
+            PropertyAction::SetExpressionCode { code } => PropertyAction::SetExpression {
+                expression: expression_edit::set_code(current, code)?,
+            },
+            PropertyAction::SetExpressionEnabled { enabled } => PropertyAction::SetExpression {
+                expression: expression_edit::set_enabled(current, enabled),
+            },
+            PropertyAction::RemoveExpression {} => PropertyAction::SetExpression { expression: None },
+            other => other,
+        };
+        match action {
+            // Taken above, before any metadata lookup: a control edit has no value record.
+            PropertyAction::AddControl { .. }
+            | PropertyAction::RenameControl { .. }
+            | PropertyAction::RemoveControl {}
+            | PropertyAction::MoveControl { .. } => return Err(DispatchErrorCode::Internal),
+            PropertyAction::SetExpression { expression } => {
+                record.expression = expression.map_or(Presence::Missing, Presence::Present);
+            }
+            PropertyAction::SetValue {
+                frame,
+                values,
+                keep_pose,
+            } => {
+                let at = finite(&frame)?;
                 if values.len() != metadata.dimension() {
                     return Err(DispatchErrorCode::InvalidRequest);
                 }
                 for value in &values {
                     finite(value)?;
                 }
-                if keyed(&record) {
-                    set_key(&mut record, frame, values, None);
-                } else {
-                    if let Some(before) = record.static_value.value() {
-                        preserve_values(before, &mut values);
+                if keep_pose {
+                    // The Position that follows an anchor edit travels in the same candidate (`follow_position` below).
+                    if payload.property != "anchor" {
+                        return Err(DispatchErrorCode::InvalidRequest);
                     }
-                    record.static_value = Presence::Present(values);
+                    let follow = keep_pose_position(&origin, &payload.target, at, &values)?;
+                    pose_follow = Some((frame.clone(), follow));
                 }
+                record.write_value(frame, values);
+            }
+            PropertyAction::SetKeyHandle {
+                frame,
+                handle,
+                values,
+            } => {
+                if !metadata.animatable() || metadata.dimension() != 2 {
+                    return Err(DispatchErrorCode::Unavailable);
+                }
+                record.write_key_handle(finite(&frame)?, &handle, values)?;
             }
             PropertyAction::SetKey {
                 frame,
@@ -327,12 +414,16 @@ impl ObjectFillOwner {
                     }
                 }
             }
+            _ => unreachable!("expression intents resolve to SetExpression above"),
         }
         if before != record {
             if let Some(i) = record_index {
                 holder.properties[i] = record;
             } else {
                 holder.properties.push(record);
+            }
+            if let Some((frame, values)) = pose_follow {
+                holder.follow_position(&document, frame, values)?;
             }
             if let Some(i) = index {
                 holders[i] = holder;

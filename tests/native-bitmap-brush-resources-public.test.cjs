@@ -269,9 +269,9 @@ test('a refusal is a plain typed error and a no-op publication keeps its revisio
   assert.equal((await adapter.dispatch(q)).error.code, 'not_found');
 });
 
-test('descriptor: both operations are declared, unavailable with a stated reason, and neither has a fallback', () => {
-  assert.deepEqual([descriptor.id, descriptor.operations, descriptor.availability.state], ['native.object.brush-resources', [PUBLISH, QUERY], 'unavailable']);
-  assert.match(descriptor.availability.reason, /brush/);
+test('descriptor: both operations are declared, available on the session-owned store, and neither has a fallback', () => {
+  assert.deepEqual([descriptor.id, descriptor.operations, descriptor.availability.state], ['native.object.brush-resources', [PUBLISH, QUERY], 'available']);
+  assert.equal(descriptor.availability.reason, null);
   assert.deepEqual([descriptor.schemaVersion, descriptor.apiVersion, descriptor.version, descriptor.status], [2, 2, 1, 'active']);
   assert.deepEqual(descriptor.authority, { document: 'native-engine::history::NativeObjectHistory', resources: 'native-engine::bitmap_brush_resources_store::BrushBitmapStore', adapterOwnsWritableMirror: false, fallback: 'none' });
   assert.equal(descriptor.resourceBoundary.maxRequestBytes, 4096);

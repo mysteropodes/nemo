@@ -1302,14 +1302,15 @@
     var el=e.target.closest&&e.target.closest('input.scrub');
     if(!el||document.activeElement===el)return;
     scrubState={el:el,pointerId:e.pointerId,startX:e.clientX,startVal:parseFloat(el.value)||0,
-      moved:false,nativeOpacity:el.dataset.nativeOpacityScrub==='static'};
+      moved:false,nativeOpacity:el.dataset.nativeOpacityScrub==='static'||el.dataset.nativeScrub==='commit'};
     el.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
   // Legacy scrubs coalesce input/change to one animation frame and flush on
   // release. Their first movement snapshots pre-gesture undo; subsequent
   // handlers see _scrubLiveActive and cannot add duplicate history entries.
-  // Native opacity skips those events; its final change makes one Rust history entry.
+  // Native opacity and other native fields (data-native-scrub="commit") skip those
+  // events; their final change makes one Rust history entry.
   var scrubChangeRaf=0,scrubLiveDirty=false;
   function dispatchLiveChange(){
     scrubLiveDirty=true;

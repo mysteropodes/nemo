@@ -274,7 +274,7 @@ fn project_only_file_selection_refuses_other_formats_before_owner_installation()
         "sourcePath":path,"projectOnly":true})
     .to_string();
     for bytes in [
-        json!({"layers":[],"canvasW":320}).to_string(),
+        json!({"hello":"world","canvasW":320}).to_string(),
         json!({"format":"nemo.native-object-document","formatVersion":1,"totalFrames":21,
             "layers":[{"layerUid":"drawing"}],"objects":[]})
         .to_string(),
@@ -365,6 +365,7 @@ fn checked_in_p38_native_fixtures_open_through_project_only_file_route() {
             refused.message,
             "object file is outside the existing filesystem scope"
         );
+        assert_eq!(refused.details.unwrap()["disposition"], "notDispatched"); // #2511: retryable
         assert!(state.native_state().lock().unwrap().active().is_none());
         let opened =
             bootstrap_request(&state, &raw, |candidate| candidate == path.as_path()).unwrap();

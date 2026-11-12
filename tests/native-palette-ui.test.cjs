@@ -1,152 +1,9 @@
 'use strict';
-const ProjectFile = require('../src/js/adapters/native-object-project-file.js');
 const test = require('node:test'), assert = require('node:assert/strict');
-const fs = require('node:fs'), vm = require('node:vm');
 const Contract = require('../src/js/adapters/native-palette-contract.js');
-const clone = value => JSON.parse(JSON.stringify(value));
-function node(tag = 'div') {
-  const listeners = new Map(); let text = '';
-  const el = { tagName: tag.toUpperCase(), children: [], dataset: {}, className: '', value: '', disabled: false,
-    style: { setProperty(key, value) { this[key] = value; } }, classList: { toggle() {} },
-    setAttribute(key, value) { this[key] = value; },
-    addEventListener(key, fn) { if (!listeners.has(key)) listeners.set(key, []); listeners.get(key).push(fn); },
-    appendChild(child) { this.children.push(child); return child; },
-    fire(key, extra = {}) {
-      const event = { target: el, currentTarget: el, clientX: 0, clientY: 0, preventDefault() {},
-        dataTransfer: {}, ...extra };
-      for (const fn of listeners.get(key) || []) fn(event);
-    }
-  };
-  Object.defineProperty(el, 'textContent', { get: () => text, set(value) { text = value; el.children = []; } });
-  Object.defineProperty(el, 'innerHTML', { get: () => text, set(value) { text = value; el.children = []; } });
-  return el;
-}
-function fixture(options = {}) {
-  const names = ['palette-grid', 'palette-tabs', 'btn-palette-new', 'btn-palette-add-fill', 'btn-palette-add-stroke',
-    'btn-palette-replace', 'btn-palette-swap', 'palette-replace-scope', 'color-fill', 'color-stroke'];
-  const elements = Object.fromEntries(names.map(name => [name, node()]));
-  elements['color-fill'].value = '#aBc'; elements['color-stroke'].value = '#010203';
-  const document = Object.assign(node('document'), { readyState: 'loading', createElement: node,
-    getElementById: id => elements[id] || null });
-  let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
-    canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
-  let metadata = { palettes: [
-    { id: 'same', name: 'First', colors: ['#AbC', '#abc', '#00000000'] },
-    { id: 'same', name: 'Second', colors: ['#DEF'] }
-  ], activePaletteIdx: 0, ...options.metadata };
-  for (const key of Object.keys(metadata)) if (metadata[key] === undefined) delete metadata[key];
-  let revision = 0, ticket = 1, serial = 0, active = true, running = 0, tail = Promise.resolve(), block = null;
-  let unavailable = options.unavailable === true, publicPresentation = true;
-  let presentation = { ...info, owner: 'native', status: 'presented' };
-  const calls = [], prompts = [], notices = [], menus = [];
-  const projected = pin => ({ ...pin, presentation });
-  let context, controller;
-  function read(selector) {
-    const list = metadata.palettes || [];
-    if (selector.kind === 'settings') return { palettesPresent: Object.hasOwn(metadata, 'palettes'), paletteCount: list.length,
-      ...Object.fromEntries(['activePaletteIdx'].filter(k => Object.hasOwn(metadata, k)).map(k => [k, metadata[k]])),
-      effectiveActivePaletteIdx: metadata.activePaletteIdx != null && metadata.activePaletteIdx < (metadata.palettes ? list.length : 1) ? metadata.activePaletteIdx : 0 };
-    const colors = selector.kind === 'colorPage', total = colors ? list[selector.ordinal - 1].colors.length : list.length;
-    const all = colors ? list[selector.ordinal - 1].colors.map((color, i) => ({ index: i + 1, color })) :
-      list.map((p, i) => ({ ordinal: i + 1, id: p.id, name: p.name, colorCount: p.colors.length }));
-    const end = Math.min(selector.cursor + selector.limit, total);
-    return { kind: colors ? 'paletteColorPage' : 'palettePage', cursor: selector.cursor,
-      items: all.slice(selector.cursor, end), nextCursor: end < total ? end : null,
-      ...(colors ? { paletteOrdinal: selector.ordinal, colorCount: total } :
-        { palettesPresent: Object.hasOwn(metadata, 'palettes'), paletteCount: total }) };
-  }
-  function apply(action) {
-    const list = metadata.palettes || [], i = action.ordinal - 1;
-    switch (action.kind) {
-      case 'create': metadata.palettes = list; list.push({ id: action.id, name: action.name, colors: [] }); metadata.activePaletteIdx = list.length - 1; break;
-      case 'select': metadata.activePaletteIdx = i; break;
-      case 'rename': list[i].name = action.name; break;
-      case 'duplicate': list.splice(i + 1, 0, { id: action.id, name: action.name, colors: list[i].colors.slice() }); metadata.activePaletteIdx = i + 1; break;
-      case 'remove': list.splice(i, 1); if (metadata.activePaletteIdx >= list.length) metadata.activePaletteIdx = list.length - 1; break;
-      case 'appendColor': if (!list[i].colors.includes(action.color)) list[i].colors.push(action.color); break;
-      case 'removeColor': list[i].colors.splice(action.index - 1, 1); break;
-      case 'moveColor': { const [color] = list[i].colors.splice(action.from - 1, 1); list[i].colors.splice(action.to - 1, 0, color); break; }
-      default: throw Error('unexpected UI intent');
-    }
-  }
-  async function dispatch(request) {
-    calls.push(clone(request));
-    if (block) { const held = block; block = null; held.entered(); await held.wait; }
-    const response = { apiVersion: 2, requestId: request.requestId, instanceId: info.instanceId,
-      documentId: info.documentId, contentRevision: revision, ok: !unavailable };
-    if (request.documentId !== info.documentId) {
-      response.ok = false; response.error = { code: 'wrong_document', message: 'Document was replaced' };
-    } else if (unavailable) response.error = { code: 'unavailable', message: 'Palette is unavailable' };
-    else if (request.operation === Contract.EDIT) {
-      assert.equal(request.expectedRevision, revision);
-      const before = JSON.stringify(metadata); apply(request.payload.action);
-      const applied = before !== JSON.stringify(metadata); if (applied) revision++;
-      response.contentRevision = revision; response.result = { applied, historyEntriesAdded: Number(applied) };
-    } else {
-      assert.equal(request.operation, Contract.READ); assert.equal(request.payload.atRevision, revision);
-      assert.equal(request.payload.documentSnapshotId, 's' + revision);
-      response.result = { instanceId: info.instanceId, documentId: info.documentId, atRevision: revision,
-        documentSnapshotId: 's' + revision, contextId: 'scene-root', result: read(request.payload.selector) };
-    }
-    return vm.runInContext('JSON.parse(' + JSON.stringify(JSON.stringify(response)) + ')', context);
-  }
-  const session = { info: () => info, isActive: () => active, requestId: () => 'palette-' + (++serial),
-    readSubscriptionGeneration: () => ticket, readPresentedObjectSession: () => active && !running && publicPresentation ? projected(info) : null,
-    runResourceCommand(action) {
-      running++;
-      const work = tail.then(() => { const origin = info;
-        return action({ dispatch: q => root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui', { dispatch }).dispatch(q),
-          readPresentedObjectSession: () => active && running === 1 && info === origin ? projected(origin) : null,
-          async reconcile(next) { assert.equal(next, revision); info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision };
-            presentation = { ...info, owner: 'native', status: 'presented' };
-            controller.willProject(info); assert.equal(ProjectFile.refreshLayerTable(browserRoot, info), true);
-            controller.presented(info); return info; } });
-      }).finally(() => { running--; controller.presented(info); });
-      tail = work.catch(() => {}); return work;
-    }
-  };
-  const state = {};
-  for (const key of ['palettes', 'activePaletteIdx']) Object.defineProperty(state, key, {
-    get() { throw Error('legacy palette read'); }, set() { throw Error('legacy palette write'); }
-  });
-  const root = { document, state, __TAURI__: { core: {} }, SM: { t: x => x,
-    setFillColor() { throw Error('legacy fill writer'); }, setStrokeColor() { throw Error('legacy stroke writer'); } },
-    NemoNativeObjectProject: { desktop: () => session },
-    NemoNativeObjectProjectFile: { projectionReadyForUI: (valueRoot, value) => active && !running && ProjectFile.projectionReadyForUI(valueRoot, value) },
-    showToast: text => notices.push(text), prompt: () => prompts.shift(),
-    showContextMenu: (x, y, items) => menus.push(items), addEventListener() {},
-    localStorage: { getItem: () => null, setItem() {} }, pushUndo() { throw Error('legacy history'); } };
-  root.window = root; root.globalThis = root; context = vm.createContext(root);
-  const browserRoot = vm.runInContext('globalThis', context);
-  function project() { presentation = { ...info, owner: 'native', status: 'presented' }; ProjectFile.projectView(browserRoot, info); }
-  project();
-  // The ordinary panel loads first, as it does in src/index.html.
-  for (const file of ['palette-panel.js', 'adapters/native-palette-contract.js', 'adapters/native-application.js',
-    'adapters/native-palette-desktop.js', 'adapters/native-palette-ui.js'])
-    vm.runInContext(fs.readFileSync(require.resolve('../src/js/' + file), 'utf8'), context, { filename: file });
-  controller = root.NemoNativePaletteController; document.fire('DOMContentLoaded');
-  async function settled() {
-    for (let i = 0; i < 30; i++) { await tail; await new Promise(r => setImmediate(r)); if (!controller.isPending()) return; }
-    throw Error('palette controller did not settle');
-  }
-  return { root, elements, controller, calls, prompts, notices, menus, settled,
-    edits: () => calls.filter(q => q.operation === Contract.EDIT),
-    metadata: () => clone(metadata), tabs: () => elements['palette-tabs'].children, swatches: () => elements['palette-grid'].children,
-    async ready() { await controller.presented(); await settled(); },
-    fullInfo: () => info, projectionReady: value => ProjectFile.projectionReadyForUI(browserRoot, value),
-    drift() { root.state.canvasW++; }, repairProjection: project,
-    replace(next = { documentId: 'replacement', lifecycleGeneration: 2 }) {
-      info = { ...info, ...next }; revision = info.contentRevision; controller.willProject(info); project();
-    },
-    resubscribe() { ticket++; }, retire() { active = false; controller.dispose(); },
-    refuse(value = true) { unavailable = value; },
-    renewPresentation() { presentation = { ...presentation }; },
-    present(value) { publicPresentation = value; },
-    rebind() { const replacement = { ...session }; root.NemoNativeObjectProject.desktop = () => replacement; },
-    hold() { let entered, release; const started = new Promise(r => entered = r), wait = new Promise(r => release = r);
-      block = { entered, wait }; return { started, release }; }
-  };
-}
+const fs = require('node:fs'), vm = require('node:vm');
+const ProjectFile = require('../src/js/adapters/native-object-project-file.js');
+const { fixture, clone, node } = require('./helpers/native-palette-fixture.cjs');
 
 test('ordinary palette uses the actual application SDK and preserves duplicate IDs and exact colors without a JS mirror', async () => {
   const h = fixture(), before = h.metadata(); await h.ready();
@@ -155,7 +12,7 @@ test('ordinary palette uses the actual application SDK and preserves duplicate I
   assert.deepEqual(h.metadata(), before); assert.equal(h.edits().length, 0);
   const count = h.calls.length; await h.ready(); assert.equal(h.calls.length, count);
   assert.equal(h.elements['btn-palette-new'].disabled, false);
-  assert.equal(h.elements['btn-palette-replace'].disabled, true); assert.equal(h.elements['btn-palette-swap'].disabled, true);
+  assert.equal(h.elements['btn-palette-replace'].disabled, false, 'Replace is native since #2372 PAL-REPLACE'); assert.equal(h.elements['btn-palette-swap'].disabled, false, 'Swap is native since #2372 PAL-APPLY');
 });
 
 test('ordinary palette presentation collects complete summaries and active colors across bounded SDK pages', async () => {
@@ -173,6 +30,8 @@ test('ordinary create, rename, duplicate, select and delete submit field-specifi
   assert.equal(h.edits().at(-1).payload.action.kind, 'create'); assert.equal(h.controller.read().palette.active.summary.name, 'New');
   h.prompts.push('Renamed'); h.tabs()[2].fire('click'); h.tabs()[2].fire('dblclick'); await h.settled();
   assert.deepEqual(h.edits().at(-1).payload.action, { kind: 'rename', ordinal: 3, name: 'Renamed' });
+  h.prompts.push('From menu'); h.tabs()[2].fire('contextmenu'); h.menus.at(-1).find(x => x.label === 'Renommer…').action(); await h.settled();
+  assert.deepEqual(h.edits().at(-1).payload.action, { kind: 'rename', ordinal: 3, name: 'From menu' }, 'the tab menu renames through the same native intent (#2378)');
   h.tabs()[2].fire('contextmenu'); h.menus.at(-1).find(x => x.label === 'Dupliquer').action(); await h.settled();
   assert.equal(h.edits().at(-1).payload.action.kind, 'duplicate'); assert.equal(h.metadata().palettes.length, 4);
   h.tabs()[0].fire('click'); await h.settled(); assert.deepEqual(h.edits().at(-1).payload.action, { kind: 'select', ordinal: 1 });
@@ -183,7 +42,7 @@ test('ordinary create, rename, duplicate, select and delete submit field-specifi
 test('ordinary add, remove and drag reorder colors use one-based native positions and confirmed readback', async () => {
   const h = fixture(); await h.ready(); h.elements['btn-palette-add-fill'].fire('click'); await h.settled();
   assert.deepEqual(h.edits().at(-1).payload.action, { kind: 'appendColor', ordinal: 1, color: '#aBc' });
-  h.swatches()[1].fire('contextmenu'); h.menus.at(-1)[0].action(); await h.settled();
+  h.swatches()[1].fire('contextmenu'); h.menus.at(-1).find(x => x.label === 'Retirer de la palette').action(); await h.settled();
   assert.deepEqual(h.edits().at(-1).payload.action, { kind: 'removeColor', ordinal: 1, index: 2 });
   const before = h.metadata(); h.swatches()[0].fire('dragstart');
   assert.deepEqual(h.metadata(), before); const count = h.edits().length;
@@ -331,4 +190,27 @@ test('palette uses full project readiness and retains narrow immutable authority
   f.repairProjection(); await f.controller.presented(); await f.settled();
   assert.ok(f.controller.read());
   assert.equal(f.edits().length, 0, 'restoring readiness does not replay a gesture');
+});
+
+// #2372: the create / rename / remove prompts read their origin while the native queue hides the presentation (queue-pending): they wait (bounded) and then prompt.
+const ticks = async (n = 6) => { for (let i = 0; i < n; i++) await new Promise(done => setImmediate(done)); };
+test('queue-pending: create, rename and remove prompt once the hidden presentation returns, then write once each', async () => {
+  const h = fixture(); await h.ready(); const asked = [];
+  h.root.prompt = (text, initial) => { asked.push(text); return h.prompts.shift(); };
+  h.present(false); h.prompts.push('Waited'); h.elements['btn-palette-new'].fire('click'); await ticks(3);
+  assert.deepEqual(asked, [], 'no prompt while the presentation is hidden'); assert.deepEqual(h.notices, []); assert.equal(h.edits().length, 0);
+  h.present(true); await ticks(); await h.settled(); assert.equal(asked.length, 1); assert.equal(h.edits().length, 1); assert.deepEqual(h.notices, []);
+  await h.ready(); const first = h.tabs()[0]; h.present(false); h.prompts.push('Renamed'); first.fire('dblclick'); await ticks(3);
+  assert.equal(asked.length, 1); h.present(true); await ticks(); await h.settled(); assert.equal(asked.length, 2); assert.equal(h.edits().length, 2);
+  await h.ready(); const menuTab = h.tabs()[1]; menuTab.fire('contextmenu'); const remove = h.menus.at(-1).find(x => x.label === 'Supprimer').action;
+  h.present(false); remove(); await ticks(3); assert.equal(h.edits().length, 2); h.present(true); await ticks(); await h.settled();
+  assert.equal(h.edits().length, 3); assert.deepEqual(h.notices, []);
+});
+test('queue-pending: a real change while the prompt origin waits still refuses; a queue that never frees gives one notice', async () => {
+  const h = fixture(); await h.ready(); const asked = []; h.root.prompt = () => { asked.push(1); return 'x'; };
+  h.present(false); const tab = h.tabs()[0]; tab.fire('dblclick'); await ticks(2); h.replace(); h.present(true); await ticks(); await h.settled();
+  assert.equal(asked.length, 0); assert.equal(h.edits().length, 0); assert.equal(h.notices.length, 1);
+  const g = fixture(); await g.ready(); g.root.prompt = () => { asked.push(1); return 'x'; };
+  g.present(false); g.elements['btn-palette-new'].fire('click'); await ticks(40);
+  assert.equal(asked.length, 0); assert.equal(g.edits().length, 0); assert.equal(g.notices.length, 1);
 });

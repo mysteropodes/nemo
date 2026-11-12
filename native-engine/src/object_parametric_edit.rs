@@ -260,6 +260,61 @@ fn compute(
     }
 }
 
+/// #2372 Select on a dynamic shape (batch `reshape` with a `matrix`, record space): a move, an axis-aligned resize or a
+/// turn of one shape through the same kernels the translate and scale actions use, so the box and the rect radii stay
+/// consistent. A turn moves the baked anchors and adds to the stored `boxAngle` (the box stays the un-rotated frame).
+/// #2372 A-select-skew-anchor-lasso: a shear (or any other affine) of a dynamic shape bakes its anchors through the affine and
+/// drops the generator (`paramShape`, `boxAngle`), as the baseline's `p.shear` left a plain sheared path: the shape is a plain
+/// closed path from then on.
+pub(crate) fn transformed(record: &ObjectRecord, m: [f64; 6]) -> Result<ObjectRecord, DispatchErrorCode> {
+    const EPS: f64 = 1e-9;
+    let ext = record.vector_ext.value().ok_or(DispatchErrorCode::Unavailable)?;
+    let stored = ext.param_shape.value().ok_or(DispatchErrorCode::Unavailable)?;
+    let angle = member(&ext.box_angle)?.unwrap_or(0.0);
+    let (mut anchors, mut frame, mut rebuilt, mut turned, mut baked) = (anchors_of(record)?, frame_of(stored)?, false, 0.0, false);
+    let refuse = |why: shape_kernels::ShapeRefusal| why.code();
+    let [a, b, c, d, e, f] = m;
+    if b.abs() < EPS && c.abs() < EPS {
+        if (a - 1.0).abs() > EPS || (d - 1.0).abs() > EPS {
+            let moved = shape_kernels::scale(&intent_of(stored)?, &anchors, frame, angle, [a, d], [0.0, 0.0]).map_err(refuse)?;
+            (anchors, frame, rebuilt) = (moved.anchors, moved.frame, moved.rebuilt);
+        }
+        if e.abs() > 0.0 || f.abs() > 0.0 {
+            let moved = shape_kernels::translate(&anchors, frame, e, f).map_err(refuse)?;
+            (anchors, frame) = (moved.anchors, moved.frame);
+        }
+    } else if (a - d).abs() < EPS && (b + c).abs() < EPS && (a.hypot(b) - 1.0).abs() < 1e-6 {
+        let at = |p: [f64; 2]| [a * p[0] + c * p[1] + e, b * p[0] + d * p[1] + f];
+        let lin = |p: [f64; 2]| [a * p[0] + c * p[1], b * p[0] + d * p[1]];
+        anchors = anchors.iter().map(|k| Anchor { point: at(k.point), handle_in: lin(k.handle_in), handle_out: lin(k.handle_out) }).collect();
+        turned = b.atan2(a).to_degrees();
+    } else {
+        let at = |p: [f64; 2]| [a * p[0] + c * p[1] + e, b * p[0] + d * p[1] + f];
+        let lin = |p: [f64; 2]| [a * p[0] + c * p[1], b * p[0] + d * p[1]];
+        anchors = anchors.iter().map(|k| Anchor { point: at(k.point), handle_in: lin(k.handle_in), handle_out: lin(k.handle_out) }).collect();
+        baked = true;
+    }
+    let mut next = record.clone();
+    next.geometry.segments = segments_of(&anchors)?;
+    next.geometry.closed = record.geometry.closed || rebuilt;
+    if let Presence::Present(next_ext) = &mut next.vector_ext {
+        // The generator rewrote the vertices: an authored point-type hint no longer describes them.
+        next_ext.point_types = Presence::Missing;
+        next_ext.param_shape = Presence::Present(match frame {
+            Some(frame) => with_frame(stored.clone(), frame)?,
+            None => stored.clone(),
+        });
+        if turned != 0.0 {
+            next_ext.box_angle = Presence::Present(number((angle + turned) % 360.0)?);
+        }
+        if baked {
+            next_ext.param_shape = Presence::Missing;
+            next_ext.box_angle = Presence::Missing;
+        }
+    }
+    Ok(next)
+}
+
 impl ObjectFillOwner {
     /// Strict payload preparation directly from the original bytes (a `Value` would erase duplicate members).
     /// The returned candidate is sealed to this owner's current immutable snapshot and already passed the
@@ -306,6 +361,7 @@ impl ObjectFillOwner {
         next.geometry.segments = segments_of(&outcome.anchors)?;
         next.geometry.closed = outcome.closed;
         if let Presence::Present(next_ext) = &mut next.vector_ext {
+            next_ext.point_types = Presence::Missing;
             next_ext.param_shape = Presence::Present(outcome.shape);
             // Baseline transformFillGradient applies the same gesture to its document-world endpoints.
             if let Some(gradient) = next_ext.fill_gradient.value().cloned() {

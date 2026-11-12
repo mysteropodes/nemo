@@ -14,11 +14,11 @@ function fixture(){
   const effects=[],calls=[],root={state:{},_layerSel:[],_layerSelAnchor:0,selectedPaths:[],NemoNativeObjectLayerSplice:Splice,
     SM:{splitLayerAtPlayhead(){effects.push('legacy');return 'legacy';}},showToast(message){effects.push(['notice',message]);}};
   ProjectFile.projectView(root,info);root.state.appMode='drawing';root.state.activeSymbolId=null;root.state.currentFrame=10;root._curFrame=10;
-  let session,active=true,blocks=true,pending=false,current,subscription=2,serial=0;
+  let session,active=true,blocks=true,pending=false,hiddenByQueue=false,current,subscription=2,serial=0;
   const control={dispatchGate:null,reconcileGate:null,receipt:null,failDispatch:null,failReconcile:null};
   function presented(){return {...info,available:true,kind:'native-object',presentation:{owner:'native',status:'presented',contextId:'scene-root',frame:root.state.currentFrame,
     instanceId:info.instanceId,documentId:info.documentId,lifecycleGeneration:info.lifecycleGeneration,contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId}};}
-  session={isActive:()=>active,blocksLegacy:()=>blocks,info:()=>info,readPresentedObjectSession:()=>pending?null:presented(),
+  session={isActive:()=>active,blocksLegacy:()=>blocks,info:()=>info,readPresentedObjectSession:why=>{if(pending||hiddenByQueue){if(why)why('queue-pending');return null;}return presented();},
     readSubscriptionGeneration:()=>subscription,requestId:()=> 'cut-ui-'+(++serial),
     async runResourceCommand(action){
       assert.equal(pending,false,'child uses existing single resource queue');pending=true;effects.push('queue');
@@ -40,7 +40,7 @@ function fixture(){
       effects.push(['select',index,uid]);root.state.activeLayerIdx=index;root._layerSel=[index];root._layerSelAnchor=index;return true;},
     repaint(){effects.push('repaint');return true;}};
   const previous=root.SM.splitLayerAtPlayhead,api=Cut.createPorts(root,ports);
-  return {root,session,api,ports,previous,control,effects,calls,info:()=>info,
+  return {hide:v=>{hiddenByQueue=v;},root,session,api,ports,previous,control,effects,calls,info:()=>info,
     setInfo:value=>{info=value;},replaceSession:()=>{current={...session};},setActive:value=>{active=value;},setBlocks:value=>{blocks=value;},
     changeSubscription:()=>{subscription++;},pending:()=>pending};
 }
@@ -219,6 +219,7 @@ function browserProjectBeforeCut(){
   const context={NemoNativeObjectProjectMetadata:require('../src/js/adapters/native-object-project-metadata.js'),
     NemoNativeObjectProjectDesktop:require('../src/js/adapters/native-object-project-desktop.js'),
     NemoNativeObjectProjectProperties:require('../src/js/adapters/native-object-project-properties.js'),
+    NemoNativeObjectProjectReads:require('../src/js/adapters/native-object-project-reads.js'),
     NemoNativeFrameEditContract:require('../src/js/adapters/native-frame-edit-contract.js'),
     NemoNativeObjectOpenExposure:require('../src/js/adapters/native-object-open-exposure.js'),
     NemoNativeObjectProjectEntryContract:require('../src/js/adapters/native-object-project-entry-contract.js')};
@@ -340,4 +341,38 @@ test('actual bootstrap composition is per-root idempotent and refuses replaced d
   assert.throws(()=>Desktop.composeUI(a.root,{},{}),/unavailable/);
   a.root.document=document;assert.equal(Bootstrap.bindObjectUI(a.root),true);
   assert.equal(Project.paintUI(a.root),true);assert.equal(Project.paintUI(b.root),true);
+});
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+test('a split issued while another native command hides the presentation waits for it and cuts exactly once',async()=>{
+  try{
+    const f=fixture();f.root.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');f.root.setTimeout=fn=>setTimeout(fn,5);assert.ok(f.api.bindCutEntries());f.hide(true);
+    const work=f.root.SM.splitLayerAtPlayhead();await new Promise(r=>setTimeout(r,30));
+    assert.equal(f.calls.length,0,'nothing is sent while the presentation is hidden');
+    f.hide(false);const done=await work;assert.equal(done,true,JSON.stringify(f.effects));assert.equal(f.calls.length,1);
+  }finally{/* the wait module is per-root */}
+});
+test('a split whose playhead moved during the wait still refuses and sends nothing',async()=>{
+  try{
+    const f=fixture();f.root.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');f.root.setTimeout=fn=>setTimeout(fn,5);assert.ok(f.api.bindCutEntries());f.hide(true);
+    const work=f.root.SM.splitLayerAtPlayhead();await new Promise(r=>setTimeout(r,20));
+    f.root.state.currentFrame=11;f.hide(false);assert.equal(await work,false);assert.equal(f.calls.length,0);
+  }finally{/* the wait module is per-root */}
+});
+test('a playhead outside the layer shows the baseline notice; refusals and applied cuts stay silent',async()=>{
+  const outside=r=>({apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:'document',contentRevision:7,ok:true,result:{applied:false,historyEntriesAdded:0}});
+  const notices=f=>f.effects.filter(value=>Array.isArray(value)&&value[0]==='notice');
+  const f=fixture();f.control.receipt=outside;f.api.bindCutEntries();
+  assert.equal(await f.root.SM.splitLayerAtPlayhead(),false);assert.deepEqual(notices(f),[['notice','toastPlayheadInsideLayerToCut']]);
+  f.root.SM.t=key=>'T:'+key;assert.equal(await f.root.SM.splitLayerAtPlayhead(1),false);
+  assert.deepEqual(notices(f).pop(),['notice','T:toastPlayheadInsideLayerToCut'],'the baseline i18n key is the notice');
+  const refused=fixture();refused.control.receipt=r=>({apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:'document',contentRevision:7,ok:false,error:{code:'unavailable',message:'No provider'}});
+  refused.api.bindCutEntries();assert.equal(await refused.root.SM.splitLayerAtPlayhead(),false);assert.deepEqual(notices(refused),[]);
+  const applied=fixture();applied.api.bindCutEntries();assert.equal(await applied.root.SM.splitLayerAtPlayhead(),true);assert.deepEqual(notices(applied),[]);
+});
+test('both layer menus and Cmd+Shift+D reach the one bound split entry with the row index',()=>{
+  const read=name=>fs.readFileSync(path.join(__dirname,'../src/js',name),'utf8');
+  assert.match(read('timeline.js'),/label:SM\.t\('ctxCutAtPlayhead'\),action:function\(\)\{window\.SM\.splitLayerAtPlayhead\(idx4\);\}/);
+  assert.match(read('motion.js'),/label: SM\.t\('ctxCutAtPlayhead'\), action: function \(\) \{ window\.SM\.splitLayerAtPlayhead\(li\); \}/);
+  assert.match(read('timeline.js'),/\(event\.metaKey\|\|event\.ctrlKey\)&&event\.shiftKey&&\(event\.key==='d'\|\|event\.key==='D'\)\)\{\s*event\.preventDefault\(\);\s*window\.SM\.splitLayerAtPlayhead\(\);/);
 });

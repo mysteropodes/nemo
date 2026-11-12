@@ -4,10 +4,11 @@
  * native-object-edit-seam.js performs the single composition the common v2 SDK injects.
  * No owner, no writer, no host. */
 (function (root, factory) {
-  const api = factory();
+  const subselect = typeof module === 'object' && module.exports ? require('./native-subselect-contract.js') : root.NemoNativeSubselectContract;
+  const api = factory(subselect);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeObjectEditContract = api;
-}(typeof globalThis === 'object' ? globalThis : this, function () {
+}(typeof globalThis === 'object' ? globalThis : this, function (Subselect) {
   'use strict';
 
   const PREFIX = 'command.document.object.';
@@ -76,7 +77,7 @@
         exact(entry.target, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], `${at}.target`);
         exact(entry.target.frameScope, ['kind', 'frame'], [], `${at}.target.frameScope`);
         exact(entry.item, ['assetId', 'x', 'y', 'width', 'height'],
-          ['opacity', 'rotation', 'isBitmapBrush', 'brushGroupId', 'isBrushTextureCopy', 'meshId'], `${at}.item`);
+          ['opacity', 'rotation', 'flipX', 'flipY', 'skew', 'xformAnchorKey', 'xformAnchorCustom', 'isBitmapBrush', 'brushGroupId', 'isBrushTextureCopy', 'meshId'], `${at}.item`);
       });
       exact(value.source, ['instanceId', 'documentId', 'contentRevision', 'strokeIds'], [], `${label}.source`);
       ['instanceId', 'documentId'].forEach((key) => text(value.source[key], MAX_ID, `${label}.source.${key}`));
@@ -88,10 +89,26 @@
   const uid = (v, at) => text(v, MAX_ID, at), layerUid = opaque;
   const uids = (min) => (v, at) => list(v, at, min, MAX_ITEMS, (item, i) => text(item, MAX_ID, i));
   const FIELDS = {
+    subselectTarget: v=>{if(!Subselect.target(v))fail('Invalid subselect target');},
+    subselectIntent: v=>{if(!Subselect.intent(v))fail('Invalid subselect intent');},
     point: (v,at)=>{if(!Array.isArray(v)||v.length!==2||v.some((n)=>typeof n!=='number'||!Number.isFinite(n)||Math.abs(n)>1e12))fail(at+' invalid fill point');},
     color: (v,at)=>{if(typeof v!=='string'||!/^#[0-9a-fA-F]{8}$/.test(v))fail(at+' requires hex8');},
     opacity: (v,at)=>{if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>1)fail(at+' invalid opacity');},
     flag: (v,at)=>{if(typeof v!=='boolean')fail(at+' requires boolean');},
+    // A Fill Brush outline: 3 to 256 closed-path segments, each point and relative handle a finite pair.
+    outline: (v,at)=>{if(!Array.isArray(v)||v.length<3||v.length>256)fail(at+' requires 3 to 256 segments');
+      v.forEach((s,i)=>{if(!s||typeof s!=='object'||Array.isArray(s)||Object.keys(s).sort().join()!=='handleIn,handleOut,point')fail(at+'['+i+'] invalid segment');
+        ['point','handleIn','handleOut'].forEach((k)=>FIELDS.point(s[k],at+'['+i+'].'+k));});},
+    placement: (v,at)=>{if(!['above','below','merge'].includes(v))fail(at+' requires above, below or merge');},
+    copies: (v,at)=>{if(!Array.isArray(v)||v.length>23)fail(at+' requires at most 23 copies');
+      v.forEach((m,i)=>{if(!Array.isArray(m)||m.length!==6||m.some((n)=>typeof n!=='number'||!Number.isFinite(n)||Math.abs(n)>1e12))fail(at+'['+i+'] invalid affine');});},
+    stamps: (v,at)=>{if(!Array.isArray(v)||v.length>256||new Set(v).size!==v.length||v.some((f)=>!Number.isInteger(f)||f<0||f>4294967295))fail(at+' requires at most 256 distinct frames');},
+    mask: (v,at)=>{if(v!==false&&!(typeof v==='string'&&v.length>0&&bytes(v)<=64&&!/[\u0000-\u001f\u007f-\u009f]/.test(v)))fail(at+' requires false or a mask mode');},
+    offset: (v, at) => { if (!Array.isArray(v) || v.length !== 2 || v.some((n) => typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) > 1e6)) fail(`${at} must be a finite [dx, dy] pair within 1e6`); },
+    // A multi-layer duplicate's other layers: one to 32 {layerUid, strokeIds}, each layer once, each with one or more distinct stroke identities.
+    others: (v, at) => { list(v, at, 1, 32, (entry, i) => { exact(entry, ['layerUid', 'strokeIds'], [], i); uid(entry.layerUid, `${i}.layerUid`);
+      list(entry.strokeIds, `${i}.strokeIds`, 1, MAX_ITEMS, (id, j) => text(id, MAX_ID, j)); if (new Set(entry.strokeIds).size !== entry.strokeIds.length) fail(`${i}.strokeIds repeats a shape`); });
+      if (new Set(v.map((entry) => entry.layerUid)).size !== v.length) fail(`${at} repeats a layer`); },
     uid: uid, layerUid: layerUid, layerUids: (v, at) => { list(v, at, 1, MAX_ITEMS, opaque); if (new Set(v).size !== v.length) fail(`${at} repeats a layer`); },
     gap: (v, at) => { if (typeof v !== 'number' || !Number.isFinite(v)) fail(`${at} must be a finite number`); },
     selection: selection, name: (v, at) => { if (typeof v !== 'string') fail(`${at} must be a string`); },
@@ -102,10 +119,13 @@
   };
   // operation suffix -> [command, result kind, [wire member, validator]...]. Member order is the wire order.
   const SPEC = {
-    'layer.delete': ['object.layer.delete', 'command', [['selection', 'selection']]],
-    'layer.duplicate': ['object.layer.duplicate', 'created', [['layerUid', 'layerUid']]],
+    // atFrame: the cell Direct Select edits, when it differs from the stored key (held frames, #2356); optional on the wire.
+    'subselect.edit': ['object.subselect.edit', 'command', [['stableTarget','subselectTarget'],['intent','subselectIntent']], [['atFrame', 'frame']]],
+    // contextId (optional on these three, #2256): the declared component whose layers the edit works on; absent is the scene root.
+    'layer.delete': ['object.layer.delete', 'command', [['selection', 'selection']], [['contextId', 'contextId']]],
+    'layer.duplicate': ['object.layer.duplicate', 'created', [['layerUid', 'layerUid']], [['contextId', 'contextId']]],
     'layer.rename': ['object.layer.rename', 'command', [['layerUid', 'layerUid'], ['name', 'name']]],
-    'layer.reorder': ['object.layer.reorder', 'command', [['layerUids', 'layerUids'], ['gap', 'gap'], ['selection', 'selection']]],
+    'layer.reorder': ['object.layer.reorder', 'command', [['layerUids', 'layerUids'], ['gap', 'gap'], ['selection', 'selection']], [['contextId', 'contextId']]],
     'group.create': ['object.group.create', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['groupId', 'groupId'], ['name', 'groupName'], ['strokeIds', 'strokeIds1']]],
     'group.ungroup': ['object.group.ungroup', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['strokeIds', 'strokeIds1']]],
     'group.combine': ['object.group.combine', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['groupId', 'groupId'], ['mode', 'combineMode'], ['strokeIds', 'strokeIds1']]],
@@ -113,13 +133,16 @@
     'group.rename': ['object.group.rename', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['groupId', 'groupId'], ['name', 'groupName']]],
     'group.member.remove': ['object.group.member.remove', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['strokeId', 'strokeId']]],
     'selection.delete': ['object.selection.delete', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
-    'selection.duplicate': ['object.selection.duplicate', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
+    // offset: where the copies land (an Alt-drag duplicate, record space); absent is the baseline 12 px nudge. others: shapes of other layers the copy also takes (a selection that spans layers).
+    'selection.duplicate': ['object.selection.duplicate', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']], [['offset', 'offset'], ['others', 'others']]],
     'layer.split': ['object.layer.split', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['labels', 'labels']]],
     'clipboard.paste': ['object.clipboard.paste', 'command', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['clip', 'clip']]],
     'boolean.apply': ['object.boolean.apply', 'command', [['mode', 'booleanMode'], ['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeIds', 'strokeIds2']]],
-    'boolean.erase': ['object.boolean.erase', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeId', 'strokeId'], ['footprint', 'footprint']]],
+    // joinHistory: a bite after the first of one drag continues the entry the drag began (one undo per gesture, as the baseline's single pushUndo).
+    'boolean.erase': ['object.boolean.erase', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeId', 'strokeId'], ['footprint', 'footprint']], [['joinHistory', 'flag']]],
     'boolean.flatten': ['object.boolean.flatten', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['groupId', 'groupId']]],
     'fill.trace':['object.fill.trace','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['point','point'],['color','color'],['opacity','opacity'],['remove','flag']]],
+    'fill.brush':['object.fill.brush','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['outline','outline'],['color','color'],['opacity','opacity'],['placement','placement'],['mask','mask'],['copies','copies'],['stamps','stamps']]],
     'clipboard.copy': ['object.clipboard.copy', 'clipboard-copy', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
     'clipboard.cut': ['object.clipboard.cut', 'clipboard-cut', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
   };
@@ -130,9 +153,11 @@
   function payload(operation, value) {
     const entry = spec(operation);
     if (!entry) fail('native object edit operation is not declared');
-    exact(value, ['command', ...entry[2].map((member) => member[0])], [], operation);
+    const optional = entry[3] || [];
+    exact(value, ['command', ...entry[2].map((member) => member[0])], optional.map((member) => member[0]), operation);
     if (value.command !== entry[0]) fail(`${operation} command is invalid`);
     for (const [member, kind] of entry[2]) FIELDS[kind](value[member], `${operation}.${member}`);
+    for (const [member, kind] of optional) if (has(value, member)) FIELDS[kind](value[member], `${operation}.${member}`);
   }
   function result(operation, value) {
     const entry = spec(operation);
@@ -152,7 +177,9 @@
       return;
     }
     exact(value, ['applied', 'historyEntriesAdded'], [], 'object edit result');
-    if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) fail('invalid object edit disposition');
+    // A joined eraser bite applies without a new entry; whether it was joined is the request's (correlate below).
+    const joined = operation === PREFIX + 'boolean.erase' && value.applied === true && value.historyEntriesAdded === 0;
+    if (typeof value.applied !== 'boolean' || !joined && value.historyEntriesAdded !== (value.applied ? 1 : 0)) fail('invalid object edit disposition');
   }
   function correlate(request, response) {
     if (response.instanceId !== request.instanceId) fail('object edit response owner mismatch');
@@ -160,6 +187,7 @@
     if (response.documentId !== request.documentId && !replaced) fail('object edit response document mismatch');
     if (!response.ok) return;
     if (response.contentRevision !== request.expectedRevision + (response.result.applied ? 1 : 0)) fail('object edit receipt revision mismatch');
+    if (request.operation === PREFIX + 'boolean.erase' && response.result.applied && response.result.historyEntriesAdded !== (request.payload.joinHistory === true ? 0 : 1)) fail('eraser history disposition mismatch');
     if (/\.clipboard\.(?:copy|cut)$/.test(request.operation) && response.result.clipboard !== null &&
         ['contextId', 'layerUid', 'frame'].some((key) => response.result.clipboard[key] !== request.payload[key])) fail('clipboard source selector mismatch');
   }
@@ -183,6 +211,13 @@
   }
   function commandOf(operation) { const entry = spec(operation); return entry ? entry[0] : null; }
   function members(operation) { const entry = spec(operation); return entry ? entry[2].map((m) => m[0]) : null; }
+  function optionalMembers(operation) { const entry = spec(operation); return entry ? (entry[3] || []).map((m) => m[0]) : null; }
   function kinds(operation) { const entry = spec(operation); return entry ? entry[2].map((m) => m.slice()) : null; }
-  return Object.freeze({ OPERATIONS, admitted, requiresRevision: admitted, payload, result, correlate, paths: own.paths, compose, commandOf, members, kinds, bytes });
+  // The command runner's bound for an edit request: a Fill Brush outline (up to 256 segments) gets the vector-geometry bound,
+  // as the SDK does (native-object-vector-contract.js); a shape paste carries its clip inline and gets the same 64 KiB; every other edit
+  // stays at 4096. Copy and cut return the clip, so their complete reply gets the 64 KiB too (the engine's own clip payload bound).
+  const SHAPE_CLIP_BYTES = 65536;
+  const requestByteLimit = (op) => (op === PREFIX + 'fill.brush' || op === PREFIX + 'clipboard.paste' ? SHAPE_CLIP_BYTES : 4096);
+  const responseByteLimit = (op) => (op === PREFIX + 'clipboard.copy' || op === PREFIX + 'clipboard.cut' ? SHAPE_CLIP_BYTES : 4096);
+  return Object.freeze({ OPERATIONS, admitted, requiresRevision: admitted, payload, result, correlate, paths: own.paths, compose, commandOf, members, optionalMembers, kinds, bytes, requestByteLimit, responseByteLimit, SHAPE_CLIP_BYTES });
 }));

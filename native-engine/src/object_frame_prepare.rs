@@ -1,6 +1,6 @@
 //! Shared immutable frame construction; caller supplies only its proven Motion port.
 use crate::object_frame_packet::{
-    duplicators, holders_fully_consumed, sources, text, video, FrameContext, NumericOrderPlan,
+    solo_view, duplicators, holders_fully_consumed, sources, text, video, FrameContext, NumericOrderPlan,
     ObjectFrameError, ObjectFrameIndices, ObjectFramePacket, ObjectFrameRasterIndex,
     ObjectFrameSelector,
 };
@@ -20,6 +20,26 @@ where
     E: From<ObjectFrameError>,
     F: FnOnce(&ObjectSnapshot, &str, u32, &[Option<u32>], bool) -> Result<NumericOrderPlan, E>,
 {
+    prepare_frame_admitting(snapshot, selector, exposure, prepare_order, motion, true)
+}
+
+/// The same construction; `require_consumed == false` skips the document-wide gate that every property holder is one a join consumes
+/// (and the unjoined-3D gate). Only a read of REST geometry may skip it (the Motion canvas boxes, #2520/#2525): such a read never
+/// evaluates a holder, so an expression, a control or an unconsumed property on some layer cannot change what it answers.
+pub(super) fn prepare_frame_admitting<E, F>(
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+    exposure: bool,
+    prepare_order: F,
+    motion: Option<
+        &dyn crate::evaluation::object_component_kernels::object_effector_layers::MotionPort,
+    >,
+    require_consumed: bool,
+) -> Result<ObjectFramePacket, E>
+where
+    E: From<ObjectFrameError>,
+    F: FnOnce(&ObjectSnapshot, &str, u32, &[Option<u32>], bool) -> Result<NumericOrderPlan, E>,
+{
     let context = FrameContext::admit(snapshot, selector, exposure)?;
     let document = snapshot.document();
     let context_layers = context.layers(document);
@@ -32,7 +52,7 @@ where
     } else {
         holders_fully_consumed(document)
     };
-    if snapshot.frame_has_unjoined_3d() || !consumed {
+    if require_consumed && (snapshot.frame_has_unjoined_3d() || !consumed) {
         return Err(ObjectFrameError::Unavailable.into());
     }
     let source_frames = sources::select(
@@ -58,6 +78,8 @@ where
         .enumerate()
         .map(|(index, layer)| (layer.layer_uid(), index))
         .collect();
+    // #2371: the Solo view decides which layers count as visible (baseline `layerIsEffectivelyVisible`), eye or not.
+    let layer_visible = solo_view::layer_visibility(selector.context_id, context_layers);
     let mut records = Vec::new();
     for (source_object_index, record) in context_objects.iter().enumerate() {
         let target = record.target();
@@ -67,7 +89,7 @@ where
                 .get(target.layer_uid())
                 .ok_or(ObjectFrameError::InvalidSource)?;
             if source_frames[source_layer_index] != Some(target.frame())
-                || !context_layers[source_layer_index].visible()
+                || !layer_visible[source_layer_index]
             {
                 continue;
             }
@@ -87,7 +109,7 @@ where
                 let layer = *layers
                     .get(target.layer_uid())
                     .ok_or(ObjectFrameError::InvalidSource)?;
-                if source_frames[layer] == Some(target.frame()) && context_layers[layer].visible() {
+                if source_frames[layer] == Some(target.frame()) && layer_visible[layer] {
                     raster_records.push(ObjectFrameRasterIndex { layer, entry });
                 }
             }
@@ -97,6 +119,7 @@ where
     let mut packet = ObjectFramePacket {
         duplicators: Vec::new(),
         motion_receipts: Vec::new(),
+        matte_on_receipts: Vec::new(),
         selector_receipts: Vec::new(),
         text_records,
         video_records: video::select(snapshot, selector, context_layers, &source_frames)?,
@@ -115,6 +138,8 @@ where
             crate::object_frame_packet::motion_receipts::capture(&packet, motion)?;
         packet.selector_receipts =
             crate::object_frame_packet::text_selectors::capture(&packet, motion)?;
+        packet.matte_on_receipts =
+            crate::object_frame_packet::motion_receipts::capture_matte_on(&packet, motion);
     }
     packet.duplicators = duplicators::prepare(&packet, exposure, motion)?;
     Ok(packet)

@@ -30,14 +30,15 @@
     return (Array.isArray(previous) ? previous : []).filter((id) => !live.has(id));
   }
 
-  // The caller supplies exactly the declared members; `command` is added here and nothing else is forwarded.
+  // The caller supplies exactly the declared members (and, optionally, any of the contract's optional ones); `command` is added here and nothing else is forwarded.
   function build(operation, input) {
-    const keys = contract.members(operation);
+    const keys = contract.members(operation), optional = typeof contract.optionalMembers === 'function' ? contract.optionalMembers(operation) || [] : [];
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('intent input must be a plain object');
     const own = Object.keys(input);
-    if (own.some((key) => !keys.includes(key)) || keys.some((key) => !own.includes(key))) throw new TypeError('intent input has missing or unknown fields');
+    if (own.some((key) => !keys.includes(key) && !optional.includes(key)) || keys.some((key) => !own.includes(key))) throw new TypeError('intent input has missing or unknown fields');
     const payload = { command: contract.commandOf(operation) };
     keys.forEach((key) => { payload[key] = input[key]; });
+    optional.forEach((key) => { if (own.includes(key)) payload[key] = input[key]; });
     return payload;
   }
 
@@ -64,7 +65,7 @@
           operation, expectedRevision: pin.contentRevision, payload: JSON.parse(JSON.stringify(body)),
         };
       } catch (error) { return failure(operation, 'invalid_request', { reason: String(error && error.message || error) }); }
-      if (contract.bytes(JSON.stringify(request)) > MAX_REQUEST_BYTES) return failure(operation, 'request_too_large', { limit: MAX_REQUEST_BYTES });
+      if (contract.bytes(JSON.stringify(request)) > contract.requestByteLimit(operation)) return failure(operation, 'request_too_large', { limit: contract.requestByteLimit(operation) });
       let response;
       try { response = await ports.submit(request, pin); } catch (error) {
         const match = refused.exec(String(error && error.message || ''));
@@ -81,7 +82,7 @@
           const fields = ['apiVersion', 'requestId', 'instanceId', 'documentId', 'contentRevision', 'ok', response.ok ? 'result' : 'error'];
           if (response.apiVersion !== 2 || !safeRevision(response.contentRevision) ||
               Object.keys(response).length !== fields.length || fields.some((key) => !Object.prototype.hasOwnProperty.call(response, key)) ||
-              contract.bytes(JSON.stringify(response)) > MAX_REQUEST_BYTES) throw new TypeError('invalid bounded clipboard response');
+              contract.bytes(JSON.stringify(response)) > contract.responseByteLimit(operation)) throw new TypeError('invalid bounded clipboard response');
           if (response.ok) contract.result(operation, response.result);
           contract.correlate(request, response);
         } catch (error) {

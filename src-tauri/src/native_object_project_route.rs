@@ -1,11 +1,19 @@
 //! Project files use the original object host and native lifecycle slot.
 use crate::application_mcp::ApplicationMcp;
-use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
+use crate::native_dispatch::{NativeDispatch, NativeObjectHost, PROJECT_INFO_LIMIT_BYTES};
 use native_engine::{
     commands::{OpacityRequest, ResponseEnvelope},
     object_frame_packet::ObjectFrameSelector,
 };
 use serde_json::{json, Value};
+
+/// Outcome of a recovery snapshot request: a stale pin is a normal answer, not
+/// an error, and a bare drawing document is never a recoverable project.
+pub(crate) enum RecoverySnapshot {
+    Bytes(Vec<u8>),
+    Stale,
+    NotProject,
+}
 
 impl ApplicationMcp {
     pub(crate) fn install_native_project_file(
@@ -16,14 +24,30 @@ impl ApplicationMcp {
         self.install_project_owner(owner)
     }
 
+    #[cfg(test)]
     pub(crate) fn install_native_blank_project(
         &self,
         width: u32,
         height: u32,
         fps: f64,
     ) -> Result<(String, u64, usize), String> {
-        let owner =
-            NativeObjectHost::new_blank_project(self.instance_id().into(), width, height, fps)?;
+        self.install_native_blank_project_frames(width, height, fps, None)
+    }
+
+    pub(crate) fn install_native_blank_project_frames(
+        &self,
+        width: u32,
+        height: u32,
+        fps: f64,
+        total_frames: Option<u32>,
+    ) -> Result<(String, u64, usize), String> {
+        let owner = NativeObjectHost::new_blank_project_frames(
+            self.instance_id().into(),
+            width,
+            height,
+            fps,
+            total_frames,
+        )?;
         self.install_project_owner(owner)
     }
 
@@ -64,7 +88,7 @@ impl ApplicationMcp {
         info["instanceId"] = json!(self.instance_id());
         info["documentId"] = json!(document);
         info["lifecycleGeneration"] = json!(generation);
-        if serde_json::to_vec(&info).map_or(true, |v| v.len() > 65536) {
+        if serde_json::to_vec(&info).map_or(true, |v| v.len() > PROJECT_INFO_LIMIT_BYTES) {
             return Err("native project metadata exceeds UI limit".into());
         }
         Ok(info)
@@ -92,6 +116,43 @@ impl ApplicationMcp {
             .downcast_mut::<NativeObjectHost>()
             .ok_or("native project owner unavailable")?;
         owner.project_file_snapshot(revision, snapshot)
+    }
+
+    /// Same serializer and pin as `native_project_file_snapshot`, with a stale
+    /// pin reported as data so the periodic recovery writer can simply retry.
+    /// The authority lock covers only the O(1) snapshot acquisition; the encoder
+    /// (which grows with project size) runs after the lock is released, so a
+    /// periodic write never stalls commands, presentation or revision sync.
+    pub(crate) fn native_project_recovery_snapshot(
+        &self,
+        document: &str,
+        revision: u64,
+        snapshot: &str,
+    ) -> Result<RecoverySnapshot, String> {
+        let serialize = {
+            let native = self.native_state();
+            let mut authority = native
+                .lock()
+                .map_err(|_| "native application lock unavailable")?;
+            let generation = authority.active_generation()?;
+            let application = authority.active_mut(generation)?;
+            if application.document_id() != document || !application.object_client_available() {
+                return Ok(RecoverySnapshot::Stale);
+            }
+            let owner = application
+                .as_any_mut()
+                .downcast_mut::<NativeObjectHost>()
+                .ok_or("native project owner unavailable")?;
+            match owner.detached_project_file_serializer(revision, snapshot) {
+                Ok(Some(serialize)) => serialize,
+                Ok(None) => return Ok(RecoverySnapshot::NotProject),
+                Err(_) if owner.content_revision() != revision => {
+                    return Ok(RecoverySnapshot::Stale)
+                }
+                Err(error) => return Err(error),
+            }
+        };
+        serialize().map(RecoverySnapshot::Bytes)
     }
 
     pub(crate) fn native_project_reference(

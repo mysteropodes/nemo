@@ -77,16 +77,17 @@ function scenario(openFault){
     if(command==='nemo_native_dispatch'&&r.operation==='query.document.object.layer.timing')return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:revision,ok:false,error:{code:'unavailable',message:'Timing is outside this policy fixture'}};
     assert.equal(command,'nemo_native_dispatch');routes.push(command);assert.equal(r.expectedRevision,revision);
     assert.equal(r.documentId,info().documentId);commands.push(r);
-    assert.equal(r.operation,'command.document.object.layer.policy.edit');assert.equal(r.payload.command,'object.layer.policy.edit');assert.ok(['locked','shy'].includes(r.payload.flag));
-    const applied=(policy[r.payload.flag]===true)!==r.payload.value;
-    if(applied){policy[r.payload.flag]=r.payload.value;revision++;}
+    assert.equal(r.operation,'command.document.object.layer.policy.edit');assert.equal(r.payload.command,'object.layer.policy.edit');assert.ok(['locked','shy','threeD','keyLock'].includes(r.payload.flag));
+    if(failure==='unavailable'){return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:revision,ok:false,error:{code:'unavailable',message:'Layer policy could not commit.'}};}
+    const keyLock=r.payload.flag==='keyLock',applied=keyLock?(policy.keyLock===undefined?null:policy.keyLock)!==r.payload.value:(policy[r.payload.flag]===true)!==r.payload.value;
+    if(applied){if(keyLock&&r.payload.value===null)delete policy.keyLock;else if(r.payload.flag==='threeD'&&r.payload.value===false)delete policy.threeD;else policy[r.payload.flag]=r.payload.value;revision++;}
     const response={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,
-      contentRevision:revision,ok:true,result:{applied,historyEntriesAdded:applied?1:0}};
+      contentRevision:revision,ok:true,result:{applied,historyEntriesAdded:applied&&r.payload.flag!=='threeD'?1:0}}; // #2520: the 3D switch is saved with a revision but is no undo step
     if(replyGate){const gate=replyGate;replyGate=null;await gate.promise;}
     if(failure==='malformed-reply')response.result.historyEntriesAdded=2;
     return response;
   }
-  const root={state:{},selectedPaths:[],userLayers:[],NemoNativeObjectProjectFile:Files,
+  const root={state:{},selectedPaths:[],userLayers:[],NemoNativeObjectProjectFile:Files,NemoNativeLayerThreeD:require('../src/js/adapters/native-layer-three-d.js'),
     NemoNativeApplicationAdapter:{createNativeApplicationAdapter(...args){const client=Application.createNativeApplicationAdapter(...args);return {...client,editLayerPolicy(request){sdkCalls++;return client.editLayerPolicy(request);}};}},NemoApplicationMcpTransport:{createNativeTauriTransport:invoke=>{
       transportGeneration++;const transport=Transport.createNativeTauriTransport(invoke);
       return {...transport,subscribeRevisions:(listen,synchronize,disconnected)=>{
@@ -282,3 +283,78 @@ test('actual native paint installs ordinary policy wrappers once and disposes th
 test('composition has no Paper selection lookup and leaves native layer fields exclusively owner-controlled',async()=>{const h=await openDesktop(),info=h.session.info();Object.defineProperty(h.root,'userLayers',{get(){throw Error('No Paper selection authority');},configurable:true});h.root.selectedPaths=[{id:'ui-only'}];h.root.state.selectedStrokeIndices=[2];assert.equal(h.uiPorts.clearDrawingSelection('legacy layer:alpha',info),false);assert.equal(h.root.selectedPaths.length,1);assert.equal(Object.hasOwn(info.layers[0],'locked'),false);});
 
 test('actual frame-only Project paint preserves policy control identity and focus without provider-driven rebuilds',async()=>{const h=await openDesktop(),button=h.row().children[2],Project=require('../src/js/adapters/native-object-project.js');button.focus();Project.paintUI(h.root,true);assert.equal(h.row().children[2]===button,true);assert.equal(h.root.document.activeElement===button,true);});
+
+test('D37 the actual SDK and session write, read back and clear a layer key lock, and refuse a stale pin or malformed mode',async()=>{
+ const h=await open(),pin=h.session.info();
+ const set=await h.session.editLayerPolicy(payload('keyLock','in'),pin);assert.equal(set.ok,true);assert.equal(set.result.applied,true);
+ assert.equal(h.session.info().layers[0].keyLock,'in','the project row is the native read the lock menu ticks');assert.equal(h.session.info().layers[1].keyLock,undefined);
+ assert.equal(h.commands[0].payload.flag,'keyLock');assert.deepEqual(h.routes,['nemo_native_dispatch']);
+ await assert.rejects(h.session.editLayerPolicy(payload('keyLock','out'),pin),/stale/);assert.equal(h.commands.length,1);
+ for(const bad of ['both',true,0,undefined])await assert.rejects(h.session.editLayerPolicy(payload('keyLock',bad),h.session.info()),/invalid/);
+ assert.equal(h.commands.length,1,'invalid intents never reach the transport');
+ const same=await h.session.editLayerPolicy(payload('keyLock','in'),h.session.info());assert.equal(same.result.applied,false);assert.equal(h.session.info().layers[0].keyLock,'in');
+ const clear=await h.session.editLayerPolicy(payload('keyLock',null),h.session.info());assert.equal(clear.result.applied,true);
+ assert.equal(Object.hasOwn(h.session.info().layers[0],'keyLock'),false);
+});
+
+// #2520/#2525: the baseline 3D Layer switch is the third layer-policy flag; the row cell reaches the real SDK/session path and the row reports it.
+const threeDCell=h=>h.row().children.find(c=>c.dataset&&c.dataset.nativeLayerThreeD!==undefined);
+test('the 3D Layer cell shows the native threeD fact and one click is ONE policy edit through the real SDK/session',async()=>{
+  const h=await open();let cell=threeDCell(h);
+  assert.ok(cell,'every row carries the baseline 3D Layer column cell');
+  assert.deepEqual([cell.className,cell.title,cell.dataset.nativeLayerThreeD],['lico motion-col-3d off','3D Layer','false']);
+  await cell.fire('click');
+  assert.equal(h.sdkCalls,1);assert.equal(h.commands.length,1);
+  assert.deepEqual(h.commands[0].payload,{command:'object.layer.policy.edit',layerUid:'legacy layer:alpha',flag:'threeD',value:true});
+  assert.equal(h.session.info().layers[0].threeD,true);assert.equal(h.session.info().contentRevision,1);
+  cell=threeDCell(h);
+  assert.deepEqual([cell.className,cell.dataset.nativeLayerThreeD],['lico motion-col-3d','true'],'the cell is lit from the native row fact');
+  await cell.fire('click');
+  assert.equal(h.commands[1].payload.value,false);
+  assert.equal(Object.hasOwn(h.session.info().layers[0],'threeD'),false,'switching off leaves no authored false in the row');
+  assert.equal(threeDCell(h).className,'lico motion-col-3d off');
+  assert.equal(h.session.info().layers[1].threeD,undefined,'the neighbour layer is untouched');
+});
+test('an external 3D revision lights the cell without any command of this window',async()=>{
+  const h=await open();await h.external('threeD',true);h.render();
+  assert.equal(h.session.info().layers[0].threeD,true);assert.equal(threeDCell(h).dataset.nativeLayerThreeD,'true');assert.equal(h.commands.length,0);
+});
+test('the metadata contract takes a true threeD row and refuses every other value',async()=>{
+  const h=await open(),Metadata=require('../src/js/adapters/native-object-project-metadata.js'),request={requestId:'policy-read',instanceId:'instance',documentId:h.current().documentId};
+  const read=Metadata.decode({...h.current(),requestId:request.requestId,layers:[{layerUid:'a',threeD:true},{layerUid:'b'}]},request);
+  assert.deepEqual(read.layers,[{layerUid:'a',threeD:true},{layerUid:'b'}]);
+  for(const value of [false,null,0,'true',[],{}])assert.throws(()=>Metadata.decode({...h.current(),requestId:request.requestId,layers:[{layerUid:'a',threeD:value}]},request),/uncorrelated/);
+});
+test('native policy intent accepts threeD as a boolean only',async()=>{
+  const h=await open();
+  for(const value of [1,null,'in'])await assert.rejects(h.session.editLayerPolicy(payload('threeD',value),h.session.info()),/stale or invalid/);
+  assert.equal(h.sdkCalls,0);assert.equal(h.commands.length,0);
+});
+
+test('#2520: the 3D switch is saved with a revision and no history entry; the receipt is accepted and the row lights',async()=>{
+  const h=await open(),response=await h.session.editLayerPolicy(payload('threeD',true),h.session.info());
+  assert.deepEqual(response.result,{applied:true,historyEntriesAdded:0});assert.equal(response.contentRevision,1);
+  assert.equal(h.session.info().layers[0].threeD,true);
+});
+test('#2520: a row of a kind the engine cannot place in 3D shows no 3D cell; every other row does, and a stored switch stays switchable off',async()=>{
+  const h=await open();assert.ok(threeDCell(h),'a drawing row (no kind fact) keeps its cell');
+  for(const kind of ['image','sequence','null','folder','effect','widget','guide','text']){
+    await h.external('kind',kind);h.render();assert.equal(h.session.info().layers[0].kind,kind);
+    assert.ok(threeDCell(h),kind+' row offers the 3D switch');
+  }
+  await h.external('kind','component');h.render();assert.equal(h.session.info().layers[0].kind,'component');
+  assert.equal(threeDCell(h),undefined,'a component row offers no 3D switch');
+  await h.external('threeD',true);h.render();
+  assert.equal(threeDCell(h).dataset.nativeLayerThreeD,'true','an imported switch that is already on can still be switched off');
+});
+test('#2520: a refused 3D switch shows the specific toast, commits nothing and leaves the row unchanged',async()=>{
+  const h=await open(),toasts=[];h.root.showToast=m=>toasts.push(m);
+  h.fail('unavailable');
+  assert.equal(await h.UI.setLayerPolicy(h.root,'legacy layer:alpha','threeD',true,h.session.info(),h.uiPorts),false);
+  assert.deepEqual(toasts,['3D is not available for this layer yet.']);
+  assert.equal(h.session.info().contentRevision,0);assert.equal(h.session.info().layers[0].threeD,undefined);
+  // The same refusal on another flag keeps the generic wording.
+  toasts.length=0;
+  assert.equal(await h.UI.setLayerPolicy(h.root,'legacy layer:alpha','locked',true,h.session.info(),h.uiPorts),false);
+  assert.deepEqual(toasts,['Native layer policy was not confirmed.']);
+});

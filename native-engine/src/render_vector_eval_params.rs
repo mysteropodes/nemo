@@ -164,20 +164,22 @@ pub(crate) fn null_layer_motion_target(
         return false;
     };
     layer.is_null_layer()
-        && layer.three_d.value() != Some(&true)
         && !layer.is_effect_layer()
-        && !layer.is_folder_layer()
         && layer.widget.value().is_none()
         && layer.groups.value().is_none()
         && layer.rig.value().is_none()
         && !layer.folder_id.value().is_some_and(Option::is_some)
         && !layer.follow_path.value().is_some_and(Option::is_some)
-        && !layer.blend_mode().is_some_and(|v| v != "normal")
-        && !layer.matte_mode().is_some_and(|v| v != "none")
-        && layer.matte_source_layer_uid.value().is_none()
-        && !layer.mattes_more.value().is_some_and(|v| !v.is_empty())
-        && !layer.effects.value().is_some_and(|v| !v.is_empty())
-        && layer.effects_from.value().is_none()
+        // #2257: a FOLDER carries its own effect stack (`sceneEffectsOf`, the borrowed one included), which the layered
+        // join applies to the flattened group; the baseline ignores a folder's blend and matte, so they are inert.
+        && (layer.is_folder_layer()
+            || (!layer.blend_mode().is_some_and(|v| v != "normal")
+                && layer.blend_keys.value().is_none()
+                && !layer.matte_mode().is_some_and(|v| v != "none")
+                && layer.matte_source_layer_uid.value().is_none()
+                && !layer.mattes_more.value().is_some_and(|v| !v.is_empty())
+                && !layer.effects.value().is_some_and(|v| !v.is_empty())
+                && layer.effects_from.value().is_none()))
         && !layer
             .path_fx()
             .is_some_and(|fx| fx.iter().any(|f| f.enabled_flag() != Some(false)))
@@ -248,8 +250,19 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
     if crate::object_document::bitmap_brush::trim_holder_consumed(document, holder) {
         return true;
     }
+    // Exposed component keys on an instance layer are read by the component override port.
+    if let Some(rest) = crate::object_document::without_exposed(document.component_set(), holder) {
+        return rest
+            .controls
+            .value()
+            .is_none_or(|controls| controls.is_empty())
+            && (rest.properties().is_empty() || holder_consumed(document, &rest));
+    }
     if let Some(consumed) = crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::component_holder_consumed(document, holder) {
         return consumed;
+    }
+    if crate::evaluation::object_vector_kernels::render_vector_eval::motion::widget_holder_consumed(document, holder) {
+        return true;
     }
     let target = holder.target();
     if holder
@@ -292,7 +305,9 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
                 || matches!(
                     property.property(),
                     "position" | "anchor" | "rotation" | "scale"
-                ))
+                )
+                // `vtxN` offsets are added to the anchor points by the element Motion join.
+                || PropertyHolder::vertex_index(property.property()).is_some())
                 && !property.expression.value().is_some_and(|code| code.enabled)
         });
         if !consumed {

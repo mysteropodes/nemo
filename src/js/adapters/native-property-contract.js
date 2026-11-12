@@ -11,13 +11,17 @@
       exact(value,['kind','instanceId','documentId','atRevision','documentSnapshotId','contextId','layerUid','frame','range'],[],'range result');
       id(value.instanceId,'instanceId');id(value.documentId,'documentId');revision(value.atRevision,'atRevision');
       objectUid(value.documentSnapshotId);objectUid(value.layerUid);frame(value.frame);
-      if(value.contextId!=='scene-root')throw new TypeError('invalid range context');
-      exact(value.range,['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'],[],'resolved range');
+      if(typeof value.contextId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId))throw new TypeError('invalid range context'); // #2256: the scene root or a component context id
+      exact(value.range,['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'],['markers','effectKeys','keyFrames'],'resolved range');
+      const rg=value.range,lists=(!has(rg,'markers')||Array.isArray(rg.markers)&&rg.markers.length<=64&&rg.markers.every(m=>plain(m)&&Number.isSafeInteger(m.frame)&&m.frame>=0&&Object.keys(m).every(k=>k==='frame'||k==='name')&&(!has(m,'name')||typeof m.name==='string'&&m.name.length>=1&&m.name.length<=32)))&&
+        (!has(rg,'effectKeys')||Array.isArray(rg.effectKeys)&&rg.effectKeys.length<=512&&rg.effectKeys.every(f=>Number.isSafeInteger(f)&&f>=0))&&
+        (!has(rg,'keyFrames')||Array.isArray(rg.keyFrames)&&rg.keyFrames.length<=512&&rg.keyFrames.every(f=>Number.isSafeInteger(f)&&f>=0));
+      if(!lists)throw new TypeError('invalid range snap lists');
       if(!['rawInPoint','rawOutPoint','inPoint','outPoint'].every(k=>Number.isFinite(value.range[k]))||
          typeof value.range.hasCustomRange!=='boolean'||typeof value.range.hasTimeLink!=='boolean')throw new TypeError('invalid resolved range');
       return;
     }
-    // T12: the layer's video placement facts, or null; remap keys are counted, never listed.
+    // T12: the layer's video placement facts, or null; remap keys are listed while they fit the read.
     function placementResult(value) {
       exact(value,['kind','instanceId','documentId','atRevision','documentSnapshotId','contextId','layerUid','frame','placement'],[],'placement result');
       id(value.instanceId,'instanceId');id(value.documentId,'documentId');revision(value.atRevision,'atRevision');
@@ -26,11 +30,30 @@
       const p=value.placement;if(p===null)return;
       exact(p,['placementId','assetId','assetKind','offsetFrames','timeRemap','interpMode','frameBlend','sourceFrameCount'],[],'video placement');
       objectUid(p.placementId);objectUid(p.assetId);
-      const r=p.timeRemap;if(r!==null)exact(r,['keyCount','keyAtFrame'],[],'time remap facts');
+      const r=p.timeRemap;if(r!==null)exact(r,['keyCount','keyAtFrame','value','keys'],[],'time remap facts');
+      // The key list is null when it does not fit the read; a listed key is one finite frame and value.
+      if(r!==null&&Array.isArray(r.keys))r.keys.forEach(k=>exact(k,['frame','value'],['color','hold'],'time remap key'));
       if(p.assetKind!=='video'||!Number.isFinite(p.offsetFrames)||
-         r!==null&&(!Number.isSafeInteger(r.keyCount)||r.keyCount<0||typeof r.keyAtFrame!=='boolean')||
+         r!==null&&(!Number.isSafeInteger(r.keyCount)||r.keyCount<0||typeof r.keyAtFrame!=='boolean'||r.value!==null&&!Number.isFinite(r.value)||
+           r.keys!==null&&(!Array.isArray(r.keys)||r.keys.length!==r.keyCount||!r.keys.every(k=>Number.isFinite(k.frame)&&Number.isFinite(k.value)&&(!Object.prototype.hasOwnProperty.call(k,'color')||typeof k.color==='string'&&/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(k.color))&&(!Object.prototype.hasOwnProperty.call(k,'hold')||k.hold===true))))||
          p.interpMode!==null&&(typeof p.interpMode!=='string'||!p.interpMode||p.interpMode.length>32)||
          p.frameBlend!==null&&typeof p.frameBlend!=='boolean'||p.sourceFrameCount!==null&&(!Number.isSafeInteger(p.sourceFrameCount)||p.sourceFrameCount<1||p.sourceFrameCount>4294967295))throw new TypeError('invalid video placement facts');
+    }
+    // U31 (#2374): the whole-row cells view; runs tile the page in order from frame, nextFrame follows the last run.
+    function cellsResult(value) {
+      exact(value,['kind','instanceId','documentId','atRevision','documentSnapshotId','contextId','layerUid','frame','cells'],[],'cells result');
+      id(value.instanceId,'instanceId');id(value.documentId,'documentId');revision(value.atRevision,'atRevision');
+      objectUid(value.documentSnapshotId);objectUid(value.layerUid);frame(value.frame);
+      if(typeof value.contextId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId))throw new TypeError('invalid cells context');
+      exact(value.cells,['runs','nextFrame'],[],'layer cells');
+      const runs=value.cells.runs;let at=value.frame;
+      if(!Array.isArray(runs)||!runs.length)throw new TypeError('invalid layer cells');
+      runs.forEach(r=>{
+        if(!Array.isArray(r)||r.length!==6||r[0]!==at||!Number.isSafeInteger(r[1])||r[1]<1||!['key','held','interpolated','unexposed'].includes(r[2])||
+           r[3]!==null&&!(Number.isSafeInteger(r[3])&&r[3]>=0)||typeof r[4]!=='boolean'||typeof r[5]!=='boolean')throw new TypeError('invalid layer cell run');
+        at+=r[1];
+      });
+      if(value.cells.nextFrame!==null&&value.cells.nextFrame!==at)throw new TypeError('invalid layer cells page');
     }
     function metadataPayload(p) {
       exact(p, ['atRevision', 'documentSnapshotId', 'view'], [], 'metadata selector'); revision(p.atRevision, 'atRevision'); objectUid(p.documentSnapshotId);
@@ -67,6 +90,9 @@
       if(r.kind==='storedProperty'){if(r.items.length!==1||r.items[0].property!==p.view.property||r.nextOffset!==null)throw new TypeError('stored property mismatch');}
       else if(r.items.length>p.view.limit||r.nextOffset!==null&&(!r.items.length||r.nextOffset!==p.view.offset+r.items.length))throw new TypeError('nonadvancing/mismatched page cursor');
     }
+    function utf8Length(text) {
+      return typeof TextEncoder === 'function' ? new TextEncoder().encode(text).length : unescape(encodeURIComponent(text)).length;
+    }
     // The native holder owns dimensions, applicability and animated/static state.
     // This public subset carries intent only; curve controls use the track route.
     function editPayload(value) {
@@ -76,11 +102,31 @@
       Object.values(value.target).forEach(objectUid); objectUid(value.property);
       const action = value.action;
       if (!plain(action)) throw new TypeError('property action must be an object');
-      const fields = {setValue:['values'], setKey:['values'], removeKey:[], setAnimated:['animated'], bake:[]};
+      // Expression authoring and D18-B control declaration edits carry no frame; for control
+      // edits `property` is the control key.
+      const fields = {setValue:['values'], setKey:['values'], setKeyHandle:['handle', 'values'], removeKey:[], setAnimated:['animated'], bake:[],
+        setExpression:['code'], setExpressionEnabled:['enabled'], removeExpression:[],
+        addControl:['controlType', 'name'], renameControl:['name'], removeControl:[], moveControl:['direction']};
       if (typeof action.kind !== 'string' || !has(fields, action.kind)) throw new TypeError('unsupported property edit action');
-      exact(action, ['kind', ...(action.kind === 'bake' ? [] : ['frame']), ...fields[action.kind]], [], 'property action');
+      const frameless = action.kind === 'bake' || /Expression/.test(action.kind) || /^(?:add|rename|remove|move)Control$/.test(action.kind);
+      exact(action, ['kind', ...(frameless ? [] : ['frame']), ...fields[action.kind]], action.kind === 'setValue' ? ['keepPose'] : [], 'property action');
+      // `keepPose` (#2520): the anchor edit that moves Position in the same revision; `setKeyHandle` names one spatial handle of an existing 2-D key.
+      if (has(action, 'keepPose') && (action.keepPose !== true || value.property !== 'anchor')) throw new TypeError('keepPose belongs to an anchor setValue');
+      if (action.kind === 'setKeyHandle' && (!['hIn', 'hOut'].includes(action.handle) || !Array.isArray(action.values) || action.values.length !== 2)) throw new TypeError('invalid key handle');
       // Native frames are finite numbers, including negative and fractional values.
-      if (action.kind !== 'bake' && !Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
+      if (!frameless && !Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
+      if (action.kind === 'setExpression') {
+        // Exact authored source: the empty string is present-but-empty, never a removal; null is refused.
+        if (typeof action.code !== 'string' || utf8Length(action.code) > 4096) throw new TypeError('invalid expression code');
+      } else if (action.kind === 'setExpressionEnabled' && typeof action.enabled !== 'boolean') {
+        throw new TypeError('expression enabled intent must be boolean');
+      }
+      if (has(action, 'name') && (typeof action.name !== 'string' || !action.name || Array.from(action.name).length > 128)) {
+        throw new TypeError('invalid control name');
+      }
+      if (action.kind === 'addControl' && (!['number', 'checkbox', 'angle', 'point', 'color'].includes(action.controlType) ||
+          !/^xc_[A-Za-z0-9_]{1,124}$/.test(value.property))) throw new TypeError('invalid control declaration');
+      if (action.kind === 'moveControl' && action.direction !== -1 && action.direction !== 1) throw new TypeError('invalid control direction');
       if (has(action, 'values')) {
         const values = action.values;
         if (!Array.isArray(values) || values.length < 1 || values.length > 4 ||
@@ -94,17 +140,25 @@
     }
     function trackPayload(value) {
       exact(value, ['command', 'selections', 'action'], [], 'property track edit');
+      // An entry names one key (`frame`) or the keys of one track inside inclusive runs of frames (`ranges`): a selection of any size is
+      // then bounded by the request bytes, not by a key count. At most 32 single-key entries; at most 128 entries.
       if (value.command !== 'object.property.track.edit' || !Array.isArray(value.selections) ||
-          value.selections.length < 1 || value.selections.length > 32) {
+          value.selections.length < 1 || value.selections.length > 128 ||
+          value.selections.filter((selection) => plain(selection) && has(selection, 'frame')).length > 32) {
         throw new TypeError('invalid property track edit selection');
       }
       for (const selection of value.selections) {
-        exact(selection, ['target', 'property', 'frame'], [], 'property key selection');
+        exact(selection, ['target', 'property'], ['frame', 'ranges'], 'property key selection');
         exact(selection.target, ['contextId', 'layerUid'], ['strokeId'], 'property holder');
         Object.values(selection.target).forEach(objectUid);
         objectUid(selection.property);
-        if (!Number.isFinite(selection.frame)) throw new TypeError('invalid selected key frame');
-
+        if (has(selection, 'frame') === has(selection, 'ranges')) throw new TypeError('a key selection names a frame or ranges, not both');
+        if (has(selection, 'frame') && !Number.isFinite(selection.frame)) throw new TypeError('invalid selected key frame');
+        if (has(selection, 'ranges')) {
+          const runs = selection.ranges;
+          if (!Array.isArray(runs) || runs.length < 1 || runs.length > 512 || !runs.every((run) => Array.isArray(run) && run.length === 2 &&
+              Number.isFinite(run[0]) && Number.isFinite(run[1]) && run[0] <= run[1])) throw new TypeError('invalid selected key ranges');
+        }
       }
       const action = value.action;
       if (!plain(action)) throw new TypeError('property track action must be an object');
@@ -121,6 +175,26 @@
         // Native baseline clamps finite percentages; transport must preserve the input.
       } else if (action.kind === 'subdivide') {
         exact(action, ['kind'], [], 'property key subdivision');
+      } else if (action.kind === 'lockTo') {
+        // D37: per-key standing lock; null clears. Required, never defaulted.
+        exact(action, ['kind', 'mode'], [], 'property key lock');
+        if (action.mode !== null && !['in', 'out', 'layer'].includes(action.mode)) throw new TypeError('invalid property key lock mode');
+      } else if (action.kind === 'shift') {
+        // #2524: whole frames, every selected key together; zero is accepted and changes nothing.
+        exact(action, ['kind', 'delta'], [], 'property key shift');
+        if (!Number.isSafeInteger(action.delta) || Math.abs(action.delta) > 1000000) throw new TypeError('invalid property key shift');
+      } else if (['delete', 'flip', 'distribute'].includes(action.kind)) {
+        exact(action, ['kind'], [], 'property key batch');
+      } else if (action.kind === 'warp') {
+        // #2377: the selection box. `grab` goes with liquify and with nothing else; the drag is fractional frames.
+        exact(action, ['kind', 'mode', 'total'], ['grab'], 'property key warp');
+        const liquify = action.mode === 'liquify';
+        if (!['top', 'bottom', 'left', 'right', 'liquify'].includes(action.mode) || !Number.isFinite(action.total) || Math.abs(action.total) > 1000000 ||
+            has(action, 'grab') !== liquify || liquify && (!Number.isFinite(action.grab) || Math.abs(action.grab) > 1000000)) throw new TypeError('invalid property key warp');
+      } else if (action.kind === 'color') {
+        // #2377: the key tint; null removes it. Required, never defaulted.
+        exact(action, ['kind', 'color'], [], 'property key colour');
+        if (action.color !== null && !(typeof action.color === 'string' && /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(action.color))) throw new TypeError('invalid property key colour');
       } else {
         throw new TypeError('unsupported property track action');
       }
@@ -139,12 +213,19 @@
       exact(value, ['atRevision', 'documentSnapshotId', 'view'], [], 'property read');
       revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId);
       const view = value.view;
-      if (!plain(view) || !['rawSample', 'authoredKeys', 'expressionContext', 'expressionState'].includes(view.kind)) {
+      if (!plain(view) || !['rawSample', 'authoredKeys', 'expressionContext', 'expressionState', 'expressionSource', 'layerBounds'].includes(view.kind)) {
         throw new TypeError('unsupported property read view');
       }
-      const fields = view.kind !== 'authoredKeys' ? ['frame'] : ['offset', 'limit'];
+      if (view.kind === 'layerBounds') { // #2520: the layer's own bounds before its Motion, at an integer frame; no property name
+        exact(view, ['kind', 'target', 'frame'], [], 'property read view');
+        readTarget(view.target); frame(view.frame);
+        if (has(view.target, 'strokeId')) throw new TypeError('layer bounds name a layer');
+        return;
+      }
+      const fields = view.kind === 'expressionSource' ? [] : view.kind !== 'authoredKeys' ? ['frame'] : ['offset', 'limit'];
       exact(view, ['kind', 'target', 'property', ...fields], [], 'property read view');
       readTarget(view.target); objectUid(view.property);
+      if (view.kind === 'expressionSource') return;
       if (view.kind !== 'authoredKeys') {
         if (!Number.isFinite(view.frame)) throw new TypeError('invalid raw sample frame');
       } else {
@@ -160,8 +241,9 @@
       }
     }
     function readKey(value, dimension) {
-      exact(value, ['frame', 'v'], ['hold', 'curvePoints', 'hIn', 'hOut','lockTo'], 'authored property key');
+      exact(value, ['frame', 'v'], ['hold', 'curvePoints', 'hIn', 'hOut','lockTo','color'], 'authored property key');
       if (!Number.isFinite(value.frame)) throw new TypeError('invalid authored key frame');
+      if (has(value, 'color') && !(typeof value.color === 'string' && /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value.color))) throw new TypeError('invalid authored key colour');
       readVector(value.v, dimension);
       if(has(value,'lockTo')&&value.lockTo!==null&&!['in','out','layer'].includes(value.lockTo))throw new TypeError('invalid authored lock');
       if (has(value, 'hold') && typeof value.hold !== 'boolean') throw new TypeError('invalid authored hold');
@@ -243,11 +325,30 @@
           diagnostic.line!==null&&(!Number.isInteger(diagnostic.line)||diagnostic.line<0||diagnostic.line>0xffffffff)) throw new TypeError('invalid expression diagnostic');
       }
     }
+    // The exact authored source of the pinned snapshot, or null when none is authored.
+    function expressionSourceResult(value) {
+      const e = value.expression;
+      if (e !== null) {
+        exact(e, ['enabled', 'code'], [], 'expression source');
+        if (typeof e.enabled !== 'boolean' || typeof e.code !== 'string') throw new TypeError('invalid expression source');
+      }
+    }
+    function layerBoundsResult(value) {
+      exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId', 'kind', 'target', 'frame', 'bounds', 'parentLayerUid', 'parentAffine'], [], 'layer bounds result');
+      id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId');
+      revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId);
+      readTarget(value.target); frame(value.frame);
+      if (!Array.isArray(value.bounds) || value.bounds.length !== 4 || !value.bounds.every(Number.isFinite)) throw new TypeError('invalid layer bounds');
+      if (value.parentLayerUid !== null) objectUid(value.parentLayerUid);
+      if (!Array.isArray(value.parentAffine) || value.parentAffine.length !== 6 || !value.parentAffine.every(Number.isFinite)) throw new TypeError('invalid parent affine');
+    }
     function readResult(value) {
+      if (value && value.kind === 'layerBounds') return layerBoundsResult(value);
+      const source = value && value.kind === 'expressionSource';
       const raw = value && value.kind === 'rawSample';
       const context = value && value.kind === 'expressionContext';
       const expression = value && value.kind === 'expressionState';
-      const fields = raw ? ['frame', 'value'] : context ? ['frame','self','comp','keyCount','compUnavailable'] : expression ? ['frame','expression','evaluation'] : ['trackPresent', 'items', 'nextOffset'];
+      const fields = source ? ['expression'] : raw ? ['frame', 'value'] : context ? ['frame','self','comp','keyCount','compUnavailable'] : expression ? ['frame','expression','evaluation'] : ['trackPresent', 'items', 'nextOffset'];
       exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId',
         'kind', 'target', 'property', 'dimension', ...fields], context ? ['mesh'] : [], 'property read result');
       id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId');
@@ -256,7 +357,9 @@
       if (!Number.isInteger(value.dimension) || value.dimension < 1 || value.dimension > 4) {
         throw new TypeError('invalid property read dimension');
       }
-      if (expression) {
+      if (source) {
+        expressionSourceResult(value);
+      } else if (expression) {
         expressionStateResult(value);
       } else if (context) {
         expressionContextResult(value);
@@ -284,10 +387,18 @@
     }
     function readCorrelated(payload, result) {
       const view = payload.view;
+      if (view.kind === 'layerBounds') {
+        if (result.atRevision !== payload.atRevision || result.documentSnapshotId !== payload.documentSnapshotId || result.kind !== view.kind ||
+            result.frame !== view.frame || ['contextId', 'layerUid'].some(key => result.target[key] !== view.target[key]) || has(result.target, 'strokeId')) {
+          throw new TypeError('layer bounds selector mismatch');
+        }
+        return;
+      }
       if (result.atRevision !== payload.atRevision || result.documentSnapshotId !== payload.documentSnapshotId ||
           result.kind !== view.kind || result.property !== view.property ||
           ['contextId', 'layerUid', 'strokeId'].some(key => result.target[key] !== view.target[key] ||
             has(result.target, key) !== has(view.target, key))) throw new TypeError('property read selector mismatch');
+      if (view.kind === 'expressionSource') return;
       if (view.kind !== 'authoredKeys') {
         if (result.frame !== view.frame) throw new TypeError('raw sample frame mismatch');
       } else if (result.items.length > view.limit || result.nextOffset !== null &&
@@ -295,8 +406,8 @@
         throw new TypeError('authored page cursor mismatch');
       }
     }
-    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|result\.(?:self\.property|mesh\.meshId|evaluation\.diagnostic\.message)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
-    return Object.freeze({ rangeResult, placementResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
+    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property|parentLayerUid)|result\.(?:self\.property|mesh\.meshId|expression\.code|evaluation\.diagnostic\.message)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
+    return Object.freeze({ rangeResult, placementResult, cellsResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
       readPayload, readResult, readCorrelated, readPaths });
   }
   return Object.freeze({ create });

@@ -83,7 +83,11 @@
     flag: 'nemo-labs-markers',
     describe: 'labsDescribeTimelineMarkers',
     onEnable: function () { observe(); decorate(); },
-    onDisable: function () { document.querySelectorAll('.labs-marker-flag').forEach(function (el) { el.remove(); }); },
+    // Disable removes the flags AND the header observer, so nothing of the aid remains attached (U31, #2374).
+    onDisable: function () {
+      document.querySelectorAll('.labs-marker-flag').forEach(function (el) { el.remove(); });
+      if (mo) { mo.disconnect(); mo = null; }
+    },
   });
   if (window.SMLabs.isOn('timeline-markers')) { observe(); decorate(); }
 })();

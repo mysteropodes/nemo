@@ -18,10 +18,10 @@ function api(candidate) {
   assert.deepEqual(candidate.modules.find(m => m.id === sceneModule).publicApi,
     ['render_scene.rs', 'render_geometry.rs', 'object_render_scene.rs']);
 }
-function harnesses(lib) {
-  assert.match(lib, /"compositor" => compositor, render_scene, render_geometry, object_render_scene;/);
+// CS2 (#2345): harness registration is a header in the test file; build.rs generates the module.
+function harnesses(text) {
   for (const target of ['compositor', 'application']) {
-    assert.match(lib, new RegExp(`"test-${target}" => object_render_scene_${target}_tests = "../tests/object_render_scene.rs";`));
+    assert.match(text, new RegExp(`^//! nemo-test-harness: test-${target} => object_render_scene_${target}_tests$`, 'm'));
   }
 }
 
@@ -49,10 +49,10 @@ test('contour consumer has exact Rust census, narrow API and tooling census', ()
 });
 
 test('both existing targets register contours and actual-history source controls', () => {
-  const lib = read('native-engine/src/lib.rs');
+  const lib = read('native-engine/tests/object_render_scene.rs');
   harnesses(lib);
   for (const target of ['compositor', 'application']) {
-    const entry = `    "test-${target}" => object_render_scene_${target}_tests = "../tests/object_render_scene.rs";`;
+    const entry = `//! nemo-test-harness: test-${target} => object_render_scene_${target}_tests\n`;
     assert.throws(() => harnesses(lib.replace(entry, '')), assert.AssertionError);
     assert.match(read('native-engine/Cargo.toml'), new RegExp(`name = "${target}"[\\s\\S]*?required-features = \\["test-${target}"\\]`));
   }
@@ -60,11 +60,11 @@ test('both existing targets register contours and actual-history source controls
   assert.equal(JSON.parse(read('engineering/application/capabilities-v2/native-object.json')).availability.state, 'available');
 });
 
-test('real contour consumer retains the adopted eighteen-module forty-nine-edge graph', () => {
+test('real contour consumer retains the adopted eighteen-module fifty-edge graph', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
   assert.equal(result.moduleCount, 18);
-  assert.equal(result.edges.length, 49);
+  assert.equal(result.edges.length, 50);
   assert.deepEqual(result.unsupported, []);
   assert.deepEqual(result.exceptionsApplied, []);
 });

@@ -286,3 +286,54 @@ fn property_read_oversized_authored_page_refuses_without_truncation_or_mutation(
 
 #[path = "native_text_read_dispatch_tests.rs"]
 mod text_read_tests;
+#[test]
+fn layer_bounds_reads_through_the_real_owner_without_changing_it() {
+    let state = ApplicationMcp::default();
+    let corner = |x: f64, y: f64| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
+    let timing = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    let element = |uid: &str| json!({"layerUid":uid,"strokeId":format!("s{uid}"),"naturalPosition":0,"order":{}});
+    let layers: Vec<Value> = ["N", "A"].iter().map(|u| {
+        let mut l = json!({"layerUid":u,"name":u,"visible":true,"locked":false,"color":"#5fa875","parentLayerUid":null,"timing":timing});
+        if *u == "N" { l["isNullLayer"] = json!(true); l["nullPos"] = json!([12, 34]); }
+        l
+    }).collect();
+    let order: Vec<Value> = ["N", "A"].iter().enumerate().map(|(n, u)| json!({"layerUid":u,"naturalPosition":n,"order":{}})).collect();
+    let source = json!({"format":"nemo.native-project-document","formatVersion":1,
+    "project":{"canvasW":64,"canvasH":48,"fps":24},"viewportReference":null,"assets":[],
+    "drawing":{"format":"nemo.native-object-document","formatVersion":2,"totalFrames":16,"layers":layers,
+        "objects":[{"schemaVersion":1,"family":"editable-vector-path",
+            "target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},"layerUid":"A","strokeId":"sA"},
+            "geometry":{"kind":"cubic-path","closed":true,"coordinateSpace":"document-world","handleSpace":"relative",
+                "segments":[corner(2., 3.), corner(22., 3.), corner(22., 13.), corner(2., 13.)]},
+            "fill":{"kind":"solid","r":0.25,"g":0.5,"b":0.75,"a":1},
+            "vector":{"stroke":null,"hasRealStroke":false,"strokeWidth":3,"strokeCap":"round","strokeJoin":"round","opacity":1}}],
+        "propertyHolders":[],
+        "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+            "migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[{"contextId":"scene-root","layers":order,
+                "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":[element("A")]}]}]}}});
+    let receipt = bootstrap_raw(&state, &json!({"apiVersion":2,"requestId":"bounds-install","instanceId":state.instance_id(),"documentJson":source.to_string()}).to_string()).unwrap();
+    let id = serde_json::to_value(receipt).unwrap()["documentId"].as_str().unwrap().to_owned();
+    let before = saved(&state, &id);
+    let info = state.native_project_info(&id).unwrap();
+    let ask = |target: Value, frame: Value| -> NativeApplicationRequest {
+        serde_json::from_value(json!({"apiVersion":2,"requestId":"layer-bounds","instanceId":state.instance_id(),"documentId":id,"operation":OP,
+            "payload":{"atRevision":info["contentRevision"],"documentSnapshotId":info["documentSnapshotId"],
+                "view":{"kind":"layerBounds","target":target,"frame":frame}}})).unwrap()
+    };
+    let delivery = invoke(&state, ask(json!({"contextId":"scene-root","layerUid":"N"}), json!(3)), true);
+    assert!(delivery.response.ok, "{:?}", delivery.response);
+    let result = delivery.response.result.unwrap();
+    assert_eq!(result["kind"], "layerBounds");
+    assert_eq!(result["bounds"], json!([12.0, 34.0, 12.0, 34.0]));
+    assert_eq!(result["parentLayerUid"], Value::Null);
+    assert_eq!(result["parentAffine"], json!([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
+    let drawn = invoke(&state, ask(json!({"contextId":"scene-root","layerUid":"A"}), json!(0)), true);
+    assert_eq!(drawn.response.result.unwrap()["bounds"], json!([2.0, 3.0, 22.0, 13.0]));
+    assert_eq!(result["frame"], 3);
+    assert!(serde_json::to_vec(&result).unwrap().len() <= 3072);
+    // A stroke holder and a fractional frame are refused by the public contract before the owner is reached.
+    assert!(ask(json!({"contextId":"scene-root","layerUid":"N","strokeId":"s"}), json!(3)).validate().is_err());
+    assert!(ask(json!({"contextId":"scene-root","layerUid":"N"}), json!(1.5)).validate().is_err());
+    assert_eq!(saved(&state, &id), before);
+    assert_eq!(state.native_project_info(&id).unwrap(), info);
+}

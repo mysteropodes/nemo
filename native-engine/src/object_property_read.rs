@@ -2,7 +2,55 @@
 use crate::object_codec::PropertyHolderTarget;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct PropertyExpressionSource {
+    pub(crate) enabled: bool,
+    pub(crate) code: String,
+}
 impl ObjectSnapshot {
+    /// Exact authored code from this retained snapshot. Returning an owned value
+    /// grants neither evaluation nor a writable document mirror; the public
+    /// `expressionSource` read view projects it under the bounded read envelope.
+    pub(crate) fn property_expression_source(
+        &self,
+        target: &PropertyHolderTarget,
+        property: &str,
+    ) -> Result<Option<PropertyExpressionSource>, DispatchErrorCode> {
+        use DispatchErrorCode::{InvalidRequest, Unavailable};
+        if target.context_id().is_empty()
+            || target.layer_uid().is_empty()
+            || target.stroke_id().is_some_and(str::is_empty)
+            || property.is_empty()
+        {
+            return Err(InvalidRequest);
+        }
+        if property == "timeRemap" {
+            return Err(Unavailable);
+        }
+        let holder = self.metadata_holder(target)?;
+        if holder
+            .metadata_in_document(self.document(), property)
+            .is_none()
+        {
+            return Err(Unavailable);
+        }
+        let expression = if property == "order" {
+            self.document()
+                .property_order(target)
+                .and_then(|order| order.expression.value())
+        } else {
+            holder
+                .properties()
+                .iter()
+                .find(|record| record.property() == property)
+                .and_then(|record| record.expression.value())
+        };
+        Ok(expression.map(|value| PropertyExpressionSource {
+            enabled: value.enabled,
+            code: value.code.clone(),
+        }))
+    }
     /// Raw values from this exact retained snapshot. Expressions are not evaluated.
     pub fn sample_property_raw(
         &self,
@@ -52,6 +100,14 @@ object_deserialize!(ReadSelector {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum ReadFields {
+    LayerBounds {
+        target: PropertyHolderTarget,
+        frame: f64,
+    },
+    ExpressionSource {
+        target: PropertyHolderTarget,
+        property: String,
+    },
     ExpressionState {
         target: PropertyHolderTarget,
         property: String,
@@ -121,7 +177,14 @@ impl ObjectSnapshot {
         {
             return Err(StaleRevision);
         }
+        if let ReadFields::LayerBounds { target, frame } = &selector.view.0 {
+            return self.layer_bounds_read(target, *frame);
+        }
         let (kind, target, property) = match &selector.view.0 {
+            ReadFields::LayerBounds { .. } => return Err(InvalidRequest),
+            ReadFields::ExpressionSource {
+                target, property, ..
+            } => ("expressionSource", target, property),
             ReadFields::ExpressionState {
                 target, property, ..
             } => ("expressionState", target, property),
@@ -154,6 +217,11 @@ impl ObjectSnapshot {
             "atRevision":self.content_revision(),"documentSnapshotId":self.snapshot_id(),
             "kind":kind,"target":target,"property":property,"dimension":dimension});
         match &selector.view.0 {
+            ReadFields::LayerBounds { .. } => return Err(InvalidRequest),
+            ReadFields::ExpressionSource { .. } => {
+                // Exact authored bytes; an oversized page is refused below, never truncated.
+                result["expression"] = json!(self.property_expression_source(target, property)?);
+            }
             ReadFields::ExpressionState { frame, .. } => {
                 if !frame.is_finite() {
                     return Err(InvalidRequest);

@@ -1,0 +1,88 @@
+{
+  "schema": "nemo.parity-family-result/1",
+  "family": "components",
+  "sourceSha": "9b274a92b7f3c7d7c76f3e5fb2480ef8a111ad58",
+  "tree": "21a17ad768756a6b4f631cdf45021821a625dd41",
+  "generatedAt": "2026-10-26T02:33:15.263Z",
+  "checks": [
+    {
+      "id": "comp-records",
+      "target": "application",
+      "filter": "object_component_records::",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "comp-document",
+      "target": "application",
+      "filter": "object_component_document::",
+      "passed": 58,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "comp-playback",
+      "target": "application",
+      "filter": "object_component_playback::",
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "comp-evaluate",
+      "target": "application",
+      "filter": "object_component_evaluate::",
+      "passed": 30,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "comp-exposed",
+      "target": "application",
+      "filter": "object_component_exposed",
+      "passed": 40,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "comp-convert",
+      "target": "application",
+      "filter": "object_component_convert::",
+      "passed": 35,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "comp-convert-history",
+      "target": "application",
+      "filter": "object_component_convert_history::",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "id": "comp-pixels",
+      "target": "application",
+      "filter": "object_render_scene::component_tests::pixels::",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "kindsCovered": [
+    "positive",
+    "oracle",
+    "undo-redo",
+    "save-reopen",
+    "pixels"
+  ],
+  "kindsMissing": [],
+  "verdict": "source-pass",
+  "tasks": [
+    "D33",
+    "I14",
+    "I15",
+    "I16a"
+  ]
+}

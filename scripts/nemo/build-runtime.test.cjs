@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const vm = require('node:vm');
 const { spawn } = require('node:child_process');
 const { after, test } = require('node:test');
 
@@ -41,11 +42,16 @@ const fs = require('node:fs');
 process.on('SIGTERM', () => {});
 setInterval(() => {}, 1000);
 const capture = process.argv[2], release = process.argv[3];
-if (!release) fs.writeFileSync(capture, String(process.pid));
+function publishReady() {
+  const pending = capture + '.' + process.pid + '.tmp';
+  fs.writeFileSync(pending, String(process.pid));
+  fs.renameSync(pending, capture);
+}
+if (!release) publishReady();
 else {
   const ready = setInterval(() => {
     if (fs.existsSync(release)) {
-      fs.writeFileSync(capture, String(process.pid));
+      publishReady();
       clearInterval(ready);
     }
   }, 20);
@@ -194,6 +200,30 @@ test('fixture readiness waits beyond OS active and rejects absent, terminal or m
     exists: () => true, pid: () => 21 }), /PID does not match/);
   await assert.rejects(waitForFixtureReady(instance, null, 10, { ...ports,
     alive: (pid) => pid === 10 }), /child exited/);
+});
+
+test('stubborn fixture publishes its complete PID atomically', () => {
+  const capture = path.join(scratch, 'atomic-ready.pid');
+  const observed = [];
+  const observe = () => observed.push(fs.existsSync(capture) ? fs.readFileSync(capture, 'utf8') : null);
+  const controlledFs = {
+    ...fs,
+    writeFileSync(file, data) {
+      const fd = fs.openSync(file, 'w');
+      try {
+        observe(); // The reader may run after creation, before the first byte.
+        fs.writeFileSync(fd, data);
+      } finally { fs.closeSync(fd); }
+    },
+    renameSync(from, to) { fs.renameSync(from, to); observe(); },
+  };
+  vm.runInNewContext(fs.readFileSync(stubbornStub, 'utf8'), {
+    require(name) { assert.equal(name, 'node:fs'); return controlledFs; },
+    process: { pid: 12345, argv: ['node', stubbornStub, capture], on() {} },
+    setInterval() {},
+  });
+  assert.deepEqual(observed, [null, '12345']);
+  assert.equal(fs.readFileSync(capture, 'utf8'), '12345');
 });
 
 test('launch plans isolate mutable build paths and serialize only the same worktree', () => {

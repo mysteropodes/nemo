@@ -19,12 +19,16 @@ use inactive_requests::InactiveRequest;
 #[path = "native_object_retained_tabs.rs"]
 mod retained_tabs;
 use retained_tabs::ParkedProject;
-pub(crate) use retained_tabs::PreparedRetainedActivation;
+pub(crate) use retained_tabs::{PreparedRetainedActivation, PROJECT_INFO_LIMIT_BYTES};
 
 #[path = "native_object_font.rs"]
 mod font_assets;
 #[path = "native_object_image.rs"]
 mod image_import;
+#[path = "native_object_brush_bitmap.rs"]
+mod brush_bitmap;
+#[path = "native_object_video_link.rs"]
+mod video_link;
 #[path = "native_object_import_batch.rs"]
 mod import_batch;
 
@@ -39,6 +43,26 @@ mod export;
 #[path = "native_object_preview.rs"]
 mod preview;
 
+/// Brackets one object preview's present for the desktop's occlusion diagnostics: before register
+/// the host reports its request pins and composed work, and the caller closes the scope with the
+/// receipt. The host seam itself never reaches a viewport adapter.
+pub(crate) trait ObjectPreviewObserver {
+    fn begin(&mut self, preview: ObservedObjectPreview<'_>);
+}
+
+impl ObjectPreviewObserver for () {
+    fn begin(&mut self, _: ObservedObjectPreview<'_>) {}
+}
+
+pub(crate) struct ObservedObjectPreview<'a> {
+    pub(crate) instance_id: &'a str,
+    pub(crate) document_id: &'a str,
+    pub(crate) content_revision: u64,
+    pub(crate) frame: u32,
+    pub(crate) work_id: u64,
+    pub(crate) view_generation: u64,
+}
+
 fn envelope_identity(value: &str) -> bool {
     let bytes = value.as_bytes();
     !bytes.is_empty()
@@ -48,6 +72,9 @@ fn envelope_identity(value: &str) -> bool {
             .iter()
             .all(|byte| byte.is_ascii_alphanumeric() || b"._:/-".contains(byte))
 }
+
+/// Encoder over an already-acquired immutable project snapshot.
+pub(crate) type DetachedProjectSerializer = Box<dyn FnOnce() -> Result<Vec<u8>, String> + Send>;
 
 /// Sole routed active history; any parked history remains private and unrouted.
 pub(crate) struct NativeObjectHost {
@@ -128,6 +155,7 @@ impl NativeObjectHost {
             .validate_project_replacement(prepared)
             .map_err(|_| "native project replacement origin changed".into())
     }
+    #[cfg(test)]
     pub(crate) fn prepare_blank_project_replacement(
         &self,
         snapshot: &str,
@@ -135,11 +163,27 @@ impl NativeObjectHost {
         canvas_height: u32,
         fps: f64,
     ) -> Result<PreparedProjectReplacement, String> {
+        self.prepare_blank_project_replacement_frames(snapshot, canvas_width, canvas_height, fps, None)
+    }
+    pub(crate) fn prepare_blank_project_replacement_frames(
+        &self,
+        snapshot: &str,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+        total_frames: Option<u32>,
+    ) -> Result<PreparedProjectReplacement, String> {
         if self.released.is_some() {
             return Err("native project owner was released".into());
         }
         self.history
-            .prepare_blank_project_replacement(snapshot, canvas_width, canvas_height, fps)
+            .prepare_blank_project_replacement_frames(
+                snapshot,
+                canvas_width,
+                canvas_height,
+                fps,
+                total_frames,
+            )
             .map_err(|error| format!("native blank project admission: {error:?}"))
     }
     pub(crate) fn commit_project_replacement(
@@ -156,6 +200,8 @@ impl NativeObjectHost {
         self.history
             .commit_project_replacement(prepared)
             .map_err(|_| "native project replacement origin changed".to_string())?;
+        // The ghost caches hold the replaced document's snapshots alive; nothing of it can be asked for again.
+        native_engine::application::release_ghost_caches();
         self.preview = preview::ObjectPreview::default();
         self.inactive_project = None;
         self.parked_project = None;
@@ -195,6 +241,25 @@ impl NativeObjectHost {
             .map(Some)
             .map_err(|_| "native project snapshot is unavailable".into())
     }
+    /// Recovery variant of `project_file_snapshot`: the immutable snapshot is
+    /// acquired here (O(1)) and the encoder runs wherever the caller invokes the
+    /// returned closure, so the authority lock need not be held while encoding.
+    pub(crate) fn detached_project_file_serializer(
+        &self,
+        revision: u64,
+        snapshot: &str,
+    ) -> Result<Option<DetachedProjectSerializer>, String> {
+        if !self.history.is_project_file() {
+            return Ok(None);
+        }
+        let serialize = self
+            .history
+            .detached_project_file_serializer(revision, snapshot)
+            .map_err(|_| "native project snapshot is unavailable")?;
+        Ok(Some(Box::new(move || {
+            serialize().map_err(|_| "native project snapshot is unavailable".to_owned())
+        })))
+    }
     pub(crate) fn project_reference(
         &mut self,
         snapshot: &str,
@@ -231,18 +296,33 @@ impl NativeObjectHost {
             released: None,
         })
     }
+    #[cfg(test)]
     pub(crate) fn new_blank_project(
         instance_id: String,
         canvas_width: u32,
         canvas_height: u32,
         fps: f64,
     ) -> Result<Self, String> {
+        Self::new_blank_project_frames(instance_id, canvas_width, canvas_height, fps, None)
+    }
+    pub(crate) fn new_blank_project_frames(
+        instance_id: String,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+        total_frames: Option<u32>,
+    ) -> Result<Self, String> {
         if !envelope_identity(&instance_id) {
             return Err("native project instance identity is invalid".into());
         }
-        let history =
-            NativeObjectHistory::new_blank_project(instance_id, canvas_width, canvas_height, fps)
-                .map_err(|error| format!("native blank project admission: {error:?}"))?;
+        let history = NativeObjectHistory::new_blank_project_frames(
+            instance_id,
+            canvas_width,
+            canvas_height,
+            fps,
+            total_frames,
+        )
+        .map_err(|error| format!("native blank project admission: {error:?}"))?;
         Ok(Self {
             history,
             inactive_project: None,
@@ -295,6 +375,9 @@ impl NativeDispatch for NativeObjectHost {
                 .dispatch_history_read(&request)
                 .map_err(|_| "native history read correlation is invalid".into());
         }
+        if Self::owns_brush_bitmap(&request) {
+            return self.dispatch_brush_bitmap(&request);
+        }
         if request.operation() == "command.document.object.asset.remove" {
             return self
                 .remove_asset(&request)
@@ -316,6 +399,17 @@ impl NativeDispatch for NativeObjectHost {
             .history
             .acquire_snapshot(self.content_revision())
             .ok_or("native object snapshot is unavailable")?;
+        if request.operation() == "query.document.object"
+            && serde_json::to_value(&request)
+                .ok()
+                .is_some_and(|wire| wire["payload"].get("view").is_some())
+        {
+            if serde_json::to_value(&request).ok().is_some_and(|wire| wire["payload"]["view"]["kind"] == "subselect") { return self.dispatch_subselect_view(&snapshot, request); }
+            if serde_json::to_value(&request).ok().is_some_and(|wire| wire["payload"]["view"]["kind"] == "widget") { return self.dispatch_widget_view(&snapshot, request); }
+            if serde_json::to_value(&request).ok().is_some_and(|wire| wire["payload"]["view"]["kind"] == "ghosts") { return self.dispatch_ghost_view(&snapshot, request); }
+            if serde_json::to_value(&request).ok().is_some_and(|wire| wire["payload"]["view"]["kind"] == "rig") { return self.dispatch_rig_view(&snapshot, request); }
+            return self.dispatch_image_mesh_view(&snapshot, request);
+        }
         let expression_state = request.operation() == "query.document.object.property.read"
             && serde_json::to_value(&request)
                 .ok()
@@ -373,6 +467,7 @@ impl NativeDispatch for NativeObjectHost {
             }
         };
         self.released = Some(application.clone());
+        native_engine::application::release_ghost_caches();
         self.inactive_project = None;
         self.parked_project = None;
         self.inactive_requests.clear();
@@ -404,6 +499,10 @@ mod command_tests;
 #[cfg(test)]
 #[path = "native_object_host_history_tests.rs"]
 mod history_tests;
+
+#[cfg(test)]
+#[path = "native_object_tween_host_tests.rs"]
+mod tween_tests;
 
 #[cfg(test)]
 #[path = "native_object_export_tests.rs"]

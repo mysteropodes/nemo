@@ -1,6 +1,6 @@
 //! Sealed layer compositing transactions (G11, L08-J) through the existing revision owner: the blend,
 //! first-matte, additional-matte, effect-stack, borrowed-stack and folder-collapse writes of the baseline
-//! panels, plus creation of an effect or folder layer. Declared as a private child of `object_fill_owner.rs`
+//! panels (including the hold-only blend keys of the Blend stopwatch), plus creation of an effect or folder layer. Declared as a private child of `object_fill_owner.rs`
 //! next to the layer policy / visibility / group preparations it mirrors.
 //!
 //! Preparation parses a bounded, strict payload (`scene_effect_layer_payload.rs`), reads the owner's current
@@ -19,7 +19,7 @@
 //! Not provided: the `matteOn` track removal that the matte menu also performs (property tracks belong to
 //! the property owners), locked-layer policy (the baseline does not guard these panels), the picker UI.
 use crate::commands::{ObjectFillOwner, PreparedLayerCreate};
-use crate::object_document::{blend_write, MatteRef, ObjectDocument, ObjectLayer, Presence};
+use crate::object_document::{blend_write, BlendKey, MatteRef, ObjectDocument, ObjectLayer, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 
@@ -33,10 +33,17 @@ pub(crate) struct PreparedLayerCompositing {
     origin: ObjectSnapshot,
     document: ObjectDocument,
     changed: bool,
+    /// The fold chevron: a disclosure toggle, saved with the layer but never an undo step (baseline
+    /// `toggleFolderLayerCollapsed` pushed no undo snapshot).
+    disclosure: bool,
 }
 
 #[allow(dead_code)]
 impl PreparedLayerCompositing {
+    /// `true`: the edit is saved and published but adds no history entry and leaves redo alone.
+    pub(crate) fn disclosure(&self) -> bool {
+        self.disclosure
+    }
     /// `false`: nothing will be published or recorded.
     pub(crate) fn changed(&self) -> bool {
         self.changed
@@ -56,6 +63,9 @@ fn check_references(
         Edit::MatteSource(uid)
         | Edit::EffectsFromSet(uid)
         | Edit::MatteMoreAdd { source: uid, .. } => Some(uid),
+        Edit::MatteMode {
+            source: Some(uid), ..
+        } => Some(uid),
         Edit::MatteMoreSet {
             source: Some(uid), ..
         } => Some(uid),
@@ -93,8 +103,12 @@ fn apply(layer: &mut ObjectLayer, edit: &Edit) -> Result<(), DispatchErrorCode> 
                 layer.matte_mode = Presence::Present(Some("alpha".to_string()));
             }
         }
-        Edit::MatteMode(mode) => {
+        Edit::MatteMode { mode, source } => {
             layer.matte_mode = Presence::Present(Some(mode.clone()));
+            // The baseline matte menu freezes the adjacent source into the same write (timeline.js initMatteDropdown).
+            if let Some(uid) = source {
+                layer.matte_source_layer_uid = Presence::Present(uid.clone());
+            }
         }
         Edit::MatteClear => {
             layer.matte_mode = Presence::Missing;
@@ -141,6 +155,76 @@ fn apply(layer: &mut ObjectLayer, edit: &Edit) -> Result<(), DispatchErrorCode> 
                 Presence::Present(extras)
             };
         }
+        Edit::BlendKeySet { frame, mode } => {
+            let mut keys = layer.blend_keys().to_vec();
+            match keys.binary_search_by_key(frame, |key| key.frame) {
+                Ok(at) => keys[at].mode = mode.clone(),
+                Err(at) => keys.insert(
+                    at,
+                    BlendKey {
+                        frame: *frame,
+                        mode: mode.clone(),
+                    },
+                ),
+            }
+            layer.blend_keys = Presence::Present(keys);
+        }
+        Edit::BlendKeyRemove(frame) => {
+            let mut keys = layer.blend_keys().to_vec();
+            let at = keys
+                .binary_search_by_key(frame, |key| key.frame)
+                .map_err(|_| DispatchErrorCode::NotFound)?;
+            keys.remove(at);
+            layer.blend_keys = if keys.is_empty() {
+                Presence::Missing
+            } else {
+                Presence::Present(keys)
+            };
+        }
+        Edit::BlendKeysRemove(frames) => {
+            let mut keys = layer.blend_keys().to_vec();
+            for frame in frames {
+                let at = keys
+                    .binary_search_by_key(frame, |key| key.frame)
+                    .map_err(|_| DispatchErrorCode::NotFound)?;
+                keys.remove(at);
+            }
+            layer.blend_keys = if keys.is_empty() {
+                Presence::Missing
+            } else {
+                Presence::Present(keys)
+            };
+        }
+        Edit::BlendKeysMove { frames, by } => {
+            let mut keys = layer.blend_keys().to_vec();
+            let mut moving = Vec::with_capacity(frames.len());
+            for frame in frames {
+                let at = keys
+                    .binary_search_by_key(frame, |key| key.frame)
+                    .map_err(|_| DispatchErrorCode::NotFound)?;
+                moving.push(keys.remove(at));
+            }
+            // The group lands whole or not at all: a target is a frame (never below 0) no staying key holds.
+            for key in &mut moving {
+                key.frame = u32::try_from(i64::from(key.frame) + i64::from(*by))
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+                if keys.iter().any(|stay| stay.frame == key.frame) {
+                    return Err(DispatchErrorCode::InvalidRequest);
+                }
+            }
+            keys.extend(moving);
+            keys.sort_by_key(|key| key.frame);
+            layer.blend_keys = Presence::Present(keys);
+        }
+        Edit::BlendKeysClear(mode) => {
+            layer.blend_keys = Presence::Missing;
+            if let Some(mode) = mode {
+                layer.blend_mode = match blend_write(mode) {
+                    Some(stored) => Presence::Present(Some(stored.to_string())),
+                    None => Presence::Missing,
+                };
+            }
+        }
         Edit::Effects(stack) => layer.effects = Presence::Present(stack.clone()),
         Edit::EffectsFromSet(uid) => layer.effects_from = Presence::Present(uid.clone()),
         Edit::EffectsFromClear => layer.effects_from = Presence::Missing,
@@ -172,6 +256,18 @@ impl ObjectFillOwner {
             .position(|layer| layer.layer_uid() == payload.layer_uid)
             .ok_or(DispatchErrorCode::NotFound)?;
         check_references(&document, &payload.layer_uid, &edit)?;
+        if matches!(&edit, Edit::BlendKeySet { frame, .. } if *frame >= document.total_frames) {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        if let Edit::BlendKeysMove { frames, by } = &edit {
+            // Every target stays inside the project (the order is increasing, so the ends are the extremes).
+            let (first, last) = (frames.first().copied(), frames.last().copied());
+            let land = |frame: Option<u32>| frame.map(|f| i64::from(f) + i64::from(*by));
+            let inside = |at: Option<i64>| at.is_some_and(|at| at >= 0 && at < i64::from(document.total_frames));
+            if !inside(land(first)) || !inside(land(last)) {
+                return Err(DispatchErrorCode::InvalidRequest);
+            }
+        }
         apply(&mut document.layers[index], &edit)?;
         let changed = document.layers[index] != origin.document().layers[index];
         ObjectSnapshot::validate_drawing(&document)
@@ -180,6 +276,7 @@ impl ObjectFillOwner {
             origin,
             document,
             changed,
+            disclosure: matches!(edit, Edit::FolderCollapsed(_)),
         })
     }
 

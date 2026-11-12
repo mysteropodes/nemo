@@ -25,6 +25,13 @@ fn target_uid<'de, D: serde::Deserializer<'de>>(decoder: D) -> Result<String, D:
     Ok(uid)
 }
 impl FollowPathRecord {
+    /// The setter's write (`setLayerFollowPath`): the target and an explicit `align`, which the caller carries over.
+    pub(crate) fn authored(target_layer_uid: String, align: bool) -> Self {
+        Self {
+            target_layer_uid,
+            align: Presence::Present(align),
+        }
+    }
     pub(crate) fn target_layer_uid(&self) -> &str {
         &self.target_layer_uid
     }

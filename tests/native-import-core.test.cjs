@@ -477,3 +477,38 @@ test('optional markers cannot change selection, availability, presentation or th
     assert.equal(core.isPending(), false, change);
   }
 });
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+function hideQueue(h) {
+  const real = h.session.readPresentedObjectSession, q = { hidden: true };
+  h.session.readPresentedObjectSession = function (why) { if (q.hidden) { if (why) why('queue-pending'); return null; } return real.call(this); };
+  return q;
+}
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+test('an import started while the queue hides the presentation waits for it and then begins once', async () => {
+  globalThis.NemoNativePresentationWait = require('../src/js/adapters/native-presentation-wait.js');
+  try {
+    const h = makeSession({}), q = hideQueue(h), core = coreModule.create(makePorts(h).ports);
+    assert.equal(core.begin().ok, false, 'the strict begin refuses while hidden');
+    const begun = core.beginSettled();
+    await sleep(150);
+    assert.equal(h.calls.length, 0);
+    q.hidden = false;
+    const ready = await begun;
+    assert.equal(ready.ok, true);
+    assert.equal((await core.submit(ready.ctx, mixed())).status, 'imported');
+    assert.equal(h.calls.length, 1, 'exactly one native import');
+  } finally { delete globalThis.NemoNativePresentationWait; }
+});
+test('an import whose native session was lost during the wait still refuses', async () => {
+  globalThis.NemoNativePresentationWait = require('../src/js/adapters/native-presentation-wait.js');
+  try {
+    const h = makeSession({}), q = hideQueue(h), made = makePorts(h), core = coreModule.create(made.ports);
+    const begun = core.beginSettled();
+    await sleep(80);
+    made.ports.currentSession = () => null; q.hidden = false;
+    const ready = await begun;
+    assert.equal(ready.ok, false);
+    assert.equal(h.calls.length, 0);
+  } finally { delete globalThis.NemoNativePresentationWait; }
+});

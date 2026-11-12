@@ -1,7 +1,7 @@
 //! The staged dispatcher envelope of the lane-4 setup / convert operations
 //! (L04-M): compact results, exact request replay, and typed refusals that publish
 //! nothing and claim no raw ingress.
-use super::fixture::{decode, document, layer, s1_document, s1_with_item, s2_document};
+use super::fixture::{decode, document, layer, s1_document, s1_with_animated_item, s2_document};
 use super::*;
 use crate::object_codec::encode_storage_project;
 use serde_json::{json, Value};
@@ -166,6 +166,8 @@ fn every_staged_operation_name_is_routed_and_unrelated_names_are_not() {
         "command.document.object.duplicator.set",
         "command.document.object.duplicator.objects",
         "command.document.object.duplicator.path",
+        "command.document.object.duplicator.config",
+        "command.document.object.component.instance.set",
     ] {
         assert!(
             NativeObjectHistory::component_setup_operation(operation),
@@ -224,7 +226,7 @@ fn an_effect_layer_and_a_layer_with_items_are_refused_in_typed_receipts_that_pub
         assert_eq!(reply["error"]["code"], "unavailable", "{id}");
         assert_eq!(
             reply["error"]["message"],
-            "component-convert-items: raster and text items cannot enter a component yet.",
+            "component-convert-items: animated text, brush and mesh-bound items cannot enter a component yet.",
             "{id}"
         );
     }
@@ -239,5 +241,5 @@ fn an_effect_layer_and_a_layer_with_items_are_refused_in_typed_receipts_that_pub
 }
 
 fn owner_for_items() -> NativeObjectHistory {
-    owner(&s1_with_item("ly_hand", 3))
+    owner(&s1_with_animated_item("ly_hand", 3))
 }

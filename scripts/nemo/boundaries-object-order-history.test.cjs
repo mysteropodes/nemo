@@ -54,7 +54,7 @@ test('versioned history shares one admitted drawing/project image and strict cod
 test('adopted native graph and revision-layer authority controls stay exact', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
-  assert.equal(result.moduleCount, 18); assert.equal(result.edges.length, 49);
+  assert.equal(result.moduleCount, 18); assert.equal(result.edges.length, 50);
   assert.deepEqual(result.unsupported, []); assert.deepEqual(result.exceptionsApplied, []);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-order-image-boundary-'));
   try {

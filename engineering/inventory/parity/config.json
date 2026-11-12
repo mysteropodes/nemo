@@ -1,0 +1,6 @@
+{
+  "schema": "nemo.parity-config/1",
+  "baseline": "1065e9d8d9c48e66d9b44bb4de446e8f4e887040",
+  "baselineStatus": "proposed — pending Ilya and Cyrill approval (CS9 #2344 / PR #2352)",
+  "tasksSource": "Nemo solo completion audit 2026-10-19, 228-task traceability (original 45-outcome contract)"
+}

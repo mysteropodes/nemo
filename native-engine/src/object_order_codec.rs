@@ -12,6 +12,15 @@ use crate::object_document::{
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
 
+pub(super) fn validate_tweens(
+    settings: Option<&crate::object_document::tween::TweenStore>,
+) -> Result<(), ObjectCodecError> {
+    if settings.is_some_and(|t| !t.valid()) {
+        return Err(invalid("invalid bounded tween settings"));
+    }
+    Ok(())
+}
+
 pub(super) fn validate_audio_tracks(
     tracks: Option<&crate::object_document::AudioTracks>,
 ) -> Result<(), ObjectCodecError> {
@@ -281,6 +290,7 @@ fn validate_order(
     Ok(())
 }
 fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
+    validate_tweens(document.tweens.value())?;
     if document.format != OBJECT_DOCUMENT_FORMAT || document.format_version != 2 {
         return Err(unsupported("unsupported ordered object format or version"));
     }
@@ -397,6 +407,7 @@ pub fn migrate_ordered_project(
         component_tables: document.component_tables.clone(),
         motion_arcs: document.motion_arcs.clone(),
         audio_tracks: document.audio_tracks.clone(),
+        tweens: document.tweens.clone(),
     };
     ordered(&migrated)?;
     Ok(migrated)

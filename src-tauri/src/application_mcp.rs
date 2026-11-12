@@ -60,6 +60,7 @@ pub(crate) use font_source::fetch_google_font;
 
 #[path = "native_revision_sync.rs"]
 mod revision_sync;
+#[path = "native_mcp_project_scope.rs"] pub(crate) mod project_scope; #[path = "native_mcp_source_scope.rs"] mod source_scope;
 #[cfg(test)]
 use revision_sync::dispatch_native;
 use revision_sync::{RevisionControl, RevisionSync};
@@ -130,7 +131,7 @@ impl ApplicationMcp {
         native.active_mut(generation)?.replace_document(document)
     }
 
-    fn native_status(&self, request: NativeStatusRequest) -> Result<NativeHostStatus, String> {
+    pub(crate) fn native_status(&self, request: NativeStatusRequest) -> Result<NativeHostStatus, String> {
         native_status(&self.instance_id, &self.native, request)
     }
 
@@ -306,9 +307,7 @@ fn native_status(
     request: NativeStatusRequest,
 ) -> Result<NativeHostStatus, String> {
     request.validate().map_err(|error| error.to_string())?;
-    let authority = native
-        .lock()
-        .map_err(|_| "native application lock unavailable")?;
+    let authority = native.lock().map_err(|_| "native application lock unavailable")?;
     let active = authority.active();
     let current = active.filter(|(_, application)| {
         request.instance_id == instance_id && application.instance_id() == instance_id
@@ -325,6 +324,7 @@ fn native_status(
         available: reason.is_none(),
         document_id: current.map(|(_, application)| application.document_id().into()),
         content_revision: current.map(|(_, application)| application.content_revision()),
+        lifecycle_generation: current.map(|(generation, _)| generation),
         reason: reason.map(str::to_owned),
     })
 }
@@ -417,7 +417,7 @@ async fn serve_connection(
             let window = app
                 .get_webview_window("main")
                 .ok_or("application window unavailable")?;
-            use tauri_plugin_fs::FsExt;
+            use tauri_plugin_fs::FsExt; source_scope::admit(&app, &message.native_request); // #2242
             let source_window = window.clone();
             let permission = Arc::new(move |path: &std::path::Path| {
                 source_window
@@ -456,7 +456,7 @@ async fn serve_legacy(
     pending: Pending,
     message: wire::WireRequest,
 ) -> Result<(), String> {
-    message.request.validate().map_err(|e| e.to_string())?;
+    if let Some(refusal) = project_scope::validate_and_admit(&app, &message.request)? { return wire::write_json(&mut stream, &refusal).await.map_err(|e| e.to_string()); }
     if message.request.instance_id.as_deref() != Some(endpoint.instance_id.as_str()) {
         return Err("request instance mismatch".into());
     }

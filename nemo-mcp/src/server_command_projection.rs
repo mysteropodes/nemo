@@ -20,11 +20,11 @@ pub(super) fn payload(legacy: &Value, native_transport: &Value) -> Value {
     // This root is a transport-friendly projection. The selected native
     // branch, not a second root-level feature switch, constrains commands.
     payload_properties.insert("command".into(), json!({"type": "string"}));
-    // Legacy numeric values and native layer-policy booleans share this projection.
+    // Legacy numeric values, native layer-policy booleans and the D37 key-lock mode string share this projection.
     // The selected version branch below still validates its exact value type.
     payload_properties.insert(
         "value".into(),
-        json!({"type": ["number", "boolean", "null"]}),
+        json!({"type": ["number", "boolean", "null", "string"]}),
     );
     payload_properties.insert(
         "stableTarget".into(),

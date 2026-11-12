@@ -33,6 +33,10 @@ mod import_assets;
 #[path = "object_selection_revision.rs"]
 mod selection;
 
+#[cfg(feature = "application")]
+#[path = "tween_resource_revision.rs"]
+mod tween_resources;
+
 static NEXT_OBJECT_DOCUMENT: AtomicU64 = AtomicU64::new(1);
 #[cfg(feature = "history")]
 const MAX_CONTENT_REVISION: u64 = 9_007_199_254_740_991;
@@ -119,6 +123,13 @@ impl ObjectSnapshot {
             content_revision: 0,
             value: Arc::new(value),
         })
+    }
+    /// Identity of the shared immutable revision value: every `acquire` of one revision names the same
+    /// allocation, and the weak handle keeps that allocation from being reused while a cache holds it.
+    pub(crate) fn revision_identity(&self) -> std::sync::Weak<dyn std::any::Any + Send + Sync> {
+        let strong: Arc<ProjectRevisionValue> = Arc::clone(&self.value);
+        let strong: Arc<dyn std::any::Any + Send + Sync> = strong;
+        Arc::downgrade(&strong)
     }
     pub fn instance_id(&self) -> &str {
         &self.instance_id

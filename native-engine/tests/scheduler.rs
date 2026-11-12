@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-scheduler => scheduler_tests
 use crate::codec::decode_project;
 use crate::commands::{NativeOpacityApplication, OpacityRequest};
 use crate::resource_leases::{LeaseError, ResourceLeaseManager};

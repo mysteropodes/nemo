@@ -29,6 +29,12 @@ impl<T> Presence<T> {
             Self::Present(value) => Some(value),
         }
     }
+    pub(crate) fn value_mut(&mut self) -> Option<&mut T> {
+        match self {
+            Self::Missing => None,
+            Self::Present(value) => Some(value),
+        }
+    }
 }
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for Presence<T> {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -67,6 +73,8 @@ pub struct OrderedObjectDocument {
     pub(crate) motion_arcs: Presence<Option<MotionArcs>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) audio_tracks: Presence<crate::object_document::AudioTracks>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) tweens: Presence<crate::object_document::tween::TweenStore>,
 }
 object_deserialize!(OrderedObjectDocument {
     format: String, format_version: u32, total_frames: u32,
@@ -77,7 +85,8 @@ object_deserialize!(OrderedObjectDocument {
     #[serde(default)] items: Presence<ItemRecords>,
     #[serde(default)] component_tables: Presence<ComponentTables>,
     #[serde(default)] motion_arcs: Presence<Option<MotionArcs>>,
-    #[serde(default)] audio_tracks: Presence<crate::object_document::AudioTracks>
+    #[serde(default)] audio_tracks: Presence<crate::object_document::AudioTracks>,
+    #[serde(default)] tweens: Presence<crate::object_document::tween::TweenStore>
 });
 impl OrderedObjectDocument {
     pub(crate) fn into_storage(self) -> ObjectDocument {
@@ -95,6 +104,7 @@ impl OrderedObjectDocument {
             component_tables: self.component_tables,
             motion_arcs: self.motion_arcs,
             audio_tracks: self.audio_tracks,
+            tweens: self.tweens,
         }
     }
     pub fn total_frames(&self) -> u32 {
@@ -206,6 +216,16 @@ pub(crate) struct OrderKey {
     pub(crate) h_in: Presence<Vec<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) h_out: Presence<Vec<Number>>,
+    /// Timeline tint of the key (baseline `key.color`, ctxColorKeys): `#rrggbb` or `#rrggbbaa`. Presentation only.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) color: Presence<String>,
+}
+/// Whether `value` is a key tint the document admits: `#` followed by six or eight hex digits.
+pub(crate) fn valid_key_color(value: &str) -> bool {
+    value.len() > 1
+        && value.starts_with('#')
+        && matches!(value.len() - 1, 6 | 8)
+        && value[1..].bytes().all(|b| b.is_ascii_hexdigit())
 }
 object_deserialize!(OrderKey {
     frame: Number, v: Vec<Number>,
@@ -213,7 +233,8 @@ object_deserialize!(OrderKey {
     #[serde(default)] lock_to: Presence<Option<KeyLockMode>>,
     #[serde(default)] curve_points: Presence<Option<Vec<OrderCurvePoint>>>,
     #[serde(default)] h_in: Presence<Vec<Number>>,
-    #[serde(default)] h_out: Presence<Vec<Number>>
+    #[serde(default)] h_out: Presence<Vec<Number>>,
+    #[serde(default)] color: Presence<String>
 });
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

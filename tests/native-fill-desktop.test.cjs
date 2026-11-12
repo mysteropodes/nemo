@@ -158,3 +158,54 @@ test('ordinary Fill retains the real Project action-local presentation while its
  const good=await run(false);assert.equal(good.sent.length,1);assert.deepEqual(good.sent[0].payload.point,[40,30]);assert.equal(good.session.info().contentRevision,1);
  const changed=await run(true);assert.equal(changed.sent.length,0);assert.equal(changed.session.info().contentRevision,0);
 });
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+function busyFill(){
+ const f=cameraPointerFixture(),toasts=[],real=f.session.readPresentedObjectSession,q={hidden:true};
+ f.root.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');f.root.setTimeout=fn=>setImmediate(fn);f.root.showToast=m=>toasts.push(m);
+ f.session.readPresentedObjectSession=why=>{if(q.hidden){if(why)why('queue-pending');return null;}return real();};
+ return {...f,toasts,q};
+}
+const spin=async(n)=>{for(let i=0;i<n;i++)await new Promise(setImmediate);};
+test('a Fill click during the queue-pending window waits for the presentation and fills once, with no unavailable notice',async()=>{
+ const f=busyFill();assert.equal(f.pointer(),true);await spin(4);
+ assert.equal(f.dispatched.length,0,'held while hidden');assert.deepEqual(f.toasts,[]);
+ f.q.hidden=false;await spin(12);
+ assert.equal(f.dispatched.length,1);assert.deepEqual(f.dispatched[0].payload.point,[100,60]);assert.equal(f.executions(),1);assert.deepEqual(f.toasts.filter(t=>/unavailable/i.test(t)),[]);
+});
+test('a Fill click whose tool left or playhead moved during the wait is dropped, and one whose view changed still refuses',async()=>{
+ for(const change of [r=>r.state.tool='draw',r=>r.state.currentFrame=4]){
+  const f=busyFill();f.pointer();change(f.root);f.q.hidden=false;await spin(12);assert.equal(f.dispatched.length,0);assert.deepEqual(f.toasts,[]);
+ }
+ const v=busyFill();v.pointer();v.root.state.cameraView=false;v.q.hidden=false;await spin(12);
+ assert.equal(v.dispatched.length,0,'a readable presentation of another view refuses');assert.deepEqual(v.toasts,['Native fill coordinates are unavailable']);
+});
+test('a queue that never frees gives a Fill click one clear notice and no fill',async()=>{
+ const f=busyFill();f.pointer();await spin(40);
+ assert.deepEqual(f.toasts,['The canvas is still busy - click again.']);assert.equal(f.dispatched.length,0);
+});
+
+// #2256 Fill inside an entered component: the target carries the component context and its layer rows, the write rides the component route, and a frame past the component refuses.
+test('Fill inside an entered component targets the component layer and rides the component route',async()=>{
+  const f=cameraPointerFixture(),routes=[],scene=f.session.runResourceCommand;
+  f.session.runComponentCommand=action=>{routes.push('component');return scene(action);};
+  f.session.readPresentedObjectSession().presentation.contextId='comp-a';
+  f.root.NemoNativeComponentContext={contextId:()=> 'comp-a',layerRows:()=>[{layerUid:'inner',locked:false}],frameBound:()=>8};
+  assert.equal(f.pointer(),true);await spin(3);
+  assert.deepEqual(routes,['component']);assert.equal(f.dispatched.length,1);
+  assert.equal(f.dispatched[0].payload.contextId,'comp-a');assert.equal(f.dispatched[0].payload.layerUid,'inner');assert.equal(f.dispatched[0].payload.frame,3);
+  // The scene presentation while a component is entered is not the component's: refused, nothing sent.
+  const stale=cameraPointerFixture();stale.session.runComponentCommand=scene;
+  stale.root.NemoNativeComponentContext={contextId:()=> 'comp-a',layerRows:()=>[{layerUid:'inner',locked:false}],frameBound:()=>8};
+  stale.pointer();await spin(3);assert.equal(stale.dispatched.length,0);
+  // A playhead past the component's frames refuses.
+  const past=cameraPointerFixture();past.session.runComponentCommand=scene;
+  past.session.readPresentedObjectSession().presentation.contextId='comp-a';
+  past.root.NemoNativeComponentContext={contextId:()=> 'comp-a',layerRows:()=>[{layerUid:'inner',locked:false}],frameBound:()=>3};
+  past.pointer();await spin(3);assert.equal(past.dispatched.length,0);
+  // A locked component layer yields no target: nothing sent.
+  const locked=cameraPointerFixture();locked.session.runComponentCommand=scene;
+  locked.session.readPresentedObjectSession().presentation.contextId='comp-a';
+  locked.root.NemoNativeComponentContext={contextId:()=> 'comp-a',layerRows:()=>[{layerUid:'inner',locked:true}],frameBound:()=>8};
+  locked.pointer();await spin(3);assert.equal(locked.dispatched.length,0);
+});

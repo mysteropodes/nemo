@@ -22,11 +22,16 @@ pub(crate) mod parent_chain;
 #[path = "object_text_scene_fonts.rs"]
 mod fonts;
 
+#[path = "object_text_scene_placed.rs"]
+pub(crate) mod placed;
+
 #[derive(Debug, Clone)]
 pub(crate) struct TextSource {
     pub(crate) source_index: usize,
     pub(crate) layer_index: usize,
     pub(crate) item: TextSceneItem,
+    /// A placed component's block (`placed`): `layer_index` is its host and it paints at the host slot.
+    pub(crate) placed: bool,
 }
 impl TextSource {
     pub(crate) fn draw(&self, scene: &mut Scene) {
@@ -47,7 +52,7 @@ pub(crate) struct TextSources {
     pub(crate) resources: Arc<ObjectSceneResourceSet>,
     pub(crate) parent_chains: Arc<parent_chain::SceneParentChains>,
 }
-fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
+pub(crate) fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
     ObjectSceneError::UnsupportedGeometry {
         source_object_index: index,
         reason,
@@ -160,9 +165,14 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
                 record: &input.entry.block,
                 glyph_stages: &[],
                 chain,
-                item_opacity: packet.layer_opacity(input.layer_index).map_err(|_| {
-                    unavailable(input.source_index, "Text layer opacity is unavailable")
-                })?,
+                // A 3D layer ignores its 2D Motion opacity (baseline `is3D`: `motionMat = null`).
+                item_opacity: if packet.source_layers()[input.layer_index].three_d.value() == Some(&true) {
+                    1.0
+                } else {
+                    packet.layer_opacity(input.layer_index).map_err(|_| {
+                        unavailable(input.source_index, "Text layer opacity is unavailable")
+                    })?
+                },
                 admission: GeometryAdmission::DropCoincidentCurves,
             },
         )
@@ -283,11 +293,20 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
                 "native Text animator parent chain unavailable",
             )
         })?;
+        // #2520: a 3D layer's glyph vertices go through the layer projector around the union bounds (its chain is empty).
+        if let Some(projector) = chains
+            .projector_3d(input.layer_index)
+            .map_err(|e| unavailable(input.source_index, e.reason()))?
+        {
+            crate::object_render_scene::object_scene_producer_text::animator::apply_projection(&mut raw, &projector)
+                .map_err(|_| unavailable(input.source_index, "native Text 3D projection unavailable"))?;
+        }
         let item = raw;
         entries.push(TextSource {
             source_index: input.source_index,
             layer_index: input.layer_index,
             item,
+            placed: false,
         });
     }
     let resources = resources
@@ -363,6 +382,16 @@ pub(super) fn verify(
 ))]
 #[path = "../tests/object_text_scene_join.rs"]
 mod tests;
+
+#[cfg(all(
+    test,
+    not(feature = "font_asset_admission"),
+    feature = "history",
+    feature = "application",
+    feature = "project_media_codec"
+))]
+#[path = "../tests/object_text_scene_nofont.rs"]
+mod nofont_tests;
 
 #[cfg(all(
     test,

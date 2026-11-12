@@ -7,6 +7,25 @@ use crate::native_contract::{
 };
 use serde_json::Value;
 
+/// A multi-layer duplicate's other layers (`others`): one to 32 `{layerUid, strokeIds}`, each layer once, each with one or more distinct stroke identities.
+pub(super) fn others(value: &Value) -> bool {
+    value.as_array().is_some_and(|layers| {
+        (1..=32).contains(&layers.len())
+            && layers.iter().enumerate().all(|(at, entry)| {
+                exact(entry, &["layerUid", "strokeIds"], &[]).is_some_and(|object| {
+                    object.get("layerUid").is_some_and(uid)
+                        && object.get("strokeIds").and_then(Value::as_array).is_some_and(|ids| {
+                            (1..=MAX_ITEMS).contains(&ids.len()) && ids.iter().all(uid) && {
+                                let mut seen = std::collections::HashSet::new();
+                                ids.iter().all(|id| seen.insert(id.as_str()))
+                            }
+                        })
+                        && layers[..at].iter().all(|before| before.get("layerUid") != object.get("layerUid"))
+                })
+            })
+    })
+}
+
 fn clip_record(value: &Value) -> bool {
     exact(
         value,
@@ -43,6 +62,11 @@ fn raster(value: &Value) -> bool {
                 &[
                     "opacity",
                     "rotation",
+                    "flipX",
+                    "flipY",
+                    "skew",
+                    "xformAnchorKey",
+                    "xformAnchorCustom",
                     "isBitmapBrush",
                     "brushGroupId",
                     "isBrushTextureCopy",

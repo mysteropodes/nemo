@@ -17,6 +17,11 @@ pub(crate) mod object_scene_style_paint;
 #[allow(dead_code)]
 pub(crate) mod object_scene_style_stroke;
 
+// Paint-side companion of the whole-layer pose: stroke scale and gradient endpoints through the batch chain.
+#[path = "object_scene_paint_pose.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_paint_pose;
+
 // L07-I: typed item style (record -> fill, stroke, paint order) over the paint and stroke kernels.
 #[path = "object_scene_style_item.rs"]
 #[allow(dead_code)]

@@ -340,12 +340,6 @@ pub(crate) fn evaluate_owned_records(
     records: Vec<ObjectRecord>,
     placement: &ResolvedComponentPlacement,
 ) -> Result<Vec<ComponentShape>, ComponentUnavailable> {
-    if let Some(record) = records.iter().find(|record| record.has_enabled_effects()) {
-        return Err(ComponentUnavailable::InnerFeature {
-            layer_uid: record.target().layer_uid().to_owned(),
-            feature: "per-element effects",
-        });
-    }
     let sources = records
         .iter()
         .map(shape_data)

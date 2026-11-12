@@ -17,6 +17,13 @@
     async function add(){
       if(retired)return {status:'unavailable'};
       if(pending)return {status:'busy'};
+      // #2372: an add right after another command finds the presentation hidden by the queue (queue-pending): wait it out (bounded); the checks below stay strict.
+      var Wt=typeof globalThis==='object'?globalThis.NemoNativePresentationWait:null,idle=Wt&&ports.currentSession();
+      if(idle&&typeof idle.readPresentedObjectSession==='function'&&Wt.busy(function(f){return idle.readPresentedObjectSession(f);})){
+        await Wt.await(null,{read:function(f){return idle.readPresentedObjectSession(f);},holds:function(){return !retired&&!pending&&ports.currentSession()===idle;}});
+        if(retired)return {status:'unavailable'};
+        if(pending)return {status:'busy'};
+      }
       var session,before,frame,selection,write;
       try{
         session=ports.currentSession();before=session&&session.info();frame=ports.frame();selection=ports.selection();
@@ -40,10 +47,10 @@
         var row=rows[rows.length-1];
         if(row.layerUid!==created||row.name!==name||row.visible!==true||row.locked!==false||row.parentLayerUid!==null||
           typeof row.color!=='string'||!/^#[a-fA-F0-9]{6}$/.test(row.color)||ports.available(session,after)!==true||
-          ports.frame()!==frame||!sameSelection(selection,ports.selection())||!presented(session,after,frame))
+          ports.frame()!==frame||!sameSelection(selection,ports.selection())||!(Wt?await Wt.until(null,session,function(){return presented(session,after,frame);},function(){return ports.currentSession()===session;}):presented(session,after,frame)))
           return {status:'created-unselected',layerUid:created};
         if(ports.select(created,after,session)!==true||ports.currentSession()!==session||!same(session.info(),after)||
-          !presented(session,after,frame)||ports.frame()!==frame||!sameSelection([created],ports.selection()))
+          !(Wt?await Wt.until(null,session,function(){return presented(session,after,frame);},function(){return ports.currentSession()===session;}):presented(session,after,frame))||ports.frame()!==frame||!sameSelection([created],ports.selection()))
           return {status:'created-unselected',layerUid:created};
         return {status:'created-selected',layerUid:created};
       }catch(_){return created?{status:'created-unselected',layerUid:created}:{status:'unconfirmed'};}

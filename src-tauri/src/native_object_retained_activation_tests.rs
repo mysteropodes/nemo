@@ -171,35 +171,45 @@ fn attach(state: &ApplicationMcp, info: &Value) -> Value {
 }
 
 #[test]
-fn cpu_retained_route_exhaustion_preserves_both_projects_and_old_replay() {
+fn cpu_retained_route_past_old_capacity_retires_superseded_receipts() {
     let f = Fixture::new();
     let first = f.complete(&f.request);
     let mut active_id = first["documentId"].as_str().unwrap().to_owned();
-    // Existing shared replacement budget: exercise its real boundary, not a mock.
-    for ordinal in 1..16 {
+    let mut last_request = f.request.clone();
+    let mut last_receipt = first.clone();
+    // Run well past the old 16-receipt limit: superseded settled receipts retire instead.
+    for ordinal in 1..20 {
         let active = f.state.native_project_info(&active_id).unwrap();
         let target = inspect_retained(&f.state, &active);
         let request = make_request(&f.state, &active, &target, &format!("switch-{ordinal}"));
-        active_id = f.complete(&request)["documentId"]
-            .as_str()
-            .unwrap()
-            .to_owned();
+        let receipt = f.complete(&request);
+        active_id = receipt["documentId"].as_str().unwrap().to_owned();
+        // Both projects survive every switch: the new active one and the parked one.
+        let now = f.state.native_project_info(&active_id).unwrap();
+        let parked = inspect_retained(&f.state, &now);
+        assert_ne!(parked["documentId"], now["documentId"]);
+        assert_eq!(parked["documentId"], active["documentId"]);
+        last_request = request;
+        last_receipt = receipt;
     }
     let before = f.state.native_project_info(&active_id).unwrap();
     let held = inspect_retained(&f.state, &before);
-    let overflow = make_request(&f.state, &before, &held, "switch-over-capacity");
-    let error = prepare(&f.state, &overflow.to_string(), "main")
+    // A recent switch still replays its receipt.
+    match prepare(&f.state, &last_request.to_string(), "main").unwrap() {
+        Admission::Replay(value) => assert_eq!(value, last_receipt),
+        _ => panic!("a recent request must replay its receipt"),
+    }
+    // The very first request was retired: typed Expired replay, no re-execution.
+    let error = prepare(&f.state, &f.request.to_string(), "main")
         .err()
         .unwrap();
-    assert_eq!(error.code, "unavailable");
-    assert!(error.message.contains("receipt capacity exhausted"));
-    assert_eq!(error.details.unwrap()["disposition"], "notDispatched");
+    assert_eq!(error.code, "replacement_indeterminate");
+    assert!(error.message.contains("receipt expired"));
+    let details = error.details.unwrap();
+    assert_eq!(details["disposition"], "indeterminate");
+    assert_eq!(details["retryExecution"], false);
     assert_eq!(f.state.native_project_info(&active_id).unwrap(), before);
     assert_eq!(inspect_retained(&f.state, &before), held);
-    match prepare(&f.state, &f.request.to_string(), "main").unwrap() {
-        Admission::Replay(value) => assert_eq!(value, first),
-        _ => panic!("capacity exhaustion must not evict the original replay"),
-    }
     let changed = attach(&f.state, &before);
     assert_eq!(
         changed["contentRevision"],

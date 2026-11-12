@@ -29,7 +29,7 @@
   function readNativeTabsUI(){return {tabs:tabs,activeTabId:activeTabId,path:currentPath,name:currentName};}
   var nativeInactiveTabs=nativeTabsUI.bind(window,{read:readNativeTabsUI,makeId:makeTabId,
     file:function(){return nativeSavedUI&&nativeSavedUI.nativeObject;},dirty:isDirty,notice:tabAddNotice,render:renderTabBar,
-    activateTab:function(id,path,name){activeTabId=id;currentPath=path;currentName=name;updateCurrentLabel();}
+    activateTab:function(id,path,name){activeTabId=id;currentPath=path;currentName=name;updateCurrentLabel();},switchTab:switchToTab,hideStart:hideStartScreen,showStart:showStartScreen,saved:function(){nativeNewReturn=null;tabAddNotice('');try{markSaved(projectJSON());}catch(e){}},closeLegacy:function(){return afterMaybe(releaseNative('tab-close'),function(admitted){if(admitted===false){tabAddNotice('Closing the project is unavailable in this build.');return false;}newProjectNow({w:1920,h:1080,fps:24,name:'Untitled'});return true;});}
   });
   function p39bUseInactiveEntry(){try{var native=window.NemoNativeOpacityCutover;return !!activeTabId&&(native?native.blocksLegacy()!==false:'NemoNativeOpacityProject' in window);}catch(_){return !!activeTabId;}}
 
@@ -155,7 +155,9 @@
     remember:function(json){try{localStorage.setItem('nemo-auto',json);}catch(e){}},
     isDirty:function(){return !savedBaselineReady||dirtyBaseline.isDirty(projectJSON);},
     invalidate:function(){savedBaselineReady=false;try{renderTabBar();}catch(e){}},
-    notice:showToast,hide:hideStartScreen,show:showStartScreen,opened:ensureInitialTab,repaint:renderTabBar
+    notice:showToast,hide:hideStartScreen,show:showStartScreen,opened:ensureInitialTab,repaint:renderTabBar,
+    // Crash-recovery cleanup (#2360 R4); bound below, after the scheduler exists.
+    recoveryDiscard:function(documentId,extra){return nativeRecoveryCleanup?nativeRecoveryCleanup.discardDocument(documentId,extra):null;}
   });
   async function writeProjectTo(path,ticket,mode){projectJSON();return nativeSavedUI.write(path,ticket,mode);}
   // ---- Browser-mode save (2026-07, "ajoute la possibilité de save un
@@ -222,13 +224,16 @@
     await openPath(Array.isArray(path)?path[0]:path);
   }
 
-  // ---- Version history (v15) — the existing 30s autosave (timeline.js)
-  // only ever held ONE slot ('nemo-auto' in localStorage): a crash right
-  // after a bad edit overwrote the one good copy with the bad one on the
-  // very next tick. This keeps a dense rolling history of real files on
-  // disk (Tauri fs — no localStorage quota risk with base64 media embedded
-  // in every snapshot) so "I crashed 10 min ago" can recover "the version
-  // from 11 min ago", not just "whatever was last written".
+  // Crash-recovery writer for native projects (#2360 R2): idle-timed, reads cached session facts only; bytes are written Rust-side.
+  try{if(window.NemoNativeObjectRecovery&&nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.recoveryPin){
+    var nativeRecovery=window.NemoNativeObjectRecovery.bind(window,{pin:nativeSavedUI.nativeObject.recoveryPin,
+      slot:function(){return {path:currentPath,name:currentName};},notice:showToast});
+    if(nativeRecovery)nativeRecovery.start();}}catch(e){console.warn('[recovery] scheduler unavailable',e);}
+  var nativeRecoveryCleanup=null;
+  try{if(nativeRecovery&&window.NemoNativeObjectRecoveryCleanup)nativeRecoveryCleanup=window.NemoNativeObjectRecoveryCleanup.bind(window,{scheduler:nativeRecovery});}
+  catch(e){console.warn('[recovery] cleanup unavailable',e);}
+  // ---- Version history (v15): a dense rolling history of real files on disk (Tauri fs, no localStorage quota
+  // risk with embedded media), so "I crashed 10 min ago" can recover "the version from 11 min ago".
   var HISTORY_MAX=120; // 60 min of history at the existing 30s cadence
   function simpleHash(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return (h>>>0).toString(36);}
   function historyKey(){return currentPath?(window.SMProjectDocument.baseName(currentPath).replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+simpleHash(currentPath)):'untitled-autosave';}
@@ -253,16 +258,20 @@
         .sort(function(a,b){return b.ts-a.ts;});
     }catch(e){return [];}
   }
+  function onVersionRestored(){ensureInitialTab();if(historyUi)historyUi.close();showToast(SM.t('toastVersionRestored'));}
   var nativeVersionRestore=window.NemoProjectNativeVersionRestore.bind(window,{
     metadata:function(){return {path:currentPath,name:currentName};},
     backupTarget:historyDir,reveal:revealOpenedProject,
     modal:function(){return document.getElementById('history-modal');},
     backup:writeVersionSnapshot,
     backupFailed:function(error){console.warn('[history] pre-restore snapshot failed',error);},
-    restored:function(){ensureInitialTab();if(historyUi)historyUi.close();showToast(SM.t('toastVersionRestored'));},
+    restored:onVersionRestored,
     unavailable:function(){showToast('Could not finish restoring this version.');}
   });
+  var legacyImport=window.NemoNativeLegacyImport?window.NemoNativeLegacyImport.bind(window,{object:nativeSavedUI.nativeObject,open:nativeSavedUI.openNative,
+    name:function(){return currentName;},notice:showToast,restored:onVersionRestored,idb:window.SMIdb,storage:{getItem:function(k){return localStorage.getItem(k);}}}):null;
   async function restoreVersion(path){
+    if(legacyImport&&legacyImport.owns())return legacyImport.restore(path);
     if(tauriOk()||'NemoNativeOpacityCutover' in window||'NemoNativeOpacityProject' in window)return nativeVersionRestore.restore(path);
     // Capture the current document before import, then record that snapshot
     // only after a successful restore. Rejected input must leave both the
@@ -384,21 +393,19 @@
     try{return nativeInactiveTabs.canReplaceActiveProject()===true&&
       typeof nativeSavedUI.nativeObject.canOpen==='function'&&nativeSavedUI.nativeObject.canOpen()===true;}catch(_){return false;}
   }
-  function nativeNewPin(){
-    var p=window.NemoNativeObjectProject.desktop(window).readPresentedObjectSession();if(!p)throw new Error('Native editor return is unavailable');
+  function nativeNewPin(p){
+    p=p||window.NemoNativeObjectProject.desktop(window).readPresentedObjectSession();if(!p)throw new Error('Native editor return is unavailable');
     return Object.freeze({tabId:activeTabId,instanceId:p.instanceId,documentId:p.documentId,contentRevision:p.contentRevision,documentSnapshotId:p.documentSnapshotId,lifecycleGeneration:p.lifecycleGeneration});
   }
+  var nativeNewWait=0;/* #2372: a presentation hidden only by the native queue (queue-pending) is waited for, bounded (adapters/native-new-return-pin.js); null = refuse as before. */function nativeNewSoon(holds,ok,fail){var N=window.NemoNativeNewReturnPin;return N?N.soon(window,holds,ok,fail):null;}
   function cancelNativeNew(context){
-    if(!nativeNewReturn)return;
-    try{
-      var current=nativeNewPin();
-      if(!context.submitted&&!context.inFlight&&nativeNewAllowed()&&Object.keys(nativeNewReturn).every(function(k){return current[k]===nativeNewReturn[k];})){
-        nativeNewReturn=null;hideStartScreen();SMProjectEntry.repaint();return true;
-      }
-    }catch(_){}
+    if(!nativeNewReturn)return;var token=++nativeNewWait,pinned=nativeNewReturn;
+    function restore(current){if(!context.submitted&&!context.inFlight&&nativeNewAllowed()&&Object.keys(pinned).every(function(k){return current[k]===pinned[k];})){nativeNewReturn=null;hideStartScreen();SMProjectEntry.repaint();return true;}}
+    try{if(restore(nativeNewPin()))return true;}
+    catch(_){nativeNewSoon(function(){return token===nativeNewWait&&nativeNewReturn===pinned;},function(p){try{restore(nativeNewPin(p));}catch(_){}});}
     showStartScreen();return false;
   }
-  var newProjectGeneration=0;window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg,isCurrent,onCreationFailure){
+  var newProjectGeneration=0;window.SMProject={nativeTabs:nativeInactiveTabs,closeActiveTab:function(){return closeTab(activeTabId);},nativeObjectProject:function(){return nativeSavedUI&&nativeSavedUI.nativeObject||null;},save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg,isCurrent,onCreationFailure){
     if(nativeSavedUI&&nativeSavedUI.nativeObject){
       if(!nativeNewAllowed())return tabAddNotice('New project unavailable — close the inactive project or finish the pending project operation first.');
       return typeof nativeSavedUI.nativeObject.newProject==='function'?nativeSavedUI.nativeObject.newProject(cfg,isCurrent,onCreationFailure):false;
@@ -455,7 +462,11 @@
         var appWindow=window.__TAURI__.window.getCurrentWindow();
         var allowConfirmedClose=false;
         appWindow.onCloseRequested(async function(event){
-          if(allowConfirmedClose||!isDirty())return; // clean/confirmed → close proceeds normally
+          if(allowConfirmedClose)return; // confirmed quit-without-saving keeps the recovery (parity)
+          if(!isDirty()){ // clean quit: drop the ACTIVE document's crash recovery only (parked dirty tabs keep theirs), bounded, best effort
+            if(nativeRecoveryCleanup)try{await nativeRecoveryCleanup.cleanQuit();}catch(_){}
+            return;
+          }
           // Tauri cannot keep the original native close request pending
           // across an awaited dialog. Cancel it synchronously, then issue a
           // fresh close request after positive confirmation.
@@ -589,10 +600,12 @@
         return tabAddNotice('New project unavailable — close the inactive project or finish the pending project operation first.');
       // Native New replaces the active project through its existing form and
       // confirmation; it never snapshots the document into a JavaScript tab.
-      try{if(document.getElementById('start-screen').classList.contains('hid')&&nativeSavedUI.nativeObject.isActive())nativeNewReturn=nativeNewPin();}catch(_){return tabAddNotice('New project unavailable — the native editor is not ready.');}
-      tabAddNotice('');showStartScreen();document.getElementById('start-new').click();
-      if(nativeSavedUI.nativeObject.isActive())showToast('Creating a new project replaces the current project.');
-      return true;
+      var unready='New project unavailable — the native editor is not ready.',enter=function(){tabAddNotice('');showStartScreen();document.getElementById('start-new').click();
+        if(nativeSavedUI.nativeObject.isActive())showToast('Creating a new project replaces the current project.');return true;};
+      try{if(document.getElementById('start-screen').classList.contains('hid')&&nativeSavedUI.nativeObject.isActive())nativeNewReturn=nativeNewPin();}
+      catch(_){var token=++nativeNewWait,tab=activeTabId;return nativeNewSoon(function(){return token===nativeNewWait&&tab===activeTabId&&document.getElementById('start-screen').classList.contains('hid');},
+        function(p){try{nativeNewReturn=nativeNewPin(p);}catch(_){tabAddNotice(unready);return;}enter();},function(status){if(status!=='changed')tabAddNotice(unready);})||tabAddNotice(unready);}
+      return enter();
     }
     var generation=++tabAddGeneration,initialTab=activeTabId,initialName=currentName,initialPath=currentPath;function denied(){return generation===tabAddGeneration&&activeTabId===initialTab&&currentName===initialName&&currentPath===initialPath?tabAddNotice('New project unavailable — native admission was denied.'):false;}
     function admitted(ok){
@@ -604,7 +617,7 @@
   }
   function closeTab(id){
     var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;if(tabs[idx].nativeInactiveProject)return nativeInactiveTabs.close(tabs[idx].nativeInactiveProject);
-    if(tabs.length===1){showToast(SM.t('hsCannotCloseLastTab'));return;}
+    if(tabs.length===1)return nativeInactiveTabs.closeLast(); // #2381: closing the only project returns to the home screen
     if(tabs[idx].nativePreparation)return inactiveEntry.close(tabs[idx].nativePreparation);
     var wasActive=id===activeTabId;
     function closed(){tabs.splice(idx,1);renderTabBar();}
@@ -648,7 +661,8 @@
 
   // ---- Start screen ----
   function hideStartScreen(){document.getElementById('start-screen').classList.add('hid');}
-  function showStartScreen(){document.getElementById('start-screen').classList.remove('hid');}
+  var startScreenView=null; // re-decides the Resume card on every show
+  function showStartScreen(){document.getElementById('start-screen').classList.remove('hid');if(startScreenView)startScreenView.refresh();}
 
   function renderRecents(){
     var snapshot;
@@ -690,14 +704,21 @@
       else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(applyAuto).catch(function(){applyAuto(null);});
       else applyAuto(null);
   }
+  // Native desktop Resume (#2360 R3): the card follows the Rust recovery store, never the legacy nemo-auto slot.
+  var nativeResume=window.NemoNativeObjectRecoveryResume&&nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.openRecovered?
+    window.NemoNativeObjectRecoveryResume.bind(window,{openRecovered:nativeSavedUI.openRecovered,
+      allowOpen:nativeSavedUI.allowOpen,notice:showToast,ownSlots:function(){return nativeRecovery?nativeRecovery.claim():[];}}):null;
+  var resumeSource=nativeResume&&legacyImport?legacyImport.combineResume(nativeResume):nativeResume;
   function initStartScreen(){
     SMProjectEntry.initializeTabs(document);
-    SMProjectEntry.bindStartScreen(document,{
-      readResumePresence:function(){try{return !!localStorage.getItem('nemo-auto');}catch(e){return false;}},
+    startScreenView=SMProjectEntry.bindStartScreen(document,{
+      readResumePresence:function(){if(nativeResume)return false;try{return !!localStorage.getItem('nemo-auto');}catch(e){return false;}},
       // Media-heavy autosave can be present only in IndexedDB after quota
       // overflow. Resolve to a boolean before crossing the view boundary.
-      readResumePresenceAsync:function(publish){if(window.SMIdb)window.SMIdb.get('nemo-auto').then(function(v){publish(!!v);}).catch(function(){});},
-      renderRecents:renderRecents,resume:resumeAutosave,open:openDialog,
+      readResumePresenceAsync:function(publish){
+        if(resumeSource){resumeSource.presence(publish);return;}
+        if(window.SMIdb)window.SMIdb.get('nemo-auto').then(function(v){publish(!!v);}).catch(function(){});},
+      renderRecents:renderRecents,resume:resumeSource?resumeSource.resume:resumeAutosave,open:openDialog,
       createProject:function(config,current,onCreationFailure){return window.SMProject.newProject(config,current,onCreationFailure);},
       showStartScreen:showStartScreen,cancelProjectEntry:cancelNativeNew,notice:showToast
     });

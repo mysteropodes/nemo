@@ -78,7 +78,7 @@ test('the MCP crate registers the validators, the descriptor, the response check
   assert.ok(contract.includes('#[path = "native_brush_resource_contract.rs"]\npub(crate) mod brush;'));
   assert.ok(contract.includes('brush::PUBLISH | brush::QUERY => brush::request(operation, payload)'));
   assert.ok(contract.includes('| brush::QUERY'), 'the read forbids expectedRevision');
-  assert.ok(contract.includes('brush::result(operation, payload, result)'));
+  assert.ok(contract.includes('brush::result(o, p, r)'));
   assert.ok(text('nemo-mcp/src/wire.rs').includes('crate::native_contract::brush::response_matches(request, response)'));
   assert.ok(text('nemo-mcp/src/native_request_input.rs').includes('crate::native_contract::brush::PUBLISH'));
   const server = text('nemo-mcp/src/server.rs');
@@ -88,11 +88,8 @@ test('the MCP crate registers the validators, the descriptor, the response check
 });
 
 test('the descriptor list names the new descriptor and the declared operations equal the request union operations', () => {
-  const rust = text('nemo-mcp/src/capabilities.rs');
-  const start = rust.indexOf('pub const NATIVE_CAPABILITY_SOURCES:');
-  assert.ok(start >= 0);
-  const block = rust.slice(start, rust.indexOf('];', start));
-  const sources = [...block.matchAll(/include_str!\s*\(\s*"([^"]+)"\s*\)/g)].map((m) => m[1]);
+  // CS1/#2341: nemo-mcp/build.rs discovers capabilities-v2/*.json; read the same set.
+  const sources = require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles().map((file) => '../../engineering/application/capabilities-v2/' + path.basename(file));
   assert.equal(sources.filter((s) => s.endsWith('capabilities-v2/native-bitmap-brush-resources.json')).length, 1);
   const descriptors = sources.map((s) => JSON.parse(fs.readFileSync(path.resolve(root, 'nemo-mcp/src', s), 'utf8')));
   const declared = descriptors.flatMap((d) => d.operations);

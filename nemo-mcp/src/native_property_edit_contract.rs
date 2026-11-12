@@ -14,16 +14,57 @@ fn values(value: &Value) -> bool {
         (1..=4).contains(&values.len()) && values.iter().all(|v| finite(Some(v)))
     })
 }
-fn action(value: &Value) -> bool {
+// The native owner caps authored code at the evaluator's 4096 UTF-8 bytes; JSON string
+// escapes may only shrink the request, so the same bound holds on the wire.
+fn code(value: Option<&Value>) -> bool {
+    value
+        .and_then(Value::as_str)
+        .is_some_and(|code| code.len() <= 4096)
+}
+/// D18-B control declaration text: non-empty and bounded; the engine owns trimming, clashes and shape.
+fn control_name(value: Option<&Value>) -> bool {
+    value
+        .and_then(Value::as_str)
+        .is_some_and(|s| !s.is_empty() && s.chars().count() <= 128)
+}
+fn action(value: &Value, property: Option<&str>) -> bool {
     match value.get("kind").and_then(Value::as_str) {
+        Some("setExpression") => {
+            exact(value, &["kind", "code"], &[]).is_some_and(|a| code(a.get("code")))
+        }
+        Some("setExpressionEnabled") => exact(value, &["kind", "enabled"], &[])
+            .is_some_and(|a| a["enabled"].is_boolean()),
+        Some("removeExpression") => exact(value, &["kind"], &[]).is_some(),
         Some("bake") => exact(value, &["kind"], &[]).is_some(),
-        Some("setValue" | "setKey") => exact(value, &["kind", "frame", "values"], &[])
+        // `keepPose` (#2520) is the anchor edit that moves Position in the same revision; it is `true` or absent.
+        Some("setValue") => exact(value, &["kind", "frame", "values"], &["keepPose"]).is_some_and(|a| {
+            finite(a.get("frame"))
+                && values(&a["values"])
+                && a.get("keepPose").is_none_or(|k| k == true && property == Some("anchor"))
+        }),
+        Some("setKey") => exact(value, &["kind", "frame", "values"], &[])
             .is_some_and(|a| finite(a.get("frame")) && values(&a["values"])),
+        Some("setKeyHandle") => exact(value, &["kind", "frame", "handle", "values"], &[]).is_some_and(|a| {
+            finite(a.get("frame"))
+                && matches!(a["handle"].as_str(), Some("hIn" | "hOut"))
+                && a["values"].as_array().is_some_and(|v| v.len() == 2 && values(&a["values"]))
+        }),
         Some("removeKey") => {
             exact(value, &["kind", "frame"], &[]).is_some_and(|a| finite(a.get("frame")))
         }
         Some("setAnimated") => exact(value, &["kind", "frame", "animated"], &[])
             .is_some_and(|a| finite(a.get("frame")) && a["animated"].is_boolean()),
+        Some("addControl") => exact(value, &["kind", "controlType", "name"], &[]).is_some_and(|a| {
+            a["controlType"]
+                .as_str()
+                .is_some_and(|t| ["number", "checkbox", "angle", "point", "color"].contains(&t))
+                && control_name(a.get("name"))
+        }),
+        Some("renameControl") => exact(value, &["kind", "name"], &[])
+            .is_some_and(|a| control_name(a.get("name"))),
+        Some("removeControl") => exact(value, &["kind"], &[]).is_some(),
+        Some("moveControl") => exact(value, &["kind", "direction"], &[])
+            .is_some_and(|a| matches!(a["direction"].as_i64(), Some(-1 | 1))),
         _ => false,
     }
 }
@@ -36,7 +77,7 @@ pub(super) fn request(value: &Value) -> bool {
                     && nonempty(t.get("layerUid"))
                     && (!t.contains_key("strokeId") || nonempty(t.get("strokeId")))
             })
-            && action(&p["action"])
+            && action(&p["action"], p["property"].as_str())
     })
 }
 pub(super) fn result(value: &Value) -> bool {

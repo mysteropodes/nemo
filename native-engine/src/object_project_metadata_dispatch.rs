@@ -49,6 +49,16 @@ impl ObjectSnapshot {
             )
             .map(Some);
         }
+        if request.operation == "query.document.object.project.camera.read" {
+            #[cfg(all(feature = "history", feature = "project_media_codec"))]
+            return self.dispatch_camera_read(request).map(Some);
+            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
+            return failure(
+                DispatchErrorCode::Unavailable,
+                "Native camera metadata is unavailable.",
+            )
+            .map(Some);
+        }
         if request.operation == "query.document.object.project.perspective.read" {
             #[cfg(all(feature = "history", feature = "project_media_codec"))]
             return self.dispatch_perspective_read(request).map(Some);
@@ -56,6 +66,16 @@ impl ObjectSnapshot {
             return failure(
                 DispatchErrorCode::Unavailable,
                 "Native Perspective metadata is unavailable.",
+            )
+            .map(Some);
+        }
+        if request.operation == "query.document.object.project.symmetry.read" {
+            #[cfg(all(feature = "history", feature = "project_media_codec"))]
+            return self.dispatch_symmetry_read(request).map(Some);
+            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
+            return failure(
+                DispatchErrorCode::Unavailable,
+                "Native symmetry metadata is unavailable.",
             )
             .map(Some);
         }

@@ -130,33 +130,57 @@
     path.closed = true;
   }
 
+  function predict(path) {
+    if (!path.segments || path.segments.length < 3) return;
+    // Vector-brush ribbons & fill shapes: geometry is a rebuilt outline,
+    // not the drawn centerline — leave them alone.
+    if (path.data && (path.data.isVectorBrush || path.data.isFillShape || path.data.centerSegments)) return;
+    var P = pts(path);
+    var L = pathLen(P);
+    if (L < 40) return; // dot / tiny tick — never "correct" those
+
+    // 1. Line: chord deviation under 4% of length.
+    if (lineDeviation(P) < 0.04) { snapToLine(path); return; }
+
+    var closedish = dist(P[0], P[P.length - 1]) < 0.18 * L;
+    if (!closedish) return;
+    var bounds = path.bounds;
+
+    // 2. Ellipse: normalized-radius stddev under 0.09.
+    if (ellipseError(P, bounds) < 0.09) { snapToEllipse(path, bounds); return; }
+
+    // 3. Rectangle: simplifies to 4 near-right-angle corners.
+    var closed = P.slice();
+    closed[closed.length - 1] = closed[0]; // exact loop for the split-and-RDP below
+    var corners = loopCorners(closed, Math.max(6, L * 0.03));
+    if (isRectCorners(corners)) { snapToRect(path, corners); return; }
+  }
+  // Native authority (U33, #2362): the native freehand commit reshapes its stroke dictionary through the same recognizer
+  // before it is committed, so the stroke and its correction are one native history entry (the baseline runs onStroke on
+  // the committed path before saving the frame). Returns the dictionary unchanged when nothing was recognized.
+  window.SMLabs.predictStrokeDict = function (dict) {
+    if (!window.SMLabs.isOn('predictive-stroke') || !dict || !Array.isArray(dict.segments)) return dict;
+    var path = new Path({ insert: false });
+    dict.segments.forEach(function (s) {
+      path.add(new Segment(new Point(s.point[0], s.point[1]), new Point(s.handleIn[0], s.handleIn[1]), new Point(s.handleOut[0], s.handleOut[1])));
+    });
+    path.closed = !!dict.closed;
+    path.data = { isVectorBrush: dict.isVectorBrush, isFillShape: dict.isFillShape, centerSegments: dict.centerSegments };
+    var read = function () {
+      return path.segments.map(function (s) {
+        return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] };
+      });
+    };
+    var before = JSON.stringify([path.closed, read()]);
+    predict(path);
+    var segments = read();
+    if (JSON.stringify([path.closed, segments]) === before) return dict;
+    return Object.assign({}, dict, { closed: path.closed, segments: segments });
+  };
   window.SMLabs.register('predictive-stroke', {
     flag: 'nemo-labs-predictive',
     describe: 'labsDescribePredictiveStroke',
-    onStroke: function (path) {
-      if (!path.segments || path.segments.length < 3) return;
-      // Vector-brush ribbons & fill shapes: geometry is a rebuilt outline,
-      // not the drawn centerline — leave them alone.
-      if (path.data && (path.data.isVectorBrush || path.data.isFillShape || path.data.centerSegments)) return;
-      var P = pts(path);
-      var L = pathLen(P);
-      if (L < 40) return; // dot / tiny tick — never "correct" those
-
-      // 1. Line: chord deviation under 4% of length.
-      if (lineDeviation(P) < 0.04) { snapToLine(path); return; }
-
-      var closedish = dist(P[0], P[P.length - 1]) < 0.18 * L;
-      if (!closedish) return;
-      var bounds = path.bounds;
-
-      // 2. Ellipse: normalized-radius stddev under 0.09.
-      if (ellipseError(P, bounds) < 0.09) { snapToEllipse(path, bounds); return; }
-
-      // 3. Rectangle: simplifies to 4 near-right-angle corners.
-      var closed = P.slice();
-      closed[closed.length - 1] = closed[0]; // exact loop for the split-and-RDP below
-      var corners = loopCorners(closed, Math.max(6, L * 0.03));
-      if (isRectCorners(corners)) { snapToRect(path, corners); return; }
-    },
+    onStroke: predict,
+    nativeDraw: true,
   });
 })();

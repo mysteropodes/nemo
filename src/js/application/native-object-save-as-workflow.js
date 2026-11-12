@@ -88,7 +88,7 @@
     }
     // Keep request identity and the chosen authority ports stable across awaits.
     options = { requestId: options.requestId, pinRequestId: options.pinRequestId, project: options.project === true,
-      signal: options.signal, isCurrent: options.isCurrent };
+      replace: options.replace === true, signal: options.signal, isCurrent: options.isCurrent };
     ports = { readPresentedObjectSession: typeof ports.readPresentedObjectSession === 'function'
         ? ports.readPresentedObjectSession.bind(ports) : function () { return null; },
       acquirePin: ports.acquirePin.bind(ports), pickDestination: ports.pickDestination.bind(ports),
@@ -118,9 +118,11 @@
     var beforeDispatch = await current(ports);
     if (cancelled(options)) return result('cancelled', 'cancelled-before-dispatch');
     if (!matches(pin, beforeDispatch)) return result('stale-before-dispatch', 'pin-changed-during-picker');
-    var request = Object.freeze({ apiVersion: 2, requestId: options.requestId,
+    var fieldsOut = { apiVersion: 2, requestId: options.requestId,
       instanceId: pin.instanceId, documentId: pin.documentId, atRevision: pin.contentRevision,
-      documentSnapshotId: pin.documentSnapshotId, destinationPath: path });
+      documentSnapshotId: pin.documentSnapshotId, destinationPath: path };
+    if (options.replace) fieldsOut.replace = true; // in-place Save of a titled project only
+    var request = Object.freeze(fieldsOut);
     var receipt;
     try { receipt = diskReceipt(await ports.savePinned(request), request, options.project); }
     catch (_) { return result('indeterminate', 'publication-response-unavailable', pin, path); }

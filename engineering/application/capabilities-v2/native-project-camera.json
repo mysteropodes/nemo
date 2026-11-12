@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-camera",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.project.camera.read"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectCameraReadPayload"
+  },
+  "output": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectCameraReadResult"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "readPolicy": "Read-only, pinned view of the stored camera of the project (scene-root only): the keys (frame, x, y, w, optional rot, hOut, hIn, ease) and the camera layer flag, exactly as stored. selector settings answers keysPresent (a missing key set is not an empty one), keyCount and, when stored, layerOn; selector keyPage answers up to 16 keys in stored order with one-based ordinals, a zero-based cursor and nextCursor, inside a complete 4096-byte response or a typed refusal. The pins atRevision and documentSnapshotId must match exactly (stale_revision otherwise); any other context is unavailable. cameraView is session state and is never stored or returned. Evaluation stays in the camera kernel; the native After Effects camera export kernel (native_ae_camera_export) reads this same pinned state, and its job route rides the EXPORT-A job route. No document mutation, no revision publication, no history entry.",
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete 4096-byte pinned response or typed refusal; no count-only or truncated page."
+  },
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Pinned camera settings: two stored keys and the layer on",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "camera-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.project.camera.read",
+        "payload": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "selector": {
+            "kind": "settings"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "camera-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "result": {
+            "keysPresent": true,
+            "keyCount": 2,
+            "layerOn": true
+          }
+        }
+      }
+    },
+    {
+      "label": "First page of stored camera keys",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "camera-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.project.camera.read",
+        "payload": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "selector": {
+            "kind": "keyPage",
+            "cursor": 0,
+            "limit": 16
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "camera-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "result": {
+            "kind": "cameraKeyPage",
+            "keysPresent": true,
+            "keyCount": 2,
+            "cursor": 0,
+            "items": [
+              {
+                "frame": 0,
+                "x": 960,
+                "y": 540,
+                "w": 1920,
+                "ordinal": 1
+              },
+              {
+                "frame": 24,
+                "x": 400,
+                "y": 300,
+                "w": 960,
+                "rot": 15,
+                "ease": [
+                  0.25,
+                  0.1,
+                  0.25,
+                  1
+                ],
+                "ordinal": 2
+              }
+            ],
+            "nextCursor": null
+          }
+        }
+      }
+    }
+  ]
+}

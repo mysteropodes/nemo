@@ -1,6 +1,4 @@
 /* Private native document metadata presenter.
- * Owner: Ilya/A1; independent reviewer: Ilya/O Root.
- * API: render, select, toggleVisibility, restoreInspector, refreshTiming.
  * Rust owns document/revision state. Visibility uses the existing native.object
  * declaration/shared visibility handler through Project's SDK/transport queue.
  * UI state: this adapter's WeakMaps retain DOM bindings, read pins and the prior
@@ -14,64 +12,59 @@
  * Timing uses the Project session's pinned SDK reader; installed acceptance stays open.
  */
 (function(root,factory){
-  var api=factory();
-  if(typeof module==='object'&&module.exports)module.exports=api;
+  // In the page the seam and presenter load after this file; render resolves them from root.
+  var cjs=typeof module==='object'&&module.exports;
+  var api=cjs?factory(require('../application/presenter-seam.js'),require('./native-layer-list-presenter.js')):factory(null,null);
+  if(cjs)module.exports=api;
   else root.NemoNativeObjectUI=api;
-}(typeof globalThis==='object'?globalThis:this,function(){
+}(typeof globalThis==='object'?globalThis:this,function(Seam,LayerList){
   'use strict';
-  var inspectors=new WeakMap(),views=new WeakMap(),timings=new WeakMap(),policyTasks=new WeakMap(),policyEpochs=new WeakMap(),policyBindings=new WeakMap(),motionBindings=new WeakMap();
-  function retireMotion(root){var hooks=motionBindings.get(root);if(hooks)hooks.retire();var prior=inspectors.get(root);if(prior&&prior.motion){var saved=prior.motion;saved.body.replaceChildren.apply(saved.body,saved.children);saved.section.hidden=saved.hidden;saved.section.style.display=saved.display;prior.motion=null;}}
+  var inspectors=new WeakMap(),views=new WeakMap(),timings=new WeakMap(),policyTasks=new WeakMap(),policyEpochs=new WeakMap(),policyBindings=new WeakMap(),motionBindings=new WeakMap(),motionSurfaces=new WeakMap();
+  function motionSurface(root){
+    var surface=motionSurfaces.get(root),api=root.NemoNativeMotionBinding;
+    if(!surface&&api&&typeof api.createSurface==='function'){surface=api.createSurface(root,seam(root),motionBindings.get(root));motionSurfaces.set(root,surface);}
+    return surface;
+  }
+  function retireMotion(root){var surface=motionSurfaces.get(root);if(surface)surface.retire();var prior=inspectors.get(root);if(prior&&prior.motion){var saved=prior.motion;saved.body.replaceChildren.apply(saved.body,saved.children);saved.section.hidden=saved.hidden;saved.section.style.display=saved.display;prior.motion=null;}}
   function bindMotion(root,hooks){
-    if(!root||!hooks||typeof hooks.paint!=='function'||typeof hooks.retire!=='function')throw new TypeError('Native Motion UI hooks unavailable');
+    if(!root||!hooks||typeof hooks.render!=='function'||typeof hooks.retire!=='function')throw new TypeError('Native Motion UI hooks unavailable');
     if(motionBindings.has(root))throw new Error('Native Motion UI already bound');motionBindings.set(root,hooks);
-    if(typeof hooks.setKeyTimelineListener==='function')hooks.setKeyTimelineListener(function(){
-      var range=root.NemoNativeLayerRangeDesktop;if(range&&typeof range.refreshKeys==='function')range.refreshKeys(root);
-    });
+    var previous=motionSurfaces.get(root);if(previous){previous.dispose();motionSurfaces.delete(root);}
     return Object.freeze({dispose:function(){if(motionBindings.get(root)!==hooks)return;retireMotion(root);
-      if(typeof hooks.setKeyTimelineListener==='function')hooks.setKeyTimelineListener(null);motionBindings.delete(root);}});
+      var surface=motionSurfaces.get(root);if(surface)surface.dispose();motionSurfaces.delete(root);
+      if(typeof hooks.dispose==='function')hooks.dispose();motionBindings.delete(root);}});
   }
   function paintMotion(root,ports,prior){
     if(!root.state||root.state.appMode!=='motion'){retireMotion(root);prior.notice.textContent='Native drawing property inspectors are unavailable.';return;}
-    var hooks=motionBindings.get(root),section=root.document.getElementById('motion-props-sec'),body=root.document.getElementById('motion-props-body');
+    var section=root.document.getElementById('motion-props-sec'),body=root.document.getElementById('motion-props-body');
     var header=section&&section.querySelector('.phdr');
     prior.notice.textContent='Native Motion property values and edits are unavailable.';
-    if(!hooks||!section||!body||!header)return;
+    if(!section||!body||!header){retireMotion(root);return;}
+    if(!motionBindings.has(root)&&!seam(root).isMounted(root,'motion-properties'))return;
+    var surface=motionSurface(root);if(!surface){retireMotion(root);return;}
     if(prior.motion&&(prior.motion.section!==section||prior.motion.body!==body||prior.motion.header!==header))retireMotion(root);
     if(!prior.motion){prior.motion={section:section,body:body,header:header,children:Array.from(body.childNodes||body.children),hidden:section.hidden,display:section.style.display};body.replaceChildren();}
     section.hidden=false;section.style.display='';
-    if(hooks.paint(ports,body,header)!==true){retireMotion(root);prior.notice.textContent='Native Motion property metadata is unavailable.';}
+    if(surface.paint(ports,body,header)!==true){retireMotion(root);prior.notice.textContent='Native Motion property metadata is unavailable.';}
   }
   function routeMotionShortcut(root,key,shift){
-    var hooks=motionBindings.get(root);if(!hooks||typeof hooks.shortcut!=='function'||!paintMotionInspector(root))return false;
-    Promise.resolve(hooks.shortcut(key,shift)).catch(function(){});return true;
+    if(!paintMotionInspector(root))return false;var surface=motionSurfaces.get(root);if(!surface)return false;
+    var result=surface.shortcut(key,shift);if(result===null)return false;Promise.resolve(result).catch(function(){});return true;
   }
-  function readSelectedMotionKeys(root,info){
+  function routeMotionKeyEdit(root,action,opts){var surface=paintMotionInspector(root)?motionSurfaces.get(root):null;return Promise.resolve(surface?surface.editKeys(action,opts):null);}
+  function readMotion(root,info,method){
     try{
-      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),hooks=motionBindings.get(root);
+      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),surface=motionSurface(root);
       if(!info||!session||!session.isActive()||!sameTimingPin(session.info(),info)||ports.projectionReady(info)!==true||
-         !confirmed(root,info,session.readPresentedObjectSession())||!hooks||typeof hooks.captureSelectedKeys!=='function')return null;
-      return hooks.captureSelectedKeys(info);
+         !confirmed(root,info,session.readPresentedObjectSession())||!surface)return null;
+      return surface[method](info);
     }catch(_){return null;}
   }
-  function readMotionKeyTimeline(root,info){
-    try{
-      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),hooks=motionBindings.get(root);
-      if(!info||!session||!session.isActive()||!sameTimingPin(session.info(),info)||ports.projectionReady(info)!==true||
-         !confirmed(root,info,session.readPresentedObjectSession())||!hooks||typeof hooks.readKeyTimeline!=='function')return null;
-      return hooks.readKeyTimeline();
-    }catch(_){return null;}
-  }
-  function readMotionKeyTimelines(root,info){
-    try{
-      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),hooks=motionBindings.get(root);
-      if(!info||!session||!session.isActive()||!sameTimingPin(session.info(),info)||ports.projectionReady(info)!==true||
-         !confirmed(root,info,session.readPresentedObjectSession())||!hooks||typeof hooks.readKeyTimelines!=='function')return null;
-      return hooks.readKeyTimelines();
-    }catch(_){return null;}
-  }
+  function readSelectedMotionKeys(root,info){return readMotion(root,info,'captureSelectedKeys');}
+  function readMotionKeyTimeline(root,info){return readMotion(root,info,'readKeyTimeline');} function readMotionKeyTimelines(root,info){return readMotion(root,info,'readKeyTimelines');}
   function setKeyTimelineRows(root,layout,info){
     var view=views.get(root);
-    if(!view||!sameTimingPin(view.pin,info)||!Array.isArray(layout)||!view.rows.every(function(row,i){return row.parentNode===view.list&&row.children.length===4&&view.controls[i].every(function(n,k){return row.children[k]===n;});}))return false;
+    if(!view||!sameTimingPin(view.pin,info)||!Array.isArray(layout)||!view.rows.every(function(row,i){return row.parentNode===view.list&&row.children.length===view.controls[i].length&&view.controls[i].every(function(n,k){return row.children[k]===n;});}))return false;
     var labels=new Map();
     for(var entry of layout){
       if(!entry||typeof entry.layerUid!=='string'||labels.has(entry.layerUid)||!Array.isArray(entry.labels)||!entry.labels.every(function(v){return typeof v==='string';})||!info.layers.some(function(l){return l.layerUid===entry.layerUid;}))return false;
@@ -99,10 +92,13 @@
     retireMotion(root);
     retirePolicy(root);
     views.delete(root);
+    if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
     var timing=timings.get(root);if(timing){timing.latest=null;timing.serial++;timing.job=null;}
     var prior=inspectors.get(root);if(!prior)return;
     if(prior.fonts)prior.fonts.retire();
     if(prior.text)prior.text.retire();
+    if(prior.footage)prior.footage.retire();
+    if(prior.subselect)prior.subselect.retire();if(root.NemoNativeShapeTree)root.NemoNativeShapeTree.retire(root);
     prior.children.forEach(function(saved){saved.node.hidden=saved.hidden;saved.node.style.display=saved.display;});
     if(prior.trigger&&prior.trigger.node.parentNode===prior.reference){
       var next=prior.trigger.next;
@@ -133,12 +129,13 @@
       var box=createNativeObjectUiText(root,'div','');box.id='native-project-settings';
       var heading=createNativeObjectUiText(root,'div','Document');heading.className='phdr';box.appendChild(heading);
       prior.settings={box:box,moves:[],pin:null,bg:null};prior.section.appendChild(box);
-      [['p-cw','Width'],['p-ch','Height'],['btn-dims-lock','Proportions'],['proj-fps','FPS'],['p-cbg','Background']].forEach(function(entry){
+      [['p-cw','Width'],['p-ch','Height'],['btn-dims-lock','Proportions'],['proj-fps','FPS'],['p-cbg','Background'],['btn-rulers','Rulers',true]].forEach(function(entry){
         var node=root.document.getElementById(entry[0]);if(!node||!node.parentNode)return;
         var parent=node.parentNode,marker=root.document.createComment('native settings position'),row=createNativeObjectUiText(root,'div','');row.className='pr';
         var label=createNativeObjectUiText(root,'span',entry[1]);label.className='pl';row.appendChild(label);
         var saved={node:node,parent:parent,marker:marker,hidden:node.hidden,display:node.style.display,pointer:node.style.pointerEvents,events:[],gesture:null};
         parent.insertBefore(marker,node);row.appendChild(node);node.hidden=false;node.style.display='';box.appendChild(row);prior.settings.moves.push(saved);
+        if(entry[2])return; // View-only (rulersOn is a session flag the native guide bars read; never saved): moved as is, no edit guard (#2378).
         function observe(event,sourceEvent){
           try{var diagnostic=root.NemoNativeObjectProjectDesktop;if(diagnostic&&diagnostic.settingsDiagnostic){
             var session=ports.currentSession();diagnostic.settingsDiagnostic(root,event,Object.assign({},session&&session.info(),{
@@ -167,7 +164,7 @@
     if(changed){if(root.ColorPicker&&root.ColorPicker.close)root.ColorPicker.close();prior.settings.moves.forEach(function(saved){if(root.document.activeElement===saved.node&&saved.node.blur)saved.node.blur();});}
     prior.settings.ownerChanged=!!changed;
   }
-  function unavailableInspector(root,ports,info){
+  function unavailableInspector(root,ports,info,frameOnly){
     var panel=root.document.getElementById('props-panel');if(!panel)return;
     var prior=inspectors.get(root);
     if(prior&&prior.panel!==panel){restoreInspector(root);prior=null;}
@@ -176,9 +173,11 @@
       var heading=createNativeObjectUiText(root,'div','Native document');heading.className='phdr';section.appendChild(heading);
       var notice=createNativeObjectUiText(root,'div','Native drawing property inspectors are unavailable.');notice.setAttribute('role','status');section.appendChild(notice);
       var rail=root.document.getElementById('props-panel-rail'),trigger=root.document.getElementById('p-ref-menu');
-      prior={panel:panel,children:Array.from(panel.children).filter(function(child){return !['props-panel-hdr-row','props-panel-rail'].includes(child.id);})
+      // Swatches stays shown (always visible at baseline): its native palette controller renders into it (#2378).
+      var palette=!!root.NemoNativePaletteController,kept=['props-panel-hdr-row','props-panel-rail'].concat(palette?['swatches-sec']:[]);
+      prior={panel:panel,children:Array.from(panel.children).filter(function(child){return !kept.includes(child.id);})
         .map(function(child){return {node:child,hidden:child.hidden,display:child.style.display};}),section:section,
-        notice:notice,rail:rail,railChildren:rail?Array.from(rail.children):[],previousShow:root._lastPropsShow,show:{'native-object-inspector':true}};
+        notice:notice,rail:rail,railChildren:rail?Array.from(rail.children):[],previousShow:root._lastPropsShow,show:{'native-object-inspector':true,'swatches-sec':palette}};
       if(trigger&&trigger.parentNode){
         var reference=createNativeObjectUiText(root,'div','Reference');reference.className='pr';
         prior.trigger={node:trigger,parent:trigger.parentNode,next:trigger.nextSibling};prior.reference=reference;
@@ -195,6 +194,8 @@
     });
     if(prior.fonts)prior.fonts.refresh();
     if(root.NemoNativeTextToolDesktop)prior.text=root.NemoNativeTextToolDesktop.mount(root,prior.section,{currentSession:ports.currentSession,fontResources:ports.fontResources});
+    if(root.NemoNativeTimeRemapUI&&root.NemoNativeTimeRemapUI.mountInspector)prior.footage=root.NemoNativeTimeRemapUI.mountInspector(root,prior.section,{currentSession:ports.currentSession});
+    if(root.NemoNativeSubselectUI)prior.subselect=root.NemoNativeSubselectUI.mount(root,prior.section);if(root.NemoNativeShapeTree)root.NemoNativeShapeTree.mount(root,prior.section,frameOnly); // #2376: the Elements panel over the native listing
     prior.children.forEach(function(saved){saved.node.hidden=true;saved.node.style.display='none';});
     paintMotion(root,ports,prior);
   }
@@ -254,6 +255,9 @@
   function renderNativeObjectUiMetadata(root,info,frameOnly,ports){
     checked(root,info,ports);
     if(info.layers.some(function(l){return ['locked','shy'].some(function(k){return l[k]!==undefined&&typeof l[k]!=='boolean';});}))throw new Error('Invalid native layer flags');
+    // Publish the validated read model before any DOM change: a failing subscriber or a
+    // missing seam refuses the paint instead of leaving it half-applied.
+    seam(root).publish(root,info);
     var shyMode=typeof ports.readShyMode==='function'&&ports.readShyMode()===true,policyOwner=policyPort(ports);
     var list=node(root,'layer-list'),header=node(root,'frame-hdr'),grid=node(root,'frame-grid');
     var previous=views.get(root),selection=root._layerSel||[];
@@ -261,40 +265,30 @@
       previous.shyMode===shyMode&&previous.inspector===root.document.getElementById('props-panel')&&previous.active===root.state.activeLayerIdx&&
       ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].every(function(k){return previous.pin[k]===info[k];})&&
       selection.length===previous.selection.length&&selection.every(function(value,i){return previous.selection[i]===value;})&&
-      info.layers.length===previous.metadata.length&&info.layers.every(function(layer,i){var old=previous.metadata[i];return old[0]===layer.layerUid&&old[1]===layer.name&&old[2]===layer.visible&&old[3]===layer.locked&&old[4]===layer.shy;})&&
+      // Every row/decoration fact lives in the info object, which the session replaces on each revision; the pin above
+      // (contentRevision + documentSnapshotId) is therefore the content key. No per-frame serialisation (CLAUDE.md 5bis b).
+      info.layers.length===previous.layerCount&&
       list.children.length===previous.rows.length&&previous.rows.every(function(row,i){return list.children[i]===row&&
-        row.children.length===4&&previous.controls[i].every(function(control,k){return row.children[k]===control;});})&&
+        row.children.length===previous.controls[i].length&&previous.controls[i].every(function(control,k){return row.children[k]===control;});})&&
       header.children.length===1&&header.children[0]===previous.caption&&((root.NemoNativeLayerRangeDesktop&&root.NemoNativeLayerRangeDesktop.owns(root,grid,previous.unavailable))||(grid.children.length===1&&grid.children[0]===previous.unavailable));
     var rows,caption,unavailable;
     if(reuse){rows=previous.rows;caption=previous.caption;unavailable=previous.unavailable;}
     else{
-      rows=info.layers.map(function(layer,i){
-        var label=layer.name===undefined?layer.layerUid:layer.name;
-        var row=createNativeObjectUiText(root,'div',''),pick=createNativeObjectUiText(root,'button',label+' — '+(layer.visible===false?'Hidden':'Visible'));
-        row.className='native-object-layer';row.dataset.layerUid=layer.layerUid;row.style.display='flex';
-        pick.type='button';pick.style.flex='1';pick.style.textAlign='left';
-        pick.setAttribute('aria-pressed',String(selection.indexOf(i)>=0));
-        pick.setAttribute('aria-label',label+' ('+layer.layerUid+')');
-        pick.addEventListener('click',function(event){
+      // CS5 pilot surface: the rows come from the presenter mounted on the seam.
+      rows=layerListRows(root,{document:root.document,info:info,selection:selection,shyMode:shyMode,policyOwner:policyOwner,
+        onPick:function(i,layer,event,row){
           var view=views.get(root);
           if(!nativeObjectUiPortsReady(ports)||row.parentNode!==list||!view||view.rows[i]!==row)return false;
           if(root._layerDragJustEnded){root._layerDragJustEnded=false;return false;}
           var mode=event&&(event.metaKey||event.ctrlKey)?'toggle':event&&event.shiftKey?'range':null;
           return ports.selectLayer(i,mode?{mode:mode}:false,layer.layerUid,info);
-        });
-        var eye=createNativeObjectUiText(root,'button',layer.visible===false?'Show':'Hide');eye.type='button';
-        eye.setAttribute('aria-label',(layer.visible===false?'Show ':'Hide ')+label+' ('+layer.layerUid+')');
-        // Availability is checked at CLICK time: this render can precede preview/ACK.
-        eye.addEventListener('click',function(){return toggleVisibility(root,layer.layerUid,info,ports);});
-        var flags=['locked','shy'].map(function(flag){
-          var on=layer[flag]===true,label=flag==='locked'?(on?'Unlock':'Lock'):(on?'Unmark shy':'Mark shy');
-          var button=createNativeObjectUiText(root,'button',label);button.type='button';button.dataset.policyFlag=flag;
-          button.setAttribute('aria-pressed',String(on));button.setAttribute('aria-label',label+' '+(layer.name===undefined?layer.layerUid:layer.name));
-          button.disabled=!policyOwner;button.addEventListener('click',function(){if(row.parentNode!==list||!views.get(root)||!views.get(root).rows.includes(row))return false;return setLayerPolicy(root,layer.layerUid,flag,!on,info,ports);});return button;
-        });
-        row.hidden=shyMode&&layer.shy===true;row.style.display=row.hidden?'none':'flex';row.replaceChildren(pick,eye,flags[0],flags[1]);
-        return row;
-      });
+        },
+        onVisibility:function(layer){return toggleVisibility(root,layer.layerUid,info,ports);},
+        onPolicy:function(layer,flag,value,row){
+          if(row.parentNode!==list||!views.get(root)||!views.get(root).rows.includes(row))return false;
+          return setLayerPolicy(root,layer.layerUid,flag,value,info,ports);
+        },
+        onOpen:function(layer){return typeof ports.openLayer==='function'&&ports.openLayer(layer.layerUid);},rowEdit:root.NemoNativeLayerRowUi?function(layer,i,row){return root.NemoNativeLayerRowUi.bind(root,layer,i,row);}:null,parentCell:root.NemoNativeLayerParent?function(layer,i,row){return root.NemoNativeLayerParent.cell(root,info,layer,i,row);}:null,threeDCell:root.NemoNativeLayerThreeD?function(layer,toggle){return root.NemoNativeLayerThreeD.cell(root.document,layer,toggle);}:null,duplicatorCell:root.NemoNativeObjectDuplicatorUi?function(layer,i,row){return root.NemoNativeObjectDuplicatorUi.cell(root,info,layer,i,row);}:null,soloCell:root.NemoNativeLayerSolo?function(layer,i,row){return root.NemoNativeLayerSolo.cell(root,info,layer,i,row);}:null,layerKind:root.SMLayerKind,blendLabels:root.BLEND_MODE_LABELS,matteLabel:typeof root.matteModeLabel==='function'?root.matteModeLabel:null});
       caption=createNativeObjectUiText(root,'div','');
       unavailable=createNativeObjectUiText(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
       unavailable.setAttribute('role','status');unavailable.className='native-object-timing-unavailable';
@@ -302,18 +296,20 @@
       list.replaceChildren.apply(list,rows);header.replaceChildren(caption);grid.replaceChildren(unavailable);
     }
     if(root.NemoNativeLayerRangeDesktop&&typeof root.NemoNativeLayerRangeDesktop.mount==='function')
-      root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{setKeyTimelineRows:function(layout,expected){return setKeyTimelineRows(root,layout,expected);},readMotionKeyTimelines:function(expected){return readMotionKeyTimelines(root,expected);},readMotionKeyTimeline:function(expected){return readMotionKeyTimeline(root,expected);},readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
+      root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{setKeyTimelineRows:function(layout,expected){return setKeyTimelineRows(root,layout,expected);},readMotionKeyTimelines:function(expected){return readMotionKeyTimelines(root,expected);},readMotionKeyTimeline:function(expected){return readMotionKeyTimeline(root,expected);},readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},editSelectedKeys:function(action,opts){return routeMotionKeyEdit(root,action,opts);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
     caption.textContent='Frame '+(root.state.currentFrame+1)+' / '+info.totalFrames;
-    if(root.NemoNativeFrameCellSelection)root.NemoNativeFrameCellSelection.mount(root,caption,info,Object.assign({},ports,{
+    if(root.NemoNativeFrameCellSelection)root.NemoNativeFrameCellSelection.mount(root,caption,info,Object.assign({},ports,{frameOnly:reuse===true,
       frameEditPending:function(){var controller=root.NemoNativeFrameEditController;return !!(controller&&controller.isPending());}}));
-    unavailableInspector(root,ports,info);
+    unavailableInspector(root,ports,info,frameOnly);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});
-      views.set(root,{list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
+      views.set(root,{layerCount:info.layers.length,list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
         controls:rows.map(function(row){return Array.from(row.children);}),shyMode:shyMode,caption:caption,unavailable:unavailable,
-        ports:ports,pin:pin,active:root.state.activeLayerIdx,selection:selection.slice(),metadata:info.layers.map(function(layer){return [layer.layerUid,layer.name,layer.visible,layer.locked,layer.shy];})});}
+        ports:ports,pin:pin,active:root.state.activeLayerIdx,selection:selection.slice()});}
     var field=root.document.getElementById('tl-cf');
     if(field){if(root.document.activeElement!==field)field.value=root.state.currentFrame+1;field.max=info.totalFrames;}
     ['tl-tf','info-frame'].forEach(function(id){var el=root.document.getElementById(id);if(el)el.textContent=id==='tl-tf'?info.totalFrames:root.state.currentFrame+1;});
+    // The ruler playhead follows the native frame like the readouts above; updatePlayhead() is the legacy path this replaces (#2371).
+    var head=root.document.getElementById('playhead'),flag=root.document.getElementById('playhead-flag');if(head&&typeof root.playheadLeftPx==='function')head.style.left=root.playheadLeftPx(root.state.currentFrame)+'px';if(flag)flag.textContent=root.state.currentFrame+1;
     // These are read-side projections only; legacy field event handlers remain
     // guarded and no legacy document/frame reader is called.
     var metadata={'p-cw':info.canvasW,'p-ch':info.canvasH,'tl-fps':info.fps,'tl-total':info.totalFrames,
@@ -329,8 +325,14 @@
     if(root.updateWaBar&&root.document.getElementById('wa-bar'))root.updateWaBar();
     ['info-badge','info-strokes','info-sel'].forEach(function(id){var el=root.document.getElementById(id);if(el){el.textContent='Unavailable';if(id==='info-badge')el.style.display='none';}});
     requestTiming(root,info,ports);refreshPolicy(root);
+    if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
     return true;
   }
+  // The default layer-list presenter mounts lazily; a replacement registered first wins.
+  function seam(root){var api=Seam||root.NemoPresenterSeam;if(!api)throw new Error('Native document UI is unavailable: presenter seam');return api;}
+  // A replacement presenter registered before the first paint of its root wins; otherwise the default mounts (mountRows).
+  function layerListRows(root,context){var presenter=LayerList||root.NemoNativeLayerListPresenter;
+    if(!presenter)throw new Error('Native document UI is unavailable: layer-list presenter');return presenter.mountRows(root,seam(root),context);}
   // Ordinary native policy entries bind on paint and dispose when the UI retires.
   function bindLayerPolicy(root,ports){
     if(policyBindings.has(root))throw new Error('Layer policy entry is already bound');
@@ -385,16 +387,16 @@
     try{var ports=view.ports,session=ports.currentSession(),info=session&&session.info();owner=policyPort(ports);
       ready=!!owner&&!policyTasks.has(root)&&!!session&&session.isActive()&&session.blocksLegacy()===true&&sameTimingPin(view.pin,info)&&ports.projectionReady(info)===true&&confirmed(root,info,session.readPresentedObjectSession());
     }catch(_){}
-    view.controls.forEach(function(controls){controls.slice(2).forEach(function(button){button.disabled=!ready;});});
+    view.controls.forEach(function(controls){controls.slice(2,4).forEach(function(button){button.disabled=!ready;});});
     return ready;
   }
   function policyPort(ports){try{var value=typeof ports.layerPolicy==='function'&&ports.layerPolicy();return value&&typeof value.edit==='function'?value:null;}catch(_){return null;}}
   function retirePolicy(root){policyEpochs.set(root,(policyEpochs.get(root)||0)+1);policyTasks.delete(root);views.delete(root);}
   function policySelection(root){return JSON.stringify([root.state.appMode,root.state.activeLayerIdx,root._layerSel||[]]);}
   function setLayerPolicy(root,uid,flag,value,expected,ports){
-    function refused(){if(root.showToast)root.showToast('Native layer policy was not confirmed.');return false;}
+    function refused(error){var no3d=flag==='threeD'&&value===true&&/refused: unavailable/.test(String(error&&error.message||''));if(root.showToast)root.showToast(no3d?'3D is not available for this layer yet.':'Native layer policy was not confirmed.');return false;} // #2520: a refused 3D switch is the engine's typed unavailable (no revision): this layer cannot be placed in 3D yet
     try{
-      if(!nativeObjectUiPortsReady(ports)||!['locked','shy'].includes(flag)||typeof value!=='boolean'||typeof ports.readTransportGeneration!=='function'||!Number.isSafeInteger(ports.readTransportGeneration())||ports.readTransportGeneration()<0||policyTasks.has(root))return Promise.resolve(false);
+      if(!nativeObjectUiPortsReady(ports)||!['locked','shy','threeD'].includes(flag)||typeof value!=='boolean'||typeof ports.readTransportGeneration!=='function'||!Number.isSafeInteger(ports.readTransportGeneration())||ports.readTransportGeneration()<0||policyTasks.has(root))return Promise.resolve(false);
       var owner=policyPort(ports),session=ports.currentSession(),info=session&&session.info(),view=views.get(root),epoch=policyEpochs.get(root)||0;
       var layer=info&&info.layers.filter(function(l){return l.layerUid===uid;});
       if(!view||!sameTimingPin(view.pin,info)||!owner||!session||!session.isActive()||!sameTimingPin(expected,info)||!confirmed(root,info,session.readPresentedObjectSession())||!layer||layer.length!==1||ports.projectionReady(info)!==true)return Promise.resolve(false);
@@ -410,7 +412,7 @@
       }).then(function(result){
         if(result!==true||policyTasks.get(root)!==ticket||(policyEpochs.get(root)||0)!==epoch||policySelection(root)!==signature||ports.currentSession()!==session||!session.isActive()||!views.get(root)||views.get(root).ports!==ports||views.get(root).list!==view.list||policyPort(ports)!==owner||ports.readTransportGeneration&&ports.readTransportGeneration()!==transport)return refused();
         var next=session.info(),target=next&&next.layers.filter(function(l){return l.layerUid===uid;});
-        if(!next||!['instanceId','documentId','lifecycleGeneration'].every(function(k){return next[k]===pin[k];})||next.contentRevision<=pin.contentRevision||next.documentSnapshotId===pin.documentSnapshotId||!target||target.length!==1||target[0][flag]!==value||ports.projectionReady(next)!==true||!confirmed(root,next,session.readPresentedObjectSession()))return refused();
+        if(!next||!['instanceId','documentId','lifecycleGeneration'].every(function(k){return next[k]===pin[k];})||next.contentRevision<=pin.contentRevision||next.documentSnapshotId===pin.documentSnapshotId||!target||target.length!==1||(target[0][flag]===true)!==value||ports.projectionReady(next)!==true||!confirmed(root,next,session.readPresentedObjectSession()))return refused();
         // Only UI-owned selection/presentation ports run after native confirmation.
         if(flag==='locked'&&value&&root.state.appMode==='drawing'&&typeof ports.clearDrawingSelection==='function')ports.clearDrawingSelection(uid,next);
         if(flag==='shy'&&value&&typeof ports.setShyMode==='function')ports.setShyMode(true,next);
@@ -423,6 +425,26 @@
       ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].every(function(k){return presented[k]===info[k];})&&
       !!presented.presentation&&presented.presentation.owner==='native'&&presented.presentation.status==='presented'&&presented.presentation.frame===root.state.currentFrame&&
       ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].every(function(k){return presented.presentation[k]===info[k];});
+  }
+  function readImageMeshSelection(root){
+    var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),info=session&&session.info();
+    var shown=session&&session.readPresentedObjectSession(),presentation=shown&&shown.presentation;
+    var index=root.state.activeLayerIdx,layer=info&&info.layers[index],ticket=session&&session.readSubscriptionGeneration();
+    function selection(){return Array.isArray(root._layerSel)&&root._layerSel.length===1&&root._layerSel[0]===index&&root.state.activeLayerIdx===index;}
+    if(!view||!info||!layer||!session.isActive()||root.state.playing||!['select','subselect'].includes(root.state.tool)||!sameTimingPin(view.pin,info)||!selection()||
+      ports.projectionReady(info)!==true||!confirmed(root,info,shown)||presentation.contextId!=='scene-root')return null;
+    var selector=Object.freeze({contextId:presentation.contextId,layerUid:layer.layerUid,frame:presentation.frame});
+    function current(lease){
+      try{
+        var live=ports.currentSession(),pin=live&&live.info(),value=lease&&typeof lease.readPresentedObjectSession==='function'?
+          lease.readPresentedObjectSession():live&&live.readPresentedObjectSession();
+        return views.get(root)===view&&live===session&&live.isActive()&&!root.state.playing&&['select','subselect'].includes(root.state.tool)&&sameTimingPin(pin,info)&&
+          sameTimingPin(view.pin,info)&&live.readSubscriptionGeneration()===ticket&&selection()&&
+          pin.layers[index].layerUid===selector.layerUid&&ports.projectionReady(pin)===true&&
+          confirmed(root,pin,value)&&value.presentation===presentation;
+      }catch(_){return false;}
+    }
+    return Object.freeze({session:session,info:info,selector:selector,current:current});
   }
   function toggleVisibility(root,uid,expected,ports){
     function refused(){try{if(root.showToast)root.showToast('Native layer visibility was not confirmed.');}catch(_){}return false;}
@@ -474,5 +496,5 @@
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }
-  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,isFrameSelectionPending:isFrameSelectionPending,showRepeatDialog:showRepeatDialog,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
+  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,readImageMeshSelection:readImageMeshSelection,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,isFrameSelectionPending:isFrameSelectionPending,showRepeatDialog:showRepeatDialog,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut,routeMotionKeyEdit:routeMotionKeyEdit,paintMotionHeld:function(root,ports){var prior=inspectors.get(root);if(prior&&root.NemoNativeComponentContext&&root.NemoNativeComponentContext.presented(root))paintMotion(root,ports,prior);}});
 }));

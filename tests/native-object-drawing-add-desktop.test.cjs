@@ -58,3 +58,25 @@ test('controller disposal and a broken notice do not reopen the removed legacy r
   const h=fixture();h.root.showToast=()=>{throw Error('notice unavailable');};h.controller.dispose();
   assert.equal((await h.root.SM.addLayer()).status,'unavailable');assert.equal(h.calls(),0);h.dispose();
 });
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+function hideQueue(h){const s=h.root.NemoNativeObjectProject.desktop(),real=s.readPresentedObjectSession,q={hidden:true};
+  s.readPresentedObjectSession=function(why){if(q.hidden){if(why)why('queue-pending');return null;}return real.call(this);};return q;}
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+test('ordinary Add made while the queue hides the presentation waits for it and creates exactly one layer',async()=>{
+  globalThis.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');
+  try{
+    const h=fixture(),q=hideQueue(h),added=h.root.SM.addLayer();
+    await sleep(150);assert.equal(h.calls(),0,'nothing is created while the presentation is hidden');assert.deepEqual(h.root.notices,[]);
+    q.hidden=false;const result=await added;
+    assert.equal(result.status,'created-selected');assert.equal(h.calls(),1);assert.deepEqual(h.root._layerSel,[1]);assert.deepEqual(h.root.notices,[]);h.dispose();
+  }finally{delete globalThis.NemoNativePresentationWait;}
+});
+test('ordinary Add whose native session was lost during the wait still refuses and creates nothing',async()=>{
+  globalThis.NemoNativePresentationWait=require('../src/js/adapters/native-presentation-wait.js');
+  try{
+    const h=fixture(),q=hideQueue(h),added=h.root.SM.addLayer();
+    await sleep(80);h.current(null);q.hidden=false;
+    assert.equal((await added).status,'unavailable');assert.equal(h.calls(),0);h.dispose();
+  }finally{delete globalThis.NemoNativePresentationWait;}
+});

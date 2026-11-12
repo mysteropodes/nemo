@@ -12,7 +12,8 @@
 //! content moved away is dropped with the frame it described; an element-less scope stays where it is. The
 //! input is only borrowed: a refusal cannot leave a partial edit.
 use crate::commands::object_fill_owner::object_frame_edit_document::{
-    ascending, layer_index, scene_authored, scene_contexts, scope_at, timing_of, FrameEditError,
+    ascending, layer_index, remap_items, scene_authored, scene_contexts, scope_at, timing_of,
+    FrameEditError,
 };
 use crate::object_document::{
     FrameScopeKind, ObjectDocument, OrderContext, OrderScope, Presence, RetimeEdit, RetimePair,
@@ -158,6 +159,14 @@ pub(crate) fn retime_key_with_active(
         }
     }
     next.objects = moved;
+    // Raster images and text blocks of the retimed layer travel with its records.
+    remap_items(&mut next, &|layer, frame| {
+        if layer == layer_uid {
+            fan.dests(frame)
+        } else {
+            vec![frame]
+        }
+    });
     for context in scene_contexts(&mut next) {
         fan_scopes(context, layer_uid, &fan)?;
     }

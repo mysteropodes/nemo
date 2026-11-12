@@ -236,16 +236,17 @@ fn real_common_3d_replaces_2d_and_suppresses_original_layer_opacity_and_stroke_s
 #[test]
 fn actual_scene_refuses_unjoined_scaled_stroke_gradient_and_legacy_pathfx_combinations() {
     for (kind, reason) in [
-        ("stroke", "scaled vector stroke awaits"),
+        ("dashed-stroke", "scaled dashed vector stroke awaits"),
         ("gradient", "transformed vector gradient awaits"),
         ("legacy-pathfx", "layer path effects on a legacy record"),
     ] {
         let mut source = drawing(kind == "legacy-pathfx");
         match kind {
-            "stroke" => {
+            "dashed-stroke" => {
                 source["objects"][0]["vector"]["stroke"] =
                     json!({"kind":"solid","r":0,"g":0,"b":0,"a":1});
                 source["objects"][0]["vector"]["hasRealStroke"] = json!(true);
+                source["objects"][0]["vector"]["dashArray"] = json!([4, 2]);
             }
             "gradient" => {
                 source["objects"][0]["vectorExt"] = json!({"fillGradient":{
@@ -284,6 +285,7 @@ fn unjoined_second_record_paint_preserves_its_actual_source_index_and_atomic_sce
     let mut source = drawing(false);
     source["objects"][1]["vector"]["stroke"] = json!({"kind":"solid","r":0,"g":0,"b":0,"a":1});
     source["objects"][1]["vector"]["hasRealStroke"] = json!(true);
+    source["objects"][1]["vector"]["dashArray"] = json!([4, 2]);
     let o = owner(&source);
     let s = o.acquire_snapshot(0).unwrap();
     let p = packet(&o, &s, 0);
@@ -292,7 +294,7 @@ fn unjoined_second_record_paint_preserves_its_actual_source_index_and_atomic_sce
         Err(
             crate::object_render_scene::ObjectSceneError::UnsupportedGeometry {
                 source_object_index: 1,
-                reason: "scaled vector stroke awaits its actual paint width and dash consumer"
+                reason: "scaled dashed vector stroke awaits its actual paint dash consumer"
             }
         )
     ));
@@ -316,6 +318,9 @@ fn shared_motion_admission_refuses_mask_and_multiple_parent_controls_without_pub
     for kind in ["mask", "parentBlend"] {
         let mut source = three_d(false);
         if kind == "mask" {
+            // Outside 3D a mask keeps the unjoined route (under the layer's own 3D switch it is projected with the layer:
+            // `a_mask_contour_under_3d_is_projected_with_the_layer`).
+            source["layers"][0]["threeD"] = json!(false);
             source["objects"][0]["vectorExt"] = json!({"isMask":true,"maskMode":"add"});
         } else {
             source["propertyHolders"][0]["properties"]
@@ -355,6 +360,8 @@ fn shared_motion_admission_refuses_mask_and_multiple_parent_controls_without_pub
 
 #[path = "object_scene_vector_parent.rs"]
 mod parent_tests;
+#[path = "render_layer_transform_keys.rs"]
+mod layer_transform_keys;
 
 // A split promotes element Position to a layer shared with differently authored frames.
 fn mixed_authored_position(position: Option<[f64; 2]>) -> Value {
@@ -453,3 +460,45 @@ fn real_common_position_handles_absent_identity_and_nonzero_across_vector_and_le
         }
     }
 }
+
+/// #2520/#2525: switching a plain layer to 3D through the layer policy, with Position Z and both rotations still at their
+/// defaults, projects at depth 0 and must leave every contour where it was (the baseline `toggleLayer3D` invariant).
+#[test]
+fn switching_a_layer_to_3d_through_the_policy_leaves_the_contours_in_place_until_a_3d_value_moves() {
+    let source = drawing(false);
+    let mut o = owner(&source);
+    let flat = starts(&plan(&packet(&o, &o.acquire_snapshot(0).unwrap(), 2)));
+    let switch = |o: &mut NativeObjectHistory, on: bool| {
+        let payload = json!({"command":"object.layer.policy.edit","layerUid":"L1","flag":"threeD","value":on});
+        let candidate = o.prepare_layer_policy_json(payload.to_string().as_bytes()).unwrap();
+        o.commit_layer_policy(candidate).unwrap()
+    };
+    let at = |o: &NativeObjectHistory| {
+        let s = o.acquire_snapshot(o.content_revision()).unwrap();
+        starts(&plan(&packet(o, &s, 2)))
+    };
+    assert_eq!(switch(&mut o, true), 1);
+    let near = |a: &[(String, [f64; 2])], b: &[(String, [f64; 2])]| {
+        a.len() == b.len()
+            && a.iter().zip(b).all(|(x, y)| x.0 == y.0 && (x.1[0] - y.1[0]).abs() < 1e-9 && (x.1[1] - y.1[1]).abs() < 1e-9)
+    };
+    let on = at(&o);
+    assert!(near(&on, &flat), "3D at depth 0 is the 2D picture: {on:?} vs {flat:?}");
+    // A real Position Z moves it, and switching back off restores the flat picture exactly.
+    let payload = json!({"command":"object.property.edit","target":{"contextId":"scene-root","layerUid":"L1"},
+        "property":"positionZ","action":{"kind":"setValue","frame":0,"values":[-400]}});
+    let candidate = o.prepare_property_edit_json(payload.to_string().as_bytes()).unwrap();
+    o.commit_property_edit(candidate).unwrap();
+    for key in ["rotationX", "rotationY"] {
+        let payload = json!({"command":"object.property.edit","target":{"contextId":"scene-root","layerUid":"L1"},
+            "property":key,"action":{"kind":"setValue","frame":0,"values":[0]}});
+        let candidate = o.prepare_property_edit_json(payload.to_string().as_bytes()).unwrap();
+        o.commit_property_edit(candidate).unwrap();
+    }
+    assert!(!near(&at(&o), &flat), "a layer pushed back in depth shrinks toward the centre");
+    assert_eq!(switch(&mut o, false), 5);
+    assert!(near(&at(&o), &flat), "positionZ is stored but inactive while the switch is off");
+}
+
+#[path = "object_scene_vector_batch_3d.rs"]
+mod three_d_scene_tests;

@@ -359,6 +359,107 @@ fn missing_parent_cycle_and_enabled_expression_never_publish_a_scene() {
     }
 }
 
+/// Baseline `OUT` paths (point, handleIn, handleOut per segment) of one case of the L06-K scene oracle.
+fn oracle_out(case: &str) -> Vec<Vec<[f64; 6]>> {
+    let (mut in_case, mut in_out) = (false, false);
+    let mut paths: Vec<Vec<[f64; 6]>> = Vec::new();
+    for line in include_str!("fixtures/text-glyph-scene/oracle.txt").lines() {
+        if let Some(rest) = line.strip_prefix("CASE ") {
+            in_case = rest.split(' ').next() == Some(case);
+        } else if !in_case {
+        } else if line.starts_with("OUT ") {
+            in_out = true;
+        } else if line.starts_with("STRICT") {
+            break;
+        } else if in_out && line.starts_with("P ") {
+            paths.push(Vec::new());
+        } else if in_out && line.starts_with("G ") {
+            let v: Vec<f64> = line[2..].split(' ').map(|n| n.parse().unwrap()).collect();
+            paths.last_mut().unwrap().push(v.try_into().unwrap());
+        }
+    }
+    paths
+}
+#[test]
+fn italic_text_is_sheared_before_the_parented_chain_on_the_production_route() {
+    // Baseline `scale_italic_parents`: "AMNV" italic, element motion (3,4) scale 150/80 about (100,60),
+    // then a parent scaled 50% about (0,0). Production pivots are the layer bounds centre + anchor, so the
+    // anchors below are solved from the production chain to land on the baseline pivots.
+    let want = oracle_out("scale_italic_parents");
+    assert_eq!(want.len(), 9);
+    let build = |l0_anchor: [f64; 2]| {
+        let mut doc = drawing();
+        doc["items"].as_object_mut().unwrap().remove("raster");
+        doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"] = json!([
+            {"layerUid":"L0","strokeId":"text","naturalPosition":0,"order":{}},
+            {"layerUid":"P","strokeId":"parent-rect","naturalPosition":0,"order":{}}]);
+        doc["items"]["text"][0]["block"] = json!({"text":"AMNV","font":{"kind":"bundled","fontKey":"Roboto-Regular"},
+            "size":40,"color":"#112233","align":"left","italic":true,"anchorTopLeft":{"x":3.5,"y":4.25}});
+        doc["propertyHolders"] = json!([
+            {"target":{"contextId":"scene-root","layerUid":"P"},"properties":[
+                {"property":"anchor","static":[-20,-10]},{"property":"scale","static":[50,50]}]},
+            {"target":{"contextId":"scene-root","layerUid":"L0"},"properties":[
+                {"property":"position","static":[3,4]},{"property":"anchor","static":l0_anchor},
+                {"property":"scale","static":[150,80]}]}]);
+        doc
+    };
+    let first = owner(&build([0.0, 0.0]));
+    let first_snapshot = snapshot(&first);
+    let base = plan(&first_snapshot, 0)
+        .native_parent_chains()
+        .chain(0)
+        .unwrap()[0]
+        .pivot;
+    let o = owner(&build([100.0 - base[0], 60.0 - base[1]]));
+    let s = snapshot(&o);
+    let before = crate::object_codec::encode_storage_project(s.document()).unwrap();
+    let p = plan(&s, 0);
+    let chain = p.native_parent_chains().chain(0).unwrap();
+    assert_eq!(chain.len(), 2, "layer motion first, then the parent");
+    for (got, want) in [
+        (chain[0].pivot, [100.0, 60.0]),
+        (chain[1].pivot, [0.0, 0.0]),
+    ] {
+        assert!(
+            (got[0] - want[0]).abs() < 1e-9 && (got[1] - want[1]).abs() < 1e-9,
+            "{got:?}"
+        );
+    }
+    let text = ordered_entries(&p)
+        .find_map(|e| {
+            if let PaintEntry::Text(t) = e {
+                Some(t)
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    let contours = text.item.scene().contours();
+    assert_eq!(contours.len(), want.len());
+    for (index, (contour, want)) in contours.iter().zip(&want).enumerate() {
+        let got = contour.contour.segments();
+        assert_eq!(got.len(), want.len(), "contour {index}");
+        for (g, w) in got.iter().zip(want) {
+            let flat = [
+                g.point[0],
+                g.point[1],
+                g.handle_in[0],
+                g.handle_in[1],
+                g.handle_out[0],
+                g.handle_out[1],
+            ];
+            assert!(
+                flat.iter().zip(w).all(|(a, b)| (a - b).abs() < 1e-9),
+                "contour {index}: {flat:?} != {w:?}"
+            );
+        }
+    }
+    assert_eq!(
+        crate::object_codec::encode_storage_project(s.document()).unwrap(),
+        before
+    );
+}
+
 #[cfg(feature = "test-compositor")]
 #[path = "object_scene_parent_chain_pixels.rs"]
 mod actual_pixels;

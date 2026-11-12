@@ -17,6 +17,15 @@
     describe: 'labsDescribePingpongCycle',
   });
 
+  function nativePingpong(native, b, times) {
+    var toast = function (text) { if (typeof showToast === 'function') showToast(text); };
+    var from = native.layerUid(b.minL), to = native.layerUid(b.maxL);
+    if (!from || !to) { toast(SM.t('labsToastLayerInvalid')); return Promise.resolve(); }
+    return native.pingpong({ fromLayer: from, toLayer: to, fromFrame: b.minF, toFrame: b.maxF, times: times }).then(function () {
+      toast(SM.t('labsToastPingpongPrefix') + times + SM.t('labsToastPingpongSuffix'));
+    }, function () { toast(SM.t('labsToastLayerInvalid')); });
+  }
+
   window.SMLabs.pingpongCycle = function (times) {
     if (typeof selBounds !== 'function') return;
     var b = selBounds();
@@ -24,6 +33,9 @@
     times = Math.max(1, Math.min(50, parseInt(times, 10) || 1));
     var span = b.maxF - b.minF + 1;
     if (span < 2) { if (typeof showToast === 'function') showToast(SM.t('labsToastNeedAtLeast2FramesPingpong')); return; }
+    // Native authority (U35, #2362): one native transaction; the call returns a Promise. The baseline path follows.
+    var native = window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window);
+    if (native) return nativePingpong(native, b, times);
     pushUndoLayers();
     saveAllLayerFrames();
     // Each appended block is span-1 frames (the turnaround frame is shared

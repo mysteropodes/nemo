@@ -9,6 +9,8 @@ use std::collections::HashSet;
 
 #[path = "object_property_catalog.rs"]
 mod catalog;
+#[path = "object_property_exposed.rs"]
+pub(crate) mod exposed;
 #[path = "object_property_names.rs"]
 mod names;
 #[path = "object_property_targets.rs"]
@@ -191,6 +193,10 @@ impl PropertyHolder {
     pub(crate) fn normalized_control_name(name: &str) -> String {
         names::normalize(name)
     }
+    /// The authored control name: the JS `trim` of what the caller typed.
+    pub(crate) fn trimmed_control_name(name: &str) -> &str {
+        names::trim(name)
+    }
 }
 fn controls(holder: &PropertyHolder) -> Result<(), PropertyAdmissionError> {
     let mut keys = HashSet::new();
@@ -232,6 +238,9 @@ fn property(
             }
             previous = Some(frame);
             vector(&key.v, meta.dimension)?;
+            if key.color.value().is_some_and(|c| !crate::object_document::valid_key_color(c)) {
+                return Err(invalid("key colour must be #rrggbb or #rrggbbaa"));
+            }
             for handle in [key.h_in.value(), key.h_out.value()].into_iter().flatten() {
                 vector(handle, 2)?;
             }
@@ -394,9 +403,17 @@ impl PropertyHolder {
                         ));
                     }
                 }
+                let exposed =
+                    crate::object_document::exposed_metadata(components, target, &record.property);
                 let meta = holder
                     .metadata(&record.property)
+                    .or_else(|| exposed.clone())
                     .ok_or_else(|| unsupported("unknown property"))?;
+                if exposed.is_some() && record.expression.value().is_some_and(|e| e.enabled) {
+                    return Err(unsupported(
+                        "exposed component property is read raw; expressions are unsupported",
+                    ));
+                }
                 property(record, &meta)?;
             }
         }

@@ -177,6 +177,31 @@ async fn corrupt_image_source_leaves_no_partial_native_asset_or_layer() {
 }
 
 #[tokio::test]
+async fn a_refused_source_reports_its_reason_and_not_dispatched_so_the_client_may_correct_and_retry() {
+    let state = state();
+    let original = save(&state);
+    let reply = state
+        .revisions
+        .dispatch_image_using(
+            state.instance_id(),
+            &state.native_state(),
+            input(&state, "refused"),
+            false,
+            |_| async { Err("native image source outside filesystem scope".to_owned()) },
+        )
+        .await
+        .unwrap()
+        .response;
+    let error = reply.error.unwrap();
+    assert_eq!(error.code, "unavailable");
+    assert!(error.message.ends_with("outside filesystem scope"), "{}", error.message);
+    let details = error.details.unwrap();
+    assert_eq!(details["disposition"], "notDispatched");
+    assert_eq!(details["committed"], false);
+    assert_eq!(save(&state), original);
+}
+
+#[tokio::test]
 async fn wrong_owner_and_changed_body_return_typed_terminal_envelopes_before_source_io_without_poisoning_replay(
 ) {
     // Like the existing positive host controls, execution waits for reviewed PNG activation.
@@ -254,4 +279,157 @@ async fn wrong_owner_and_changed_body_return_typed_terminal_envelopes_before_sou
         serde_json::to_value(first).unwrap()
     );
     assert_eq!(save(&state), committed);
+}
+fn stroke_request(state: &ApplicationMcp) -> NativeApplicationRequest {
+    let pin = info(state);
+    let file: Value = serde_json::from_slice(&save(state)).unwrap();
+    let layer = file["drawing"]["layers"][0]["layerUid"].clone();
+    let point = |x: f64, y: f64| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
+    let record = json!({"schemaVersion":1,"family":"editable-vector-path",
+        "target":{"contextId":"scene-root","layerUid":layer,"strokeId":"","frameScope":{"kind":"authored","frame":0}},
+        "geometry":{"kind":"cubic-path","closed":false,"coordinateSpace":"document-world","handleSpace":"relative",
+            "segments":[point(10.0, 10.0), point(60.0, 20.0)]},
+        "fill":null,
+        "vector":{"stroke":{"kind":"solid","r":0,"g":0,"b":1,"a":1},"hasRealStroke":true,"strokeWidth":8,"strokeCap":"round",
+            "strokeJoin":"round","miterLimit":10,"dashOffset":0,"opacity":0},
+        "vectorExt":{"bitmapBrush":{"bitmapBrushSpec":{"tip":"soft","size":8,"spacing":15,"scatter":20,"opacity":1,
+            "color":"#0000ffff","pressure":false,"seed":7},"brushGroupId":"bmb_host_1","preTextureOpacity":1}}});
+    let request: NativeApplicationRequest = serde_json::from_value(json!({"apiVersion":2,"requestId":"host-bitmap",
+        "instanceId":state.instance_id(),"documentId":pin["documentId"],"expectedRevision":pin["contentRevision"],
+        "operation":"command.document.object.brush.bitmap.stroke",
+        "payload":{"documentSnapshotId":pin["documentSnapshotId"],"lifecycleGeneration":pin["lifecycleGeneration"],
+            "record":record,"companion":{"x":35,"y":15,"width":58,"height":18,"opacity":1},
+            "source":{"kind":"file","path":"/admitted/brush.png"}}}))
+    .unwrap();
+    request
+}
+/// #2361: a bitmap-brush Draw stroke rides the same byte port: the anchor, its companion and the PNG land in one
+/// revision, survive save/reload, and a replay never reads the source again.
+#[tokio::test]
+async fn bitmap_brush_stroke_lands_anchor_companion_and_png_through_the_byte_port() {
+    let state = state();
+    let native = state.native_state();
+    let request = stroke_request(&state);
+    let first = state
+        .revisions
+        .dispatch_image_using(state.instance_id(), &native, request.clone(), false, |_| {
+            assert!(native.try_lock().is_ok());
+            async { Ok(png()) }
+        })
+        .await
+        .unwrap()
+        .response;
+    assert!(first.ok, "{}", serde_json::to_value(&first).unwrap());
+    let bytes = save(&state);
+    let file: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(file["assets"].as_array().unwrap().len(), 1);
+    assert_eq!(file["drawing"]["objects"].as_array().unwrap().len(), 1);
+    let companion = &file["drawing"]["items"]["raster"][0]["item"];
+    assert_eq!(
+        (&companion["isBrushTextureCopy"], &companion["brushGroupId"]),
+        (&json!(true), &json!("bmb_host_1"))
+    );
+    let again = state
+        .revisions
+        .dispatch_image_using(state.instance_id(), &native, request, false, |_| async {
+            panic!("replay must not access source");
+            #[allow(unreachable_code)]
+            Ok(Vec::new())
+        })
+        .await
+        .unwrap()
+        .response;
+    assert_eq!(
+        serde_json::to_value(again).unwrap(),
+        serde_json::to_value(first).unwrap()
+    );
+    let reopened = ApplicationMcp::default();
+    reopened.install_native_project_file(&bytes).unwrap();
+    assert_eq!(save(&reopened), bytes);
+}
+fn run(
+    state: &ApplicationMcp,
+    id: &str,
+    operation: &str,
+    payload: impl Fn(&Value) -> Value,
+) -> nemo_mcp::contract::NativeApplicationResponse {
+    let pin = info(state);
+    let mut wire = json!({"apiVersion":2,"requestId":id,"instanceId":state.instance_id(),
+        "documentId":pin["documentId"],"operation":operation,"payload":payload(&pin)});
+    if operation.starts_with("command.") {
+        wire["expectedRevision"] = pin["contentRevision"].clone();
+    }
+    let request: NativeApplicationRequest = serde_json::from_value(wire).unwrap();
+    state
+        .revisions
+        .dispatch(state.instance_id(), &state.native_state(), request, false)
+        .unwrap()
+        .response
+}
+/// #2361 DRAW-C: the bitmap-brush resource operations reach the session-owned store through the real host: a
+/// publication or read leaves the saved document byte-identical, the scene names the id the ink is published under, and
+/// another session never sees them and closing the session retires them.
+#[tokio::test]
+async fn brush_bitmap_resources_publish_and_read_through_the_session_store_without_touching_the_document() {
+    let fresh = state();
+    let state = state();
+    let native = state.native_state();
+    let delivered = state
+        .revisions
+        .dispatch_image_using(state.instance_id(), &native, stroke_request(&state), false, |_| async {
+            Ok(png())
+        })
+        .await
+        .unwrap()
+        .response;
+    assert!(delivered.ok);
+    let committed = save(&state);
+    let file: Value = serde_json::from_slice(&committed).unwrap();
+    let asset = file["assets"][0]["id"].as_str().unwrap().to_owned();
+    let publish = |brush: String| {
+        let asset = asset.clone();
+        move |pin: &Value| json!({"command":"object.brush.bitmap.publish","documentSnapshotId":pin["documentSnapshotId"],
+            "assetId":asset,"brushId":brush,"width":2,"height":1})
+    };
+    let read = |extra: Value| {
+        move |pin: &Value| {
+            let mut payload = json!({"atRevision":pin["contentRevision"],"documentSnapshotId":pin["documentSnapshotId"]});
+            payload.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+            payload
+        }
+    };
+    let scene = || read(json!({"action":"scene","contextId":"scene-root","frame":0,"offset":0,"limit":1}));
+    let query = "query.document.object.brush.bitmap";
+    let missing = run(&state, "scene-1", query, scene());
+    assert!(missing.ok, "{}", serde_json::to_value(&missing).unwrap());
+    let missing = missing.result.unwrap();
+    assert_eq!(missing["totalEntries"], 1);
+    assert_eq!(missing["entries"][0]["unavailable"]["code"], "ink-missing");
+    let brush = missing["entries"][0]["brushId"].as_str().unwrap().to_owned();
+    let published = run(&state, "publish-1", "command.document.object.brush.bitmap.publish", publish(brush.clone()));
+    assert!(published.ok, "{}", serde_json::to_value(&published).unwrap());
+    assert_eq!(published.result.unwrap()["applied"], true);
+    let drawn = run(&state, "scene-2", query, scene()).result.unwrap();
+    assert_eq!(drawn["entries"][0]["ink"]["width"], 2);
+    let row = run(&state, "inspect-1", query, read(json!({"action":"inspect","brushId":brush.clone()}))).result.unwrap();
+    assert_eq!(row["brush"]["resident"], true);
+    assert_eq!(save(&state), committed, "a publication or read must not change the document");
+    // A refusal is typed: an asset the project does not hold.
+    let absent = publish(brush.clone());
+    let refusal = run(&state, "publish-2", "command.document.object.brush.bitmap.publish", move |pin: &Value| {
+        let mut payload = absent(pin);
+        payload["assetId"] = "no-such-asset".into();
+        payload
+    });
+    assert_eq!(refusal.error.unwrap().code, "not_found");
+    // The store belongs to this session: a fresh session holds none of these bitmaps, and closing this one retires it.
+    let other = fresh;
+    let elsewhere = run(&other, "inspect-2", query, read(json!({"action":"inspect","brushId":brush}))).result.unwrap();
+    assert_eq!(elsewhere["brush"]["resident"], false);
+    use crate::{native_application::admit_release_request, native_application_contract::NativeReleaseRequest};
+    let pin = info(&state);
+    let close: NativeReleaseRequest = serde_json::from_value(json!({"apiVersion":2,"requestId":"close-brush",
+        "instanceId":state.instance_id(),"documentId":pin["documentId"],"expectedRevision":pin["contentRevision"]})).unwrap();
+    admit_release_request(&native, &close).unwrap();
+    assert!(native.lock().unwrap().active().is_none());
 }

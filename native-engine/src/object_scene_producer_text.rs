@@ -25,7 +25,7 @@
 //!
 //! Inputs are borrowed and never mutated; the item owns detached copies.
 
-use crate::evaluation::motion_parent_chain::ChainEntry;
+use crate::evaluation::motion_parent_chain::{ChainEntry, MotionMat};
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     ProducerOutput, ScenePin,
 };
@@ -132,6 +132,20 @@ impl TextSceneItem {
         &self.font_resource
     }
 
+    /// The block inside a placed component: its glyph contours through each matrix of the
+    /// placement chain in turn (camera, then symMatrix), fills unchanged.
+    pub(crate) fn placed_by(
+        &self,
+        chain: &[[f64; 6]],
+        admission: crate::object_render_scene::text_glyph_scene_kernels::text_glyph_scene::GeometryAdmission,
+    ) -> Result<Self, TextSceneError> {
+        let mut item = self.clone();
+        for m in chain {
+            item.scene = item.scene.affine(*m, admission)?;
+        }
+        Ok(item)
+    }
+
     /// Paint order (per line the decorations, then the glyph paths), each contour with
     /// its straight RGBA8 fill.
     pub(crate) fn painted(&self) -> impl Iterator<Item = (&SceneContour, [u8; 4])> + '_ {
@@ -147,6 +161,25 @@ pub(crate) fn fill_rgba(color: &str, opacity: f64) -> Result<[u8; 4], TextProduc
     }
 }
 
+/// #2267: the stored turn of a block as the first stage of its chain: a rotation of every contour (decorations too) about the
+/// stored anchor, applied after a glyph's own animator stage and before the layer stage and the parent chain, so preview, export and
+/// every other reader of the scene (one producer) draw the same turned block.
+pub(crate) fn turn_stage(record: &TextBlockRecord) -> Vec<ChainEntry> {
+    let turn = record.rotation();
+    // #2372: the stored shear and mirror come first (shear, then mirror, then the turn), each a stage about the same anchor.
+    let mut stages: Vec<(f64, f64, f64)> = record.local_form().stages();
+    if turn != 0.0 {
+        stages.push((turn, 1.0, 1.0));
+    }
+    stages
+        .into_iter()
+        .map(|(rot, sx, sy)| ChainEntry {
+            mat: MotionMat { dx: 0.0, dy: 0.0, rot, sx, sy, op: 1.0, ax: 0.0, ay: 0.0 },
+            pivot: record.anchor(),
+        })
+        .collect()
+}
+
 pub(super) fn prepare_block(
     fonts: Option<TextFontProvider<'_>>,
     target: &TextBlockTarget<'_>,
@@ -155,11 +188,15 @@ pub(super) fn prepare_block(
     let request = target.record.layout_request(target.holder_id);
     let layout =
         layout_text(&request, Some(provider.catalog)).map_err(TextProducerError::Layout)?;
+    let turned: Vec<ChainEntry> = turn_stage(target.record)
+        .into_iter()
+        .chain(target.chain.iter().copied())
+        .collect();
     let input = TextSceneInput {
         layout: &layout,
         outlines: Some(provider.outlines),
         glyph_stages: target.glyph_stages,
-        chain: target.chain,
+        chain: &turned,
         item_opacity: target.item_opacity,
         admission: target.admission,
     };

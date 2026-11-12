@@ -8,7 +8,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 function fixture(rawActive = 0) {
   let info = { instanceId: 'instance-A', documentId: 'document-A', lifecycleGeneration: 1,
     contentRevision: 0, documentSnapshotId: 'snapshot-0' };
-  let revision = 0, ticket = 1, active = true, available = true, raw = rawActive, serial = 0, queued = Promise.resolve(), block = null;
+  let queueBusy = false, revision = 0, ticket = 1, active = true, available = true, raw = rawActive, serial = 0, queued = Promise.resolve(), block = null;
   const palettes = [{ id: 'same', name: 'First', colors: ['#AbC', '#abc', ...Array.from({ length: 16 }, (_, i) => '#color-' + i)] },
     { id: 'same', name: 'Second', colors: ['#def'] }];
   const initial = clone(palettes), calls = [], published = [], reconciles = [];
@@ -46,7 +46,7 @@ function fixture(rawActive = 0) {
     return reply;
   }
   const session = { info: () => info, isActive: () => active, requestId: () => 'palette-' + (++serial),
-    readSubscriptionGeneration: () => ticket, readPresentedObjectSession: shown,
+    readSubscriptionGeneration: () => ticket, readPresentedObjectSession: why => { if (queueBusy) { if (why) why('queue-pending'); return null; } return shown(); },
     runResourceCommand(action) {
       const work = queued.then(() => action({ dispatch, readPresentedObjectSession: shown,
         async reconcile(next) { reconciles.push(next); assert.equal(next, revision);
@@ -55,7 +55,7 @@ function fixture(rawActive = 0) {
     } };
   const model = Model.create({ currentSession: () => session, available: () => available,
     publish(value) { published.push(value); return true; } });
-  return { model, calls, published, reconciles, palettes, initial,
+  return { model, calls, published, busy(value) { queueBusy = value; }, reconciles, palettes, initial,
     replace() { info = { ...info, documentId: 'replacement', lifecycleGeneration: 2 }; },
     resubscribe() { ticket++; }, hide() { available = false; }, retire() { active = false; model.dispose(); },
     hold() { let entered, release; const started = new Promise(resolve => entered = resolve), wait = new Promise(resolve => release = resolve);
@@ -121,4 +121,36 @@ test('a palette no-op keeps the native pin and still retires the old gesture pro
   assert.deepEqual(h.reconciles, [0]);
   await assert.rejects(h.model.edit({ kind: 'select', ordinal: 2 }, before), e => e.code === 'stale_revision');
   assert.deepEqual(h.palettes, h.initial);
+});
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending).
+test('a palette edit made while the queue hides the presentation keeps the sealed cache, waits for it and applies once', async () => {
+  globalThis.NemoNativePresentationWait = require('../src/js/adapters/native-presentation-wait.js');
+  try {
+    const h = fixture(), before = await h.model.refresh();
+    h.busy(true);
+    assert.equal(h.model.read(), null, 'read() authorizes input, so it stays null while the presentation is hidden');
+    const edit = h.model.edit({ kind: 'select', ordinal: 2 }, before);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.equal(h.calls.filter(q => q.operation === Contract.EDIT).length, 0, 'nothing is sent while the presentation is hidden');
+    h.busy(false);
+    const result = await edit;
+    assert.equal(result.status, 'applied-presented');
+    assert.equal(h.calls.filter(q => q.operation === Contract.EDIT).length, 1, 'the edit went out exactly once');
+    assert.equal(result.projection.palette.active.summary.ordinal, 2);
+  } finally { delete globalThis.NemoNativePresentationWait; }
+});
+
+test('a palette edit whose document was replaced during the wait still refuses as stale and sends nothing', async () => {
+  globalThis.NemoNativePresentationWait = require('../src/js/adapters/native-presentation-wait.js');
+  try {
+    const h = fixture(), before = await h.model.refresh();
+    h.busy(true);
+    const edit = h.model.edit({ kind: 'select', ordinal: 2 }, before);
+    const refused = assert.rejects(edit, e => e.code === 'stale_revision');
+    await new Promise(resolve => setTimeout(resolve, 80));
+    h.replace(); h.busy(false);
+    await refused;
+    assert.equal(h.calls.filter(q => q.operation === Contract.EDIT).length, 0);
+  } finally { delete globalThis.NemoNativePresentationWait; }
 });

@@ -95,3 +95,24 @@ mod object_rig_edit_wire_tests;
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_rig_edit_kernels.rs"]
 mod object_rig_edit_kernel_tests;
+
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_rig_edit_mesh_rows.rs"]
+mod object_rig_edit_mesh_rows;
+
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_rig_edit_meshes.rs"]
+mod object_rig_edit_mesh_tests;
+
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_rig_edit_mesh_controls.rs"]
+mod object_rig_edit_mesh_control_tests;
+
+// #2255: the rig presentation view, over rigs created by the owner itself.
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_rig_view.rs"]
+mod object_rig_view_tests;
+// #2255: the held pose drag, the Alt-drag IK edit and the world map of a rig layer with Motion.
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_rig_view_pose.rs"]
+mod object_rig_view_pose_tests;

@@ -15,6 +15,17 @@ use serde_json::{json, Value};
 pub(crate) mod build;
 #[path = "object_frame_edit_structure_controls.rs"]
 mod controls;
+// #2256: the same edits inside a declared component.
+#[path = "object_frame_edit_context_history.rs"]
+mod context_history;
+// #2256 part 2: key move, Move, Repeat, the clipboard, layer policy and lifecycle and the playhead cut inside a declared component.
+#[path = "object_frame_edit_context_moves_history.rs"]
+mod context_moves_history;
+// #2256 part 3: the layer bar and its menu inside a declared component.
+#[path = "object_frame_edit_context_range_history.rs"]
+mod context_range_history;
+#[path = "object_frame_edit_structure_items.rs"]
+mod items;
 #[cfg(feature = "evaluation")]
 #[path = "object_frame_edit_structure_exposure.rs"]
 mod exposure;

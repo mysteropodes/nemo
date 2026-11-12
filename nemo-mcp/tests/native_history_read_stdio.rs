@@ -55,7 +55,9 @@ async fn official_sdk_stdio_admits_history_and_refuses_tampered_reply_and_malfor
                 ok: true,
                 error: None,
                 result: Some(
-                    json!({"atRevision":7,"documentSnapshotId":snapshot,"undoDepth":2,"redoDepth":1}),
+                    json!({"atRevision":7,"documentSnapshotId":snapshot,"undoDepth":2,"redoDepth":1,
+                        "offset":0,"entries":[{"index":0,"label":"Draw"},{"index":1,"label":"Rename Layer"},
+                        {"index":2,"label":"Edit"}]}),
                 ),
             };
             bounded(wire::write_json(&mut stream, &response))
@@ -98,7 +100,9 @@ async fn official_sdk_stdio_admits_history_and_refuses_tampered_reply_and_malfor
             assert_eq!(body["ok"], true);
             assert_eq!(
                 body["result"],
-                json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","undoDepth":2,"redoDepth":1})
+                json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","undoDepth":2,"redoDepth":1,
+                    "offset":0,"entries":[{"index":0,"label":"Draw"},{"index":1,"label":"Rename Layer"},
+                    {"index":2,"label":"Edit"}]})
             );
         }
     }

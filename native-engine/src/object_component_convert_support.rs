@@ -101,9 +101,9 @@ pub(crate) enum SetupError {
     ObjectScope {
         layer_uid: String,
     },
-    /// Raster items and text blocks of the layer: the baseline moves a raster with the frames it clones
-    /// into the component, but the component record has no `items` member and item admission resolves
-    /// layers of the scene only, so they cannot follow (stable code `component-convert-items`).
+    /// Text on a layer with text animators, bitmap-brush or brush-texture rasters and mesh-bound
+    /// images of the layer: the baseline moves them with the frames it clones, but no placed
+    /// component paints them yet (stable code `component-convert-items`). Plain items move.
     ItemsUnavailable {
         layer_uid: String,
     },
@@ -112,6 +112,19 @@ pub(crate) enum SetupError {
     PathChained(String),
     PathUnknown(String),
     SeedRange,
+    /// A duplicator setting outside its closed set (a mode or direction label).
+    ConfigInvalid,
+    /// The layer is not a scene-root component instance (it carries no instance record).
+    NotAnInstance(String),
+    /// The instance shows something a flat layer cannot hold yet (items, inner Motion, groups, a rig, a record that does not
+    /// bake); the text names it. Stable code `component-break-apart`.
+    BreakApartUnavailable(&'static str),
+    /// A component camera or marker request outside its closed shape (a frame past the component, a non-finite value, a missing member).
+    StateEditInvalid(&'static str),
+    /// The key or marker the request names is not stored.
+    StateTargetMissing(&'static str),
+    /// A component playback setting outside its closed set (a mode label, a non-positive speed, a frame outside the document).
+    PlaybackInvalid,
     IdUnavailable,
     RevisionOutOfRange,
     TooMany,
@@ -349,14 +362,6 @@ pub(crate) fn layer_index(document: &ObjectDocument, uid: &str) -> Result<usize,
         .ok_or_else(|| SetupError::UnknownLayer(uid.to_string()))
 }
 
-/// Whether the scene layer holds raster items or text blocks (`document.items`).
-pub(crate) fn items_on(document: &ObjectDocument, uid: &str) -> bool {
-    document.item_records().is_some_and(|items| {
-        items
-            .targets()
-            .any(|target| target.layer_uid() == uid && target.context_id() == SCENE_CONTEXT)
-    })
-}
 
 /// A live edge: the baseline lifts `inPoint` / `outPoint` only when `!= null`.
 fn live_edge(edge: Presence<Option<i64>>) -> Presence<Option<i64>> {

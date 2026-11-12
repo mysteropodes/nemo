@@ -24,6 +24,12 @@ mod layer_policy;
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_image_import_history.rs"]
 mod image_import;
+#[cfg(feature = "project_media_codec")]
+#[path = "object_media_video_link_history.rs"]
+mod video_link;
+#[cfg(feature = "project_media_codec")]
+#[path = "object_brush_bitmap_stroke_history.rs"]
+mod bitmap_stroke;
 #[path = "object_raster_asset_history.rs"]
 mod item_history;
 #[path = "object_command_dispatch.rs"]
@@ -91,6 +97,8 @@ mod object_media_link_history;
 // L01-G (#2107): parameter edit and path-effect stack edit as history transactions (G22, G13).
 #[path = "object_parametric_edit_history.rs"]
 mod object_parametric_edit_history;
+#[path = "object_subselect_history.rs"]
+mod object_subselect_history;
 // L10-B (#2124): lane-10 shot/montage/import family aggregator.
 #[path = "object_shot_kernels.rs"]
 #[allow(dead_code)]
@@ -161,6 +169,19 @@ mod object_layer_lifecycle_controls;
 #[path = "../tests/object_layer_lifecycle_payloads.rs"]
 mod object_layer_lifecycle_payloads;
 #[cfg(test)]
+#[path = "../tests/object_layer_follow_path_set.rs"]
+mod object_layer_follow_path_set;
+#[cfg(test)]
+#[path = "../tests/object_layer_link_set.rs"]
+mod object_layer_link_set;
+#[cfg(test)]
+#[path = "../tests/object_layer_parent_set.rs"]
+mod object_layer_parent_set;
+// #2372: Parent A under a rotated or scaled ancestor, checked against the real renderer's world points.
+#[cfg(all(test, feature = "export_job"))]
+#[path = "../tests/object_layer_parent_keep_world.rs"]
+mod object_layer_parent_keep_world;
+#[cfg(test)]
 #[path = "../tests/object_layer_lifecycle_scenario.rs"]
 mod object_layer_lifecycle_scenario;
 #[cfg(test)]
@@ -208,6 +229,10 @@ mod object_selection_edit_tests;
 #[cfg(test)]
 #[path = "../tests/object_property_edit.rs"]
 mod property_edit_tests;
+// D18-B (#2376): expression-control declaration edits (uses the widget harness for the axis guard).
+#[cfg(test)]
+#[path = "../tests/object_property_control_edit.rs"]
+mod object_property_control_edit_tests;
 // L03-M (#2109): widget transaction tests (the write tests need the evaluation kernel).
 #[cfg(test)]
 #[path = "../tests/object_widget_edit_controls.rs"]
@@ -224,12 +249,20 @@ mod object_widget_edit_tests;
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_widget_edit_writes.rs"]
 mod object_widget_edit_writes_tests;
+// #2255: the widget presentation read, over widgets created by the owner itself.
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_widget_view.rs"]
+mod object_widget_view_tests;
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_property_sampling.rs"]
 mod property_sampling_tests;
 #[cfg(test)]
 #[path = "../tests/object_property_track_edit.rs"]
 mod property_track_edit_tests;
+// G39 (#2376): a Motion preset applied as one atomic native history entry.
+#[cfg(test)]
+#[path = "../tests/object_property_preset_apply.rs"]
+mod property_preset_apply_tests;
 
 #[cfg(feature = "project_media_codec")]
 #[path = "object_project_history.rs"]
@@ -243,6 +276,7 @@ pub struct NativeObjectHistory {
     owner: ObjectFillOwner,
     undo: Vec<ObjectHistoryEntry>,
     redo: Vec<ObjectHistoryEntry>,
+    labels: history_read::HistoryLabels,
     receipts: StageReceipts,
 }
 
@@ -380,6 +414,7 @@ impl NativeObjectHistory {
             owner: ObjectFillOwner::from_admitted_project(instance_id, project)?,
             undo: vec![],
             redo: vec![],
+            labels: Default::default(),
             receipts: StageReceipts::default(),
         })
     }
@@ -391,6 +426,7 @@ impl NativeObjectHistory {
             owner: ObjectFillOwner::new(instance_id, document)?,
             undo: vec![],
             redo: vec![],
+            labels: Default::default(),
             receipts: StageReceipts::default(),
         })
     }
@@ -460,25 +496,7 @@ impl NativeObjectHistory {
         expected_revision: u64,
         undo: bool,
     ) -> Result<u64, DispatchErrorCode> {
-        if expected_revision != self.content_revision() {
-            return Err(DispatchErrorCode::StaleRevision);
-        }
-        let source = if undo { &self.undo } else { &self.redo };
-        let entry = source.last().ok_or(DispatchErrorCode::Unavailable)?.clone();
-        let revision = if undo {
-            entry.before_revision
-        } else {
-            entry.after_revision
-        };
-        let restored = self.owner.restore(revision)?;
-        if undo {
-            self.undo.pop();
-            self.redo.push(entry);
-        } else {
-            self.redo.pop();
-            self.undo.push(entry);
-        }
-        Ok(restored)
+        self.move_history_steps(expected_revision, undo, 1)
     }
 }
 
@@ -486,3 +504,7 @@ impl NativeObjectHistory {
 mod object_frame_bulk_move;
 #[path = "object_layer_shift_history.rs"]
 mod object_layer_shift;
+
+#[cfg(feature = "application")]
+#[path = "object_tween_history.rs"]
+mod tween;

@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => property_transform_eval_controls_tests
 //! Hand-written controls for the property-transform provider: oracle
 //! coverage, mutation detection and the JavaScript coercions.
 

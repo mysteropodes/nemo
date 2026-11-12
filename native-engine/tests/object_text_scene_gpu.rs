@@ -20,12 +20,12 @@ const WIDTH: usize = 320;
 const HEIGHT: usize = 180;
 const GLYPH_ORACLE: &str = include_str!("fixtures/text-glyph-source/oracle.txt");
 
-fn metal() -> Compositor {
+pub(super) fn metal() -> Compositor {
     let gpu = Compositor::new().expect("Text GPU acceptance requires a real Metal adapter");
     assert_eq!(gpu.adapter().get_info().backend, wgpu::Backend::Metal);
     gpu
 }
-fn document() -> Value {
+pub(super) fn document() -> Value {
     let mut doc = drawing();
     doc["objects"] = json!([]);
     doc["items"]["raster"][0]["item"] = support::raster_item("img-1", 280, 150, 2, 2);
@@ -74,7 +74,7 @@ fn decode_png(bytes: &[u8]) -> Vec<u8> {
     assert_eq!(rgba.len(), WIDTH * HEIGHT * 4);
     rgba
 }
-fn render(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
+pub(super) fn render(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
     let packet = witness.plan().packet();
     let snapshot = packet.snapshot();
     let frame = packet.frame();
@@ -166,12 +166,12 @@ fn assert_repeatable(
         }
     }
 }
-fn pixel(bytes: &[u8], x: usize, y: usize) -> [u8; 4] {
+pub(super) fn pixel(bytes: &[u8], x: usize, y: usize) -> [u8; 4] {
     bytes[(y * WIDTH + x) * 4..(y * WIDTH + x + 1) * 4]
         .try_into()
         .unwrap()
 }
-fn witnesses(snapshot: &ObjectSnapshot) -> (ObjectCompositionWitness, ObjectCompositionWitness) {
+pub(super) fn witnesses(snapshot: &ObjectSnapshot) -> (ObjectCompositionWitness, ObjectCompositionWitness) {
     let p = plan(snapshot, 7);
     assert_eq!(
         p.commands().len(),

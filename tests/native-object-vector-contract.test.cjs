@@ -161,7 +161,7 @@ test('a create names no stroke id; a replace and a delete name an authored one',
   assert.equal(accepts(C.VECTOR, { command: 'object.vector.replace', record: record('native-stroke:8:0', 'reference') }), false, 'reference storage is readable, never replaced');
   assert.equal(accepts(C.VECTOR, { command: 'object.vector.delete', stableTarget: target('') }), false);
   assert.doesNotThrow(() => C.record(record('native-stroke:8:0', 'reference'), false), 'the object read returns reference-scope records');
-  for (const mutate of [(t) => { t.contextId = 'other'; }, (t) => { t.layerUid = ''; }, (t) => { t.frameScope.kind = 'ghost'; }, (t) => { t.frameScope.frame = 4294967296; },
+  for (const mutate of [(t) => { t.contextId = 'two words'; }, (t) => { t.layerUid = ''; }, (t) => { t.frameScope.kind = 'ghost'; }, (t) => { t.frameScope.frame = 4294967296; },
     (t) => { t.frameScope.frame = -1; }, (t) => { t.frameScope.frame = 1.5; }, (t) => { t.extra = 1; }]) {
     const t = target('native-stroke:8:0'); mutate(t);
     assert.equal(accepts(C.VECTOR, { command: 'object.vector.delete', stableTarget: t }), false);
@@ -259,4 +259,75 @@ test('gradient record admission is closed at the same public vector and read DTO
   }
   const missing=JSON.parse(JSON.stringify(record));delete missing.vectorExt;assert.doesNotThrow(()=>C.record(missing,true));
   const nullGradient=JSON.parse(JSON.stringify(record));nullGradient.vectorExt.fillGradient=null;assert.throws(()=>C.record(nullGradient,true),TypeError);
+});
+
+test('trimEnds is an optional finite positive limit on the two creates and refused elsewhere', () => {
+  const create = COMMANDS.find(([, p]) => p.command === 'object.vector.create');
+  const replace = COMMANDS.find(([, p]) => p.command === 'object.vector.replace');
+  for (const [value, ok] of [[24, true], [0.5, true], [0, false], [-1, false], [Infinity, false], ['24', false], [null, false]]) {
+    assert.equal(accepts(create[0], { ...create[1], trimEnds: value }), ok, String(value));
+  }
+  assert.equal(accepts(replace[0], { ...replace[1], trimEnds: 24 }), false);
+});
+
+test('trimClip is a well-formed stop-at-axis clip beside trimEnds on the creates and the all-create batch (#2361)', () => {
+  const create = COMMANDS.find(([, p]) => p.command === 'object.vector.create');
+  const clip = { axis: [60, 0, 60, 100], mirrors: [[0, 1]] };
+  const base = { ...create[1], trimEnds: 24 };
+  assert.equal(accepts(create[0], { ...base, trimClip: clip }), true);
+  assert.equal(accepts(create[0], { ...create[1], trimClip: clip }), false, 'needs trimEnds');
+  for (const bad of [{ ...clip, axis: [60, 0, 60] }, { ...clip, axis: [60, 0, 60, '100'] }, { ...clip, axis: [60, 0, 60, Infinity] }, { ...clip, mirrors: [] }, { ...clip, mirrors: [[0]] },
+    { ...clip, mirrors: [[0, -1]] }, { ...clip, mirrors: [[0, 1.5]] }, { ...clip, mirrors: [[0, 1], [1, 2]] }, { ...clip, mirrors: [[1, 1]] }, { ...clip, extend: true }, { axis: clip.axis }, null, 'clip']) {
+    assert.equal(accepts(create[0], { ...base, trimClip: bad }), false, JSON.stringify(bad));
+  }
+  const replace = COMMANDS.find(([, p]) => p.command === 'object.vector.replace');
+  assert.equal(accepts(replace[0], { ...replace[1], trimEnds: 24, trimClip: clip }), false);
+  const batch = (extra) => ({ command: 'object.vector.batch', ops: [{ op: 'create', record: create[1].record }, { op: 'create', record: create[1].record }], ...extra });
+  assert.equal(accepts(create[0], batch({ trimEnds: 24, trimClip: clip })), true);
+  assert.equal(accepts(create[0], batch({ trimClip: clip })), false);
+});
+
+test('a batch reshape takes new geometry or a ribbon centreline (#2362 sculpt), never both or neither', () => {
+  const EDIT = 'command.document.object.vector.edit';
+  const anchor = (x) => ({ point: { x, y: 2 }, handleIn: { x: 0, y: 0 }, handleOut: { x: 3, y: 0 }, width: 6.5 });
+  const sculpt = (op) => ({ command: 'object.vector.batch', ops: [Object.assign({ op: 'reshape', stableTarget: target('s-r') }, op)] });
+  const geometry = record('s-r').geometry;
+  assert.doesNotThrow(() => C.payload(EDIT, sculpt({ center: [anchor(0), anchor(9)] })));
+  assert.doesNotThrow(() => C.payload(EDIT, sculpt({ geometry })));
+  for (const bad of [{}, { center: [anchor(0), anchor(9)], geometry }, { center: [anchor(0)] }, { center: [anchor(0), { ...anchor(9), width: 'wide' }] },
+    { center: [anchor(0), { point: { x: 1, y: 1 }, handleIn: { x: 0, y: 0 }, handleOut: { x: 0, y: 0 } }] }]) {
+    assert.throws(() => C.payload(EDIT, sculpt(bad)), TypeError, JSON.stringify(Object.keys(bad)));
+  }
+  assert.throws(() => C.payload(EDIT, { command: 'object.vector.batch', ops: [{ op: 'clone', stableTarget: target('s-r'), frame: 3, center: [anchor(0), anchor(9)] }] }), TypeError);
+});
+
+test('a batch reshape by matrix (#2372 Select) is six finite numbers and excludes geometry and a centreline', () => {
+  const EDIT = 'command.document.object.vector.edit';
+  const step = (op) => ({ command: 'object.vector.batch', ops: [Object.assign({ op: 'reshape', stableTarget: target('s-r') }, op)] });
+  assert.doesNotThrow(() => C.payload(EDIT, step({ matrix: [1, 0, 0, 1, 12.5, -4] })));
+  assert.doesNotThrow(() => C.payload(EDIT, step({ matrix: [2, 0, 0, 2, 0, 0], frame: 3 })));
+  for (const bad of [{ matrix: [1, 0, 0, 1, 0] }, { matrix: [1, 0, 0, 1, 0, 0, 0] }, { matrix: [1, 0, 0, 1, 0, NaN] }, { matrix: 'id' }, { matrix: [1, 0, 0, 1, 0, 0], geometry: record('s-r').geometry }]) {
+    assert.throws(() => C.payload(EDIT, step(bad)), TypeError, JSON.stringify(bad));
+  }
+  assert.throws(() => C.payload(EDIT, { command: 'object.vector.batch', ops: [{ op: 'clone', stableTarget: target('s-r'), frame: 3, matrix: [1, 0, 0, 1, 0, 0] }] }), TypeError);
+});
+
+test('a batch is atomic: skipUnavailable is an optional boolean, and only an opted-in receipt may report skipped steps (#2372)', () => {
+  const EDIT = 'command.document.object.vector.edit';
+  const step = (id) => ({ op: 'restyle', stableTarget: target(id), style: { stroke: '#00ff00' } });
+  const batch = (extra = {}) => ({ command: 'object.vector.batch', ops: [step('s-a'), step('s-b')], ...extra });
+  assert.equal(accepts(EDIT, batch()), true);
+  for (const good of [true, false]) assert.equal(accepts(EDIT, batch({ skipUnavailable: good })), true, String(good));
+  for (const bad of [1, 0, 'true', null, [true], {}]) assert.equal(accepts(EDIT, batch({ skipUnavailable: bad })), false, JSON.stringify(bad));
+  assert.equal(accepts(EDIT, { command: 'object.vector.delete', stableTarget: target('s-a'), skipUnavailable: true }), false, 'a batch member only');
+  const withReceipt = (payload, extra) => {
+    const request = envelope(EDIT, payload), result = { applied: true, historyEntriesAdded: 1, operation: 'batch', strokeId: 's-a', strokeIds: ['s-a', 's-b'], ...extra };
+    return () => { C.result(C.VECTOR, result); C.correlate(request, ok(request, 8, result)); };
+  };
+  assert.doesNotThrow(withReceipt(batch({ skipUnavailable: true }), { skippedSteps: 1 }));
+  assert.doesNotThrow(withReceipt(batch(), {}));
+  for (const bad of [0, 2, -1, 1.5, '1']) assert.throws(withReceipt(batch({ skipUnavailable: true }), { skippedSteps: bad }), TypeError, String(bad));
+  assert.throws(withReceipt(batch(), { skippedSteps: 1 }), TypeError, 'an atomic request never skips');
+  assert.throws(withReceipt(batch({ skipUnavailable: false }), { skippedSteps: 1 }), TypeError, 'an explicit false never skips');
+  assert.throws(() => C.result(C.VECTOR, { applied: true, historyEntriesAdded: 1, operation: 'replace', strokeId: 's-a', skippedSteps: 1 }), TypeError, 'only a batch receipt reports skipped steps');
 });

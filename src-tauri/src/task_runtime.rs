@@ -442,9 +442,10 @@ fn prepare_play_observer<R: Runtime>(
         .0
         .lock()
         .map_err(|_| "test observer lock refused")? = Some(log);
+    let fixed_clock = std::env::var("NEMO_TEST_PLAY_FIXED_CLOCK").ok().as_deref() == Some("1");
     let script = format!(
         "window.__NEMO_PLAY_OBSERVER_CONFIG__ = {};\n{}",
-        json!({"runId":run}),
+        json!({"runId":run, "fixedClock":fixed_clock}),
         include_str!("../../tests/desktop/play-publication-observer-bootstrap.js")
     );
     Ok(Some((run, script)))

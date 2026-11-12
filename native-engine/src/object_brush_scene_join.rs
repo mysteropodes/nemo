@@ -28,6 +28,9 @@ impl BrushRuntime {
             previous: None,
         }
     }
+    pub(crate) fn producer_mut(&mut self) -> &mut NativeBrushProducer {
+        &mut self.producer
+    }
     #[cfg(test)]
     pub(crate) fn resident_count(&self) -> usize {
         self.producer.resident_count()
@@ -40,6 +43,8 @@ impl BrushRuntime {
         }
     }
 }
+// #2361: the bitmap-brush resource route lives with the charged producer it serves.
+pub(crate) use crate::read_queries::brush_read::bitmap_route;
 #[derive(Debug, Clone)]
 pub(crate) struct BrushPaint {
     pub(crate) source_index: usize,
@@ -210,14 +215,22 @@ pub(crate) fn prepare_object_render_scene_with_brush(
     crate::object_render_scene::validate_pins(packet, expected)?;
     let brushes = prepare(packet, runtime, previous, limits, retire)?;
     let claimed = brushes.claimed_rasters();
-    let contours = object_scene_producer_contour::produce(packet).into_admitted()?;
+    let (contours, early_texts) = object_scene_producer_contour::produce_with_texts(packet);
+    let contours = contours.into_admitted()?;
+    let duplicators = Arc::new(duplicator_scene::prepare(packet)?);
+    let mut rasters = raster_scene::sources_excluding(packet, &claimed)?;
+    let mut texts = match early_texts {
+        Some(texts) => texts?,
+        None => text_scene::prepare(packet)?,
+    };
+    let components = component_scene::prepare(packet, expected, &mut rasters, &mut texts)?;
     Ok(crate::object_render_scene::ObjectRenderScene {
         packet: packet.clone(),
-        duplicators: Arc::new(duplicator_scene::prepare(packet)?),
+        duplicators,
         contours: contours.into(),
-        rasters: raster_scene::sources_excluding(packet, &claimed)?.into(),
-        texts: text_scene::prepare(packet)?,
-        components: component_scene::prepare(packet, expected)?,
+        rasters: rasters.into(),
+        texts,
+        components,
         videos: media_scene::slots(packet)?.into(),
         brushes: Some(Arc::new(brushes)),
     })
@@ -225,3 +238,6 @@ pub(crate) fn prepare_object_render_scene_with_brush(
 #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_brush_scene_join.rs"]
 mod tests;
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_brush_scene_lottie.rs"]
+mod lottie_tests;

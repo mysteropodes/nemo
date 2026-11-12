@@ -115,6 +115,7 @@ pub(super) fn complete(
                     content_revision: owner.content_revision(),
                     resource_count: usize::from(!info["reference"].is_null()),
                     viewport_available: false,
+                    legacy_import: None,
                 })
             },
         ))
@@ -193,6 +194,10 @@ pub(super) fn reconcile_executor(
 #[cfg(test)]
 #[path = "native_object_project_replace_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_status_lifecycle_tests.rs"]
+mod status_lifecycle_tests;
 
 #[cfg(test)]
 mod callback_tests {

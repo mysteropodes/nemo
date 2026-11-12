@@ -77,6 +77,12 @@ pub struct Compositor {
     last_reference_image: Option<u64>,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     retained_object_reference: Option<crate::object_render_scene::ObjectCompositionWitness>,
+    /// Ghost images (ids) drawn that the live artwork does not own and that stay resident in the renderer's atlas, and
+    /// how many times the image cache was reset to bound them (#2358 GHOST-FIDELITY).
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    resident_ghost_images: Vec<u64>,
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    ghost_cache_resets: u64,
 }
 
 /// First half of native GPU construction. A window host creates its surface
@@ -153,6 +159,10 @@ impl CompositorInstance {
             last_reference_image: None,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             retained_object_reference: None,
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            resident_ghost_images: Vec::new(),
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            ghost_cache_resets: 0,
         })
     }
 }
@@ -475,3 +485,19 @@ impl NativeRgba8Readback {
 fn align_to(value: u32, alignment: u32) -> u32 {
     value.div_ceil(alignment) * alignment
 }
+
+#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_viewport_checker.rs"]
+mod viewport_checker_tests;
+
+#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_viewport_outline.rs"]
+mod viewport_outline_tests;
+
+#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_viewport_shadow.rs"]
+mod viewport_shadow_tests;
+
+#[cfg(all(test, feature = "history", feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_viewport_solo.rs"]
+mod viewport_solo_tests;

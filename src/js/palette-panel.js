@@ -311,12 +311,23 @@
     if (newBtn) newBtn.addEventListener('click', newPalette);
     var swapBtn = document.getElementById('btn-palette-swap');
     if (swapBtn) swapBtn.addEventListener('click', function () {
-      if (paletteNativeBlocked(true)) return;
+      if (paletteNativeBlocked(false)) {
+        var controller = window.NemoNativePaletteController;
+        if (controller && controller.swap) controller.swap(); else paletteNativeBlocked(true);
+        return;
+      }
       var f = currentHex('fill'), s = currentHex('stroke');
       window.SM.setFillColor(s); window.SM.setStrokeColor(f);
     });
     var replaceBtn = document.getElementById('btn-palette-replace');
-    if (replaceBtn) replaceBtn.addEventListener('click', function () { if (replaceArmed) cancelReplace(); else startReplace(); });
+    if (replaceBtn) replaceBtn.addEventListener('click', function () {
+      if (paletteNativeBlocked(false)) {
+        var controller = window.NemoNativePaletteController;
+        if (controller && controller.toggleReplace) controller.toggleReplace(); else paletteNativeBlocked(true);
+        return;
+      }
+      if (replaceArmed) cancelReplace(); else startReplace();
+    });
     var scopeSel = document.getElementById('palette-replace-scope');
     if (scopeSel) {
       scopeSel.value = replaceScope();

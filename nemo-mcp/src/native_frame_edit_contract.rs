@@ -110,7 +110,7 @@ fn clipboard_cells(value: Option<&Value>) -> bool {
                     exact(
                         cell,
                         &["relLayer", "relFrame", "keyframe", "records"],
-                        &["orderElements"],
+                        &["orderElements", "rasterItems", "textItems"],
                     )
                     .is_some_and(|cell| {
                         frame(cell.get("relLayer")).is_some()
@@ -120,6 +120,9 @@ fn clipboard_cells(value: Option<&Value>) -> bool {
                             && cell
                                 .get("orderElements")
                                 .is_none_or(|v| object_list(Some(v)))
+                            && ["rasterItems", "textItems"]
+                                .iter()
+                                .all(|key| cell.get(*key).is_none_or(|v| object_list(Some(v))))
                     })
                 })
         })
@@ -168,77 +171,105 @@ pub(crate) fn clipboard_identity_matches(
                     && packet.get("documentId").and_then(Value::as_str) == Some(document_id))
         })
 }
+/// #2256: the optional declared component an edit works inside (absent is the scene root); an opaque nonempty id, resolved by the native owner.
+fn context(map: &Map<String, Value>) -> bool {
+    map.get("contextId").is_none_or(|value| name(Some(value)))
+}
 fn span(map: &Map<String, Value>) -> bool {
     name(map.get("layerUid")) && frame(map.get("from")).is_some() && frame(map.get("to")).is_some()
 }
 
 pub(super) fn request(operation: &str, value: &Value) -> bool {
     match operation {
-        INSERT => exact(value, &["command", "cell"], &["layerUids"]).is_some_and(|p| {
-            command_is(p, "object.frames.insert")
-                && frame(p.get("cell")).is_some()
-                && p.get("layerUids").is_none_or(|v| unique_names(Some(v)))
-        }),
-        EXTEND => exact(value, &["command", "cell", "count"], &[]).is_some_and(|p| {
+        INSERT => {
+            exact(value, &["command", "cell"], &["layerUids", "contextId"]).is_some_and(|p| {
+                command_is(p, "object.frames.insert")
+                    && context(p)
+                    && frame(p.get("cell")).is_some()
+                    && p.get("layerUids").is_none_or(|v| unique_names(Some(v)))
+            })
+        }
+        EXTEND => exact(value, &["command", "cell", "count"], &["contextId"]).is_some_and(|p| {
             command_is(p, "object.frames.extend")
+                && context(p)
                 && frame(p.get("cell")).is_some()
                 && frame(p.get("count")).is_some_and(|count| count <= MAX_EXTEND)
         }),
-        DUPLICATE => exact(value, &["command", "layerUid", "cell"], &[]).is_some_and(|p| {
-            command_is(p, "object.frames.duplicate")
-                && name(p.get("layerUid"))
-                && frame(p.get("cell")).is_some()
-        }),
-        REMOVE => exact(value, &["command", "from", "to"], &[]).is_some_and(|p| {
+        DUPLICATE => {
+            exact(value, &["command", "layerUid", "cell"], &["contextId"]).is_some_and(|p| {
+                command_is(p, "object.frames.duplicate")
+                    && context(p)
+                    && name(p.get("layerUid"))
+                    && frame(p.get("cell")).is_some()
+            })
+        }
+        REMOVE => exact(value, &["command", "from", "to"], &["contextId"]).is_some_and(|p| {
             command_is(p, "object.frames.remove")
+                && context(p)
                 && frame(p.get("from")).is_some()
                 && frame(p.get("to")).is_some()
         }),
-        KEY_PROMOTE => exact(value, &["command", "cells"], &["layerUids"]).is_some_and(|p| {
-            command_is(p, "object.layer.key.promote")
-                && unique_frames(p.get("cells"))
-                && p.get("layerUids").is_none_or(|v| unique_names(Some(v)))
+        KEY_PROMOTE => exact(value, &["command", "cells"], &["layerUids", "contextId"])
+            .is_some_and(|p| {
+                command_is(p, "object.layer.key.promote")
+                    && context(p)
+                    && unique_frames(p.get("cells"))
+                    && p.get("layerUids").is_none_or(|v| unique_names(Some(v)))
+            }),
+        KEY_BLANK => {
+            exact(value, &["command", "layerUid", "cell"], &["contextId"]).is_some_and(|p| {
+                command_is(p, "object.layer.key.blank")
+                    && context(p)
+                    && name(p.get("layerUid"))
+                    && frame(p.get("cell")).is_some()
+            })
+        }
+        KEY_CLEAR => {
+            exact(value, &["command", "layerUid", "cell"], &["contextId"]).is_some_and(|p| {
+                command_is(p, "object.layer.key.clear")
+                    && context(p)
+                    && name(p.get("layerUid"))
+                    && frame(p.get("cell")).is_some()
+            })
+        }
+        KEY_CLEAR_CELLS => exact(value, &["command", "targets"], &["contextId"]).is_some_and(|p| {
+            command_is(p, "object.layer.key.clear_cells")
+                && context(p)
+                && unique_cells(p.get("targets"))
         }),
-        KEY_BLANK => exact(value, &["command", "layerUid", "cell"], &[]).is_some_and(|p| {
-            command_is(p, "object.layer.key.blank")
-                && name(p.get("layerUid"))
-                && frame(p.get("cell")).is_some()
-        }),
-        KEY_CLEAR => exact(value, &["command", "layerUid", "cell"], &[]).is_some_and(|p| {
-            command_is(p, "object.layer.key.clear")
-                && name(p.get("layerUid"))
-                && frame(p.get("cell")).is_some()
-        }),
-        KEY_CLEAR_CELLS => exact(value, &["command", "targets"], &[]).is_some_and(|p| {
-            command_is(p, "object.layer.key.clear_cells") && unique_cells(p.get("targets"))
-        }),
-        TWEEN_REMOVE => exact(value, &["command", "layerUid", "from", "to"], &[])
-            .is_some_and(|p| command_is(p, "object.layer.tween.remove") && span(p)),
+        TWEEN_REMOVE => exact(
+            value,
+            &["command", "layerUid", "from", "to"],
+            &["contextId"],
+        )
+        .is_some_and(|p| command_is(p, "object.layer.tween.remove") && context(p) && span(p)),
         KEY_MOVE => exact(
             value,
             &["command", "layerUid", "from", "to"],
-            &["activeLayerUid"],
+            &["activeLayerUid", "contextId"],
         )
         .is_some_and(|p| {
             command_is(p, "object.layer.key.move")
+                && context(p)
                 && span(p)
                 && p.get("activeLayerUid")
                     .is_none_or(|value| name(Some(value)))
         }),
-        SELECTION_DUPLICATE => exact(value, &["command", "layerUid", "selection"], &[])
+        SELECTION_DUPLICATE => exact(value, &["command", "layerUid", "selection"], &["contextId"])
             .is_some_and(|p| {
                 command_is(p, "object.frames.clipboard.duplicate")
+                    && context(p)
                     && name(p.get("layerUid"))
                     && unique_cells(p.get("selection"))
             }),
         CLIPBOARD_COPY | CLIPBOARD_CUT => {
-            exact(value, &["command", "selection"], &[]).is_some_and(|p| {
+            exact(value, &["command", "selection"], &["contextId"]).is_some_and(|p| {
                 let command = if operation == CLIPBOARD_COPY {
                     "object.frames.clipboard.copy"
                 } else {
                     "object.frames.clipboard.cut"
                 };
-                command_is(p, command) && clipboard_selection(p.get("selection"))
+                command_is(p, command) && context(p) && clipboard_selection(p.get("selection"))
             })
         }
         CLIPBOARD_PASTE => exact(
@@ -251,10 +282,11 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
                 "frame",
                 "cells",
             ],
-            &[],
+            &["contextId"],
         )
         .is_some_and(|p| {
             command_is(p, "object.frames.clipboard.paste")
+                && context(p)
                 && name(p.get("instanceId"))
                 && name(p.get("documentId"))
                 && name(p.get("layerUid"))
@@ -263,8 +295,14 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
         }),
         RANGE_DRAG => layer_shift::request(value),
         MOVE => {
-            exact(value, &["command", "selection", "layerUid", "frame"], &[]).is_some_and(|p| {
+            exact(
+                value,
+                &["command", "selection", "layerUid", "frame"],
+                &["contextId"],
+            )
+            .is_some_and(|p| {
                 command_is(p, "object.frames.move")
+                    && context(p)
                     && clipboard_selection(p.get("selection"))
                     && name(p.get("layerUid"))
                     && frame(p.get("frame")).is_some()
@@ -280,10 +318,11 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
                 "toFrame",
                 "times",
             ],
-            &[],
+            &["contextId"],
         )
         .is_some_and(|p| {
             command_is(p, "object.frames.repeat")
+                && context(p)
                 && name(p.get("fromLayerUid"))
                 && name(p.get("toLayerUid"))
                 && frame(p.get("fromFrame")).is_some()
@@ -367,6 +406,9 @@ pub(crate) fn revision_matches(expected: Option<u64>, revision: u64, value: &Val
 #[cfg(test)]
 #[path = "native_frame_edit_contract_tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "native_frame_edit_context_tests.rs"]
+mod context_tests;
 
 #[path = "native_layer_shift_contract.rs"]
 mod layer_shift;

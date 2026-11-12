@@ -13,7 +13,9 @@
   const RASTER=['create','move','resize','rotate','opacity','delete'].map(v=>'raster.'+v),TEXT=['create','edit','delete'].map(v=>'text.'+v);
   const BOOLS=['bold','italic','underline','strike'],NUMS=['letterSpacing','wordSpacing','lineHeightMult'];
   const TEXT_OPTIONAL=['fixedWidth','fixedHeight'].concat(BOOLS,NUMS,['textCase']);
-  const ITEM_OPTIONAL=['opacity','rotation','isBitmapBrush','brushGroupId','isBrushTextureCopy','meshId'];
+  // #2267: a created block may carry the stored turn (degrees about its anchor, within one turn either way); a patch never does.
+  const BLOCK_OPTIONAL=TEXT_OPTIONAL.concat(['rotation','flipX','flipY','skew','xformAnchorKey','xformAnchorCustom']);
+  const ITEM_OPTIONAL=['opacity','rotation','flipX','flipY','skew','xformAnchorKey','xformAnchorCustom','isBitmapBrush','brushGroupId','isBrushTextureCopy','meshId'];
   function fail(message){throw new TypeError(message);}
   function plain(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
   function exact(v,required,optional,label){
@@ -31,15 +33,21 @@
   function opaque(v,max,raw){if(typeof v!=='string'||!v.length||(!raw&&!v.trim())||v.includes('\0')||bytes(v)>(max||255))fail('opaque string invalid');}
   function oneOf(v,list){if(!list.includes(v))fail('enumerated value invalid');}
   function frameScope(v){exact(v,['kind','frame'],[],'frameScope');oneOf(v.kind,['authored','reference']);int(v.frame,0,4294967295);}
-  function target(v,create){
+  // `declared` (text only, #2267): the context may be a declared component's id; the owner refuses an undeclared one.
+  function target(v,create,declared){
     exact(v,['contextId','frameScope','layerUid','strokeId'],[],'target');
-    if(v.contextId!=='scene-root')fail('contextId invalid');frameScope(v.frameScope);opaque(v.layerUid);
+    if(declared)opaque(v.contextId);else if(v.contextId!=='scene-root')fail('contextId invalid');frameScope(v.frameScope);opaque(v.layerUid);
     if(create){if(v.strokeId!=='')fail('a created item names no stroke id; the owner allocates it');}else opaque(v.strokeId);
   }
   function rasterItem(v){
     exact(v,['assetId','x','y','width','height'],ITEM_OPTIONAL,'raster item');opaque(v.assetId);['x','y','width','height'].forEach(k=>num(v[k]));
     if('opacity' in v)num(v.opacity);if('rotation' in v)num(v.rotation);
-    ['isBitmapBrush','isBrushTextureCopy'].forEach(k=>{if(k in v)bool(v[k]);});['brushGroupId','meshId'].forEach(k=>{if(k in v)opaque(v[k]);});
+    ['isBitmapBrush','isBrushTextureCopy','flipX','flipY'].forEach(k=>{if(k in v)bool(v[k]);});if('skew' in v){num(v.skew);if(Math.abs(v.skew)>=90)fail('skew invalid');}pivot(v);['brushGroupId','meshId'].forEach(k=>{if(k in v)opaque(v[k]);});
+  }
+  // #2372: the stored Select pivot of an image or a text block: one of the nine presets, or a custom world point [x, y].
+  function pivot(v){
+    if('xformAnchorKey' in v)oneOf(v.xformAnchorKey,['tl','tc','tr','ml','mc','mr','bl','bc','br']);
+    if('xformAnchorCustom' in v){if(!Array.isArray(v.xformAnchorCustom)||v.xformAnchorCustom.length!==2)fail('xformAnchorCustom invalid');v.xformAnchorCustom.forEach(num);}
   }
   function font(v){
     if(plain(v)&&v.kind==='bundled'){exact(v,['kind','fontKey'],[],'font');oneOf(v.fontKey,FONTS);return;}
@@ -54,9 +62,9 @@
     ['fixedWidth','fixedHeight'].forEach(k=>{if(k in v&&v[k]!==null)num(v[k]);});
     BOOLS.forEach(k=>{if(k in v)bool(v[k]);});NUMS.forEach(k=>{if(k in v)num(v[k]);});
     if('textCase' in v)oneOf(v.textCase,CASES);
-    if(block){exact(v.anchorTopLeft,['x','y'],[],'anchorTopLeft');num(v.anchorTopLeft.x);num(v.anchorTopLeft.y);}
+    if(block){exact(v.anchorTopLeft,['x','y'],[],'anchorTopLeft');num(v.anchorTopLeft.x);num(v.anchorTopLeft.y);if('rotation' in v){num(v.rotation);if(Math.abs(v.rotation)>360)fail('rotation invalid');}['flipX','flipY'].forEach(k=>{if(k in v)bool(v[k]);});if('skew' in v){num(v.skew);if(Math.abs(v.skew)>=90)fail('skew invalid');}pivot(v);}
   }
-  function textBlock(v){exact(v,['text','font','size','color','align','anchorTopLeft'],TEXT_OPTIONAL,'text block');textBody(v,true);}
+  function textBlock(v){exact(v,['text','font','size','color','align','anchorTopLeft'],BLOCK_OPTIONAL,'text block');textBody(v,true);}
   function textPatch(v){
     // Same members as a block minus the anchor: a patch can never re-anchor (baseline feedback #37).
     const members=['text','font','size','color','align'].concat(TEXT_OPTIONAL);
@@ -109,9 +117,13 @@
   };
   function itemPayload(p){
     if(!plain(p)||!Object.prototype.hasOwnProperty.call(SHAPES,p.command))fail('item command invalid');
-    exact(p,['command'].concat(SHAPES[p.command]),[],'item command');
+    // Text transactions may carry the copy key (a held cell is keyed with a copy first); an edit or delete may name the cell it lands in, with it.
+    const text=p.command==='object.text.create'||p.command==='object.text.edit'||p.command==='object.text.delete';
+    exact(p,['command'].concat(SHAPES[p.command]),text?(p.command==='object.text.create'?['keyframe']:['frame','keyframe']):p.command.startsWith('object.text.animator.')?['contextId']:[],'item command'); // an animator may name the declared component whose layer holds it (#2267)
+    if('contextId' in p)opaque(p.contextId);
+    if('keyframe' in p)oneOf(p.keyframe,['copy']);if('frame' in p){int(p.frame,0,4294967295);if(!('keyframe' in p))fail('a landing frame needs the copy key');}
     if('layerUid' in p)opaque(p.layerUid);if('animator' in p)animator(p.animator);if('animatorId' in p)opaque(p.animatorId);if('edit' in p)animatorEdit(p.edit);
-    if('target' in p)target(p.target,true);if('stableTarget' in p)target(p.stableTarget,false);
+    if('target' in p)target(p.target,true,text);if('stableTarget' in p)target(p.stableTarget,false,text);
     if('item' in p)rasterItem(p.item);if('block' in p)textBlock(p.block);if('patch' in p)textPatch(p.patch);
     ['x','y','width','height','rotation','opacity'].forEach(k=>{if(k in p)num(p[k]);});
   }

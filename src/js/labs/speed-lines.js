@@ -14,8 +14,31 @@
     describe: 'labsDescribeSpeedLines',
   });
 
+  function nativeSpeedLines(native, opts) {
+    var layerUid = native.layerUid(state.activeLayerIdx);
+    if (!layerUid) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return Promise.resolve(0); }
+    var w = state.canvasW || 1920, h = state.canvasH || 1080;
+    var count = Math.max(3, Math.min(400, opts.count || 60));
+    var r1 = opts.r1 !== undefined ? +opts.r1 : Math.max(w, h) * 0.75;
+    return native.speedLines({ layerUid: layerUid, frame: state.currentFrame,
+      cx: opts.cx !== undefined ? +opts.cx : w / 2, cy: opts.cy !== undefined ? +opts.cy : h / 2, count: count,
+      r0: opts.r0 !== undefined ? +opts.r0 : r1 * 0.45, r1: r1,
+      jitter: opts.jitter !== undefined ? Math.max(0, Math.min(1, +opts.jitter)) : 0.35,
+      // The baseline draws every line from Math.random; one seed drawn here names the whole run.
+      seed: opts.seed !== undefined ? opts.seed >>> 0 : Math.floor(Math.random() * 4294967296),
+      color: NemoNativeObjectLabs.rgba(state.strokeEnabled ? state.strokeColor : '#000000'),
+      brushSize: state.brushSize, opacity: state.opacity / 100 }).then(function () {
+      if (typeof showToast === 'function') showToast(count + SM.t('labsToastSpeedLinesGeneratedSuffix'));
+      return count;
+    }, function () { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; });
+  }
+
   window.SMLabs.speedLines = function (opts) {
     opts = opts || {};
+    // Native authority (U36, #2362): the engine runs this generator over the shown cell as one history entry and
+    // the call returns a Promise of the same count; the code below is the baseline path.
+    var native = window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window);
+    if (native) return nativeSpeedLines(native, opts);
     var ld = state.layers[state.activeLayerIdx];
     if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; }
     var cx = opts.cx !== undefined ? +opts.cx : (state.canvasW || 1920) / 2;

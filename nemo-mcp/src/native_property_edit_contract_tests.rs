@@ -170,3 +170,126 @@ fn property_bake_admits_only_the_intent_not_samples_or_replacement_keys() {
         assert!(envelope(payload(action)).validate().is_err());
     }
 }
+
+#[test]
+fn property_expression_actions_admit_exact_code_enablement_and_removal_only() {
+    let unicode = "// café 🧭\r\nconst 値 = 'é';\n";
+    let mut accepted = vec![
+        json!({"kind":"setExpression","code":""}),
+        json!({"kind":"setExpression","code":unicode}),
+        // Authored source is data, never a binary or blob resource, even when it looks like one.
+        json!({"kind":"setExpression","code":"data:x\nblob:y"}),
+        json!({"kind":"setExpression","code":"é".repeat(2048)}),
+        json!({"kind":"setExpression","code":"x".repeat(4096)}),
+        json!({"kind":"removeExpression"}),
+    ];
+    for enabled in [false, true] {
+        accepted.push(json!({"kind":"setExpressionEnabled","enabled":enabled}));
+    }
+    for action in accepted {
+        let p = payload(action);
+        assert!(request(&p), "{p}");
+        // The shape admits 4096 code bytes, but the complete request keeps its own 4096-byte
+        // ceiling, so the largest codes are refused whole by the envelope, never truncated.
+        let envelope = envelope(p);
+        let fits = serde_json::to_vec(&envelope).unwrap().len() <= 4096;
+        assert_eq!(envelope.validate().is_ok(), fits);
+    }
+    for action in [
+        json!({"kind":"setExpression"}),
+        json!({"kind":"setExpression","code":null}),
+        json!({"kind":"setExpression","code":1}),
+        json!({"kind":"setExpression","code":"x".repeat(4097)}),
+        json!({"kind":"setExpression","code":"é".repeat(2049)}),
+        json!({"kind":"setExpression","code":"x","enabled":true}),
+        json!({"kind":"setExpression","code":"x","frame":0}),
+        json!({"kind":"setExpression","expression":{"enabled":true,"code":"x"}}),
+        json!({"kind":"setExpressionEnabled"}),
+        json!({"kind":"setExpressionEnabled","enabled":null}),
+        json!({"kind":"setExpressionEnabled","enabled":1}),
+        json!({"kind":"setExpressionEnabled","enabled":true,"code":"x"}),
+        json!({"kind":"removeExpression","code":null}),
+        json!({"kind":"removeExpression","frame":0}),
+        json!(["setExpression", "x"]),
+        json!({"kind":"clearExpression"}),
+    ] {
+        let p = payload(action);
+        assert!(!request(&p), "{p}");
+        assert!(envelope(p).validate().is_err());
+    }
+}
+
+#[test]
+fn property_control_edits_admit_only_the_closed_declaration_shapes() {
+    for kind in ["number", "checkbox", "angle", "point", "color"] {
+        let p = payload(json!({"kind":"addControl","controlType":kind,"name":"Speed 雪"}));
+        assert!(request(&p), "{kind}");
+        assert!(envelope(p).validate().is_ok());
+    }
+    for action in [
+        json!({"kind":"renameControl","name":" Velocity "}),
+        json!({"kind":"removeControl"}),
+        json!({"kind":"moveControl","direction":-1}),
+        json!({"kind":"moveControl","direction":1}),
+    ] {
+        let p = payload(action);
+        assert!(request(&p));
+        assert!(envelope(p).validate().is_ok());
+    }
+    let long = "x".repeat(129);
+    for action in [
+        json!({"kind":"addControl","controlType":"slider","name":"A"}),
+        json!({"kind":"addControl","controlType":"number"}),
+        json!({"kind":"addControl","name":"A"}),
+        json!({"kind":"addControl","controlType":"number","name":""}),
+        json!({"kind":"addControl","controlType":"number","name":4}),
+        json!({"kind":"addControl","controlType":"number","name":long}),
+        json!({"kind":"addControl","controlType":"number","name":"A","frame":0}),
+        json!({"kind":"renameControl"}),
+        json!({"kind":"renameControl","name":""}),
+        json!({"kind":"renameControl","name":null}),
+        json!({"kind":"renameControl","name":"A","controlType":"number"}),
+        json!({"kind":"removeControl","frame":0}),
+        json!({"kind":"removeControl","name":"A"}),
+        json!({"kind":"moveControl"}),
+        json!({"kind":"moveControl","direction":0}),
+        json!({"kind":"moveControl","direction":2}),
+        json!({"kind":"moveControl","direction":1.5}),
+        json!({"kind":"moveControl","direction":"up"}),
+        json!({"kind":"moveControl","direction":true}),
+        json!(["removeControl"]),
+    ] {
+        assert!(!request(&payload(action.clone())), "{action}");
+        assert!(envelope(payload(action)).validate().is_err());
+    }
+}
+
+// #2520/#2525: keepPose is the anchor-only Position-following setValue; setKeyHandle names one spatial handle of an existing key.
+#[test]
+fn keep_pose_and_key_handle_have_closed_shapes() {
+    let on = |property: &str, action: Value| {
+        let mut p = payload(action);
+        p["property"] = json!(property);
+        p
+    };
+    let keep = json!({"kind":"setValue","frame":3,"values":[4,5],"keepPose":true});
+    assert!(request(&on("anchor", keep.clone())));
+    assert!(envelope(on("anchor", keep.clone())).validate().is_ok());
+    for property in ["position", "rotation", "blob:property"] {
+        assert!(!request(&on(property, keep.clone())), "keepPose is anchor only: {property}");
+    }
+    for bad in [json!(false), json!(0), json!("true"), Value::Null] {
+        assert!(!request(&on("anchor", json!({"kind":"setValue","frame":3,"values":[4,5],"keepPose":bad}))));
+    }
+    assert!(!request(&on("anchor", json!({"kind":"setKey","frame":3,"values":[4,5],"keepPose":true}))));
+    let handle = |h: Value, v: Value| json!({"kind":"setKeyHandle","frame":-2.5,"handle":h,"values":v});
+    for which in ["hIn", "hOut"] {
+        assert!(request(&on("position", handle(json!(which), json!([-30, 5.5])))));
+    }
+    for (which, values) in [(json!("tangent"), json!([1, 2])), (json!("hIn"), json!([1])), (json!("hIn"), json!([1, 2, 3])), (json!("hOut"), json!([1, null])), (json!(0), json!([1, 2]))] {
+        assert!(!request(&on("position", handle(which, values))));
+    }
+    let mut no_frame = handle(json!("hIn"), json!([1, 2]));
+    no_frame.as_object_mut().unwrap().remove("frame");
+    assert!(!request(&on("position", no_frame)));
+}

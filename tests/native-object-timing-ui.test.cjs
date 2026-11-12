@@ -5,6 +5,7 @@ const UI=require('../src/js/adapters/native-object-ui.js');
 const Files=require('../src/js/adapters/native-object-project-file.js');
 const SDK=require('../src/js/adapters/native-application.js');
 const Transport=require('../src/js/adapters/application-mcp.js');
+const SymmetryUI=require('../src/js/adapters/native-symmetry-ui.js'),SymmetryContract=require('../src/js/adapters/native-symmetry-contract.js');
 const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 // Independent native-result oracle, including a blank authored key and a sample.
@@ -15,12 +16,15 @@ const rows=new Map([
   [12,{cellKind:'key',sourceFrame:12,hasContent:false,manualEdit:false}],
   [20,{cellKind:'unexposed',sourceFrame:null,hasContent:false,manualEdit:false}],
 ]);
+// The same row as whole-row cells runs, served three runs per page (U31, #2374).
+const CELLS=[[0,1,'key',0,true,false],[1,5,'held',0,true,false],[6,1,'interpolated',6,true,true],[7,5,'held',6,true,false],
+  [12,1,'key',12,false,false],[13,7,'held',12,false,false],[20,1,'unexposed',null,false,false]];
 function element(){return {children:[],style:{},dataset:{},attributes:{},textContent:'',value:'',
   setAttribute(k,v){this.attributes[k]=v;},addEventListener(name,fn){this[name]=fn;},
   appendChild(node){this.children.push(node);node.parentNode=this;return node;},
   replaceChildren(...nodes){for(const n of this.children)n.parentNode=null;this.children=[];nodes.forEach(n=>this.appendChild(n));},
   classList:{add(){},remove(){}},getBoundingClientRect(){return {left:0,top:0,width:64,height:48};}};}
-function harness(){
+function harness(options={}){
   let active=false,revision=0,generation=1,doc='document',hold=null,fault=null,ack=null;
   const calls=[],listeners=new Map(),nodes=new Map();
   for(const id of ['layer-list','frame-hdr','frame-grid','tl-cf','tl-tf','info-frame','info-badge','info-strokes','info-sel','drawing-canvas','start-screen'])nodes.set(id,element());
@@ -51,12 +55,23 @@ function harness(){
       if(r.action==='acknowledge'&&ack){const wait=ack;ack=null;await wait;}
       return null;
     }
+    if(command==='nemo_native_dispatch'&&r.operation===SymmetryContract.READ){
+      const at=r.payload.atRevision,m=meta(),stored={symmetryEnabled:true};
+      return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:at,ok:true,
+        result:{instanceId:r.instanceId,documentId:r.documentId,atRevision:at,documentSnapshotId:m.documentSnapshotId,contextId:'scene-root',
+          result:{effective:{enabled:true,mode:'y',axis:{x1:32,y1:0,x2:32,y2:48},radialCenter:{x:32,y:24},radialSectors:6,extend:true},...stored}}};
+    }
     assert.equal(command,'nemo_native_dispatch');assert.equal(r.operation,'query.document.object.layer.timing');
-    assert.deepEqual(Object.keys(r.payload).sort(),['atRevision','contextId','documentSnapshotId','frame','layerUid'].concat(r.payload.view==='range'?['view']:[]));
+    assert.deepEqual(Object.keys(r.payload).sort(),['atRevision','contextId','documentSnapshotId','frame','layerUid'].concat(r.payload.view?['view']:[]));
     const response={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:r.payload.atRevision,ok:true,
       result:{instanceId:r.instanceId,documentId:r.documentId,...r.payload,...rows.get(r.payload.frame)}};
     if(r.payload.view==='range'){
       const {view,...selector}=r.payload;response.result={kind:'layerRange',instanceId:r.instanceId,documentId:r.documentId,...selector,range:{rawInPoint:-2.5,rawOutPoint:24,inPoint:0,outPoint:20,hasCustomRange:true,hasTimeLink:false}};
+    }
+    if(r.payload.view==='cells'){
+      const {view,...selector}=r.payload,at=CELLS.findIndex(run=>run[0]===r.payload.frame);
+      response.result={kind:'layerCells',instanceId:r.instanceId,documentId:r.documentId,...selector,
+        cells:{runs:CELLS.slice(at,at+3),nextFrame:CELLS[at+3]?CELLS[at+3][0]:null}};
     }
     if(r.payload.layerUid==='missing'&&r.payload.view!=='range'){
       response.ok=false;delete response.result;response.error={code:'unavailable',message:'No authored timing'};
@@ -69,6 +84,10 @@ function harness(){
   require('./helpers/native-viewport-underlay.cjs').install(root);
   require('../src/js/bootstrap/native-opacity-application.js').bindObjectUI(root);
   const session=Project.desktop(root);root.updateUI=()=>Project.paintUI(root,true);
+  // The real symmetry controller, whose repaint reaches a native preview as SMEngineBridge.renderNow does (#2343 B1).
+  // Capped, so a regressed loop fails the count below instead of hanging the run.
+  if(options.symmetry){let renders=0;root.SMEngineBridge={renderNow(){if(++renders<=50)session.renderPreview(root.state.currentFrame||0);}};
+    SymmetryUI.install(root);}
   function poison(){root.state.layers.forEach(layer=>Object.defineProperty(layer,'frames',{configurable:true,get(){throw Error('legacy frame read');}}));}
   const open=async()=>{await session.openPath('/timed.json',{commit(info){Files.projectView(root,info);}});poison();await turn();await turn();};
   return {root,session,calls,nodes,meta,open,hold(p){hold=p;},fault(fn){fault=fn;},holdAck(p){ack=p;},
@@ -91,6 +110,38 @@ test('ordinary Project/SDK/Tauri/UI reads exact fixed native timing and preserve
   assert.ok(h.queries().length>=5);assert.ok(h.calls.every(c=>!c.r||!c.r.operation||c.r.operation.startsWith('query.')));
   assert.equal(h.calls.filter(c=>c.r&&c.r.action==='acknowledge').length,0);
   assert.ok(h.calls.every(c=>!c.command.includes('save')&&!c.command.includes('export')));
+});
+test('Open timing refused during a concurrent resource read converges after the native queue settles',async()=>{
+  const h=harness(),timing=deferred(),resource=deferred();h.hold(timing.promise);await h.open();
+  assert.equal(h.queries().length,1);
+  const pin=h.session.info(),presented=h.session.readPresentedObjectSession();
+  const busy=h.session.runResourceCommand(async lease=>{
+    assert.ok(lease.readPresentedObjectSession());await resource.promise;
+  });
+  try{
+    await turn();assert.equal(h.session.readPresentedObjectSession(),null);
+    timing.resolve();await turn();await turn();
+    assert.equal(h.text(),'Native timing is unavailable.');
+    resource.resolve();await busy;await new Promise(resolve=>setTimeout(resolve,10));await turn();
+    assert.equal(h.text(),'Key — Source frame 1 — Content');
+    assert.equal(h.queries().length,2,'settled presentation retries only the refused read');
+    assert.strictEqual(h.session.info(),pin);
+    assert.deepEqual(h.session.readPresentedObjectSession(),presented);
+    await h.session.runResourceCommand(async()=>{});await new Promise(resolve=>setTimeout(resolve,10));
+    assert.equal(h.queries().length,2,'later queue completions reuse the confirmed timing');
+    assert.equal(h.meta().undoDepth,0);assert.equal(h.meta().contentRevision,0);
+  }finally{timing.resolve();resource.resolve();await busy;}
+});
+test('a genuinely unavailable timing read is not retried on unrelated queue completions',async()=>{
+  const h=harness();await h.open();
+  assert.equal(h.nodes.get('layer-list').children[1].children[0].click(),true);
+  await turn();await turn();assert.equal(h.text(),'Native timing is unavailable.');
+  const count=h.queries().length;
+  for(let i=0;i<3;i++){
+    await h.session.runResourceCommand(async()=>{});await new Promise(resolve=>setTimeout(resolve,10));
+  }
+  assert.equal(h.queries().length,count);assert.equal(h.text(),'Native timing is unavailable.');
+  assert.equal(h.session.isIndeterminate(),false);assert.equal(h.meta().contentRevision,0);
 });
 test('one outstanding read coalesces rapid frame intent and never publishes an obsolete result',async()=>{
   const h=harness();await h.open();const gate=deferred();h.hold(gate.promise);await h.frame(6);
@@ -157,4 +208,33 @@ test('Project range-only read works for untimed layer without inventing cell exp
  assert.equal(h.queries().at(-1).r.payload.view,'range');const revision=h.meta().contentRevision;
  h.fault(r=>r.result.range.extra=1);assert.equal(await h.session.readLayerRange('missing',frame,pin),null);assert.equal(h.meta().contentRevision,revision);
  const old=h.queries().length;assert.equal(await h.session.readLayerRange('missing',frame,{...pin,documentSnapshotId:'foreign'}),null);assert.equal(h.queries().length,old);
+});
+
+test('Project cells read pages the whole row through the same timing query, independent of the presented frame',async()=>{
+  const h=harness();await h.open();const pin=h.session.info(),before=h.queries().length;
+  const row=await h.session.readLayerCells('drawing:雪',pin);
+  assert.deepEqual(row.map(run=>[...run]),CELLS);assert.equal(Object.isFrozen(row)&&Object.isFrozen(row[0]),true);
+  const pages=h.queries().slice(before);
+  assert.deepEqual(pages.map(q=>[q.r.operation,q.r.payload.view,q.r.payload.frame]),
+    [0,7,20].map(f=>['query.document.object.layer.timing','cells',f]));
+  for(const [f,cell] of rows)assert.deepEqual(CELLS.filter(run=>f>=run[0]&&f<run[0]+run[1]).map(run=>[run[2],run[2]==='interpolated'?f:run[3],run[4],run[5]])[0],
+    [cell.cellKind,cell.sourceFrame,cell.hasContent,cell.manualEdit],'the runs agree with the single-cell oracle at '+f);
+  h.fault(r=>{r.result.cells.runs[0][0]=1;});assert.equal(await h.session.readLayerCells('drawing:雪',pin),null,'a misplaced page refuses the row');
+  assert.equal(await h.session.readLayerCells('missing',pin),null,'a layer without timing is unavailable, not blank');
+  const count=h.queries().length;assert.equal(await h.session.readLayerCells('drawing:雪',{...pin,documentSnapshotId:'old'}),null);
+  assert.equal(h.queries().length,count);assert.equal(h.meta().contentRevision,0);
+});
+// #2343 B1: the presentation callback (settingsNotice) calls the symmetry controller, and its repaint renders a native
+// preview. An unchanged confirmed value must not ask for another one, or the queue never settles and timing never reads.
+test('Open with the symmetry controller installed settles its previews and reaches timing',async()=>{
+  const h=harness({symmetry:true});await h.open();
+  const previews=()=>h.calls.filter(c=>c.command==='nemo_native_object_preview').length,pause=()=>new Promise(r=>setTimeout(r,5));
+  for(let i=0;i<20;i++){await turn();await pause();}
+  const settled=previews();
+  for(let i=0;i<20;i++){await turn();await pause();}
+  assert.equal(previews(),settled,'no further preview without a change');
+  assert.ok(settled<=4,'previews: '+settled);
+  assert.equal(h.root.state.symmetryEnabled,true,'the confirmed symmetry value is shown');
+  assert.equal(h.text(),'Key — Source frame 1 — Content');
+  assert.ok(h.calls.some(c=>c.r&&c.r.operation===SymmetryContract.READ),'the controller read native symmetry');
 });

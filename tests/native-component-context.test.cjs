@@ -1,0 +1,660 @@
+'use strict';
+// #2256 leaf 3: entering and leaving a Component on a native object project. The real pieces run: the layer-list row (its dblclick),
+// the controller, the SM entry replacement, the native adapter and its contracts, the scene projection (projectView) and the real
+// renderSymbolTabs of timeline.js (extracted). The native owner is a scripted double that answers the component read and the
+// workspace transition from a small model; the legacy enterSymbol / exitToScene / closeSymbolTab are recorders that must NEVER run on a
+// native document. The viewport is a recorder that notes WHICH context is presented when it is asked to render.
+const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
+const Context = require('../src/js/adapters/native-component-context.js');
+const EnterUI = require('../src/js/adapters/native-component-enter-ui.js');
+const Presenter = require('../src/js/adapters/native-layer-list-presenter.js');
+const Component = require('../src/js/adapters/native-object-component.js');
+const Files = require('../src/js/adapters/native-object-project-file.js');
+const SDK = require('../src/js/adapters/native-application.js');
+
+const SRC = path.join(__dirname, '..', 'src', 'js');
+const SNAP = (revision) => 'native-object:document-A:' + revision;
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const settle = async () => { for (let i = 0; i < 24; i++) await new Promise((done) => setImmediate(done)); };
+
+// The model: a 24-frame scene with an instance of sym_a (12 frames, 12 fps) and another of sym_b (6 frames).
+function model() {
+  return { revision: 7, comps: { sym_a: { name: 'Comp A', totalFrames: 12, fps: 12, layers: [['ia', 'Inner A', 'drawing'], ['ib', null, 'null']], instances: ['L2'] },
+    sym_b: { name: 'Comp B', totalFrames: 6, fps: null, layers: [['ic', 'Inner C', 'drawing']], instances: ['L3'] } } };
+}
+const SCENE_LAYERS = [['L1', 'Plain', 'drawing'], ['L2', 'Inst A', 'instance'], ['L3', 'Inst B', 'instance']];
+function readAnswer(m, request) {
+  const p = request.payload, s = p.selector, head = { atRevision: p.atRevision, documentSnapshotId: p.documentSnapshotId, kind: s.kind };
+  const page = (rows, countKey, extra) => { const take = rows.slice(s.cursor, s.cursor + s.limit), end = s.cursor + take.length;
+    return Object.assign(head, extra, { [countKey]: rows.length, cursor: s.cursor, items: take, nextCursor: end < rows.length ? end : null }); };
+  const all = [{ contextId: 'scene-root', contextKind: 'scene', name: null, totalFrames: 24, layerCount: 3 }]
+    .concat(Object.entries(m.comps).map(([id, c]) => ({ contextId: id, contextKind: 'component', name: c.name, totalFrames: c.totalFrames, layerCount: c.layers.length })));
+  if (s.kind === 'contexts') return page(all, 'contextCount');
+  const comp = m.comps[s.contextId];
+  const rows = (list) => list.map(([layerUid, name, layerKind, facts]) => Object.assign({ layerUid, name, layerKind }, facts));
+  if (s.kind === 'layers') return page(rows(comp ? comp.layers : SCENE_LAYERS), 'layerCount', { contextId: s.contextId });
+  return page(comp.instances.map((layerUid) => ({ layerUid })), 'instanceCount', { contextId: s.contextId });
+}
+// The baseline rules of enterSymbol / exitToScene / closeSymbolTab (stated independently of the Rust kernel).
+function workspaceAnswer(m, request) {
+  const ws = clone(request.payload.workspace), action = request.payload.action, comps = m.comps;
+  const shown = (outcome) => { const a = ws.activeContextId, meta = a === null ? { totalFrames: 24, fps: 24 } : comps[a];
+    return { atRevision: request.payload.atRevision, documentSnapshotId: request.payload.documentSnapshotId, outcome, contextId: a === null ? 'scene-root' : a,
+      totalFrames: meta.totalFrames, fps: meta.fps || 24, workspace: Object.assign(ws, { openTabs: ws.openTabs.filter((id) => comps[id]) }) }; };
+  if (ws.activeContextId !== null && !comps[ws.activeContextId]) { ws.view = ws.sceneView; ws.sceneView = null; ws.activeContextId = null; if (action.kind === 'refresh') return shown('context_gone'); }
+  const leave = () => { ws.view = ws.sceneView; ws.sceneView = null; ws.activeContextId = null; };
+  if (action.kind === 'enter') {
+    if (ws.activeContextId === action.contextId) return shown('already_active');
+    if (ws.activeContextId !== null) return shown('refused_nested');
+    const meta = comps[action.contextId];
+    if (!meta) return null;
+    ws.sceneView = ws.view; ws.activeContextId = action.contextId; ws.view = { frame: action.fromLayerUid && m.entryFrames ? Math.min(meta.totalFrames - 1, m.entryFrames[action.fromLayerUid] || 0) : (action.entryFrame || 0), workIn: 0, workOut: meta.totalFrames - 1 };
+    if (!ws.openTabs.includes(action.contextId)) ws.openTabs.push(action.contextId);
+    while (ws.openTabs.length > 8) ws.openTabs.splice(ws.openTabs.findIndex((id) => id !== ws.activeContextId), 1);
+    return shown('entered');
+  }
+  if (action.kind === 'exit') { if (ws.activeContextId === null) return shown('not_in_context'); leave(); return shown('exited'); }
+  if (action.kind === 'close') { if (ws.activeContextId === action.contextId) leave(); const at = ws.openTabs.indexOf(action.contextId); if (at >= 0) ws.openTabs.splice(at, 1); return shown(at >= 0 ? 'closed' : 'close_noop'); }
+  return shown('refreshed');
+}
+
+// A tiny DOM: enough for the presenter row, the paint and the tab strip (events dispatched through real listeners).
+function element(tag) {
+  const listeners = {}, kids = [], classes = new Set();
+  const el = { tagName: tag, style: { setProperty(k, v) { this[k] = v; } }, dataset: {}, attributes: {}, textContent: '', type: '', value: '', hidden: false, disabled: false, parentNode: null,
+    classList: { add: (x) => classes.add(x), remove: (x) => classes.delete(x), contains: (x) => classes.has(x), toggle: (x, on) => (on ? classes.add(x) : classes.delete(x)) },
+    querySelector(sel) { const cls = sel.replace(/^\./, ''); return kids.find((k) => k.className.split(' ').includes(cls)) || null; },
+    setAttribute(k, v) { this.attributes[k] = String(v); }, addEventListener(k, f) { (listeners[k] = listeners[k] || []).push(f); },
+    replaceChildren(...next) { kids.splice(0).forEach((k) => { k.parentNode = null; }); next.forEach((k) => this.appendChild(k)); },
+    appendChild(k) { if (k.parentNode) k.parentNode.removeChild(k); kids.push(k); k.parentNode = this; return k; },
+    removeChild(k) { kids.splice(kids.indexOf(k), 1); k.parentNode = null; },
+    fire(type, extra) { (listeners[type] || []).forEach((f) => f(Object.assign({ target: el, preventDefault() {}, stopPropagation() {} }, extra))); } };
+  Object.defineProperty(el, 'className', { get: () => [...classes].join(' '), set(v) { classes.clear(); String(v).split(/\s+/).filter(Boolean).forEach((x) => classes.add(x)); } });
+  Object.defineProperty(el, 'children', { get: () => kids.slice() });
+  Object.defineProperty(el, 'innerHTML', { set() { this.replaceChildren(); }, get: () => '' });
+  return el;
+}
+function documentFor() {
+  const nodes = new Map(['layer-list', 'frame-hdr', 'frame-grid', 'tl-cf', 'tl-tf', 'info-frame', 'playhead', 'playhead-flag', 'symbol-tabs'].map((id) => [id, Object.assign(element('div'), { id })]));
+  const doc = { nodes, activeElement: null, getElementById: (id) => nodes.get(id) || null, createElement: (tag) => Object.assign(element(tag), { ownerDocument: doc }) };
+  return doc;
+}
+// The real renderSymbolTabs of timeline.js, run against the fake page (window = the host).
+function realRenderSymbolTabs(host) {
+  const text = fs.readFileSync(path.join(SRC, 'timeline.js'), 'utf8'), start = text.indexOf('function renderSymbolTabs(){'), end = text.indexOf('// Footage panel', start);
+  assert.ok(start > 0 && end > start, 'renderSymbolTabs located');
+  const context = vm.createContext({ window: host, document: host.document, state: host.state });
+  vm.runInContext(text.slice(start, end), context);
+  return vm.runInContext('renderSymbolTabs', context);
+}
+
+function fixture(options) {
+  options = options || {};
+  const m = model(), effects = [], toasts = [], renders = [], requests = [];
+  let ready = true;
+  const info = () => ({ apiVersion: 2, instanceId: 'instance-A', documentId: 'document-A', lifecycleGeneration: 1, contentRevision: m.revision, documentSnapshotId: SNAP(m.revision),
+    canvasW: 320, canvasH: 180, fps: 24, totalFrames: 24, layers: SCENE_LAYERS.map(([layerUid, name]) => ({ layerUid, name })) });
+  const sdk = SDK.createNativeApplicationAdapter('component-context-test', { async dispatch(request) {
+    requests.push(clone(request));
+    if (options.hold && request.operation === 'query.document.object.workspace.context' && request.payload.action.kind === options.hold.kind) await options.hold.promise;
+    const base = { apiVersion: 2, requestId: request.requestId, instanceId: 'instance-A', documentId: 'document-A', contentRevision: m.revision };
+    if (m.failExit && request.operation === 'query.document.object.workspace.context' && request.payload.action.kind === 'exit') {
+      return Object.assign(base, { ok: false, error: { code: 'unavailable', message: 'the owner could not exit' } });
+    }
+    if (m.failRefresh > 0 && request.operation === 'query.document.object.workspace.context' && request.payload.action.kind === 'refresh') {
+      m.failRefresh -= 1; return Object.assign(base, { ok: false, error: { code: 'unavailable', message: 'the owner could not answer' } });
+    }
+    const result = request.operation === 'query.document.object.workspace.context' ? workspaceAnswer(m, request) : readAnswer(m, request);
+    return result ? Object.assign(base, { ok: true, result }) : Object.assign(base, { ok: false, error: { code: 'not_found', message: 'no such context' } });
+  } });
+  const host = { document: documentFor(), userLayers: [], _layerSel: [0], selectedPaths: [], showToast: (text) => toasts.push(text),
+    state: { activeLayerIdx: 0, currentFrame: 0, activeSymbolId: null, openSymbolTabs: [] },
+    SM: { enterSymbol: () => effects.push('legacy-enter'), exitToScene: () => effects.push('legacy-exit'), closeSymbolTab: () => effects.push('legacy-close'), t: (key) => key },
+    updateUI: () => { effects.push('updateUI'); if (host.NemoNativeComponentContext.paint(host) !== true) effects.push('scene-paint'); host.renderSymbolTabs(); },
+    NemoNativeObjectProjectFile: Files, NemoNativeComponentContext: Context, NemoNativeObjectComponent: Component };
+  const session = {
+    isActive: () => ready, blocksLegacy: () => !options.legacyDocument, info, requestId: (label) => label + '-' + (requests.length + 1),
+    async runResourceCommand(action) { return action({ dispatch: (request) => sdk.dispatch(request), reconcile: async () => info() }); },
+    async renderPreview(frame) {
+      renders.push({ frame, presented: Context.presented(host) });
+      if (options.failPresent && Context.presented(host)) throw new Error('the viewport refused the context');
+    },
+  };
+  host.NemoNativeObjectProject = { desktop: () => session };
+  host.renderSymbolTabs = realRenderSymbolTabs(host);
+  Files.projectView(host, info(), null);
+  const ports = { currentSession: () => (options.legacyDocument ? null : session), projectionReady: () => true, selectLayer: () => true };
+  const policy = { bindPolicyEntries: () => true, disposePolicyEntries: () => effects.push('policy-disposed') };
+  const composed = EnterUI.compose(host, ports, policy);
+  return { host, m, session, effects, toasts, renders, requests, composed, ports, setReady: (v) => { ready = v; },
+    workspaceRequests: () => requests.filter((r) => r.operation === 'query.document.object.workspace.context'),
+    // The real presenter row of a scene layer, built with the open port the native list gives it.
+    row(index) {
+      const context = { document: host.document, info: info(), selection: [], shyMode: false, policyOwner: null, onPick: () => false, onVisibility: () => false, onPolicy: () => false,
+        onOpen: (layer) => composed.openLayer(layer.layerUid) };
+      return Presenter.render(host.document.getElementById('layer-list'), context).rows[index];
+    },
+    tabs: () => host.document.getElementById('symbol-tabs').children.map((tab) => ({ text: tab.children.length ? tab.children[0].textContent : tab.textContent, act: tab.className.includes('act') })) };
+}
+
+test('double-clicking an instance layer enters its component through ONE native workspace request and presents the component context', async () => {
+  const f = fixture();
+  assert.equal(f.composed.bindPolicyEntries(), true);
+  f.host.state.currentFrame = 5; f.host.state.waIn = 0; f.host.state.waOut = 23;
+  f.row(1).fire('dblclick'); await settle();
+  assert.equal(f.workspaceRequests().length, 1, 'one native workspace transition');
+  assert.deepEqual(f.workspaceRequests()[0].payload.workspace, { activeContextId: null, openTabs: [], view: { frame: 5, workIn: 0, workOut: 23 }, sceneView: null });
+  assert.deepEqual(f.workspaceRequests()[0].payload.action, { kind: 'enter', contextId: 'sym_a', entryFrame: null, fromLayerUid: 'L2' }, 'the instance layer is named so the owner can resolve its frame');
+  assert.equal('expectedRevision' in f.workspaceRequests()[0], false);
+  assert.deepEqual(f.effects.filter((e) => e.startsWith('legacy')), [], 'the legacy enterSymbol never ran');
+  // The viewport was asked once, for the component context at its first frame, after the context was entered.
+  assert.deepEqual(f.renders, [{ frame: 0, presented: { contextId: 'sym_a', totalFrames: 12, fps: 12 } }]);
+  const s = f.host.state;
+  assert.equal(s.activeSymbolId, 'sym_a');
+  assert.equal(s.totalFrames, 12); assert.equal(s.fps, 12); assert.equal(s.currentFrame, 0); assert.equal(s.waIn, 0); assert.equal(s.waOut, 11); assert.equal(s.activeLayerIdx, 0);
+  assert.deepEqual(s.layers.map((l) => [l.layerUid, l.name]), [['ia', 'Inner A'], ['ib', 'Layer 2']], 'the component layers come from the native read');
+  assert.deepEqual(f.host._layerSel, [0]);
+  assert.deepEqual(f.tabs(), [{ text: 'Scene', act: false }, { text: 'Comp A', act: true }]);
+  assert.deepEqual(f.toasts, []);
+});
+
+test('a row that instances nothing does nothing, and the component read finds the right component per instance', async () => {
+  const f = fixture();
+  f.composed.bindPolicyEntries();
+  f.row(0).fire('dblclick'); await settle();
+  assert.equal(f.workspaceRequests().length, 0, 'a plain layer is not entered');
+  assert.equal(f.host.state.activeSymbolId, null);
+  f.row(2).fire('dblclick'); await settle();
+  assert.equal(f.host.state.activeSymbolId, 'sym_b');
+  assert.equal(f.host.state.totalFrames, 6);
+  assert.equal(f.host.state.fps, 24, 'a component without fps keeps the scene fps');
+});
+
+test('the Scene tab leaves the component and restores the scene projection from the native truth', async () => {
+  const f = fixture();
+  f.composed.bindPolicyEntries();
+  f.host.state.currentFrame = 5; f.host.state.activeLayerIdx = 2; f.host._layerSel = [2]; f.host._layerSelAnchor = 2;
+  f.row(1).fire('dblclick'); await settle();
+  f.host.state.currentFrame = 3; // the user scrubbed inside the component
+  f.host.document.getElementById('symbol-tabs').children[0].fire('click'); await settle();
+  const exit = f.workspaceRequests()[1];
+  assert.deepEqual(exit.payload.action, { kind: 'exit' });
+  assert.deepEqual(exit.payload.workspace.view, { frame: 3, workIn: 0, workOut: 11 }, 'the live playhead of the component is sent');
+  const s = f.host.state;
+  assert.equal(s.activeSymbolId, null);
+  assert.equal(s.totalFrames, 24); assert.equal(s.fps, 24); assert.equal(s.currentFrame, 5);
+  assert.deepEqual(s.layers.map((l) => l.layerUid), ['L1', 'L2', 'L3']);
+  assert.equal(s.activeLayerIdx, 2, 'the scene selection is restored');
+  assert.deepEqual(f.host._layerSel, [2]);
+  assert.deepEqual(f.renders.map((r) => [r.frame, r.presented && r.presented.contextId]), [[0, 'sym_a'], [5, null]], 'the scene is presented again at its own frame');
+  assert.deepEqual(f.tabs(), [{ text: 'Scene', act: true }, { text: 'Comp A', act: false }], 'the tab stays open');
+  assert.equal(Files.projectionReadyForUI(f.host, f.session.info()), true, 'the ordinary scene UI is ready again');
+  assert.deepEqual(f.effects.filter((e) => e.startsWith('legacy')), []);
+});
+
+test('a component tab re-enters it, its x closes it (the active tab exits first), and entering from inside another component is refused', async () => {
+  const f = fixture();
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  f.host.SM.enterSymbol('sym_b'); await settle();
+  assert.deepEqual(f.toasts, ['toastNestedComponentsUnsupported'], 'the baseline nested notice');
+  assert.equal(f.host.state.activeSymbolId, 'sym_a', 'nothing moved');
+  assert.equal(f.renders.length, 1);
+  const compTab = () => f.host.document.getElementById('symbol-tabs').children[1];
+  compTab().children[1].fire('click', { target: compTab().children[1] }); await settle(); // the x
+  const close = f.workspaceRequests().pop();
+  assert.deepEqual(close.payload.action, { kind: 'close', contextId: 'sym_a' });
+  assert.equal(f.host.state.activeSymbolId, null);
+  assert.deepEqual(f.tabs(), [{ text: 'Scene', act: true }]);
+  f.row(1).fire('dblclick'); await settle();
+  f.host.document.getElementById('symbol-tabs').children[0].fire('click'); await settle();
+  assert.deepEqual(f.tabs(), [{ text: 'Scene', act: true }, { text: 'Comp A', act: false }]);
+  f.host.document.getElementById('symbol-tabs').children[1].fire('click', { target: {} }); await settle(); // the tab itself
+  assert.equal(f.host.state.activeSymbolId, 'sym_a');
+  assert.deepEqual(f.effects.filter((e) => e.startsWith('legacy')), []);
+});
+
+test('the SM entries (Scene tab, programmatic) route to the native transition; a legacy document keeps its guarded entries', async () => {
+  const f = fixture();
+  const legacy = f.host.SM.enterSymbol;
+  f.composed.bindPolicyEntries();
+  assert.notEqual(f.host.SM.enterSymbol, legacy);
+  await f.host.SM.enterSymbol('sym_a');
+  assert.equal(f.host.state.activeSymbolId, 'sym_a');
+  await f.host.SM.exitToScene();
+  assert.equal(f.host.state.activeSymbolId, null);
+  await f.host.SM.closeSymbolTab('sym_a');
+  assert.deepEqual(f.effects.filter((e) => e.startsWith('legacy')), []);
+  const old = fixture({ legacyDocument: true });
+  old.composed.bindPolicyEntries();
+  old.host.SM.enterSymbol('sym_a'); old.host.SM.exitToScene(); old.host.SM.closeSymbolTab('sym_a');
+  assert.deepEqual(old.effects.filter((e) => e.startsWith('legacy')), ['legacy-enter', 'legacy-exit', 'legacy-close'], 'a legacy document keeps its (guarded) entries');
+  assert.equal(old.workspaceRequests().length, 0);
+  assert.equal(old.host.state.activeSymbolId, null);
+});
+
+test('an unknown component, a missing session and a viewport that cannot present it leave the scene untouched', async () => {
+  const f = fixture();
+  f.composed.bindPolicyEntries();
+  await f.host.SM.enterSymbol('sym_nope');
+  assert.equal(f.host.state.activeSymbolId, null);
+  assert.deepEqual(f.toasts.length, 0, 'the baseline ignores an unknown symbol silently');
+  f.setReady(false);
+  await f.host.SM.enterSymbol('sym_a');
+  assert.deepEqual(f.toasts, ['Native component context is unavailable.']);
+  assert.equal(f.workspaceRequests().length, 1, 'only the unknown-context request was sent');
+  f.setReady(true);
+  const bad = fixture({ failPresent: true });
+  bad.composed.bindPolicyEntries();
+  await bad.host.SM.enterSymbol('sym_a');
+  assert.match(bad.toasts.join('|'), /the viewport refused the context/);
+  assert.equal(bad.host.state.activeSymbolId, null, 'the half-entered view is rolled back');
+  assert.equal(bad.host.state.totalFrames, 24);
+  assert.equal(Context.presented(bad.host), null);
+  assert.deepEqual(bad.workspaceRequests().map((r) => r.payload.action.kind), ['enter', 'exit']);
+  assert.deepEqual(bad.renders.map((r) => r.presented && r.presented.contextId), ['sym_a', null], 'the scene is presented again');
+});
+
+test('a component that vanished (Undo) is left on the next revision, the others re-read their layers', async () => {
+  const f = fixture();
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  f.m.revision = 8; f.m.comps.sym_a.layers.push(['id', 'Inner D', 'drawing']);
+  Context.revision(f.host, f.session.info()); await settle();
+  assert.equal(f.host.state.activeSymbolId, 'sym_a');
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['ia', 'ib', 'id']);
+  f.m.revision = 9; delete f.m.comps.sym_a;
+  Context.revision(f.host, f.session.info()); await settle();
+  assert.equal(f.host.state.activeSymbolId, null);
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['L1', 'L2', 'L3']);
+  assert.match(f.toasts.join('|'), /no longer exists/);
+  assert.deepEqual(f.tabs(), [{ text: 'Scene', act: true }], 'the tab of a context that no longer exists is not listed');
+});
+
+test('an entered component paints its own timeline: baseline rows, no scene paint, a layer row activates the layer', async () => {
+  const f = fixture();
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  const list = f.host.document.getElementById('layer-list'), grid = f.host.document.getElementById('frame-grid');
+  assert.deepEqual(list.children.map((r) => r.dataset.layerUid), ['ia', 'ib']);
+  assert.ok(list.children.every((r) => r.className.split(' ').includes('lrow')), 'the baseline .lrow rhythm');
+  assert.deepEqual(grid.children.map((r) => r.dataset.layerUid), ['ia', 'ib'], 'one .frow per .lrow, in the same order (CLAUDE.md section 11)');
+  assert.ok(grid.children.every((r) => r.className.split(' ').includes('frow') && r.children.length === 12), 'a baseline cell per component frame');
+  assert.match(f.host.document.getElementById('frame-hdr').children[0].textContent, /^Comp A — Frame 1 \/ 12$/);
+  assert.equal(f.host.document.getElementById('tl-tf').textContent, 12);
+  assert.equal(f.effects.includes('scene-paint'), false, 'the scene paint is skipped inside a component');
+  f.host.state.currentFrame = 4; f.host.updateUI();
+  assert.match(f.host.document.getElementById('frame-hdr').children[0].textContent, /Frame 5 \/ 12/);
+  assert.ok(f.host.document.getElementById('frame-grid').children[0].children[4].className.split(' ').includes('cur'), 'the playhead cell follows the frame');
+  f.host.document.getElementById('layer-list').children[1].fire('click'); await settle();
+  assert.equal(f.host.state.activeLayerIdx, 1, 'a row click activates the component layer');
+  assert.deepEqual(f.host._layerSel, [1]);
+  assert.ok(f.host.document.getElementById('layer-list').children[1].className.split(' ').includes('act'));
+  // #2256: the selected cells stay painted across a repaint (a click on a cell activates its layer, which repaints the grid).
+  f.host._sel = { frames: [{ layer: 1, frame: 3 }] }; f.host.updateUI();
+  const cells = f.host.document.getElementById('frame-grid').children;
+  assert.deepEqual([cells[1].children[3].className.split(' ').includes('sel'), cells[0].children[3].className.split(' ').includes('sel'), cells[1].children[2].className.split(' ').includes('sel')], [true, false, false]);
+});
+
+test('the entered grid shows the component\'s OWN frames and range from the pinned timing reads, never the scene\'s, and drops a stale answer', async () => {
+  const f = fixture(), calls = [];
+  // The runs the owner answers for the component's layer `ia`: a key with content, a held span, a tween, a blank key, a held empty tail (12 frames).
+  const runs = [[0, 1, 'key', null, true, false], [1, 3, 'held', 0, true, false], [4, 2, 'interpolated', null, true, false], [6, 1, 'key', null, false, false], [7, 5, 'held', 6, false, false]];
+  f.session.readLayerCells = async (uid, pin) => { calls.push(['cells', uid, pin.contentRevision]); return uid === 'ia' ? runs : null; };
+  f.session.readLayerRange = async (uid, frame) => { calls.push(['range', uid, frame]); return { kind: 'layerRange', range: { rawInPoint: 2, rawOutPoint: 9, inPoint: 2, outPoint: 9, hasCustomRange: true, hasTimeLink: false } }; };
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  const grid = f.host.document.getElementById('frame-grid'), classes = (row, at) => grid.children[row].children[at].className.split(' ');
+  assert.deepEqual(calls.filter((c) => c[0] === 'cells').map((c) => c[1]).sort(), ['ia', 'ib'], 'one cells read per component layer');
+  assert.ok(classes(0, 0).includes('kf-full') && classes(0, 0).length > 0, 'a key with content');
+  assert.ok(classes(0, 2).includes('span-full') && !classes(0, 2).includes('span-end'), 'a held span');
+  assert.ok(classes(0, 3).includes('span-full') && classes(0, 3).includes('span-end'), 'the last held cell before the tween ends the span');
+  assert.ok(classes(0, 4).includes('tw'), 'a tween cell');
+  assert.ok(classes(0, 6).includes('kf-empty'), 'a blank key');
+  assert.ok(classes(0, 8).includes('span-empty'), 'a held empty tail');
+  assert.equal(grid.children[1].children[0].className.split(' ').includes('kf-full'), false, 'a refused read leaves the row blank');
+  assert.deepEqual(f.host.state.layers[0].frames.map((x) => x.isKeyframe).slice(0, 8), [true, false, false, false, false, false, true, false], 'the row frames the legacy readers see');
+  assert.equal(f.host.state.layers[0].frames.length, 12);
+  const bar = grid.children[0].children.find((c) => c.className.includes('layer-inout-bar'));
+  assert.ok(bar && bar.style.left === '28px' && bar.attributes['aria-disabled'] === 'true', 'the read-only in/out bar from the component range read');
+  const before = calls.filter((c) => c[0] === 'cells' && c[1] === 'ia').length; // a refused read (ib) is asked again, an answered row is not
+  f.host.state.currentFrame = 3; f.host.updateUI(); await settle();
+  assert.equal(calls.filter((c) => c[0] === 'cells' && c[1] === 'ia').length, before, 'a scrub re-reads no row of the same revision');
+  assert.deepEqual(calls.filter((c) => c[0] === 'range').map((c) => c[1]).sort(), ['ia', 'ib'], 'the in/out range is read once per layer and revision: the playhead is not an input');
+  // A read that lands after the context was left paints nothing.
+  let late; f.session.readLayerCells = () => new Promise((resolve) => { late = resolve; });
+  f.m.revision = 8; Context.revision(f.host, f.session.info()); await settle();
+  await f.host.SM.exitToScene(); await settle();
+  late(runs); await settle();
+  assert.equal(f.host.state.activeSymbolId, null);
+});
+
+test('a revision that arrives while another transition is in flight is queued, not dropped: the context is re-read once it is done', async () => {
+  let release; const hold = { kind: 'close', promise: new Promise((resolve) => { release = resolve; }) };
+  const f = fixture({ hold }); f.composed.bindPolicyEntries();
+  await f.host.SM.enterSymbol('sym_a'); await f.host.SM.exitToScene(); await f.host.SM.enterSymbol('sym_b');
+  const closing = f.host.SM.closeSymbolTab('sym_a'); await settle(); // held in flight
+  f.m.revision = 8; f.m.comps.sym_b.layers.push(['id', 'Inner D', 'drawing']);
+  Context.revision(f.host, f.session.info()); await settle();
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['ic'], 'nothing could be re-read while the transition is in flight');
+  release(); await closing; await settle();
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['ic', 'id'], 'the queued revision re-read the layers afterwards');
+  assert.equal(f.host.state.activeSymbolId, 'sym_b');
+});
+
+test('leaving a component that vanished under the user still shows the scene (the owner answers not_in_context)', async () => {
+  const f = fixture(); f.composed.bindPolicyEntries();
+  await f.host.SM.enterSymbol('sym_a');
+  delete f.m.comps.sym_a; f.m.revision = 8; // deleted by Undo / an agent; no revision event reached the view yet
+  assert.equal(await f.host.SM.exitToScene(), true);
+  assert.equal(f.host.state.activeSymbolId, null);
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['L1', 'L2', 'L3']);
+  assert.equal(Context.presented(f.host), null);
+  assert.equal(f.renders[f.renders.length - 1].presented, null, 'the scene is presented');
+  assert.deepEqual(f.toasts, []);
+});
+
+test('a ninth distinct component keeps the strip within the eight tabs the wire allows', async () => {
+  const f = fixture(); f.composed.bindPolicyEntries();
+  for (let n = 0; n < 7; n += 1) f.m.comps['sym_x' + n] = { name: 'X' + n, totalFrames: 4, fps: null, layers: [['x' + n, 'X', 'drawing']], instances: [] };
+  const order = ['sym_a', 'sym_b'].concat([0, 1, 2, 3, 4, 5, 6].map((n) => 'sym_x' + n));
+  for (const id of order) { assert.equal(await f.host.SM.enterSymbol(id), true, id); await f.host.SM.exitToScene(); }
+  assert.deepEqual(f.toasts, [], 'no opaque contract error');
+  assert.equal(f.host.state.openSymbolTabs.length, 8);
+  assert.equal(f.host.state.openSymbolTabs.includes('sym_a'), false, 'the oldest tab was evicted');
+  assert.equal(await f.host.SM.enterSymbol('sym_a'), true, 'an evicted component can still be entered');
+  assert.equal(f.host.state.activeSymbolId, 'sym_a');
+  assert.equal(f.host.state.openSymbolTabs.length, 8);
+});
+
+test('the layer-row double-click enters at the frame the instance shows at the playhead (resolveSymbolFrameIdx); tabs and SM.enterSymbol start at the first frame', async () => {
+  const f = fixture(); f.composed.bindPolicyEntries();
+  f.m.entryFrames = { L2: 7, L3: 99 }; // what the owner resolves from the instance's placement, speed, play mode and component frame keys
+  f.host.state.currentFrame = 15;
+  f.row(1).fire('dblclick'); await settle();
+  const enter = f.workspaceRequests()[0].payload;
+  assert.deepEqual(enter.action, { kind: 'enter', contextId: 'sym_a', entryFrame: null, fromLayerUid: 'L2' });
+  assert.deepEqual(enter.workspace.view, { frame: 15, workIn: 0, workOut: 23 }, 'the scene playhead is what the instance is resolved at');
+  assert.equal(f.host.state.currentFrame, 7, 'the playhead is on the resolved component frame');
+  assert.deepEqual([f.host.state.waIn, f.host.state.waOut], [0, 11]);
+  assert.deepEqual(f.renders.map((r) => r.frame), [7], 'the component is presented at that frame');
+  await f.host.SM.exitToScene();
+  assert.equal(f.host.state.currentFrame, 15, 'the scene playhead is restored');
+  await f.host.SM.enterSymbol('sym_a');
+  assert.equal(f.host.state.currentFrame, 0, 'a tab / programmatic entry has no instance and starts at the first frame');
+  assert.equal('fromLayerUid' in f.workspaceRequests().pop().payload.action, false);
+  await f.host.SM.exitToScene();
+  f.row(2).fire('dblclick'); await settle();
+  assert.equal(f.host.state.currentFrame, 5, 'an out-of-range resolution is clamped into the component (6 frames)');
+});
+
+// #2256 review of #2660: a refresh that failed must not be acknowledged. The revision is recorded only once the context was re-read; until
+// then projectionReady() is false (the rows, tabs and frame count are stale), the refresh is retried a bounded number of times, and when
+// the retries run out the scene is shown with a notice instead of a stale entered view.
+async function enteredAt8(f) {
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  f.m.revision = 8; f.m.comps.sym_a.layers.push(['id', 'Inner D', 'drawing']);
+  return f;
+}
+const refreshes = (f) => f.workspaceRequests().filter((r) => r.payload.action.kind === 'refresh').length;
+
+test('a failed refresh does not acknowledge the revision: it is retried, and only the successful retry makes the projection ready', async () => {
+  const f = fixture(), timers = [];
+  f.host.setTimeout = (fn, ms) => { timers.push({ fn, ms }); };
+  await enteredAt8(f); f.m.failRefresh = 1;
+  const info = f.session.info();
+  Context.revision(f.host, info); await settle();
+  assert.equal(refreshes(f), 1, 'the first refresh failed');
+  assert.equal(Context.projectionReady(f.host, info), false, 'the stale rows are not a ready projection');
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['ia', 'ib'], 'nothing was applied from the failed answer');
+  assert.equal(timers.length, 1, 'one backoff pause is pending');
+  timers.shift().fn(); await settle();
+  assert.equal(refreshes(f), 2);
+  assert.equal(Context.projectionReady(f.host, info), true, 'acknowledged once the context was re-read');
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['ia', 'ib', 'id']);
+  assert.equal(f.host.state.activeSymbolId, 'sym_a', 'the component stays entered');
+});
+
+test('when every retry fails the scene is shown with a notice, after a bounded number of asks', async () => {
+  const f = fixture(), pauses = [];
+  f.host.setTimeout = (fn, ms) => { pauses.push(ms); fn(); };
+  await enteredAt8(f); f.m.failRefresh = Infinity;
+  const info = f.session.info();
+  Context.revision(f.host, info); await settle();
+  assert.equal(refreshes(f), 4, 'the first ask and three retries, never more');
+  assert.deepEqual(pauses, [100, 300, 900], 'with a growing pause');
+  assert.equal(f.host.state.activeSymbolId, null, 'back on the scene');
+  assert.deepEqual(f.host.state.layers.map((l) => l.layerUid), ['L1', 'L2', 'L3']);
+  assert.match(f.toasts.join('|'), /could not be refreshed/);
+  assert.equal(Context.projectionReady(f.host, info), false, 'no entered context is claimed ready');
+});
+
+test('a failed refresh inside a publication rides the same retry and exit (the lease is the publication the queue runs)', async () => {
+  const f = fixture();
+  f.host.setTimeout = (fn) => { fn(); };
+  await enteredAt8(f); f.m.failRefresh = Infinity;
+  await f.session.runResourceCommand((lease) => Context.revision(f.host, f.session.info(), lease));
+  assert.equal(refreshes(f), 4);
+  assert.equal(f.host.state.activeSymbolId, null);
+  assert.match(f.toasts.join('|'), /could not be refreshed/);
+});
+
+// #2256 review of #2668/#2669: retries AND the exit failed. The context is fenced (typed unavailable state, one toast) and later revisions
+// do not repeat the ladder of pauses on the publication queue; the next user action lifts the fence.
+test('when the retries and the exit both fail the context is fenced: later revisions neither pause nor ask again until a user action', async () => {
+  const f = fixture(), pauses = [];
+  f.host.setTimeout = (fn, ms) => { pauses.push(ms); fn(); };
+  await enteredAt8(f); f.m.failRefresh = Infinity; f.m.failExit = true;
+  const exits = () => f.workspaceRequests().filter((r) => r.payload.action.kind === 'exit').length;
+  await f.session.runResourceCommand((lease) => Context.revision(f.host, f.session.info(), lease));
+  assert.deepEqual(pauses, [100, 300, 900], 'the first revision ran the whole ladder once');
+  assert.equal(refreshes(f), 4);
+  assert.ok(exits() >= 1, 'the exit was tried');
+  assert.equal(f.host.state.activeSymbolId, 'sym_a', 'the exit failed: the component stays entered (fenced)');
+  assert.deepEqual(Context.fault(f.host), { code: 'unavailable', revision: 8 }, 'the typed unavailable state');
+  // The fence is visible, persistently: the entered tab is marked unavailable with an explanatory title, and no other tab is.
+  const strip = () => f.host.document.getElementById('symbol-tabs').children.filter((tab) => /\bsym-tab\b/.test(tab.className));
+  const marked = () => strip().filter((tab) => /\bunavail\b/.test(tab.className));
+  assert.equal(marked().length, 1, 'one tab is marked unavailable');
+  assert.ok(/\bact\b/.test(marked()[0].className) && /could not be refreshed/.test(marked()[0].title) && marked()[0].attributes['aria-disabled'] === 'true', 'the entered tab, titled');
+  f.host.renderSymbolTabs();
+  assert.equal(marked().length, 1, 'still marked after any later repaint of the strip');
+  const toasts = f.toasts.length, asked = f.requests.length;
+  f.m.revision = 9;
+  const t0 = Date.now();
+  await f.session.runResourceCommand((lease) => Context.revision(f.host, f.session.info(), lease));
+  await f.session.runResourceCommand((lease) => Context.revision(f.host, f.session.info(), lease));
+  Context.revision(f.host, f.session.info()); await settle();
+  assert.deepEqual(pauses, [100, 300, 900], 'no further pause');
+  assert.equal(f.requests.length, asked, 'no further ask of the owner');
+  assert.equal(f.toasts.length, toasts, 'the unavailable notice is shown once');
+  assert.ok(Date.now() - t0 < 500, 'the publication queue is not held');
+  assert.equal(Context.projectionReady(f.host, f.session.info()), false, 'the stale view is still not a ready projection');
+  // The next user action lifts the fence: the exit works again and the scene is shown.
+  f.m.failExit = false;
+  assert.equal(await Context.exit(f.host), true);
+  assert.equal(f.host.state.activeSymbolId, null);
+  assert.equal(Context.fault(f.host), null);
+  assert.equal(marked().length, 0, 'the mark is gone with the fence');
+});
+
+test('the unavailable mark is lifted by a row click and by closing the component, and shows no other tab as unavailable', async () => {
+  const f = fixture();
+  f.host.setTimeout = (fn) => { fn(); };
+  const fenced = async () => { await enteredAt8(f); f.m.failRefresh = Infinity; f.m.failExit = true; await f.session.runResourceCommand((lease) => Context.revision(f.host, f.session.info(), lease)); };
+  const marks = () => f.host.document.getElementById('symbol-tabs').children.filter((tab) => /\bunavail\b/.test(tab.className)).length;
+  await fenced();
+  assert.equal(marks(), 1);
+  assert.equal(Context.selectLayer(f.host, 0), true, 'a row click');
+  assert.equal(Context.fault(f.host), null);
+  assert.equal(marks(), 0, 'the click lifted the mark');
+  f.m.failRefresh = 0; f.m.failExit = false;
+  await Context.exit(f.host);
+  assert.equal(marks(), 0);
+});
+
+// A component with a key at 0, a held span and a range; the playhead moves with frameOnly (CLAUDE.md section 5bis (b)).
+async function enteredWithReads() {
+  const f = fixture(), calls = [];
+  const runs = [[0, 1, 'key', null, true, false], [1, 11, 'held', 0, true, false]];
+  f.session.readLayerCells = async (uid) => { calls.push(['cells', uid]); return runs; };
+  f.session.readLayerRange = async (uid, frame) => { calls.push(['range', uid, frame]); return { kind: 'layerRange', range: { rawInPoint: 2, rawOutPoint: 9, inPoint: 2, outPoint: 9, hasCustomRange: true, hasTimeLink: false } }; };
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  return Object.assign(f, { calls });
+}
+test('a scrub or playback tick (frameOnly) moves the playhead in place: the grid is not rebuilt and no read starts', async () => {
+  const f = await enteredWithReads();
+  const doc = f.host.document, grid = doc.getElementById('frame-grid'), list = doc.getElementById('layer-list'), hdr = doc.getElementById('frame-hdr');
+  const nodes = () => [...grid.children, ...list.children, ...hdr.children, ...grid.children.flatMap((r) => r.children)];
+  const before = nodes(), asked = f.calls.length;
+  assert.equal(f.calls.filter((c) => c[0] === 'range').length, 2, 'the range of both layers was read on entry');
+  assert.ok(grid.children[0].children.some((c) => c.className.includes('layer-inout-bar')), 'the in/out bar is painted');
+  for (let frame = 1; frame < 12; frame += 1) {
+    f.host.state.currentFrame = frame;
+    assert.equal(f.host.NemoNativeComponentContext.paint(f.host, true), true);
+    await settle();
+    assert.equal(grid.children[0].children[frame].className.split(' ').includes('cur'), true, 'the playhead cell follows frame ' + frame);
+    assert.equal(grid.children[0].children.filter((c) => c.className.split(' ').includes('cur')).length, 1, 'exactly one current cell');
+    assert.match(hdr.children[0].textContent, new RegExp('Frame ' + (frame + 1) + ' / 12$'));
+    assert.equal(doc.getElementById('tl-cf').value, frame + 1);
+  }
+  assert.deepEqual(nodes(), before, 'every row, cell and caption node is the one painted on entry (no rebuild)');
+  assert.equal(f.calls.length, asked, 'no read started during the scrub');
+  assert.ok(grid.children[0].children.some((c) => c.className.includes('layer-inout-bar')), 'the bar survives the scrub');
+});
+test('a repaint of changed content rebuilds the grid but asks no read for an answered row (cells and range are cached per revision)', async () => {
+  const f = await enteredWithReads();
+  const doc = f.host.document, grid = doc.getElementById('frame-grid'), asked = f.calls.length;
+  const first = grid.children[0];
+  f.host._layerSel = [1]; f.host.state.activeLayerIdx = 1; f.host.state.currentFrame = 3;
+  assert.equal(f.host.NemoNativeComponentContext.paint(f.host, true), true, 'a selection change with frameOnly still repaints in full');
+  await settle();
+  assert.notEqual(grid.children[0], first, 'the grid was rebuilt');
+  assert.equal(grid.children[1].className.split(' ').includes('act'), true);
+  assert.equal(f.calls.length, asked, 'the rebuilt rows took the cached cells and range');
+  assert.equal(grid.children[0].children[0].className.split(' ').includes('kf-full'), true, 'the cells are painted from the cache');
+  assert.ok(grid.children[1].children.some((c) => c.className.includes('layer-inout-bar')), 'the bar is painted from the cache');
+  f.m.revision = 8; Context.revision(f.host, f.session.info()); await settle();
+  assert.ok(f.calls.length > asked, 'a new revision reads again');
+});
+test('the shy switch hides the marked entered rows on BOTH panels alike, and the range edit binds each painted bar', async () => {
+  const f = fixture();
+  f.m.comps.sym_a.layers = [['ia', 'Inner A', 'drawing', { shy: true }], ['ib', 'Inner B', 'drawing', { shy: false }]];
+  f.session.readLayerCells = async () => null;
+  f.session.readLayerRange = async () => ({ kind: 'layerRange', range: { rawInPoint: 2, rawOutPoint: 9, inPoint: 2, outPoint: 9, hasCustomRange: true, hasTimeLink: false } });
+  const bound = [];
+  f.host.NemoNativeComponentRangeEdit = { bind: (host, bar, uid, range) => { bound.push([uid, range.rawInPoint]); return true; } };
+  f.host.state.shyEnabled = true;
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  const doc = f.host.document, list = doc.getElementById('layer-list'), grid = doc.getElementById('frame-grid');
+  assert.deepEqual(list.children.map((r) => r.hidden === true), [true, false]);
+  assert.deepEqual(grid.children.map((r) => r.hidden === true), [true, false], 'the two lists keep the same rows hidden (CLAUDE.md section 11)');
+  assert.deepEqual(bound.sort(), [['ia', 2], ['ib', 2]], 'each bar is bound to the range edit with its owner range');
+});
+test('the entered rows carry the owner\'s hidden / locked / parent / 3D / Motion facts that the drawing gates read', async () => {
+  const f = fixture();
+  f.m.comps.sym_a.layers = [['ia', 'Inner A', 'drawing', { visible: false, locked: true, parentLayerUid: 'ib', threeD: true, hasMotion: true, shy: true }], ['ib', 'Inner B', 'drawing', { visible: true, locked: false, parentLayerUid: null, threeD: false, hasMotion: false }]];
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  const rows = Context.layerRows(f.host);
+  assert.deepEqual(rows[0], { layerUid: 'ia', locked: true, visible: false, parentLayerUid: 'ib', threeD: true, hasMotion: true, shy: true });
+  assert.deepEqual(rows[1], { layerUid: 'ib', locked: false, visible: true, parentLayerUid: null, threeD: false, hasMotion: false, shy: false });
+  assert.deepEqual(Context.layers(f.host).map((r) => [r.layerUid, r.name, r.locked, r.visible]), [['ia', 'Inner A', true, false], ['ib', 'Inner B', false, true]]);
+  assert.deepEqual(f.host.state.layers.map((r) => [r.locked, r.visible, r.parentLayerUid, r.threeD]), [[true, false, 'ib', true], [false, true, null, false]]);
+});
+
+test('the entered grid mounts the header "Select frames" strip once and keeps it across a scrub tick (the real paint hook)', async () => {
+  const f = fixture(), mounts = [];
+  f.host.NemoNativeComponentCellSelection = { mount: (host, st, caption, frameOnly) => { mounts.push({ name: st.name, caption, frameOnly, text: caption.textContent, total: st.totalFrames }); return true; } };
+  f.composed.bindPolicyEntries();
+  f.row(1).fire('dblclick'); await settle();
+  const header = f.host.document.getElementById('frame-hdr');
+  const full = mounts[mounts.length - 1];
+  assert.equal(full.frameOnly, false); assert.equal(full.caption, header.children[0], 'mounted on the caption the grid painted'); assert.equal(full.name, 'Comp A'); assert.equal(full.total, 12);
+  f.host.state.currentFrame = 4;
+  assert.equal(Context.paint(f.host, true), true);
+  const tick = mounts[mounts.length - 1];
+  assert.equal(tick.frameOnly, true, 'a scrub tick asks for the in-place remount');
+  assert.equal(tick.caption, full.caption, 'the same caption node (the grid did not rebuild)');
+  assert.match(tick.text, /Frame 5 \/ 12$/, 'the caption text the strip copies is already the new frame');
+});
+
+// #2256 E-comp-auto-split: Motion's double-click on an instance releases a single-layer component into one layer per shape (motion.js:6888).
+function splitRecorder(f, outcome) {
+  const calls = [];
+  f.host.NemoNativeComponentLayerEdit = { split: async (host, uid) => { calls.push({ uid, frame: host.state.currentFrame, presented: Context.presented(host).contextId }); return outcome || { ok: true, applied: true }; } };
+  return calls;
+}
+test('Motion: entering a component that holds one drawing layer splits it once, inside the entered context, and says how to undo', async () => {
+  const f = fixture(); f.composed.bindPolicyEntries();
+  const calls = splitRecorder(f); f.host.state.appMode = 'motion';
+  f.row(2).fire('dblclick'); await settle();
+  assert.deepEqual(calls, [{ uid: 'ic', frame: 0, presented: 'sym_b' }], 'one split request, for the lone layer, after the context is presented');
+  assert.deepEqual(f.toasts, ['toastSplitToLayersUndoHint'], 'the baseline hint (the fixture locale returns the key)');
+});
+test('Motion: a component with two layers, an Animation 2D entry, a refused split and a plain tab entry never split or toast', async () => {
+  const f = fixture(); f.composed.bindPolicyEntries();
+  const calls = splitRecorder(f, { ok: false, code: 'invalid_request' }); f.host.state.appMode = 'motion';
+  f.row(1).fire('dblclick'); await settle();
+  assert.deepEqual(calls, [], 'sym_a holds two layers: the baseline splits only a single-layer component');
+  await f.host.SM.exitToScene(); await settle();
+  f.row(2).fire('dblclick'); await settle();
+  assert.equal(calls.length, 1, 'the single-layer component asks once');
+  assert.deepEqual(f.toasts, [], 'a refusal (already one shape per layer) is the idempotent re-entry: silent');
+  await f.host.SM.exitToScene(); await settle();
+  f.host.state.appMode = 'anim2d';
+  f.row(2).fire('dblclick'); await settle();
+  assert.equal(calls.length, 1, 'Animation 2D enters without splitting');
+  await f.host.SM.exitToScene(); await settle();
+  f.host.state.appMode = 'motion';
+  f.host.SM.enterSymbol('sym_b'); await settle();
+  assert.equal(calls.length, 1, 'the tab / panel entry (enterSymbol) does not split');
+});
+
+// #2256 B-comp-edit-rest: NumpadEnter in Motion on the active instance row (1065e9d8:src/js/timeline.js:9728) is the row double-click's enter-and-split path.
+function keyboard(f) {
+  const listeners = [];
+  f.host.document.addEventListener = (type, fn, capture) => { if (type === 'keydown') listeners.push({ fn, capture }); };
+  f.host.document.removeEventListener = (type, fn) => { const at = listeners.findIndex((l) => l.fn === fn); if (type === 'keydown' && at >= 0) listeners.splice(at, 1); };
+  f.composed.bindPolicyEntries();
+  const press = (code, extra) => { const event = Object.assign({ key: 'Enter', code, target: f.host.document.getElementById('layer-list'), prevented: false, stopped: false,
+    preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } }, extra); listeners.forEach((l) => l.fn(event)); return event; };
+  return { listeners, press };
+}
+test('NumpadEnter in Motion enters the active component instance and splits a single-layer component, exactly as the row double-click', async () => {
+  const f = fixture(), keys = keyboard(f), calls = splitRecorder(f);
+  Object.assign(f.host.state.layers[2], { kind: 'component', componentId: 'sym_b' }); f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'motion';
+  assert.ok(keys.listeners.length === 1 && keys.listeners[0].capture === true, 'one capture listener on the document');
+  const event = keys.press('NumpadEnter'); await settle();
+  assert.ok(event.prevented && event.stopped, 'the key is consumed (regular Enter would toggle play)');
+  assert.equal(Context.presented(f.host).contextId, 'sym_b', 'the instance component is presented');
+  assert.deepEqual(calls, [{ uid: 'ic', frame: 0, presented: 'sym_b' }], 'the same one split request as the double-click');
+  assert.deepEqual(f.toasts, ['toastSplitToLayersUndoHint']);
+  assert.equal(f.workspaceRequests().find((r) => r.payload.action.kind === 'enter').payload.action.fromLayerUid, 'L3', 'enters at the frame the instance shows');
+});
+test('NumpadEnter does nothing for regular Enter, a plain layer, Animation 2D, modifiers, a text field or from inside a component', async () => {
+  const f = fixture(), keys = keyboard(f), calls = splitRecorder(f);
+  Object.assign(f.host.state.layers[2], { kind: 'component', componentId: 'sym_b' }); f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'motion';
+  const field = { tagName: 'INPUT', parentNode: null };
+  const idle = [keys.press('Enter'), keys.press('NumpadEnter', { altKey: true }), keys.press('NumpadEnter', { metaKey: true }), keys.press('NumpadEnter', { target: field })];
+  f.host.state.activeLayerIdx = 0; idle.push(keys.press('NumpadEnter'));
+  f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'anim2d'; idle.push(keys.press('NumpadEnter'));
+  await settle();
+  assert.ok(idle.every((e) => !e.prevented), 'none of them is consumed');
+  assert.equal(f.workspaceRequests().length, 0, 'no workspace request was sent');
+  f.host.state.appMode = 'motion'; keys.press('NumpadEnter'); await settle();
+  assert.equal(Context.presented(f.host).contextId, 'sym_b');
+  const inside = keys.press('NumpadEnter'); await settle();
+  assert.ok(!inside.prevented, 'inside a component the key is left alone (nested components are refused)');
+  assert.equal(calls.length, 1);
+});
+test('a legacy document keeps the key, and disposing the entries removes the listener', async () => {
+  const f = fixture({ legacyDocument: true }), keys = keyboard(f);
+  Object.assign(f.host.state.layers[2], { kind: 'component', componentId: 'sym_b' }); f.host.state.activeLayerIdx = 2; f.host.state.appMode = 'motion';
+  assert.ok(!keys.press('NumpadEnter').prevented, 'not a native document');
+  f.composed.disposePolicyEntries();
+  assert.equal(keys.listeners.length, 0, 'the capture listener is removed on dispose');
+});

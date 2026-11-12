@@ -327,7 +327,8 @@ async fn native_only_discovery(legacy_silent: bool, native_reply: &'static str) 
         } else {
             let mut status = json!({"apiVersion":2,"requestId":request.request_id,
                 "instanceId":SELECTED,"available":true,
-                "documentId":"native-document","contentRevision":23});
+                "documentId":"native-document","contentRevision":23,
+                "lifecycleGeneration":4});
             match native_reply {
                 "available" => {}
                 "unavailable" => {
@@ -337,6 +338,7 @@ async fn native_only_discovery(legacy_silent: bool, native_reply: &'static str) 
                     // discovery must still expose no active document/revision.
                     status["documentId"] = json!("inactive-decoy");
                     status["contentRevision"] = json!(777);
+                    status["lifecycleGeneration"] = json!(99);
                 }
                 "wrong-request" => status["requestId"] = json!("foreign-request"),
                 "wrong-instance" => status["instanceId"] = json!(OTHER),
@@ -386,7 +388,8 @@ async fn executable_discovers_real_native_status_after_unanswered_or_refused_leg
                 "instanceId":SELECTED,"buildId":"native-only-build",
                 "documentId":"native-document","revision":23,"capabilities":null,
                 "nativeHostStatus":{"apiVersion":2,"instanceId":SELECTED,"available":true,
-                    "documentId":"native-document","contentRevision":23}
+                    "documentId":"native-document","contentRevision":23,
+                    "lifecycleGeneration":4}
             }])
         );
         let legacy: Value =
@@ -409,7 +412,7 @@ async fn executable_native_only_discovery_keeps_authenticated_unavailable_host_w
             "instanceId":SELECTED,"buildId":"native-only-build",
             "documentId":null,"revision":null,"capabilities":null,
             "nativeHostStatus":{"apiVersion":2,"instanceId":SELECTED,"available":false,
-                "documentId":"inactive-decoy","contentRevision":777,"reason":"native authority inactive"}
+                "documentId":"inactive-decoy","contentRevision":777,"lifecycleGeneration":99,"reason":"native authority inactive"}
         }])
     );
 }

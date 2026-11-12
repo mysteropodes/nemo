@@ -58,6 +58,9 @@ pub(crate) use group_edit::{PreparedBooleanEdit, PreparedGroupEdit};
 #[path = "object_frame_edit_document.rs"]
 #[allow(dead_code)]
 mod object_frame_edit_document;
+// #2256: a declared component as the scene of the document-level timing kernels (project / embed).
+#[path = "object_context_projection.rs"]
+mod object_context_projection;
 // L05-C (lane #2111): sealed insert / extend / duplicate / remove frame transactions.
 #[path = "object_frame_edit_structure.rs"]
 mod object_frame_edit_structure;
@@ -96,6 +99,11 @@ pub(crate) use object_frame_clipboard_repeat::{
 };
 #[allow(unused_imports)]
 pub(crate) use object_frame_clipboard_repeat_wire::repeat_payload;
+// U36 (#2362): the Labs generators (speed lines, boil, follow-path) over the frame-paste kernel.
+#[path = "object_labs_generate.rs"]
+#[allow(dead_code)]
+mod object_labs_generate;
+pub(crate) use object_labs_generate::PreparedLabs;
 // L03-M (#2109): widget (rig control) transactions; the settings edit is a child of this module.
 #[path = "object_widget_edit.rs"]
 mod widget_edit;
@@ -105,6 +113,13 @@ pub(crate) use widget_edit::{
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_image_import_owner.rs"]
 pub(crate) mod image_import;
+#[cfg(feature = "project_media_codec")]
+#[path = "object_media_video_link_owner.rs"]
+pub(crate) mod video_link;
+// #2361: a bitmap-brush Draw stroke (anchor, companion and its baked PNG) in one candidate project.
+#[cfg(feature = "project_media_codec")]
+#[path = "object_brush_bitmap_stroke_owner.rs"]
+pub(crate) mod bitmap_stroke;
 // L06-H (lane #2112): sealed commit of a prepared asset attach / remove.
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_asset_owner.rs"]
@@ -458,4 +473,10 @@ mod tests {
 // Whole-cell Move and atomic bar Shift share this existing native owner.
 #[path = "object_frame_bulk_move.rs"]
 mod object_frame_bulk_move;
-pub(crate) use object_frame_bulk_move::{PreparedBulkFrameEdit, PreparedLayerShift};
+pub(crate) use object_frame_bulk_move::{
+    retime_root_layer_motion, PreparedBulkFrameEdit, PreparedLayerShift,
+};
+
+#[cfg(feature = "application")]
+#[path = "object_tween_owner.rs"]
+mod tween;

@@ -11,7 +11,7 @@
   var presenters = new WeakMap(), installed = new WeakMap();
   var keys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
   var storageKeys = ['nemo-layer-panel-width', 'nemo-tools-panel-width', 'nemo-props-panel-width',
-    'nemo-props-panel-collapsed', 'nemo-timeline-height', 'nemo-panel-order', 'nemo-motion-columns'];
+    'nemo-props-panel-collapsed', 'nemo-timeline-height', 'nemo-panel-order', 'nemo-motion-columns', 'nemo-tools-dock'];
   function native(root) { return !!(root.__TAURI__ && root.__TAURI__.core); }
   function same(a, b) { return !!a && !!b && keys.every(function (key) { return a[key] === b[key]; }); }
   function presentation(root, ports) {
@@ -20,6 +20,7 @@
     function _w(id) { var el = document.getElementById(id); return el && el.style.width ? el.style.width : null; }
     function syncPropsPanelCollapseTitle() { if (root.syncPropsPanelCollapseTitle) root.syncPropsPanelCollapseTitle(); }
     function renderPropsPanelRail(show) { if (root.renderPropsPanelRail) root.renderPropsPanelRail(show); }
+    function dockPort() { var port = root.NemoToolsDock; return port && typeof port.read === 'function' && typeof port.apply === 'function' ? port : null; }
   var original={
     capture:function(){
       var ta=document.getElementById('timeline-area');
@@ -36,6 +37,7 @@
         panelOrder:_secOrderNow(),
       };
       try{ws.motionColumns=localStorage.getItem('nemo-motion-columns')||null;}catch(e){}
+      try{var dock=dockPort();var where=dock&&dock.read();if(where)ws.toolsDock=where;}catch(e){}
       return ws;
     },
     apply:function(ws){
@@ -72,6 +74,9 @@
         var lp=document.getElementById('layer-panel');
         if(lp)lp.dataset.motionColumns=ws.motionColumns;
       }
+      // Unknown spellings are ignored by the dock port: the layout stays as it is. A record WITHOUT a dock (capture always writes one, so
+      // this is an older revision) is the default dock: undo to it must move the panel back instead of leaving it where it was (#2256).
+      var dp=dockPort();if(dp)dp.apply(typeof ws.toolsDock==='string'?ws.toolsDock:'left');
       // The canvas sizes itself from a window resize (see the panel drag
       // handlers above, which fire one for the same reason).
       window.dispatchEvent(new Event('resize'));
@@ -99,7 +104,8 @@
       var storage = storageKeys.map(function (key) {
         try { return { key: key, value: localStorage.getItem(key) }; } catch (_) { return null; }
       }).filter(Boolean);
-      return { nodes: nodes, sections: sections, storage: storage, expanded: root._propsExpandedWidth,
+      var dock = null; try { var port = dockPort(); dock = port ? port.read() : null; } catch (_) {}
+      return { nodes: nodes, sections: sections, storage: storage, expanded: root._propsExpandedWidth, dock: dock,
         motion: motion && motion.read() };
     }
     function restore(saved) {
@@ -116,6 +122,7 @@
           if (row.motion === undefined) delete row.el.dataset.motionColumns; else row.el.dataset.motionColumns = row.motion;
         });
         root._propsExpandedWidth = saved.expanded;
+        if (saved.dock) { var port = dockPort(); if (port) port.apply(saved.dock); }
         if (motion && saved.motion !== null) { motion.apply(saved.motion); selectors.forEach(function (row) { row.select.value = saved.motion; }); }
         saved.storage.forEach(function (row) { try {
           if (row.value === null) localStorage.removeItem(row.key); else localStorage.setItem(row.key, row.value);
@@ -217,6 +224,7 @@ function toggleProps(force){
     function owns(token) {
       var next = owner(); return !!token && !!next && token.session === next.session && same(token.info, next.info) && token.ticket === next.ticket;
     }
+    function hiddenByQueue() { var Wait = root.NemoNativePresentationWait; return !!Wait && Wait.busy(model.read); }
     function notice() { if (!retired && root.showToast) root.showToast('Workspace change is unavailable or unconfirmed. Wait for synchronization before trying again.'); }
     function rollback(token) {
       // Retire only this still-owned DOM draft, even if its native pin was just replaced.
@@ -244,7 +252,9 @@ function toggleProps(force){
       catch (_) { rollback(token); notice(); return { status: 'unavailable' }; }
       rollback(token);
       if (equal) return { status: 'unchanged', applied: false };
-      if (retired || pending || loading || !owns(token) || !token.origin || model.read() !== token.origin) {
+      if (retired || pending || loading || !owns(token) || !token.origin) { notice(); return { status: 'unavailable' }; }
+      // #2372: an origin that is not readable only because a pending native command hides the presentation is waited out (bounded), then compared strictly.
+      if (model.read() !== token.origin && !(hiddenByQueue() && await model.readSettled() === token.origin && !retired && !pending && !loading && owns(token))) {
         notice(); return { status: 'unavailable' };
       }
       pending = true; busyStamp = owner();
@@ -272,7 +282,8 @@ function toggleProps(force){
       release: function (source) { if (gesture && gesture.source === source) gesture = null; },
       begin: function (source) {
         if (retired) return false; if (presenter.isApplying()) return;
-        cancel(); var token = owner(), origin = !pending && !loading ? model.read() : null;
+        // #2372: a begin while the queue hides the presentation keeps the last applied projection as its origin; settle re-proves it strictly before any write.
+        cancel(); var token = owner(), origin = !pending && !loading ? model.read() || (hiddenByQueue() ? lastApplied : null) : null;
         if (!token || !origin || origin !== lastApplied) { notice(); return false; }
         token.saved = presenter.snapshot(); token.before = presenter.api.capture(); token.source = source; token.origin = origin;
         gesture = token; return true;
@@ -288,5 +299,7 @@ function toggleProps(force){
     installed.set(root, controller); root.NemoNativeWorkspaceController = controller;
     root.addEventListener('pagehide', controller.dispose, { once: true }); presented(); return controller;
   }
-  return Object.freeze({ presentation: presentation, motionColumns: motionColumns, bindMotion: bindMotion, install: install });
+  // The presentation gate (begin/settle/capture) of one root, for gestures owned by other scripts such as the tools dock drop.
+  function workspace(root) { var presenter = presenters.get(root); return presenter ? presenter.api : null; }
+  return Object.freeze({ presentation: presentation, workspace: workspace, motionColumns: motionColumns, bindMotion: bindMotion, install: install });
 }));

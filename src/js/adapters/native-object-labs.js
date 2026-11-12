@@ -1,0 +1,83 @@
+/* U35/U36 (#2362): the Labs generators, reference fill and timing actions through their native operations. The engine reads the
+ * shown cell itself and runs the baseline algorithms, so a request carries parameters only. Holds no document state and
+ * has no fallback writer: an absent project or route is a typed unavailability. */
+(function (root, factory) {
+  const commonjs = typeof module === 'object' && module.exports;
+  const command = commonjs ? require('./native-object-rig-command.js') : root.NemoNativeObjectRigCommand;
+  const contract = commonjs ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract;
+  const api = factory(command, contract, root);
+  if (commonjs) module.exports = api;
+  else root.NemoNativeObjectLabs = api;
+}(typeof globalThis === 'object' ? globalThis : this, function (Command, Contract, root) {
+  'use strict';
+  // '#rgb', '#rrggbb' or '#rrggbbaa' as the record's 0..1 components; anything else is opaque black.
+  function rgba(hex) {
+    const m = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(typeof hex === 'string' ? hex : '');
+    if (!m) return [0, 0, 0, 1];
+    const h = m[1].length === 3 ? m[1].replace(/./g, (c) => c + c) : m[1];
+    const byte = (at) => parseInt(h.slice(at, at + 2), 16) / 255;
+    return [byte(0), byte(2), byte(4), h.length === 8 ? byte(6) : 1];
+  }
+  function create(session, host) {
+    // The vector route of the host window (or of this realm when bound directly).
+    const vectorRoute = () => (host && host.NemoNativeObjectVector) || root.NemoNativeObjectVector;
+    const commands = Command.create(session, 'labs');
+    // The context the workspace controller holds: the entered component's id, or the scene root.
+    const heldContext = () => { const c = host && host.NemoNativeComponentContext; return c && typeof c.contextId === 'function' ? c.contextId(host) : 'scene-root'; };
+    const run = (operation, body) => commands.execute(operation, () => Object.assign({ command: Contract.commandOf(operation) }, body));
+    return Object.freeze({
+      layerInfo: (index) => { const info = session.info(); return info && info.layers ? info.layers[index] || null : null; },
+      layerUid: (index) => { const info = session.info(), layer = info && info.layers && info.layers[index]; return layer ? layer.layerUid : null; },
+      speedLines: (body) => run(Contract.LABS_SPEED_LINES, body),
+      boil: (body) => run(Contract.LABS_BOIL, body),
+      followPath: (body) => run(Contract.LABS_FOLLOW_PATH, body),
+      referenceFill: (body) => run(Contract.LABS_REFERENCE_FILL, body),
+      pingpong: (body) => run(Contract.LABS_PINGPONG, body),
+      retime: (body) => run(Contract.LABS_RETIME, body),
+      interval: (body) => run(Contract.LABS_INTERVAL, body),
+      moveToLayer: (body) => run(Contract.LABS_MOVE_TO_LAYER, body),
+      // A Labs-created stroke through the ordinary native vector create, keyed with what a held cell showed
+      // (the Labs creators' ensureKeyframe(), not Draw's empty key).
+      // Several Labs strokes as ONE native vector batch (one revision, one undo entry), keyed with what a held cell showed.
+      // `options.skipUnavailable: true` lets a restyle batch skip the steps the engine cannot do (Select's multi-select edit); absent, it is atomic.
+      // #2256: inside an entered component ONLY Select's batches (`options.select === true`: move, scale, rotate, restyle, delete) are made context-aware:
+      // they ride the component command route on the context the workspace controller holds, with the scene's copy-on-write key (a held component frame
+      // is keyed with a copy of what it showed, so the edit never lands on the source key every held frame carries).
+      // Every other Labs batch (sculpt, trim, pose stamps) is unavailable there rather than silently landing on the scene.
+      // `options.inherit === true` is Motion's held-frame rule (Animation 2D keys the held cell with a copy; Motion edits the key it inherits): no copy key is sent and each step
+      // that names a presented record is addressed to the cell that record lives in (its stable target's frame), so the shared key is edited in place.
+      batchStrokes: (layerUid, frame, steps, options) => {
+        const Vector = vectorRoute();
+        if (!Vector) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'no_vector_route' }));
+        const held = heldContext(), skip = options && options.skipUnavailable === true ? { skipUnavailable: true } : {};
+        const inherit = !!options && options.inherit === true, key = inherit ? {} : { keyframe: 'copy' };
+        const sent = inherit ? steps.map((step) => {
+          const named = step.order || step.reshape || step.clone || step.restyle, at = named && named.stableTarget && named.stableTarget.frameScope && named.stableTarget.frameScope.frame;
+          return Number.isInteger(at) ? Object.assign({}, step, { frame: at }) : step;
+        }) : steps;
+        if (held === 'scene-root') return Vector.create(session).batchStrokes(layerUid, frame, sent, Object.assign(key, skip));
+        if (!options || options.select !== true) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'component_labs_unavailable' }));
+        return Vector.create(session, () => held).batchStrokes(layerUid, frame, sent, Object.assign(key, skip));
+      },
+      createStroke: (layerUid, frame, dict, opacity) => {
+        const Vector = vectorRoute();
+        if (!Vector) return Promise.resolve(Object.freeze({ status: 'unavailable', reason: 'no_vector_route' }));
+        return Vector.create(session).createStroke(layerUid, frame, dict, { keyframe: 'copy', opacity });
+      },
+      // The row's authored/held/blank runs through the native timing query (null when refused).
+      cells: (layerUid) => (typeof session.readLayerCells === 'function' ? session.readLayerCells(layerUid, session.info()) : Promise.resolve(null)),
+    });
+  }
+  const bindings = new WeakMap();
+  function desktop(host) {
+    const module = host.NemoNativeObjectProject, session = module && module.desktop(host);
+    if (!session || !session.blocksLegacy()) return null;
+    if (!bindings.has(host)) bindings.set(host, create(session, host));
+    return bindings.get(host);
+  }
+  // The bucket colour as the fill contract's '#rrggbbaa'.
+  function hex8(color) {
+    return '#' + rgba(color).map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
+  }
+  return Object.freeze({ create, desktop, rgba, hex8 });
+}));

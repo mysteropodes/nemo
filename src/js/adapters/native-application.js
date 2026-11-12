@@ -1,11 +1,12 @@
 /* N15 pure v2 transport/validation adapter. N16 owns host bindings. */
 (function (root, factory) {
-  const vectorContract = typeof module === 'object' && module.exports ? require('./native-object-vector-contract.js') : root.NemoNativeObjectVectorContract, fontContract = [typeof module === 'object' && module.exports ? require('./native-audio-track-contract.js') : root.NemoNativeAudioTrackContract, typeof module === 'object' && module.exports ? require('./native-layer-playhead-cut-contract.js') : root.NemoNativeLayerPlayheadCutContract, typeof module === 'object' && module.exports ? require('./native-project-placement-contract.js') : root.NemoNativeProjectPlacementContract, typeof module === 'object' && module.exports ? require('./native-text-read-contract.js') : root.NemoNativeTextReadContract, typeof module === 'object' && module.exports ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract, typeof module === 'object' && module.exports ? require('./native-object-component-contract.js') : root.NemoNativeObjectComponentContract, typeof module === 'object' && module.exports ? require('./native-media-export-contract.js') : root.NemoNativeMediaExportContract, typeof module === 'object' && module.exports ? require('./native-import-contract.js') : root.NemoNativeImportContract, typeof module === 'object' && module.exports ? require('./native-bitmap-brush-resources-contract.js') : root.NemoNativeBitmapBrushResourcesContract, typeof module === 'object' && module.exports ? require('./native-composition-contract.js') : root.NemoNativeCompositionContract, typeof module === 'object' && module.exports ? require('./native-palette-contract.js') : root.NemoNativePaletteContract, typeof module === 'object' && module.exports ? require('./native-guide-contract.js') : root.NemoNativeGuideContract, typeof module === 'object' && module.exports ? require('./native-shadow-contract.js') : root.NemoNativeShadowContract, typeof module === 'object' && module.exports ? require('./native-perspective-contract.js') : root.NemoNativePerspectiveContract, typeof module === 'object' && module.exports ? require('./native-workspace-contract.js') : root.NemoNativeWorkspaceContract, typeof module === 'object' && module.exports ? require('./native-custom-brush-contract.js') : root.NemoNativeCustomBrushContract, typeof module === 'object' && module.exports ? require('./native-comments-contract.js') : root.NemoNativeCommentsContract, vectorContract].reduce((base, lane) => (lane ? lane.compose(base) : base), ((base, item) => item ? item.compose(base) : base)(typeof module === 'object' && module.exports ? require('./native-object-edit-seam.js') : root.NemoNativeObjectEditSeam, typeof module === 'object' && module.exports ? require('./native-object-item-contract.js') : root.NemoNativeObjectItemContract));
+  const vectorContract = typeof module === 'object' && module.exports ? require('./native-object-vector-contract.js') : root.NemoNativeObjectVectorContract, fontContract = [typeof module === 'object' && module.exports ? require('./native-audio-track-contract.js') : root.NemoNativeAudioTrackContract, typeof module === 'object' && module.exports ? require('./native-layer-playhead-cut-contract.js') : root.NemoNativeLayerPlayheadCutContract, typeof module === 'object' && module.exports ? require('./native-project-placement-contract.js') : root.NemoNativeProjectPlacementContract, typeof module === 'object' && module.exports ? require('./native-text-read-contract.js') : root.NemoNativeTextReadContract, typeof module === 'object' && module.exports ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract, typeof module === 'object' && module.exports ? require('./native-object-component-contract.js') : root.NemoNativeObjectComponentContract, typeof module === 'object' && module.exports ? require('./native-media-export-contract.js') : root.NemoNativeMediaExportContract, typeof module === 'object' && module.exports ? require('./native-import-contract.js') : root.NemoNativeImportContract, typeof module === 'object' && module.exports ? require('./native-bitmap-brush-resources-contract.js') : root.NemoNativeBitmapBrushResourcesContract, typeof module === 'object' && module.exports ? require('./native-composition-contract.js') : root.NemoNativeCompositionContract, typeof module === 'object' && module.exports ? require('./native-palette-contract.js') : root.NemoNativePaletteContract, typeof module === 'object' && module.exports ? require('./native-guide-contract.js') : root.NemoNativeGuideContract, typeof module === 'object' && module.exports ? require('./native-shadow-contract.js') : root.NemoNativeShadowContract, typeof module === 'object' && module.exports ? require('./native-perspective-contract.js') : root.NemoNativePerspectiveContract, typeof module === 'object' && module.exports ? require('./native-symmetry-contract.js') : root.NemoNativeSymmetryContract, typeof module === 'object' && module.exports ? require('./native-workspace-contract.js') : root.NemoNativeWorkspaceContract, typeof module === 'object' && module.exports ? require('./native-custom-brush-contract.js') : root.NemoNativeCustomBrushContract, typeof module === 'object' && module.exports ? require('./native-comments-contract.js') : root.NemoNativeCommentsContract, typeof module === 'object' && module.exports ? require('./native-history-read-contract.js') : root.NemoNativeHistoryReadContract, typeof module === 'object' && module.exports ? require('./native-object-component-read-contract.js') : root.NemoNativeObjectComponentReadContract, typeof module === 'object' && module.exports ? require('./native-object-workspace-context-contract.js') : root.NemoNativeObjectWorkspaceContextContract, vectorContract].reduce((base, lane) => (lane ? lane.compose(base) : base), ((base, item) => item ? item.compose(base) : base)(typeof module === 'object' && module.exports ? require('./native-object-edit-seam.js') : root.NemoNativeObjectEditSeam, typeof module === 'object' && module.exports ? require('./native-object-item-contract.js') : root.NemoNativeObjectItemContract));
   const propertyContract = typeof module === 'object' && module.exports ? require('./native-property-contract.js') : root.NemoNativePropertyContract;
-  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract), vectorContract, propertyContract);
+  const queryContract = typeof module === 'object' && module.exports ? require('./native-object-query-contract.js') : root.NemoNativeObjectQueryContract;
+  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract), vectorContract, propertyContract, queryContract);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeApplicationAdapter = api;
-}(typeof globalThis === 'object' ? globalThis : this, function (fontContract, vectorContract, propertyContract) {
+}(typeof globalThis === 'object' ? globalThis : this, function (fontContract, vectorContract, propertyContract, queryContract) {
   'use strict';
 
   const editOperation = 'command.document.object.property.edit';
@@ -66,16 +67,13 @@
     return value;
   }
   function objectIdPaths(operation) {
-    if (operation === editOperation) return { has: p => /^payload\.(?:property|target\.(?:contextId|layerUid|strokeId))$/.test(p) };
+    if (operation === editOperation) return { has: p => /^payload\.(?:property|action\.code|target\.(?:contextId|layerUid|strokeId))$/.test(p) };
     if (operation === readOperation) return property.readPaths;
     if (operation === trackOperation) return { has: p => /^payload\.selections\.\d+\.(?:property|target\.(?:contextId|layerUid|strokeId))$/.test(p) };
     if (fontContract && fontContract.admitted(operation)) return fontContract.paths(operation);
     if(operation==='query.document.object.property.metadata') return {has:p=>p==='payload.view.property'||/^(?:payload\.view\.target|result\.target|result\.items\.\d+\.target)\.(?:contextId|layerUid|strokeId)$/.test(p)||/^result\.items\.\d+\.(?:contextId|controlName|property)$/.test(p)};
     if (operation === 'query.document.object.layer.timing') return new Set(['payload.layerUid', 'result.layerUid']);
-    if (operation === 'query.document.object') return vectorContract ? vectorContract.readPaths : new Set([
-      'payload.stableTarget.layerUid', 'payload.stableTarget.strokeId',
-      'result.object.target.layerUid', 'result.object.target.strokeId',
-    ]);
+    if (operation === 'query.document.object') return {has: (p) => queryContract.paths.has(p) || !!(vectorContract && vectorContract.readPaths.has(p))};
     if (operation === 'command.document.object.layer.create') return new Set(['payload.name', 'result.layerUid']);
     return ['command.document.object.layer.visibility.set', 'command.document.object.layer.policy.edit'].includes(operation) ? new Set(['payload.layerUid']) : null;
   }
@@ -117,9 +115,13 @@
   function objectUid(value) {
     if (typeof value !== 'string' || !value.length) throw new TypeError('object UID must be a nonempty opaque string');
   }
+  function heldContext(id) {
+    try { const c = typeof globalThis === 'object' ? globalThis.NemoNativeComponentContext : undefined; return typeof id === 'string' && !!id && !!c && typeof c.contextId === 'function' && c.contextId(globalThis) === id; } catch (_) { return false; }
+  }
   function objectTarget(value) {
     exact(value, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], 'object target');
-    if (value.contextId !== 'scene-root') throw new TypeError('unsupported object context');
+    // #2256: the scene root or the component context the workspace controller holds (the id the owner declared on enter); never free text.
+    if (value.contextId !== 'scene-root' && !heldContext(value.contextId)) throw new TypeError('unsupported object context');
     objectUid(value.layerUid); objectUid(value.strokeId);
     exact(value.frameScope, ['kind', 'frame'], [], 'object frame scope');
     if (!['authored', 'reference'].includes(value.frameScope.kind)) throw new TypeError('unsupported object frame scope');
@@ -150,7 +152,7 @@
     if (payload.command !== 'object.project.settings.edit') throw new TypeError('invalid project settings command');
     const action = payload.action;
     if (!plain(action)) throw new TypeError('project settings action must be an object');
-    const fields = {setCanvasSize:['width','height'],setFps:['fps'],setCanvasBackground:['color'],setWorkArea:['inFrame','outFrame']};
+    const fields = {setCanvasSize:['width','height'],setFps:['fps'],setCanvasBackground:['color'],setWorkArea:['inFrame','outFrame'],setTotalFrames:['frames'],trimToWorkArea:[]};
     if (!has(fields, action.kind)) throw new TypeError('unsupported project settings action');
     exact(action, ['kind', ...fields[action.kind]], [], 'project settings action');
     if (action.kind === 'setCanvasSize') {
@@ -166,24 +168,25 @@
     if (fontContract && fontContract.admitted(operation)) return fontContract.payload(operation, payload, envelope);
     if(operation==='query.document.object.property.metadata') property.metadataPayload(payload);
     else if (operation === 'query.document.object') {
-      exact(payload, ['atRevision', 'stableTarget'], [], 'object query');
-      revision(payload.atRevision, 'atRevision'); objectTarget(payload.stableTarget);
+      queryContract.payload(payload, { exact, revision, objectTarget });
     } else if (operation === 'query.document.object.layer.timing') {
       exact(payload, ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'], ['view'], 'timing selector');
-      if(has(payload,'view')&&!['range','placement'].includes(payload.view))throw new TypeError('invalid timing view');
+      if(has(payload,'view')&&!['range','placement','cells'].includes(payload.view))throw new TypeError('invalid timing view');
       revision(payload.atRevision, 'atRevision'); frame(payload.frame);
       ['documentSnapshotId', 'contextId', 'layerUid'].forEach(key => objectUid(payload[key]));
     } else if (operation === 'command.document.object.project.settings.edit') {
       projectSettingsPayload(payload);
     } else if (operation === 'command.document.object.layer.create') {
-      exact(payload, ['command', 'name'], [], 'object layer create');
+      exact(payload, ['command', 'name'], ['contextId'], 'object layer create'); if (has(payload, 'contextId')) objectUid(payload.contextId); // #2256: the entered component
       if (payload.command !== 'object.layer.create' || typeof payload.name !== 'string') throw new TypeError('invalid object layer create');
     } else if (['command.document.object.layer.visibility.set', 'command.document.object.layer.policy.edit'].includes(operation)) {
       const policy = operation === 'command.document.object.layer.policy.edit';
-      exact(payload, policy ? ['command', 'layerUid', 'flag', 'value'] : ['command', 'layerUid', 'visible'], [], 'object layer command');
-      if (payload.command !== (policy ? 'object.layer.policy.edit' : 'object.layer.visibility.set') || typeof payload[policy ? 'value' : 'visible'] !== 'boolean' || policy && !['locked', 'shy'].includes(payload.flag)) throw new TypeError('invalid object layer command');
+      exact(payload, policy ? ['command', 'layerUid', 'flag', 'value'] : ['command', 'layerUid', 'visible'], ['contextId'], 'object layer command'); if (has(payload, 'contextId')) objectUid(payload.contextId); // #2256
+      // D37: the keyLock flag carries the layer key-lock mode (null clears); locked, shy and threeD stay booleans.
+      const keyLock = policy && payload.flag === 'keyLock' && (payload.value === null || ['in', 'out', 'layer'].includes(payload.value));
+      if (payload.command !== (policy ? 'object.layer.policy.edit' : 'object.layer.visibility.set') || !keyLock && typeof payload[policy ? 'value' : 'visible'] !== 'boolean' || policy && !keyLock && !['locked', 'shy', 'threeD'].includes(payload.flag)) throw new TypeError('invalid object layer command');
       objectUid(payload.layerUid);
-    } else if (objectHistoryOperations.includes(operation)) { exact(payload, ['command'], [], 'object history command'); if (payload.command !== operation.slice('command.document.'.length)) throw new TypeError('invalid object history command'); } else if (operation === 'query.document.serialize' || operation === 'query.document.evaluate') {
+    } else if (objectHistoryOperations.includes(operation)) { exact(payload, ['command'], ['steps'], 'object history command'); if (payload.command !== operation.slice('command.document.'.length) || has(payload, 'steps') && !(Number.isSafeInteger(payload.steps) && payload.steps >= 1)) throw new TypeError('invalid object history command'); } else if (operation === 'query.document.serialize' || operation === 'query.document.evaluate') {
       const evaluate = operation === 'query.document.evaluate';
       exact(payload, evaluate ? ['atRevision', 'contextId', 'frame'] : ['atRevision'], [], 'pinned read');
       revision(payload.atRevision, 'atRevision');
@@ -314,12 +317,12 @@
     });
   }
   function validateNativeObjectLayerTimingResult(value) {
-    if(value&&value.kind==='layerRange')return property.rangeResult(value);if(value&&value.kind==='layerPlacement')return property.placementResult(value);
+    if(value&&value.kind==='layerRange')return property.rangeResult(value);if(value&&value.kind==='layerPlacement')return property.placementResult(value);if(value&&value.kind==='layerCells')return property.cellsResult(value);
     exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame',
       'cellKind', 'sourceFrame', 'hasContent', 'manualEdit'], [], 'timing result');
     id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId'); revision(value.atRevision, 'atRevision');
     objectUid(value.documentSnapshotId); objectUid(value.layerUid); frame(value.frame);
-    if (value.contextId !== 'scene-root' || typeof value.hasContent !== 'boolean' || typeof value.manualEdit !== 'boolean') throw new TypeError('invalid timing result');
+    if (typeof value.contextId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.contextId) || typeof value.hasContent !== 'boolean' || typeof value.manualEdit !== 'boolean') throw new TypeError('invalid timing result');
     if (value.sourceFrame !== null) frame(value.sourceFrame);
     const valid = value.cellKind === 'unexposed' ? value.sourceFrame === null && !value.hasContent && !value.manualEdit
       : value.cellKind === 'held' ? value.sourceFrame !== null && value.sourceFrame < value.frame && !value.manualEdit
@@ -334,8 +337,7 @@
     if (fontContract && fontContract.admitted(operation)) return fontContract.result(operation, value);
     if(operation==='query.document.object.property.metadata') property.metadataResult(value);
     else if (operation === 'query.document.object') {
-      exact(value, ['atRevision', 'documentSnapshotId', 'object'], [], 'object read result');
-      revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId); objectRecord(value.object);
+      queryContract.result(value, { exact, revision, objectUid, objectRecord });
     } else if (operation === 'query.document.object.layer.timing') {
       validateNativeObjectLayerTimingResult(value);
     } else if (operation === 'command.document.object.layer.create') {
@@ -344,7 +346,7 @@
       objectUid(value.layerUid);
     } else if (['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit'].includes(operation)) {
       exact(value, ['applied', 'historyEntriesAdded'], [], 'visibility result');
-      if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) throw new TypeError('invalid visibility disposition');
+      if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0) && !(operation === 'command.document.object.layer.policy.edit' && value.applied && value.historyEntriesAdded === 0)) throw new TypeError('invalid visibility disposition'); // #2520: the 3D switch saves a revision with no undo entry
     } else if (objectHistoryOperations.includes(operation)) { exact(value, ['applied', 'historyEntriesAdded'], [], 'object history result'); if (value.applied !== true || value.historyEntriesAdded !== 0) throw new TypeError('invalid object history disposition'); } else if (operation === 'query.diagnostics.recent') {
       exact(value, ['records', 'truncated'], [], 'diagnostics result');
       if (!Array.isArray(value.records) || value.records.length > 32 || typeof value.truncated !== 'boolean') throw new TypeError('invalid diagnostics bounds');
@@ -467,19 +469,17 @@
             const replacement = !response.ok && response.error.code === 'wrong_document';
             if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId && !replacement) throw new TypeError('object response identity mismatch');
             if (response.ok && outbound.operation === 'query.document.object') {
-              const expected = outbound.payload.stableTarget, actual = response.result.object.target;
-              if (response.result.atRevision !== outbound.payload.atRevision ||
-                  ['contextId', 'layerUid', 'strokeId'].some((key) => actual[key] !== expected[key]) ||
-                  ['kind', 'frame'].some((key) => actual.frameScope[key] !== expected.frameScope[key])) throw new TypeError('object read selector mismatch');
+              queryContract.correlate(outbound.payload, response.result, undefined, outbound.documentId);
             }
             if (response.ok && outbound.operation==='query.document.object.property.metadata') property.metadataCorrelated(outbound.payload,response.result);
             if (response.ok && outbound.operation === readOperation) property.readCorrelated(outbound.payload, response.result);
             if (response.ok && outbound.operation === 'query.document.object.layer.timing' &&
-                (['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some(key => response.result[key] !== outbound.payload[key]) || (outbound.payload.view==='range')!==(response.result.kind==='layerRange') || (outbound.payload.view==='placement')!==(response.result.kind==='layerPlacement'))) throw new TypeError('timing read selector mismatch');
+                (['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some(key => response.result[key] !== outbound.payload[key]) || (outbound.payload.view==='range')!==(response.result.kind==='layerRange') || (outbound.payload.view==='placement')!==(response.result.kind==='layerPlacement') || (outbound.payload.view==='cells')!==(response.result.kind==='layerCells'))) throw new TypeError('timing read selector mismatch');
             if (response.ok && (objectHistoryOperations.includes(outbound.operation) || outbound.operation === 'command.document.object.layer.create') &&
                 response.contentRevision !== outbound.expectedRevision + 1) throw new TypeError(objectHistoryOperations.includes(outbound.operation) ? 'object history receipt revision mismatch' : 'creation receipt revision mismatch');
             if (response.ok && ['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation].includes(outbound.operation) &&
                 response.contentRevision !== outbound.expectedRevision + (response.result.applied ? 1 : 0)) throw new TypeError('visibility receipt revision mismatch');
+            if (response.ok && outbound.operation === 'command.document.object.layer.policy.edit' && response.result.applied && response.result.historyEntriesAdded === 0 && outbound.payload.flag !== 'threeD') throw new TypeError('invalid visibility disposition');
           }
           if (['query.diagnostics.recent', 'query.reproduction.report'].includes(outbound.operation) &&
               (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId)) throw new TypeError('diagnostics response identity mismatch');

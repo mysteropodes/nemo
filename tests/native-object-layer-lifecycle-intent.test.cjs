@@ -109,12 +109,16 @@ test('shape edit inputs are closed: unknown modes, labels, clips and members nev
   assert.equal(h.state.sent.length, 0);
 });
 
-test('a clip over the 4096-byte envelope is refused locally, never split', async () => {
-  const record = (n) => ({ schemaVersion: 1, family: 'closed-solid-fill-cubic-path', geometry: { kind: 'cubic-path', segments: new Array(40).fill({ point: { x: 1.5, y: 2.5 } }) },
+test('a clip over the 64 KiB envelope is refused locally, never split; one between 4096 bytes and 64 KiB is sent whole', async () => {
+  const record = (n, pad) => ({ schemaVersion: 1, family: 'closed-solid-fill-cubic-path', geometry: { kind: 'cubic-path', segments: new Array(40).fill({ point: { x: 1.5, y: 2.5 } }), ...(pad ? { pad: 'x'.repeat(pad) } : {}) },
     target: { contextId: 'scene-root', frameScope: { kind: 'authored', frame: 2 }, layerUid: 'layer-a', strokeId: 'stroke-' + n } });
+  const mid = createHarness({ strokes }), four = [record(1), record(2), record(3), record(4)];
+  assert.ok(JSON.stringify(four).length > 4096, 'over the old envelope');
+  assert.equal((await createLayerLifecycleIntent(mid.ports).pasteShapes({ ...cell, mode: 'motion', clip: { ...clip, records: four } })).ok, true);
   const h = createHarness({ strokes });
-  const outcome = await createLayerLifecycleIntent(h.ports).pasteShapes({ ...cell, mode: 'motion', clip: { ...clip, records: [record(1), record(2), record(3), record(4)] } });
-  assert.deepEqual({ code: outcome.code, limit: outcome.limit }, { code: 'request_too_large', limit: 4096 });
+  const outcome = await createLayerLifecycleIntent(h.ports).pasteShapes({ ...cell, mode: 'motion', clip: { ...clip, records: [record(1, 20000), record(2, 20000), record(3, 20000), record(4, 20000)] } });
+  assert.deepEqual({ code: outcome.code, limit: outcome.limit }, { code: 'request_too_large', limit: 65536 });
+  assert.equal(h.state.sent.length, 0);
   const small = await createLayerLifecycleIntent(createHarness({ strokes }).ports).pasteShapes({ ...cell, mode: 'motion', clip: { ...clip, records: [record(1)] } });
   assert.equal(small.ok, true, 'a small clip with a structurally valid record is sent');
 });
@@ -273,7 +277,7 @@ test('clipboard raw-port replies require closed bounded owner-correlated receipt
       (r) => { delete r.result.clipboard; }, (r) => { r.result.clipboard = []; },
       (r) => { r.result.clipboard.contextId = 'foreign'; }, (r) => { r.result.clipboard.layerUid = 'foreign'; }, (r) => { r.result.clipboard.frame += 1; },
       (r) => { r.result.clipboard.records[0].target.frameScope = null; },
-      (r) => { r.result.clipboard.records[0].target.strokeId = 'x'.repeat(4096); },
+      (r) => { r.result.clipboard.records[0].target.strokeId = 'x'.repeat(65536); },
       (r) => { r.result.historyEntriesAdded = applied ? 0 : 1; }]) {
       const h = createHarness({ strokes, rawResponse: (q) => { const r = reply(q); mutate(r); return r; } });
       const intent = createLayerLifecycleIntent(h.ports); intent.selectShapes(cell, ['stroke-1']);

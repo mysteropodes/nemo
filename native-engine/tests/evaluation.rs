@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => evaluation_tests
 use crate::animation_curve::{evaluate_curve, CurveSample};
 use crate::codec::{decode_project, encode_project, CodecErrorKind};
 use crate::commands::{NativeOpacityApplication, OpacityRequest};

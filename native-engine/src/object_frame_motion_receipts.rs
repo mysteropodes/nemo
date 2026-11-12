@@ -15,6 +15,46 @@ pub(super) struct MotionReceipt {
     pose: Option<Pose3D>,
 }
 
+/// The evaluated `matteOn` of every layer whose switch carries an ENABLED expression, as the owner's expression port
+/// returned it at the packet's frame (baseline `matteOnAt` reads `valueAtFrame`, which runs the expression). A layer
+/// whose value the port could not produce has no receipt: the layer-composition join then refuses it typed.
+pub(super) fn capture_matte_on(
+    packet: &ObjectFramePacket,
+    motion: &dyn MotionPort,
+) -> Vec<(String, f64)> {
+    let document = packet.snapshot().document();
+    let mut out = Vec::new();
+    for layer in packet.source_layers() {
+        let target = PropertyHolderTarget {
+            context_id: packet.context_id().to_owned(),
+            layer_uid: layer.layer_uid().to_owned(),
+            stroke_id: Presence::Missing,
+        };
+        let expressed = document.property_holders().unwrap_or(&[]).iter().any(|holder| {
+            holder.target() == &target
+                && holder.properties().iter().any(|property| {
+                    property.property() == "matteOn"
+                        && property.expression.value().is_some_and(|code| code.enabled)
+                })
+        });
+        if !expressed {
+            continue;
+        }
+        let Ok(Some(values)) = motion.value(layer.layer_uid(), "matteOn") else {
+            continue;
+        };
+        match values.first() {
+            // An empty result reads as matted (`!v || v[0] == null`).
+            None => out.push((layer.layer_uid().to_owned(), 100.)),
+            Some(JsNumber::Value(value)) if value.is_finite() => {
+                out.push((layer.layer_uid().to_owned(), *value));
+            }
+            Some(_) => {}
+        }
+    }
+    out
+}
+
 pub(super) fn capture(
     packet: &ObjectFramePacket,
     motion: &dyn MotionPort,
@@ -150,6 +190,13 @@ pub(super) fn capture(
 }
 
 impl ObjectFramePacket {
+    /// The evaluated `matteOn` of a layer whose switch is expressed, when the owner's expression port produced it.
+    pub(crate) fn evaluated_matte_on(&self, layer_uid: &str) -> Option<f64> {
+        self.matte_on_receipts
+            .iter()
+            .find(|(uid, _)| uid == layer_uid)
+            .map(|(_, value)| *value)
+    }
     pub(crate) fn sampled_pose_3d(
         &self,
         target: &PropertyHolderTarget,
@@ -222,21 +269,32 @@ pub(crate) fn remaining_holder(
         crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(
             document, target,
         );
-    let three_d = common
-        && document
-            .layers()
-            .iter()
-            .any(|l| l.layer_uid() == target.layer_uid() && l.three_d.value() == Some(&true));
-    if !(layer || common || text_element(document, target)) {
+    let three_d_on = document
+        .layers()
+        .iter()
+        .any(|l| l.layer_uid() == target.layer_uid() && l.three_d.value() == Some(&true));
+    // The stored 3D keys of a layer whose switch is off are dormant whatever else the layer holds (mask, component, ...).
+    let dormant_layer = evaluated
+        && !three_d_on
+        && target.stroke_id().is_none()
+        && target.context_id() == "scene-root"
+        && document.layers().iter().any(|l| l.layer_uid() == target.layer_uid());
+    let base = layer || common || text_element(document, target);
+    // #2257: a layer's `matteOn` track is consumed by the layer-composition join (`matteOnAt`, `>= 50` is matted).
+    let matte_on = target.stroke_id().is_none()
+        && target.context_id() == "scene-root"
+        && document.layers().iter().any(|l| l.layer_uid() == target.layer_uid());
+    if !(base || dormant_layer || matte_on) {
         return None;
     }
     // A mixed visible contour and Text/raster layer
     // may consume only its shared opacity here. Other pose fields must not be
     // admitted on the strength of a Text/raster sibling alone.
     let mixed = layer
+        && !crate::evaluation::object_vector_kernels::render_vector_eval::motion::layer_vectors_batchable(document, target)
         && document.layers().iter().any(|l| {
             l.layer_uid() == target.layer_uid()
-                && l.visible()
+                && crate::object_frame_packet::solo_view::layer_visible("scene-root", document.layers(), l)
                 && document.objects().iter().any(|record| {
                     record.target().context_id() == target.context_id()
                         && record.target().layer_uid() == target.layer_uid()
@@ -245,9 +303,16 @@ pub(crate) fn remaining_holder(
     let mut remaining = holder.clone();
     remaining.properties.retain(|p| {
         let key = p.property();
+        // #2520/#2525: with the 3D switch off the three 3D keys are stored but dormant (the baseline `toggleLayer3D` keeps
+        // them), so a common layer ignores them rather than refusing the frame; with it on the Pose3D consumer reads them.
+        // A Text/raster layer with the switch off ignores them the same way on the owner's Motion route; the strict raw packet
+        // keeps refusing any property it does not consume.
+        let dormant_key = dormant_layer && ["positionZ", "rotationX", "rotationY"].contains(&key);
         let consumed = KEYS.contains(&key)
-            || (three_d && ["positionZ", "rotationX", "rotationY"].contains(&key));
-        let owned = consumed && (common || !mixed || key == "opacity");
+            || ((common || dormant_key) && ["positionZ", "rotationX", "rotationY"].contains(&key));
+        let owned = (base && consumed && (common || !mixed || key == "opacity"))
+            || dormant_key
+            || (matte_on && key == "matteOn");
         !owned || (!evaluated && p.expression.value().is_some_and(|e| e.enabled))
     });
     if remaining.properties.len() == holder.properties().len() {

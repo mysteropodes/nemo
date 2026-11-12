@@ -20,7 +20,7 @@ function node() {
     appendChild(child) { this.children.push(child); return child; }, contains(child) { return this === child || this.children.includes(child); },
     getBoundingClientRect() { return { left: 20, top: 30, width: 640, height: 360, bottom: 390, right: 660 }; }, focus() {} };
 }
-async function fixture(initial, browser = false) {
+async function fixture(initial, browser = false, wait = false) {
   const elements = new Map(), events = node(), doc = node();
   for (const id of ['drawing-canvas','canvas-area','comment-popover','comment-author-row','comment-text','comment-resolved',
     'comment-delete','comment-save','comment-save-feedback','comment-fb-name','comment-fb-email','comment-fb-blocking',
@@ -34,7 +34,7 @@ async function fixture(initial, browser = false) {
   doc.createElement = () => node(); doc.createTextNode = text => ({ textContent: text });
   doc.documentElement = { clientWidth: 1200, clientHeight: 900, classList: { contains: n => n === 'nemo-native-underlay' },
     style: { getPropertyValue: name => String(({ left: rect.left, top: rect.top, right: rect.left+rect.width, bottom: rect.top+rect.height })[name.replace('--nemo-native-','')]) } };
-  let metadata = copy(initial), revision = 0, ticket = 1, serial = 0, running = 0, tail = Promise.resolve(), gate = null, refuse = false, actionReader = null, lastLease = null;
+  let metadata = copy(initial), revision = 0, ticket = 1, serial = 0, running = 0, tail = Promise.resolve(), gate = null, queueHidden = false, refuse = false, actionReader = null, lastLease = null;
   const calls = [], checkpoints = [], notices = [], navigation = []; let select = 0, text = 0, feedback = 0;
   let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
     canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
@@ -48,6 +48,7 @@ async function fixture(initial, browser = false) {
     addEventListener: events.addEventListener.bind(events), removeEventListener: events.removeEventListener.bind(events),
     NemoNativeCommentsUI: UI, NemoProjectCommentsPresentation: Presentation,
     NemoNativeOpacityCutover: { blocksLegacy: () => !browser }, SMEngineBridge: { renderNow() {} } };
+  if (wait) { raw.setTimeout = (fn, ms) => ms ? setImmediate(fn) : setTimeout(fn, 0); raw.NemoNativePresentationWait = require('../src/js/adapters/native-presentation-wait.js'); }
   if (!browser) raw.__TAURI__ = { core: {} };
   if (!browser) Object.defineProperty(raw.state,'comments',{ get() { throw Error('legacy comments read'); }, set() { throw Error('legacy comments write'); } });
   else raw.state.comments = copy(initial) || [];
@@ -82,7 +83,7 @@ async function fixture(initial, browser = false) {
   }
   const adapter=SDK.createNativeApplicationAdapter('comments-control-test',{dispatch});
   const session={ info:()=>info,isActive:()=>true,requestId:()=>`comments-${++serial}`,readSubscriptionGeneration:()=>ticket,
-    readPresentedObjectSession:()=>running?null:shown(info),
+    readPresentedObjectSession:refused=>{if(queueHidden){if(typeof refused==='function')refused('queue-pending');return null;}return running?null:shown(info);},
     runResourceCommand(fn){running++;const job=tail.then(async()=>{
       if(gate){const held=gate;gate=null;await held;}
       const pin=info;let live=true;const lease={dispatch:q=>adapter.dispatch(q),readPresentedObjectSession:()=>{
@@ -119,7 +120,7 @@ async function fixture(initial, browser = false) {
   if(!browser)await settled();
   const pointer=(x=100,y=100,extra={})=>root.target.fire('pointerdown',{target:elements.get('drawing-canvas'),pointerId:1,isPrimary:true,button:0,clientX:x,clientY:y,...extra});
   return {root,doc,elements,events,pointer,settled,calls,checkpoints,notices,navigation,metadata:()=>copy(metadata),counts:()=>({select,text,feedback}),
-    publicShown:()=>session.readPresentedObjectSession(),actionLease:()=>lastLease,actionReader:value=>{actionReader=value;},hold(){let release;gate=new Promise(resolve=>release=resolve);return release;},refuse(value){refuse=value;},
+    hide(value){queueHidden=value;},publicShown:()=>session.readPresentedObjectSession(),actionLease:()=>lastLease,actionReader:value=>{actionReader=value;},hold(){let release;gate=new Promise(resolve=>release=resolve);return release;},refuse(value){refuse=value;},
     camera(){root.state.cameraView=true;presentation={...presentation,view:{mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}};},pan(){presentation={...presentation,workId:presentation.workId+'-pan'};},resize(){rect={...rect,left:rect.left+1};},
     replace(){info={...info,documentId:'other',lifecycleGeneration:2};ticket++;controller.willProject();project();},
     subscription(){ticket++;},
@@ -274,4 +275,39 @@ test('comment action refuses missing, foreign, refused and different-presentatio
   UI.save(f.root,record,'must refuse',false);await f.settled();
   assert.equal(f.calls.filter(q=>q.operation===C.EDIT).length,0,mode);assert.equal(f.checkpoints.length,0,mode);assert.deepEqual(f.metadata(),[]);
  }
+});
+
+// #2372: a comment press / save whose origin is read while the native queue hides the presentation (queue-pending) waits for it instead of refusing.
+const ticks = async (n = 6) => { for (let i = 0; i < n; i++) await turn(); };
+test('queue-pending: a canvas press held for several ticks opens the popover once the presentation returns', async () => {
+  const f = await fixture([], false, true); f.hide(true);
+  assert.equal(f.pointer(400, 250).type, 'pointerdown'); await ticks(3);
+  assert.ok(!f.root._activeComment, 'nothing opened while hidden'); assert.deepEqual(f.notices, []);
+  f.hide(false); await ticks();
+  assert.equal(f.root._activeComment.x, 190); assert.equal(f.root._activeComment.y, 110); assert.deepEqual(f.notices, []);
+});
+test('queue-pending: Save and Delete wait for the presentation, then write once; the popover can open through the window', async () => {
+  const f = await fixture([{ id: 'same', x: 40, y: 35, frame: 0, text: 'first' }], false, true);
+  f.pointer(100, 100); const record = f.root._activeComment; assert.equal(record.id, 'same');
+  f.hide(true); assert.equal(UI.begin(f.root, record), record, 'opening on an untouched origin is allowed through the window');
+  f.elements.get('comment-text').value = 'edited'; f.elements.get('comment-save').fire('click'); await ticks(3);
+  assert.equal(f.calls.filter(q => q.operation === C.EDIT).length, 0); assert.deepEqual(f.notices, []);
+  f.hide(false); await ticks(); await f.settled();
+  assert.equal(f.calls.filter(q => q.operation === C.EDIT).length, 1); assert.equal(f.metadata()[0].text, 'edited'); assert.deepEqual(f.notices, []);
+  f.pointer(100, 100); f.hide(true); f.elements.get('comment-delete').fire('click'); f.elements.get('comment-delete').fire('click'); await ticks(2); f.hide(false); await ticks(); await f.settled();
+  assert.equal(f.metadata().length, 0); assert.equal(f.calls.filter(q => q.operation === C.EDIT).length, 2, 'a double click while waiting still writes once');
+});
+test('queue-pending: a real change while the origin waits still refuses with no write', async () => {
+  for (const change of ['replace', 'pan', 'cancel']) {
+    const f = await fixture([{ id: 'same', x: 40, y: 35, frame: 0, text: 'first' }], false, true);
+    f.pointer(100, 100); f.hide(true); f.elements.get('comment-text').value = 'x'; f.elements.get('comment-save').fire('click'); await ticks(2);
+    if (change === 'replace') f.replace(); if (change === 'pan') f.pan(); if (change === 'cancel') f.events.fire('keydown', { key: 'Escape' });
+    f.hide(false); await ticks(); await f.settled();
+    assert.equal(f.calls.filter(q => q.operation === C.EDIT).length, 0, change); assert.equal(f.root._activeComment, null, change);
+  }
+});
+test('queue-pending: a queue that never frees gives one notice, closes the popover and writes nothing', async () => {
+  const f = await fixture([{ id: 'same', x: 40, y: 35, frame: 0, text: 'first' }], false, true);
+  f.pointer(100, 100); f.hide(true); f.elements.get('comment-text').value = 'x'; f.elements.get('comment-save').fire('click'); await ticks(40);
+  assert.equal(f.calls.filter(q => q.operation === C.EDIT).length, 0); assert.equal(f.notices.length, 1); assert.equal(f.root._activeComment, null);
 });

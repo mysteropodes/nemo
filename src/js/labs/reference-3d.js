@@ -251,6 +251,9 @@
   function close() {
     if (raf) cancelAnimationFrame(raf);
     if (glState && glState.blobUrls) glState.blobUrls.forEach(function (url) { URL.revokeObjectURL(url); });
+    // Closing or replacing the viewer releases what openMeshReference allocated: the two window
+    // listeners, every buffer/texture, the program, and the context itself (U32, #2374).
+    if (glState && glState.release) glState.release();
     raf = null; glState = null;
     if (panel) { panel.remove(); panel = null; }
   }
@@ -340,13 +343,27 @@
 
     var dragging = false, lastX = 0, lastY = 0;
     panel.addEventListener('pointerdown', function (e) { if (e.target === closeBtn) return; dragging = true; lastX = e.clientX; lastY = e.clientY; panel.style.cursor = 'grabbing'; });
-    window.addEventListener('pointermove', function (e) {
+    function onMove(e) {
       if (!dragging || !glState) return;
       glState.yaw += (e.clientX - lastX) * 0.01;
       glState.pitch += (e.clientY - lastY) * 0.01;
       lastX = e.clientX; lastY = e.clientY;
-    });
-    window.addEventListener('pointerup', function () { dragging = false; if (panel) panel.style.cursor = 'grab'; });
+    }
+    function onUp() { dragging = false; if (panel) panel.style.cursor = 'grab'; }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    glState.release = function () {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      batches.forEach(function (batch) {
+        [batch.pos, batch.norm, batch.color, batch.uv].forEach(function (buffer) { gl.deleteBuffer(buffer); });
+        if (batch.texture !== whiteTex) gl.deleteTexture(batch.texture);
+      });
+      gl.deleteTexture(whiteTex);
+      gl.deleteProgram(prog);
+      var lose = gl.getExtension && gl.getExtension('WEBGL_lose_context');
+      if (lose) lose.loseContext();
+    };
     panel.addEventListener('wheel', function (e) { e.preventDefault(); if (glState) glState.zoom = Math.max(1.2, Math.min(15, glState.zoom + e.deltaY * 0.01)); }, { passive: false });
 
     return { triCount: mesh.triCount };

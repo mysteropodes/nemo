@@ -35,8 +35,40 @@
     return hit && hit.item && hit.item.data ? hit.item.data.strokeId || null : null;
   };
 
+  // The moving strokes: explicit ids, else the selected items' stroke ids with their linked fills (as the baseline snaps).
+  function movingIds(opts) {
+    if (Array.isArray(opts.strokeIds)) return opts.strokeIds.slice();
+    var ids = [];
+    (typeof selectedPaths !== 'undefined' ? selectedPaths : []).forEach(function (p) {
+      var fill = p && p.data && p.data.linkedFill;
+      [p && p.data && p.data.strokeId, fill && fill.data && fill.data.strokeId].forEach(function (id) {
+        if (id && id !== opts.pathId && ids.indexOf(id) < 0) ids.push(id);
+      });
+    });
+    return ids;
+  }
+  function nativeFollowPath(native, opts) {
+    var toast = function (key) { if (typeof showToast === 'function') showToast(SM.t(key)); };
+    var layerUid = native.layerUid(state.activeLayerIdx);
+    if (!layerUid) { toast('labsToastLayerInvalidLocked'); return Promise.resolve(0); }
+    if (typeof opts.pathId !== 'string' || !opts.pathId) { toast('labsToastTrajectoryNotFound'); return Promise.resolve(0); }
+    var ids = movingIds(opts);
+    if (!ids.length) { toast('labsToastSelectStrokesToAnimate'); return Promise.resolve(0); }
+    var nFrames = Math.max(2, Math.min(120, opts.frames || 12));
+    return native.followPath({ layerUid: layerUid, frame: state.currentFrame, pathId: opts.pathId, strokeIds: ids, frames: nFrames,
+      ease: EASES[opts.ease] ? opts.ease : 'inout', removeTrajectory: opts.removeTrajectory !== false }).then(function () {
+      if (typeof clearSel === 'function') clearSel();
+      if (typeof showToast === 'function') showToast(SM.t('labsToastFollowPathPrefix') + nFrames + SM.t('labsToastFollowPathSuffix'));
+      return nFrames;
+    }, function (error) { toast(error && error.code === 'not_found' ? 'labsToastTrajectoryNotFound' : 'labsToastLayerInvalidLocked'); return 0; });
+  }
+
   window.SMLabs.followPath = function (opts) {
     opts = opts || {};
+    // Native authority (U36, #2362): the engine runs this generator over the shown cell as one history entry and
+    // the call returns a Promise of the same count; the code below is the baseline path.
+    var native = window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window);
+    if (native) return nativeFollowPath(native, opts);
     var li = state.activeLayerIdx;
     var ld = state.layers[li];
     if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; }

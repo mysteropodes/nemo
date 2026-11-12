@@ -310,7 +310,8 @@ final class F03OwnedSave {
         if command == "f03.save.name" {
           try kernel.effect("save-name-focus",identity:context,before:{try sameName();try check(try settable(name,pid,kAXFocusedAttribute))},write:{
             try check(AXUIElementSetAttributeValue(name,kAXFocusedAttribute as CFString,kCFBooleanTrue) == .success)
-          },after:{try sameName();try check(try read(name,pid,kAXFocusedAttribute) as? Bool == true)})
+          },after:{try cs7AwaitFocus(identity:{try context();try sameName()},
+            read:{try read(name,pid,kAXFocusedAttribute) as? Bool == true})})
           try kernel.effect(command,identity:context,before:{try sameName();try check(try read(name,pid,kAXFocusedAttribute) as? Bool == true && settable(name,pid,kAXValueAttribute))},write:{
             try check(AXUIElementSetAttributeValue(name,kAXValueAttribute as CFString,f03SavedName as CFString) == .success)
           },after:{try sameName();try check(try read(name,pid,kAXFocusedAttribute) as? Bool == true);try check(try read(name,pid,kAXValueAttribute) as? String == f03SavedName)})

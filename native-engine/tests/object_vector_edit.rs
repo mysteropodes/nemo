@@ -10,6 +10,33 @@ mod controls;
 mod limits;
 #[path = "object_vector_edit_lock.rs"]
 mod lock;
+#[path = "object_vector_create_many.rs"]
+mod create_many;
+#[path = "object_vector_create_held.rs"]
+mod create_held;
+#[path = "object_vector_edit_component.rs"]
+mod component;
+#[path = "object_vector_batch.rs"]
+mod batch;
+#[path = "object_vector_batch_layers.rs"]
+mod batch_layers;
+#[path = "object_vector_batch_order.rs"] mod batch_order;
+#[path = "object_vector_batch_items.rs"]
+mod batch_items;
+#[path = "object_vector_batch_box_angle.rs"] mod batch_box_angle;
+#[path = "object_vector_batch_items_form.rs"] mod batch_items_form; #[path = "object_vector_batch_items_pivot.rs"] mod batch_items_pivot; #[path = "object_vector_batch_flip.rs"] mod batch_flip; #[path = "object_vector_batch_pen.rs"] mod batch_pen;
+#[path = "object_vector_batch_style.rs"]
+mod batch_style;
+#[path = "object_vector_batch_style_detail.rs"]
+mod batch_style_detail;
+#[path = "object_vector_batch_style_preset.rs"] mod batch_style_preset;
+#[path = "object_vector_batch_bitmap.rs"] mod batch_bitmap;
+#[path = "object_vector_batch_skip.rs"]
+mod batch_skip;
+#[path = "object_vector_trim_ends.rs"]
+mod trim_ends;
+#[path = "object_vector_trim_clip.rs"]
+mod trim_clip;
 #[path = "object_vector_edit_support.rs"]
 mod support;
 use support::*;

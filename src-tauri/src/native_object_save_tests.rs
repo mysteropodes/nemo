@@ -414,5 +414,68 @@ fn selected_file_collision_preserves_foreign_destination_and_cleans_staging() {
     assert_eq!(scratch.files(), 1);
 }
 
+#[test]
+fn in_place_replace_overwrites_an_existing_regular_file_atomically_and_leaves_no_stage() {
+    let scratch = Scratch::new();
+    let state = ApplicationMcp::default();
+    let pins = install(&state, ORIGINAL);
+    let destination = scratch.0.join("titled.json");
+    fs::write(&destination, "previous project bytes").unwrap();
+    // Without the replace flag an existing destination is still refused and untouched.
+    assert!(save_request(
+        &state,
+        &request(&pins, 0, &destination).to_string(),
+        |p| p.starts_with(&scratch.0),
+        |_, _| Ok(())
+    )
+    .is_err());
+    assert_eq!(
+        fs::read_to_string(&destination).unwrap(),
+        "previous project bytes"
+    );
+    assert_eq!(scratch.files(), 1);
+    let mut replace = request(&pins, 0, &destination);
+    replace["replace"] = json!(true);
+    let result = save(&state, &replace, &scratch.0);
+    assert_eq!(result["published"], true);
+    assert_eq!(result["cleanupPending"], false);
+    assert_eq!(fs::read_to_string(&destination).unwrap(), ORIGINAL);
+    assert_eq!(scratch.files(), 1, "the staged file was renamed, not left behind");
+    // A replace whose target vanished still publishes the file.
+    fs::remove_file(&destination).unwrap();
+    let result = save(&state, &replace, &scratch.0);
+    assert_eq!(result["published"], true);
+    assert_eq!(fs::read_to_string(&destination).unwrap(), ORIGINAL);
+    assert_eq!(scratch.files(), 1);
+}
+
+#[test]
+fn in_place_replace_refuses_a_directory_destination_and_cleans_staging() {
+    let scratch = Scratch::new();
+    let state = ApplicationMcp::default();
+    let pins = install(&state, ORIGINAL);
+    let destination = scratch.0.join("a-directory");
+    fs::create_dir(&destination).unwrap();
+    let mut replace = request(&pins, 0, &destination);
+    replace["replace"] = json!(true);
+    assert!(save_request(
+        &state,
+        &replace.to_string(),
+        |p| p.starts_with(&scratch.0),
+        |_, _| Ok(())
+    )
+    .is_err());
+    assert!(destination.is_dir());
+    assert_eq!(scratch.files(), 1, "only the directory remains");
+    replace["replace"] = json!("yes");
+    assert!(save_request(
+        &state,
+        &replace.to_string(),
+        |_| true,
+        |_, _| panic!("a non-boolean replace reached an effect")
+    )
+    .is_err());
+}
+
 #[path = "native_object_save_failure_tests.rs"]
 mod failure_tests;

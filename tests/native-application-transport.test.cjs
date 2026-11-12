@@ -235,12 +235,9 @@ test('schema includes active feature operations while the JS adapter retains its
     const operation = branch.allOf[1].properties.operation;
     for (const value of operation.enum || [operation.const]) schemaOperations.add(value);
   }
-  const rust = fs.readFileSync(path.join(ROOT, 'nemo-mcp/src/capabilities.rs'), 'utf8');
-  const start = rust.indexOf('pub const NATIVE_CAPABILITY_SOURCES:');
-  assert.ok(start >= 0);
-  const block = rust.slice(start, rust.indexOf('];', start));
-  const descriptors = [...block.matchAll(/include_str!\s*\(\s*"([^"]+)"\s*\)/g)]
-    .map((match) => JSON.parse(fs.readFileSync(path.resolve(ROOT, 'nemo-mcp/src', match[1]), 'utf8')));
+  // CS1/#2341: nemo-mcp/build.rs discovers capabilities-v2/*.json; read the same set.
+  const descriptors = require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles()
+    .map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
   assert.deepEqual([...schemaOperations].sort(), descriptors.flatMap((entry) => entry.operations).sort());
   assert.doesNotThrow(() => validateRequest({ ...query(), operation: 'query.diagnostics.recent', payload: {} }));
   assert.equal(declaration.schemaVersion, 2);

@@ -57,10 +57,21 @@
       return origin.epoch === gestureEpoch && !!next && next.session === origin.context.session && next.projection === origin.projection &&
         next.presentation === origin.context.presentation && next.ticket === origin.context.ticket && next.key === origin.context.key;
     }
+    // #2372: a presentation hidden only by the native queue (queue-pending) is "cannot prove it right now", not "changed". Opening the popover on an origin whose
+    // session, subscription and gesture are untouched is allowed through that window; save / delete re-prove the whole origin (route) before any write.
+    function hiddenByQueue() {
+      var Wait = root.NemoNativePresentationWait;
+      return !!Wait && Wait.busy(function (f) { var session = current(); return session ? session.readPresentedObjectSession(f) : null; });
+    }
+    function unproven(origin) {
+      var session = current();
+      return !retired && !pending && !loading && origin.epoch === gestureEpoch && !!session && session === origin.context.session &&
+        session.readSubscriptionGeneration() === origin.context.ticket && hiddenByQueue();
+    }
     function begin(existing) {
       var origin = existing && origins.get(existing);
       // Only the genuine existing pointer port can issue this transient identity.
-      if (!origin || !owns(origin)) { notice(); return false; }
+      if (!origin || !(owns(origin) || unproven(origin))) { notice(); return false; }
       return existing;
     }
     function screen(record) {
@@ -68,7 +79,7 @@
       var c = origin.context;
       return Mapping.screen(origin.point, c);
     }
-    function handle(method, event) {
+    function handleRaw(method, event) {
       var active = ownsPopover(root._activeComment);
       if (!root.state || root.state.tool !== 'comment') {
         if (active) close(root._activeComment); pointerIntent = null; return false;
@@ -118,9 +129,26 @@
       if (typeof root.openCommentPopover !== 'function') { origins.delete(record); popovers.delete(record); notice(); return true; }
       root.openCommentPopover(point, record); return true;
     }
+    var waiting = new WeakSet();
+    function refuse(record, origin) { if ((origin || ownsPopover(record)) && !pending) close(record); notice(); return true; }
     function route(record, text, resolved, remove) {
       var origin = record && origins.get(record);
-      if (retired || pending || loading || !origin || !owns(origin)) { if ((origin || ownsPopover(record)) && !pending) close(record); notice(); return true; }
+      if (retired || pending || loading || !origin) return refuse(record, origin);
+      if (!owns(origin)) {
+        // #2372: an origin that is not provable only because a pending native command hides the presentation is waited out (bounded, native-presentation-wait.js);
+        // every strict check then runs again against what is readable, and a real change (cancel, pin, view) still refuses.
+        if (waiting.has(record)) return true;
+        if (!hiddenByQueue()) return refuse(record, origin);
+        waiting.add(record);
+        root.NemoNativePresentationWait.until(root, { readPresentedObjectSession: function (f) { var session = current(); return session ? session.readPresentedObjectSession(f) : null; } },
+          function () { return !retired && owns(origin); }, function () { return !retired && origins.get(record) === origin && origin.epoch === gestureEpoch; })
+          .then(function (ok) { waiting.delete(record); if (ok && !retired && origins.get(record) === origin && !pending && !loading && owns(origin)) submit(record, origin, text, resolved, remove); else refuse(record, origins.get(record)); },
+            function () { waiting.delete(record); refuse(record, origins.get(record)); });
+        return true;
+      }
+      return submit(record, origin, text, resolved, remove);
+    }
+    function submit(record, origin, text, resolved, remove) {
       if (origin.ordinal === null && (remove || !text.trim())) { close(record); return true; }
       var intent;
       if (origin.ordinal === null) intent = { kind: 'append', comment: Object.assign({}, record, { text: text, resolved: resolved }) };
@@ -145,11 +173,29 @@
         .finally(function () { loading = null; var again = refreshNeeded; refreshNeeded = false; if (again && !model.read()) presented(); });
       return loading;
     }
-    function retireGesture() { pointerIntent = null; var record = root._activeComment; if (ownsPopover(record)) close(record); cancel(); }
+    function retireGesture() { if (gateOf) gateOf.cancel(); pointerIntent = null; var record = root._activeComment; if (ownsPopover(record)) close(record); cancel(); }
     function key(event) { if (event.key === 'Escape' || root.state.tool !== 'comment') retireGesture(); }
     function focus(event) { var pop = root.document.getElementById('comment-popover'); if (!pop || !pop.contains(event.target)) retireGesture(); }
     root.document.addEventListener('focusin', focus);
     root.addEventListener('blur', retireGesture); root.addEventListener('resize', retireGesture); root.addEventListener('keydown', key);
+    // #2372: a press that finds the presentation hidden by the queue is held with the move / release that follow it and replayed once it is readable; a real change
+    // (tool, frame, session, subscription, gesture) drops it. Only a press can start waiting, so the other events skip the gate unless one is held.
+    var gateOf = null;
+    function gate() {
+      var Wait = root.NemoNativePresentationWait;
+      if (!gateOf && Wait) gateOf = Wait.gate(root, {
+        handle: handleRaw, ends: ['cancelEvent'],
+        begins: function (method, event) { var cutover = root.NemoNativeOpacityCutover; return method === 'down' && !pending && !loading && root.state && root.state.tool === 'comment' && event.button === 0 &&
+          !!cutover && typeof cutover.blocksLegacy === 'function' && cutover.blocksLegacy() !== false; },
+        read: function (f) { var session = current(); return session ? session.readPresentedObjectSession(f) : null; },
+        snapshot: function () { var session = current(); return { tool: root.state.tool, frame: root.state.currentFrame, epoch: gestureEpoch, session: session, ticket: session && session.readSubscriptionGeneration(), info: session && session.info() }; },
+        holds: function (t) { var session = current();
+          return !retired && root.state.tool === 'comment' && root.state.currentFrame === t.frame && gestureEpoch === t.epoch && session === t.session && !!session &&
+            session.readSubscriptionGeneration() === t.ticket && same(session.info(), t.info); },
+        notice: 'Project comments are unavailable or unconfirmed. Wait for synchronization.' });
+      return gateOf;
+    }
+    function handle(method, event) { var g = gate(); return g && (method === 'down' || g.waiting()) ? g.handle(method, event) : handleRaw(method, event); }
     var controller = Object.freeze({ read: model.read, presented: presented, begin: begin, handle: handle, screen: screen,
       existing: function (record) { var origin = record && origins.get(record); return !!origin && origin.ordinal !== null; },
       save: function (record, text, resolved) { return route(record, text, resolved, false); },
@@ -162,7 +208,7 @@
         repaint();
       },
       dispose: function () {
-        if (retired) return; retireGesture(); retired = true; model.dispose();
+        if (retired) return; retireGesture(); retired = true; if (gateOf) gateOf.cancel(); model.dispose();
         root.removeEventListener('pagehide', controller.dispose); root.removeEventListener('blur', retireGesture);
         root.removeEventListener('resize', retireGesture); root.removeEventListener('keydown', key);
         root.document.removeEventListener('focusin', focus); repaint();

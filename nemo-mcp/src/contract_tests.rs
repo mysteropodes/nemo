@@ -314,7 +314,7 @@ fn fixed_payload_compatibility_accepts_every_legacy_nullable_wire_type() {
 fn descriptor_schema_projects_query_and_command_branches() {
     assert_eq!(
         Operation::labels().len(),
-        11,
+        15,
         "transport-v1 operation count"
     );
     let mut generator = schemars::SchemaGenerator::default();

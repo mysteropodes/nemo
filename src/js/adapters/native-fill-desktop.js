@@ -8,7 +8,7 @@
   if(common)module.exports=api;else root.NemoNativeFillDesktop=api;
 }(typeof globalThis==='object'?globalThis:this,function(command,contract){
   'use strict';
-  const OP='command.document.object.fill.trace';
+  const OP='command.document.object.fill.trace',BRUSH='command.document.object.fill.brush';
   const PIN=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   function hex(value){
     if(typeof value!=='string')throw new TypeError('Fill color is unavailable');
@@ -37,7 +37,24 @@
         return payload;
       });
     }
-    return Object.freeze({fill});
+    // The Fill Brush commit (#2361): the drawn outline placed by fillBrushMode, then the same-colour merge, natively.
+    async function brush(input){
+      const session=ports.current(),before=session&&session.info();
+      if(!session||!session.isActive()||!before||!ports.ready(session,before))throw command.fault('unavailable','Native Fill Brush is unavailable');
+      const target=ports.target(before);
+      if(!target||typeof target.layerUid!=='string')throw command.fault('unavailable','Native Fill Brush target is unavailable');
+      const pin=Object.fromEntries(PIN.map((key)=>[key,before[key]]));
+      const payload={command:'object.fill.brush',contextId:target.contextId||'scene-root',layerUid:target.layerUid,frame:target.frame,
+        outline:input.outline.map((s)=>({point:s.point.slice(),handleIn:s.handleIn.slice(),handleOut:s.handleOut.slice()})),
+        color:hex(input.color),opacity:input.opacity,placement:input.placement,mask:typeof input.mask==='string'?input.mask:false,copies:(input.copies||[]).map((m)=>m.slice()),stamps:(input.stamps||[]).slice()};
+      contract.payload(BRUSH,payload);
+      return command.create(session,'fill',contract).execute(BRUSH,(current)=>{
+        if(ports.current()!==session||!ports.ready(session,current)||!PIN.every((key)=>pin[key]===current[key]))
+          throw command.fault('stale_owner','Fill Brush target changed before dispatch');
+        return payload;
+      });
+    }
+    return Object.freeze({fill,brush});
   }
   function current(root){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
   function nativeMode(root){
@@ -46,7 +63,7 @@
       const s=current(root);return !!(s&&(s.isActive()||typeof s.blocksLegacy==='function'&&s.blocksLegacy()));
     }catch(_){return true;}
   }
-  function handlePointerDown(root,event,ports){
+  function handlePointerDown(root,event,ports,late){
     if(!nativeMode(root))return false;
     const state=root.state;
     if(!state||state.tool!=='fill'||state.playing)return false;
@@ -57,10 +74,20 @@
     const Mapping=ports&&ports.mapping;
     if(!Mapping||['bounds','point','matchesView'].some(key=>typeof Mapping[key]!=='function')){toast('Native fill coordinates are unavailable');return true;}
     const owner=current(root),shown=owner&&owner.readPresentedObjectSession&&owner.readPresentedObjectSession(),info=owner&&owner.info();
+    // #2372: a click while the native queue is busy (queue-pending) waits for the presentation, then fills once - not "coordinates unavailable".
+    const W=root.NemoNativePresentationWait,read=f=>{const o=current(root);return o&&o.readPresentedObjectSession?o.readPresentedObjectSession(f):null;};
+    if(!late&&owner&&!shown&&W&&W.busy(read)){const frame=state.currentFrame,layer=state.activeLayerIdx;
+      W.await(root,{read,notice:'The canvas is still busy - click again.',holds:()=>state.tool==='fill'&&!state.playing&&current(root)===owner&&state.currentFrame===frame&&state.activeLayerIdx===layer})
+        .then(r=>{if(r.ready||r.status==='refused')handlePointerDown(root,event,ports,true);});
+      return true;}
+    // #2256 fill.trace: inside an entered component the context, its layer rows and its frame count are the component's (the ones the workspace controller holds) and the write rides the component route.
+    const comp=root.NemoNativeComponentContext,held=comp&&typeof comp.contextId==='function'?comp.contextId(root):'scene-root',rows=held!=='scene-root'&&comp.layerRows(root)||(info&&info.layers);
     const rect=info&&Mapping.bounds(root,info);
-    if(!shown||!shown.presentation||!rect||!PIN.every(key=>shown[key]===info[key])||shown.presentation.frame!==state.currentFrame||!Mapping.matchesView(root,shown.presentation)){toast('Native fill coordinates are unavailable');return true;}
+    if(!shown||!shown.presentation||!rect||!PIN.every(key=>shown[key]===info[key])||shown.presentation.frame!==state.currentFrame||(shown.presentation.contextId||'scene-root')!==held||(held!=='scene-root'&&!(state.currentFrame<comp.frameBound(root,info)))||!Mapping.matchesView(root,shown.presentation)){toast('Native fill coordinates are unavailable');return true;}
     const captured=shown.presentation;let actionReady=null;
-    const guarded={info:owner.info,isActive:owner.isActive,requestId:owner.requestId,runResourceCommand:action=>owner.runResourceCommand(ctx=>{
+    const route=held==='scene-root'?owner.runResourceCommand:owner.runComponentCommand;
+    if(typeof route!=='function'){toast('Native fill coordinates are unavailable');return true;}
+    const guarded={info:owner.info,isActive:owner.isActive,requestId:owner.requestId,runResourceCommand:action=>route.call(owner,ctx=>{
       const exact=()=>{const p=ctx.readPresentedObjectSession&&ctx.readPresentedObjectSession();return p&&p.presentation===captured&&(captured.view?captured.view.mode:'canvas')===(state.cameraView===true?'stored-camera':'canvas')&&state.currentFrame===captured.frame&&JSON.stringify(Mapping.bounds(root,owner.info()))===JSON.stringify(rect);};
       if(!exact())throw command.fault('stale_owner','Fill presentation changed');
       actionReady=exact;try{return action({reconcile:ctx.reconcile,dispatch:q=>{if(!exact())throw command.fault('stale_owner','Fill presentation changed');return ctx.dispatch(q);}});}finally{actionReady=null;}
@@ -68,8 +95,8 @@
     const editor=create({current:()=>current(root)===owner?guarded:current(root),ready:(session,info)=>session===guarded&&current(root)===owner&&(actionReady?actionReady():Mapping.matchesView(root,captured))
       &&root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true,
       target:(info)=>{
-        const row=info.layers&&info.layers[state.activeLayerIdx];
-        return row&&!row.locked?{layerUid:row.layerUid,contextId:'scene-root',frame:state.currentFrame}:null;
+        const row=rows&&rows[state.activeLayerIdx];
+        return row&&!row.locked?{layerUid:row.layerUid,contextId:held,frame:state.currentFrame}:null;
       }});
     try{
       const mapped=Mapping.point(event,{bounds:rect,canvasW:info.canvasW,canvasH:info.canvasH,presentation:captured});

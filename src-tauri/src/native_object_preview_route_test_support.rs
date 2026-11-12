@@ -25,7 +25,7 @@ use native_engine::{
 use serde_json::{json, Value};
 use std::{any::Any, cell::Cell, rc::Rc};
 
-fn document() -> Value {
+pub(super) fn document() -> Value {
     let source: Value = serde_json::from_str(include_str!(
         "../../engineering/application/examples/native-object-v1/cases.json"
     ))
@@ -225,7 +225,7 @@ impl Fixture {
         json!({"format":"nemo.native-project-document","formatVersion":1,
             "project":{"canvasW":64,"canvasH":64,"fps":24},"drawing":drawing,"viewportReference":null,"assets":[]})
     }
-    fn from_project(project: Value) -> Self {
+    pub(super) fn from_project(project: Value) -> Self {
         let state = ApplicationMcp::default();
         state
             .install_native_project_file(&serde_json::to_vec(&project).unwrap())

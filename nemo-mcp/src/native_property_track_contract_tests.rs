@@ -20,6 +20,22 @@ fn track_actions_preserve_native_numeric_and_opaque_string_domains() {
     for preset in ["linear", "ease", "easeIn", "easeOut", "hold"] {
         actions.push(json!({"kind":"preset","preset":preset}));
     }
+    for mode in [json!(null), json!("in"), json!("out"), json!("layer")] {
+        actions.push(json!({"kind":"lockTo","mode":mode}));
+    }
+    for delta in [-1_000_000, -1, 0, 7, 1_000_000] {
+        actions.push(json!({"kind":"shift","delta":delta}));
+    }
+    for kind in ["delete", "flip", "distribute"] {
+        actions.push(json!({ "kind": kind }));
+    }
+    for mode in ["top", "bottom", "left", "right"] {
+        actions.push(json!({"kind":"warp","mode":mode,"total":-12.5}));
+    }
+    actions.push(json!({"kind":"warp","mode":"liquify","total":3,"grab":40.25}));
+    for color in [json!(null), json!("#e8b64c"), json!("#4EA9FFcc")] {
+        actions.push(json!({"kind":"color","color":color}));
+    }
     for side in ["in", "out"] {
         for percent in [-1000.5, 0.0, 100.0, 1000.5] {
             actions.push(json!({"kind":"influence","side":side,"percent":percent}));
@@ -43,6 +59,26 @@ fn track_actions_preserve_native_numeric_and_opaque_string_domains() {
         .unwrap();
     assert_eq!(descriptor["id"], "native.property-track-edit");
     assert_eq!(descriptor["authority"]["fallback"], "none");
+}
+#[test]
+fn warp_and_color_actions_refuse_malformed_shapes() {
+    for action in [
+        json!({"kind":"warp","mode":"diagonal","total":1}),
+        json!({"kind":"warp","mode":"top"}),
+        json!({"kind":"warp","mode":"liquify","total":1}),
+        json!({"kind":"warp","mode":"top","total":1,"grab":2}),
+        json!({"kind":"warp","mode":"top","total":1000001}),
+        json!({"kind":"warp","mode":"top","total":"1"}),
+        json!({"kind":"warp","mode":"top","total":1,"extra":1}),
+        json!({"kind":"color"}),
+        json!({"kind":"color","color":"red"}),
+        json!({"kind":"color","color":"#12345"}),
+        json!({"kind":"color","color":"#gggggg"}),
+        json!({"kind":"color","color":7}),
+        json!({"kind":"color","color":"#e8b64c","extra":true}),
+    ] {
+        assert!(!request(&payload(action.clone())), "{action}");
+    }
 }
 #[test]
 fn track_payload_selection_target_and_action_are_closed_at_every_level() {
@@ -77,6 +113,20 @@ fn track_payload_selection_target_and_action_are_closed_at_every_level() {
         ("/selections", json!({})),
         ("/action", json!({"kind":"preset","preset":"elastic"})),
         ("/action", json!({"kind":"subdivide","preset":"linear"})),
+        ("/action", json!({"kind":"lockTo"})),
+        ("/action", json!({"kind":"lockTo","mode":"both"})),
+        ("/action", json!({"kind":"lockTo","mode":""})),
+        ("/action", json!({"kind":"lockTo","mode":true})),
+        ("/action", json!({"kind":"lockTo","mode":["in"]})),
+        ("/action", json!({"kind":"lockTo","mode":"in","extra":0})),
+        ("/action", json!({"kind":"shift"})),
+        ("/action", json!({"kind":"shift","delta":1.5})),
+        ("/action", json!({"kind":"shift","delta":"2"})),
+        ("/action", json!({"kind":"shift","delta":1_000_001})),
+        ("/action", json!({"kind":"shift","delta":1,"extra":0})),
+        ("/action", json!({"kind":"delete","keep":true})),
+        ("/action", json!({"kind":"flip","times":2})),
+        ("/action", json!({"kind":"distribute","mode":"even"})),
         (
             "/action",
             json!({"kind":"influence","side":"both","percent":50}),
@@ -147,4 +197,39 @@ fn track_receipt_is_closed_and_exactly_correlates_one_or_zero_history_revisions(
     ] {
         assert!(!result(&bad));
     }
+}
+#[test]
+fn track_selection_names_one_frame_or_runs_of_frames_never_both_or_neither() {
+    let base = |entry: Value| {
+        json!({"command":"object.property.track.edit","selections":[entry],"action":{"kind":"delete"}})
+    };
+    let target = json!({"contextId":"scene-root","layerUid":"layer"});
+    let runs = |ranges: Value| json!({"target":target,"property":"opacity","ranges":ranges});
+    for ranges in [json!([[0, 99]]), json!([[0, 4], [6, 6], [10.5, 20.25]]), json!([[-3, -1]])] {
+        let p = base(runs(ranges));
+        assert!(request(&p), "{p}");
+        assert!(envelope(p).validate().is_ok());
+    }
+    for ranges in [json!([]), json!([[5, 4]]), json!([[1]]), json!([[1, 2, 3]]), json!(["1,2"]), json!([["1", 2]]), json!({"from":1}), json!(null)] {
+        assert!(!request(&base(runs(ranges.clone()))), "{ranges}");
+    }
+    let mut both = runs(json!([[1, 2]]));
+    both["frame"] = json!(1);
+    assert!(!request(&base(both)));
+    let mut neither = runs(json!([[1, 2]]));
+    neither.as_object_mut().unwrap().remove("ranges");
+    assert!(!request(&base(neither)));
+    let too_many: Vec<Value> = (0..513).map(|i| json!([i * 2, i * 2])).collect();
+    assert!(!request(&base(runs(Value::Array(too_many)))));
+    // 128 entries (one per track), at most 32 of them single-key addresses.
+    let entries = |singles: usize, runs_n: usize| {
+        let mut all: Vec<Value> = (0..singles)
+            .map(|i| json!({"target":target,"property":format!("p{i}"),"frame":i}))
+            .collect();
+        all.extend((0..runs_n).map(|i| json!({"target":target,"property":format!("r{i}"),"ranges":[[0, 9]]})));
+        json!({"command":"object.property.track.edit","selections":all,"action":{"kind":"delete"}})
+    };
+    assert!(request(&entries(32, 96)));
+    assert!(!request(&entries(33, 0)));
+    assert!(!request(&entries(0, 129)));
 }

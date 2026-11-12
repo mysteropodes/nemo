@@ -1,3 +1,4 @@
+//! nemo-test-harness: test-evaluation => property_follow_path_sample_tests
 //! Follow-path path sampler (D30/#2075): oracle against Paper.js itself.
 //!
 //! Rows come from `gen.mjs` (sha256 0aee2efd3453511ea797d227eaa5fab9184191336bc9dc0bb7d92d368a42b53f; its

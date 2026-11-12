@@ -22,9 +22,9 @@ class Element{
 
 }
 function baselineFunction(text,name){const start=text.indexOf('function '+name+'(');assert.ok(start>=0,name);let at=text.indexOf('{',start),depth=1,end=at+1;while(depth){if(text[end]==='{')depth++;if(text[end]==='}')depth--;end++;}return text.slice(start,end);}
-async function fixture(tool='rect',native=true){
+async function fixture(tool='rect',native=true,facts={}){
  let installed=false,generation=0,revision=0,hold=null,refusal=null,replyChange=null,wrongOwner=false,ack=null,binding=null;
- let rect={left:40,top:50,width:640,height:360};const records=new Map(),receipts=new Map(),calls=[],events=new Map(),log=[];
+ let rect={left:40,top:50,width:640,height:360};const records=new Map(),receipts=new Map(),calls=[],batches=[],events=new Map(),log=[];let listingFn=null;
  const canvas=new Element(),area=new Element(),body=new Element(),doc=new Element();canvas.getBoundingClientRect=()=>rect;
  const pills=new Element(),pill=new Element(),zoom=new Element(),fit=new Element(),ruler=new Element();
  zoom.id='zoom-scrub';zoom.tagName='INPUT';zoom.value='100';fit.id='canvas-fit-btn';ruler.id='ruler-h';
@@ -32,14 +32,15 @@ async function fixture(tool='rect',native=true){
  area.appendChild(canvas);area.appendChild(pills);pills.appendChild(fit);pills.appendChild(pill);pill.appendChild(zoom);area.appendChild(ruler);
  doc.readyState='complete';doc.body=body;doc.getElementById=id=>({'drawing-canvas':canvas,'canvas-area':area,'zoom-scrub':zoom,'canvas-fit-btn':fit,'ruler-h':ruler}[id]||null);
  doc.createElementNS=()=>new Element();doc.documentElement={clientWidth:1200,clientHeight:900};
+ const flags={locked:false,visible:true},undos=[];
  const info=()=>({apiVersion:2,instanceId:'instance-A',documentId:'document-'+generation,lifecycleGeneration:generation,contentRevision:revision,
   documentSnapshotId:'native-object:document-'+generation+':'+revision,documentDigest:String(revision%10).repeat(64),byteCount:1000,
   canvasW:320,canvasH:180,totalFrames:16,fps:24,undoDepth:revision,redoDepth:0,reference:null,
-  layers:[{layerUid:'L1',name:'Drawing',visible:true,locked:false,shy:false,color:'#5FA875',parentLayerUid:null}]});
+  layers:[Object.assign({layerUid:'L1',name:'Drawing',visible:flags.visible,locked:flags.locked,shy:false,color:'#5FA875',parentLayerUid:null},facts)]});
  const root={document:doc,state:{tool,appMode:'anim2d',currentFrame:0,strokeEnabled:true,fillEnabled:true,strokeColor:'#112233',fillColor:'#44556680',
   brushSize:4,opacity:50,strokeCap:'round',strokeStyle:'solid',miterLimit:10,dashOffset:0,paintOrder:'fillFirst'},userLayers:[],selectedPaths:[],devicePixelRatio:2,
   NemoNativeObjectProject:Project,NemoNativeObjectProjectFile:Files,NemoApplicationMcpTransport:Transport,NemoNativeApplicationAdapter:SDK,NemoNativeObjectVector:Vector,
-  NemoNativeObjectUI:{refreshTiming(){},refreshPolicy(){}},updateUI:()=>log.push('publish-'+revision),showToast:s=>log.push(s)};
+  NemoNativeObjectUI:{refreshTiming(){},refreshPolicy(){}},updateUI:()=>log.push('publish-'+revision),showToast:s=>log.push(s),setTimeout:fn=>setImmediate(fn)};
  require('./helpers/native-viewport-underlay.cjs').install(root);
  async function invoke(command,args){const q=args&&(args.request||JSON.parse(args.requestJson));
   if(command==='nemo_native_status'||command==='nemo_native_object_client_status')return {...info(),available:installed};
@@ -51,32 +52,43 @@ async function fixture(tool='rect',native=true){
    if(q.action==='subscribe'){binding=q.binding;return q.binding;}
    if(q.action==='acknowledge'){if(ack)await ack.promise;return null;}if(q.action==='disconnect')return null;
   }
+  if(command==='nemo_native_object_dispatch'){assert.equal(q.operation,'command.document.object.undo');undos.push(revision);revision++;
+   return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true}};}
   assert.equal(command,'nemo_native_dispatch');calls.push(structuredClone(q));assert.equal(q.operation,'command.document.object.vector.edit');
   const prior=receipts.get(q.requestId);if(prior){assert.deepEqual(prior.request,q);const r=structuredClone(prior.response);if(replyChange)replyChange(r);return r;}
-  assert.equal(q.expectedRevision,revision);assert.equal(q.payload.command,'object.vector.create');assert.equal(q.payload.record.target.strokeId,'');
+  if(q.payload.command==='object.vector.batch'){assert.equal(q.expectedRevision,revision);batches.push(structuredClone(q));revision++;
+   const ids=q.payload.ops.map(op=>op.op==='replace'?op.record.target.strokeId:op.stableTarget.strokeId);
+   const r={apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1,operation:'batch',strokeId:ids[0],strokeIds:ids}};
+   receipts.set(q.requestId,{request:structuredClone(q),response:structuredClone(r)});return r;}
+  assert.equal(q.expectedRevision,revision);const many=q.payload.command==='object.vector.createMany';
+  if(!many){assert.equal(q.payload.command,'object.vector.create');assert.equal(q.payload.record.target.strokeId,'');}
   if(refusal)return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:false,error:{code:refusal,message:'Native refusal'}};
-  revision++;const strokeId='native-stroke:'+revision+':0',record=structuredClone(q.payload.record);record.target.strokeId=strokeId;records.set(strokeId,record);
-  let r={apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1,operation:'create',strokeId}};
+  revision++;const ids=(many?q.payload.records:[q.payload.record]).map((rec,n)=>{const strokeId='native-stroke:'+revision+':'+n,record=structuredClone(rec);record.target.strokeId=strokeId;records.set(strokeId,record);return strokeId;});
+  const strokeId=ids[0];
+  let r={apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:many?{applied:true,historyEntriesAdded:1,operation:'createMany',strokeId,strokeIds:ids}:{applied:true,historyEntriesAdded:1,operation:'create',strokeId}};
   receipts.set(q.requestId,{request:structuredClone(q),response:structuredClone(r)});if(replyChange)replyChange(r);if(hold)await hold.promise;if(wrongOwner)r.documentId='replacement';return r;
  }
  root.__TAURI__={core:{invoke},event:{listen:async(name,fn)=>{events.set(name,fn);return ()=>events.delete(name);}}};
  const session=Project.desktop(root);if(native)await session.openPath('/simulated.json',{commit:meta=>Files.projectView(root,meta)});
  // VM global proxies have a different WeakMap identity; resolve the actual cached
  // desktop session explicitly, without substituting any Project/queue method.
- root.NemoNativeObjectProject={...Project,desktop:()=>session};
+ const listed=Object.assign({},session,{readPresentedStrokes:async(selector,pin,wanted)=>{
+  if(!listingFn)throw new Error('no listing');const shown=session.readPresentedObjectSession();
+  return {info:pin,presentation:shown.presentation,items:listingFn(selector).map(i=>wanted(i)?structuredClone(i):{...structuredClone(i),segments:undefined}),layerMatrix:null};}});
+ root.NemoNativeObjectProject={...Project,desktop:()=>listed};
  // Controlled immutable native Perspective projection; never read legacy Perspective fields.
- let perspectiveMode='disabled',perspectiveOwner=session;
+ let perspectiveMode='disabled',perspectiveOwner=session,perspectiveItems=[];
  const perspectiveKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'],perspectiveProofs=new WeakMap();
  root.NemoNativePerspectiveController=Object.freeze({read(){
   const owner=perspectiveOwner,info=owner.info(),shown=owner.readPresentedObjectSession();
   if(perspectiveMode==='unavailable'||!owner.isActive()||!shown||perspectiveKeys.some(k=>shown[k]!==info[k]))return null;
   const pin=Object.fromEntries(perspectiveKeys.map(k=>[k,info[k]]));
   if(perspectiveMode==='stale')pin.documentSnapshotId='stale-perspective-snapshot';
-  const value=Object.freeze({info:Object.freeze(pin),perspective:Object.freeze({settings:Object.freeze({perspectiveEnabled:perspectiveMode==='enabled'})})});
+  const value=Object.freeze({info:Object.freeze(pin),perspective:Object.freeze({settings:Object.freeze({perspectiveEnabled:perspectiveMode==='enabled'}),items:Object.freeze(perspectiveItems.map((v,i)=>Object.freeze({ordinal:i+1,x:v[0],y:v[1],locked:false})))})});
   perspectiveProofs.set(value,typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0);return value;
  },readForCommand(value){
   const owner=perspectiveOwner,info=owner.info(),ticket=typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0;
-  return perspectiveMode==='disabled'&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
+  return (perspectiveMode==='disabled'||perspectiveMode==='enabled')&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
  }});
 
  root.NemoNativeObjectProjectFile={...Files,projectionReadyForUI:(_proxy,pin)=>Files.projectionReadyForUI(root,pin)};
@@ -86,9 +98,17 @@ async function fixture(tool='rect',native=true){
  root.SMEngineBridge={isEnabled:()=>true,nativeEditGuard:{allow:()=>!native},screenToWorld:()=>assert.fail('stale legacy viewport used'),suspend:()=>assert.fail('legacy engine suspended')};
  root.window=root;root.console=console;root.TextEncoder=TextEncoder;const context=vm.createContext(root),tools=fs.readFileSync(path.join(ROOT,'src/js/tools.js'),'utf8');
  for(const name of ['constrainSquare','constrainAngle45','applyStrokeStyle'])vm.runInContext(baselineFunction(tools,name),context,{filename:'tools.js:'+name});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-paint.js'),'utf8'),context,{filename:'native-object-draw-paint.js'});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-symmetry.js'),'utf8'),context,{filename:'native-object-draw-symmetry.js'});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-draw-bitmap.js'),'utf8'),context,{filename:'native-object-draw-bitmap.js'});
+ if(fs.existsSync(path.join(ROOT,'src/js/adapters/native-presentation-wait.js')))vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-presentation-wait.js'),'utf8'),context,{filename:'native-presentation-wait.js'});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-layer-motion-pose.js'),'utf8'),context,{filename:'native-layer-motion-pose.js'});
+ vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-perspective-snap.js'),'utf8'),context,{filename:'native-object-perspective-snap.js'});
+ root.NemoNativePenContinue=require('../src/js/adapters/native-object-pen-continue.js'); // required like the Fill desktop: the geometry it builds must be a plain object of the SDK's own realm
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
- return {perspectiveMode:value=>perspectiveMode=value,root,context,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
+ if(tool==='pen'){root.SM={setTool(t){root.state.tool=t;}};vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/pen-bridge.js'),'utf8'),context,{filename:'pen-bridge.js'});}
+ return {batches,listing:fn=>listingFn=fn,perspectiveMode:(value,items)=>{perspectiveMode=value;perspectiveItems=items||[];},root,context,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,flags,undos,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
   async external(g){ack=g;const from=revision;revision++;return events.get('nemo-native-revision')({payload:{instanceId:'instance-A',documentId:info().documentId,lifecycleGeneration:generation,requestId:'external-'+revision,fromRevision:from,toRevision:revision}});},
   async gesture(end={clientX:240,clientY:210}){area.fire('pointerdown');area.fire('pointermove',end);area.fire('pointerup',end);return root.NemoNativeShapeToolController.whenSettled();}};
 }
@@ -118,18 +138,28 @@ test('pointercancel, lost capture, Escape, tiny click and unrelated pointer cann
  }
  const f=await fixture();f.area.fire('pointerdown');assert.equal(f.area.fire('pointerup',{pointerId:2}).stopped,true);assert.equal(f.calls.length,0);f.area.fire('pointercancel');
 });
-test('stale frame, selection, tool, style, owner or viewport cancels without transport and no legacy fallback',async()=>{
- for(const change of [f=>f.root.state.currentFrame=1,f=>f.root._layerSel=[],f=>f.root.state.tool='ellipse',f=>f.root.state.opacity=70,
+test('stale frame, selection, style, owner or viewport cancels without transport and no legacy fallback (a tool switch is its own cell below)',async()=>{
+ for(const change of [f=>f.root.state.currentFrame=1,f=>f.root._layerSel=[],f=>f.root.state.opacity=70,
   f=>f.setRect({left:45,top:50,width:640,height:360}),async f=>f.session.newProject({canvasW:320,canvasH:180,fps:24},{commit:meta=>Files.projectView(f.root,meta)})]){
   const f=await fixture();f.area.fire('pointerdown');await change(f);const up=f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(up.stopped,true);assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0);
  }
 });
 test('native unavailable modes and unconfirmed presentation are consumed before any legacy writer',async()=>{
- for(const change of [f=>f.root.state.tool='star',f=>f.root.state.symmetryEnabled=true,f=>f.root.state.shadowMode=true,f=>f.root.state.maskMode=true,
-  f=>f.perspectiveMode('enabled'),f=>f.root.state.strokeStyle='dashed',f=>f.root.state.layers[0].locked=true,
+ for(const change of [f=>f.root.state.tool='star',f=>f.root.state.symmetryEnabled=true,f=>f.root.state.shadowMode=true,
+  f=>f.root.state.strokeStyle='dashed',f=>f.root.state.layers[0].locked=true,
   f=>f.root.state.strokeEnabled=f.root.state.fillEnabled=false,f=>f.root.document.documentElement.classList.remove('nemo-native-underlay')]){
   const f=await fixture();change(f);assert.equal(f.area.fire('pointerdown').stopped,true);f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0);
  }
+});
+// #2361 G15 Mask mode (tools.js tagOwner @1065e9d8): a shape drawn while Mask is on commits once as a mask of the layer.
+test('Mask mode commits the shape as a mask with the chosen combine mode, add by default',async()=>{
+ for(const [type,mode] of [[undefined,'add'],['intersect','intersect']]){
+  const f=await fixture();f.root.state.maskMode=true;if(type)f.root.state.maskModeType=type;
+  assert.equal((await f.gesture()).status,'applied');assert.equal(f.calls.length,1);
+  const ext=f.calls[0].payload.record.vectorExt||{};assert.deepEqual([ext.isMask,ext.maskMode],[true,mode]);
+ }
+ const plainShape=await fixture();assert.equal((await plainShape.gesture()).status,'applied');
+ assert.equal((plainShape.calls[0].payload.record.vectorExt||{}).isMask,undefined,'without Mask mode nothing is tagged');
 });
 test('pending native receipt blocks new gestures; typed refusal and false ACK never invoke a Paper writer',async()=>{
  const f=await fixture(),wait=gate();f.hold(wait);f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});await turn();assert.equal(f.calls.length,1);
@@ -184,24 +214,27 @@ test('stage canvas pointer origin still creates exactly one native rectangle thr
  const f=await fixture();f.canvas.fire('pointerdown');f.canvas.fire('pointermove',{clientX:240,clientY:210});f.canvas.fire('pointerup',{clientX:240,clientY:210});
  assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status,'applied');assert.equal(f.calls.length,1);
 });
-test('all 43 retained bootstrap identities match their explicit amended ordinal literal without metadata substitution',()=>{
+test('all 45 retained bootstrap identities keep their frozen runs and adjacency in the actual page',()=>{
  const html=fs.readFileSync(path.join(ROOT,'src/index.html'),'utf8'),fixture=fs.readFileSync(path.join(ROOT,'scripts/nemo/boundaries-application.test.cjs'),'utf8');
  const start=fixture.indexOf("test('N20 contract, authority, adapters and bootstrap load in their frozen order'");assert.ok(start>0);
- const block=fixture.slice(start),paths=Array.from(vm.runInNewContext(block.match(/const paths = (\[[\s\S]*?\]);/)[1]));assert.equal(paths.length,43);
- const expected=JSON.parse(block.match(/assert\.deepEqual\(paths\.map\([\s\S]*?scriptOrdinal\),\s*(\[[\d,\s]+\])\);/)[1]);
+ const block=fixture.slice(start),paths=Array.from(vm.runInNewContext(block.match(/const paths = (\[[\s\S]*?\]);/)[1]));assert.equal(paths.length,45);
+ const runs=JSON.parse(block.match(/assertRuns\(paths\.map\([\s\S]*?scriptOrdinal\),\s*(\[[\d,\s]+\])/)[1]);
  const scripts=[...html.matchAll(/<script\b([^>]*)>/gi)].map((m,i)=>({src:m[1].match(/\bsrc=["']([^"']+)/)?.[1],ordinal:i+1}));
- assert.deepEqual(paths.map(p=>scripts.find(s=>'src/'+s.src===p).ordinal),expected);
+ const ordinals=paths.map(p=>scripts.find(s=>'src/'+s.src===p).ordinal);let at=0;
+ for(const size of runs){for(let k=1;k<size;k++)assert.equal(ordinals[at+k],ordinals[at+k-1]+1);if(at)assert.ok(ordinals[at]>ordinals[at-1]+1);at+=size;}
+ assert.equal(at,45);
  // Read actual HTML directly: one helper after SDK, before the following consumer.
  assert.equal(scripts.filter(s=>s.src==='js/adapters/native-frame-edit-desktop.js').length,1);
- assert.deepEqual(['native-application','native-frame-edit-desktop','native-text-read'].map(name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal),[248,249,252]);
- assert.equal(scripts.find(s=>s.src==='js/adapters/native-fill-desktop.js').ordinal,250);
- assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,121);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,122);
- assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 121/);
- assert.match(fixture,/assert\.deepEqual\(positions, \[14, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26\]/);
+ const ord=name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal;
+ assert.equal(ord('native-frame-edit-desktop'),ord('native-application')+1);
+ assert.ok(ord('native-frame-edit-desktop')<ord('native-fill-desktop')&&ord('native-fill-desktop')<ord('native-text-read'));
+ assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,ord('i18n-runtime')+1);
+ assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, runtime\[0\]\.ordinal/);
+ assert.match(fixture,/assertRuns\(positions, \[1, 10, 2\]/);
 });
 
-test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{
- for(const mode of ['unavailable','stale','enabled']){
+test('native drawing refuses unavailable and stale Perspective projections before a document command',async()=>{
+ for(const mode of ['unavailable','stale']){
   const f=await fixture();f.perspectiveMode(mode);
   Object.defineProperty(f.root.state,'perspectiveEnabled',{get(){throw new Error('legacy Perspective read');},set(){throw new Error('legacy Perspective write');}});
   f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});await turn();
@@ -244,4 +277,445 @@ test('queued shape uses the actual action lease while public presentation stays 
   assert.equal(f.calls.length,changed?0:1);assert.equal(f.records.size,changed?0:1);assert.equal(f.session.info().contentRevision,changed?0:1);
   assert.equal(f.body.children.length,0);
  }
+});
+
+// Pen (G15, #2361): tools.js Pen @1065e9d8 over the same native create. Client (80,90) is document (20,20); scale 2.
+const pts=r=>r.geometry.segments.map(s=>[s.point.x,s.point.y]);
+async function pen(f,steps){let t=1000;const now=Date.now;Date.now=()=>t;
+ try{for(const [kind,x,y,extra] of steps){if(kind==='wait'){t+=x;continue;}f.area.fire(kind,{clientX:x,clientY:y,...(extra||{})});t+=kind==='pointerdown'?1:0;}}finally{Date.now=now;}
+ return f.root.NemoNativePenToolController&&f.root.NemoNativePenToolController.whenSettled();}
+// #2361 Shadow Brush: tools.js tags the committed Pen/Shape path (applyShadowBrushTag @1065e9d8): the active swatch
+// strokes it at max(1, width) with round ends and clears its fill; the channel and swatch id travel with the record.
+test('Shadow mode commits Pen and Shape paths as construction ink in the active swatch, never in the preview',async()=>{
+ const swatch={id:'sh5',ordinal:5,color:'#2288ff'},shadow={channelTag:'shadow',shadowSwatchId:'sh5'};
+ const ink=r=>[r.vector.stroke.r,r.vector.stroke.g,r.vector.stroke.b,r.vector.hasRealStroke,r.fill,r.vector.strokeWidth,r.vector.strokeCap,r.vector.strokeJoin];
+ const want=[0x22/255,0x88/255,1,true,null,4,'round','round'];
+ const rect=await fixture();rect.root.SMShadowBrush={activeSwatch:()=>swatch};rect.root.state.shadowMode=true;
+ assert.equal((await rect.gesture()).status,'applied');const r=rect.calls[0].payload.record;
+ assert.deepEqual(ink(r),want,'the rectangle is ink, not a fill');assert.deepEqual(r.vectorExt.shadow,shadow);
+ assert.equal(r.vectorExt.paramShape.kind,'rect','its parametric shape survives');
+ const off=await fixture();off.root.SMShadowBrush={activeSwatch:()=>swatch};Object.assign(off.root.state,{shadowMode:true,strokeEnabled:false});
+ assert.equal((await off.gesture()).status,'applied');assert.deepEqual(ink(off.calls[0].payload.record),want,'Stroke off still inks in Shadow mode');
+ const p=await fixture('pen');p.root.SMShadowBrush={activeSwatch:()=>swatch};p.root.state.shadowMode=true;
+ const res=await pen(p,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(res.status,'applied');const q=p.calls[0].payload.record;assert.deepEqual(ink(q),want);assert.deepEqual(q.vectorExt.shadow,shadow);
+ // The baseline tags at pointer-up: while dragging, the preview keeps the drawing colours and never names the swatch.
+ const live=await fixture();live.root.SMShadowBrush={activeSwatch:()=>swatch};live.root.state.shadowMode=true;
+ live.area.fire('pointerdown');live.area.fire('pointermove',{clientX:240,clientY:210});const shown=live.body.firstChild.firstChild.attributes;
+ assert.deepEqual([shown.stroke,shown.fill],['#112233','#44556680'],'the preview is not the committed ink');
+ live.area.fire('pointerup',{clientX:240,clientY:210});await live.root.NemoNativeShapeToolController.whenSettled();
+ assert.deepEqual(live.calls[0].payload.record.vectorExt.shadow,shadow);
+ const none=await fixture();none.root.SMShadowBrush={activeSwatch:()=>null};none.root.state.shadowMode=true;
+ none.area.fire('pointerdown');none.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(none.calls.length,0,'no swatch, no commit');
+});
+test('Pen: clicks place anchors, a drag sets symmetric handles, a double press commits one open native path',async()=>{
+ const f=await fixture('pen');
+ const r=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointermove',260,110],['pointerup',260,110],['wait',500],
+  ['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+ assert.equal(r.status,'applied');assert.equal(f.calls.length,1);const rec=f.calls[0].payload.record;
+ assert.deepEqual(pts(rec),[[20,20],[100,20],[100,80]]);assert.equal(rec.geometry.closed,false);
+ assert.deepEqual([rec.geometry.segments[1].handleOut.x,rec.geometry.segments[1].handleOut.y],[10,10]);
+ assert.deepEqual([rec.geometry.segments[1].handleIn.x,rec.geometry.segments[1].handleIn.y],[-10,-10]);
+ assert.equal(rec.fill,null);assert.equal(rec.vector.strokeCap,'round');assert.equal(rec.vector.opacity,0.5);
+ assert.deepEqual(f.root.state.layers[0].frames,[],'no legacy frame was written');
+});
+test('Pen: pressing near the first anchor closes; Shift snaps to 45 degrees; Alt keeps the incoming handle',async()=>{
+ const f=await fixture('pen');
+ const r=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,100,{shiftKey:true}],['pointermove',250,100,{altKey:true}],['pointerup',250,100],['wait',500],
+  ['pointerdown',240,210],['pointerup',240,210],['wait',500],['pointerdown',84,94]]);
+ assert.equal(r.status,'applied');const rec=f.calls[0].payload.record;assert.equal(rec.geometry.closed,true);
+ assert.deepEqual(pts(rec),[[20,20],[100.156,20],[100,80]],'Shift snaps the angle and keeps the distance (constrainAngle45)');
+ const second=rec.geometry.segments[1];assert.deepEqual([second.handleOut.x,second.handleOut.y],[4.844,5]);assert.deepEqual([second.handleIn.x,second.handleIn.y],[0,0]);
+});
+test('Pen: Escape and a single anchor commit nothing; Backspace drops the last anchor; a tool switch commits',async()=>{
+ let f=await fixture('pen');await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90]]);
+ f.doc.listeners.get('keydown').forEach(l=>l.fn({key:'Escape',stopImmediatePropagation(){},preventDefault(){}}));
+ await pen(f,[['wait',500],['pointerdown',240,210],['pointerup',240,210]]);assert.equal(f.calls.length,0,'Escape dropped the gesture; the next press starts a new one');
+ f=await fixture('pen');const single=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['pointerdown',80,90]]);
+ assert.equal(single.status,'cancelled');assert.equal(f.calls.length,0);
+ f=await fixture('pen');await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210]]);
+ f.doc.listeners.get('keydown').forEach(l=>l.fn({key:'Backspace',stopImmediatePropagation(){},preventDefault(){}}));
+ f.root.SM.setTool('rect');const switched=await f.root.NemoNativePenToolController.whenSettled();
+ assert.equal(switched.status,'applied','switching tools commits the open path, as finalizePen does');
+ assert.deepEqual(pts(f.calls[0].payload.record),[[20,20],[100,20]],'Backspace removed the last anchor first');
+});
+// #2361 draw-pen-taper: tools.js finalizePen with Taper ends @1065e9d8 replaces the placed path with a filled ribbon whose
+// width tapers (buildCenterSegmentsFromPath + taperWidthAtFrac(frac, brushSize, 0.18)) and rebuildVectorBrushOutline outlines.
+// The oracle below runs those baseline functions itself on a Paper path built from the same anchors.
+function paperTaper(f){
+ const paper=require('./helpers/native-import-paper.cjs').load(),tools=fs.readFileSync(path.join(ROOT,'src/js/tools.js'),'utf8'),r=f.root;
+ r.Point=paper.Point;r.Segment=paper.Segment;r.Path=function(options){assert.equal(options&&options.insert,false,'all geometry must be detached');return new paper.Path(options);};
+ for(const name of ['widthAtFrac','taperFloorWidth','taperWidthAtFrac','buildCenterSegmentsFromPath','sampleVectorBrushCenterline','_polylineCrossCandidates',
+  '_ribbonHasRealSelfIntersections','_flattenResolvedRibbon','_cleanupSelfIntersectingOutline','buildVariableWidthPath','buildClosedRingOutline','_polyClosestPair'])
+  vm.runInContext(baselineFunction(tools,name),f.context,{filename:'tools.js:'+name});
+ return paper;
+}
+function oracle(f,paper,anchors,closed){
+ const r=f.root,path=new paper.Path({insert:false});anchors.forEach(a=>path.add(new paper.Segment(new paper.Point(a[0],a[1]),new paper.Point(a[2]||0,a[3]||0),new paper.Point(a[4]||0,a[5]||0))));path.closed=!!closed;
+ const cs=r.buildCenterSegmentsFromPath(path,frac=>r.taperWidthAtFrac(frac,r.state.brushSize,0.18)),sampled=r.sampleVectorBrushCenterline(cs,undefined);
+ const outline=r.buildVariableWidthPath(sampled.pts,sampled.widths);return {cs:JSON.parse(JSON.stringify(cs)),segments:JSON.parse(JSON.stringify(outline.segments.map(s=>[s.point.x,s.point.y])))};
+}
+const penSteps=[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]];
+test('Pen with Taper ends commits the baseline tapered ribbon as ONE native create, the preview stays the plain line',async()=>{
+ const f=await fixture('pen'),paper=paperTaper(f);Object.assign(f.root.state,{taperEnds:true,brushSize:10,strokeStyle:'dashed'});
+ const want=oracle(f,paper,[[20,20],[100,20],[100,80]],false);
+ f.area.fire('pointerdown',{clientX:80,clientY:90});f.area.fire('pointerup',{clientX:80,clientY:90});f.area.fire('pointermove',{clientX:240,clientY:210});
+ const live=f.body.firstChild.firstChild.attributes;assert.deepEqual([live.fill,live.stroke,live['stroke-width']],['none','#112233','10'],'baseline: plain line until the path is finalised');
+ f.area.fire('pointerdown',{clientX:240,clientY:90});f.area.fire('pointerup',{clientX:240,clientY:90});
+ const r=await pen(f,[['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+ assert.equal(r.status,'applied');assert.equal(f.calls.length,1,'one revision, one undo step');assert.equal(f.calls[0].payload.command,'object.vector.create');
+ const rec=f.calls[0].payload.record,ribbon=rec.vectorExt.pressure;
+ assert.equal(rec.geometry.closed,true);assert.equal(rec.vector.hasRealStroke,false);assert.deepEqual(rec.vector.dashArray||[],[],'a ribbon has no dashes');
+ assert.equal(rec.vector.strokeWidth,1);assert.equal(rec.vector.opacity,0.5);assert.equal(rec.vector.fill===undefined,true);
+ assert.deepEqual([rec.fill.r,rec.fill.g,rec.fill.b].map(v=>Math.round(v*255)),[0x11,0x22,0x33],'filled in the stroke colour');
+ assert.deepEqual(pts(rec),want.segments.map(p=>p.map(v=>Math.round(v*1000)/1000)),'the outline is the baseline taper outline');
+ assert.deepEqual(ribbon.centerSegments.map(c=>[c.point[0]??c.point.x,c.width]).map(([x,w])=>[x,Math.round(w*1000)/1000]),want.cs.map(c=>[c.point[0],Math.round(c.width*1000)/1000]));
+ const widths=ribbon.centerSegments.map(c=>c.width);assert.equal(widths[0],.8,'tapers to the floor at the start');assert.equal(widths.at(-1),.8,'and at the end');
+ assert.ok(widths.some(w=>w>=9.9),'full brush width mid-path');assert.equal(ribbon.widthProfile,undefined,'a Pen path has no pressure profile');
+ assert.deepEqual(f.root.state.layers[0].frames,[],'no legacy frame was written');
+});
+test('Pen with Taper ends: a closed path, Shadow mode and the plain path stay the baseline',async()=>{
+ const closed=await fixture('pen'),paper=paperTaper(closed);Object.assign(closed.root.state,{taperEnds:true,brushSize:10});
+ const rc=await pen(closed,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['wait',500],['pointerdown',84,94]]);
+ assert.equal(rc.status,'applied');const want=oracle(closed,paper,[[20,20],[100,20],[100,80]],true);
+ assert.deepEqual(pts(closed.calls[0].payload.record),want.segments.map(p=>p.map(v=>Math.round(v*1000)/1000)),'closed: ribbon of the anchors, as finalizePen');
+ const swatch={id:'sh5',ordinal:5,color:'#2288ff'},sh=await fixture('pen');paperTaper(sh);Object.assign(sh.root.state,{taperEnds:true,shadowMode:true});sh.root.SMShadowBrush={activeSwatch:()=>swatch};
+ await pen(sh,penSteps);const q=sh.calls[0].payload.record;assert.equal(q.geometry.closed,false,'applyShadowBrushTag returns the ribbon to its centreline');
+ assert.deepEqual(pts(q),[[20,20],[100,20],[100,80]]);assert.equal(q.vectorExt.shadow.shadowSwatchId,'sh5');assert.equal(q.vector.hasRealStroke,true);assert.equal(q.fill,null);
+ const off=await fixture('pen');await pen(off,penSteps);const plain=off.calls[0].payload.record;
+ assert.equal(plain.geometry.closed,false);assert.equal(plain.vectorExt&&plain.vectorExt.pressure,undefined,'without Taper ends the Pen path is plain');
+});
+
+test('Pen: Enter commits; Alt reshapes a placed anchor; a direct tool change still commits; another pointer type cannot join',async()=>{
+ let f=await fixture('pen');await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['wait',500],
+  ['pointerdown',240,90,{altKey:true}],['pointermove',260,110,{altKey:true}],['pointerup',260,110],['wait',500],['pointerdown',240,210,{pointerType:'touch'}]]);
+ f.doc.listeners.get('keydown').forEach(l=>l.fn({key:'Enter',stopImmediatePropagation(){},preventDefault(){}}));
+ let r=await f.root.NemoNativePenToolController.whenSettled();assert.equal(r.status,'applied');
+ const rec=f.calls[0].payload.record;assert.deepEqual(pts(rec),[[20,20],[100,20]],'the touch press did not join the mouse gesture');
+ assert.deepEqual([rec.geometry.segments[1].handleOut.x,rec.geometry.segments[1].handleOut.y],[10,10]);
+ assert.deepEqual([rec.geometry.segments[1].handleIn.x,rec.geometry.segments[1].handleIn.y],[0,0],'Alt reshape leaves the incoming handle');
+ f=await fixture('pen');await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90]]);
+ f.root.state.tool='hand';f.area.fire('pointerdown',{clientX:100,clientY:100});r=await f.root.NemoNativePenToolController.whenSettled();
+ assert.equal(r.status,'applied','a tool change that bypassed SM.setTool still commits at the next event the Pen sees');
+ f=await fixture('pen');await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90]]);
+ f.root.state.currentFrame=1;f.root.SM.setTool('rect');r=await f.root.NemoNativePenToolController.whenSettled();
+ assert.notEqual(r.status,'applied','a frame change after the gesture voids the commit');assert.equal(f.calls.length,0);
+ f=await fixture('pen');const hover=f.area.fire('pointermove',{clientX:100,clientY:100});assert.equal(hover.stopped,false,'hover is not consumed without a gesture');
+});
+
+// G23 symmetry (#2361): the stroke and its copies as ONE createMany. Canvas 320x180, default axes through the centre.
+test('symmetry: a mirrored Pen path and a radial rectangle each commit as one native createMany',async()=>{
+ let f=await fixture('pen');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
+ let r=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(r.status,'applied');assert.equal(f.calls.length,1);let q=f.calls[0].payload;assert.equal(q.command,'object.vector.createMany');
+ assert.deepEqual(q.records.map(pts),[[[20,20],[100,20]],[[300,20],[220,20]]],'reflected across x = 160');
+ f=await fixture('rect');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'radial',symmetryRadialSectors:4,symmetryRadialCenter:{x:160,y:90}});
+ r=await f.gesture();assert.equal(r.status,'applied');q=f.calls[0].payload;assert.equal(q.records.length,4);
+ assert.deepEqual(pts(q.records[0]),[[20,20],[100,20],[100,80],[20,80]]);
+ assert.deepEqual(pts(q.records[2]),[[300,160],[220,160],[220,100],[300,100]],'180 degrees about (160,90)');
+ assert.deepEqual(pts(q.records[1])[0],[90,230],'copies stack as insertAbove leaves them: 270 degrees right above the original');
+ assert.equal(f.session.info().contentRevision,1,'four strokes, one revision');
+});
+
+test('symmetry: a stroke the axis clip leaves with one anchor refuses with its reason instead of dropping silently',async()=>{
+ let f=await fixture('pen');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'y',symmetryExtend:false});
+ await pen(f,[['pointerdown',400,90],['pointerup',400,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(f.calls.length,0);assert.ok(f.log.some(m=>/starts at the symmetry axis/.test(m)));
+});
+
+test('symmetry preview draws the stroke and its mirror without writing anything, then clears on commit',async()=>{
+ const f=await fixture('rect');Object.assign(f.root.state,{symmetryEnabled:true,symmetryMode:'y',symmetryExtend:true});
+ f.area.fire('pointerdown');f.area.fire('pointermove',{clientX:240,clientY:210});
+ const overlay=f.body.firstChild;assert.equal(overlay.children.length,2,'stroke plus its mirror');
+ assert.match(overlay.children[0].attributes.d,/^M 20 20/);assert.match(overlay.children[1].attributes.d,/^M 300 80/,'the mirrored closed copy is re-oriented');
+ assert.equal(f.calls.length,0,'preview writes nothing');
+ f.area.fire('pointerup',{clientX:240,clientY:210});await f.root.NemoNativeShapeToolController.whenSettled();
+ assert.equal(f.body.children.length,0);assert.equal(f.calls.length,1);assert.equal(f.calls[0].payload.records.length,2);
+});
+
+// #2361 draw-cancel-matrix (shapes and Pen). Baseline shape-bridge.js @1065e9d8 captures `shapeTool` at the press and commitShape runs
+// whatever the tool, frame, lock or history did meanwhile; tools.js setTool runs finalizePen, so a Pen tool switch commits the path.
+// Matched: tool switch (Shape and Pen commit once), Undo with an open Pen (pops the path's own pushUndo entry: the path goes, no earlier
+// edit is undone). Cancelled on purpose: the baseline's frame/lock/undo outcomes are writes into whatever frame or layer is current at
+// release (or, for the Pen, a path saveAllLayerFrames leaves half-built on the old frame), which the pinned native owner cannot repeat.
+const keyDown=(f,e)=>{const seen={stopped:false,prevented:false},event={target:{tagName:'DIV'},...e,stopImmediatePropagation(){seen.stopped=true;},preventDefault(){seen.prevented=true;}};
+ (f.doc.listeners.get('keydown')||[]).forEach(l=>{if(!seen.stopped)l.fn(event);});return seen;};
+const penOpen=[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90]];
+async function unlockedAgain(f,key,value){f.flags[key]=value;const wait=gate();wait.resolve();await f.external(wait);}
+test('cancel matrix: a tool switch mid-drag still commits the shape it began, once (#2361)',async()=>{
+ for(const [from,next] of [['rect','ellipse'],['rect','select'],['ellipse','rect'],['line','hand']]){
+  const f=await fixture(from);f.area.fire('pointerdown');f.root.state.tool=next;const up=f.area.fire('pointerup',{clientX:240,clientY:210});
+  assert.equal(up.stopped,true);assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status,'applied',from+'>'+next);
+  assert.equal(f.calls.length,1);assert.equal(f.session.info().contentRevision,1,'exactly one revision');assert.equal(f.body.children.length,0);assert.equal(f.area.captured.size,0);
+  const rec=f.calls[0].payload.record;assert.equal(rec.vectorExt&&rec.vectorExt.paramShape?rec.vectorExt.paramShape.kind:from,from==='rect'?'rect':from,'the shape the drag began with');
+  assert.equal(f.root.state.tool,next);
+ }
+});
+test('cancel matrix: Pen tool switch commits exactly one revision; frame change, lock and hide cancel with zero (#2361)',async()=>{
+ let f=await fixture('pen');await pen(f,penOpen);f.root.SM.setTool('rect');assert.equal((await f.root.NemoNativePenToolController.whenSettled()).status,'applied');
+ assert.equal(f.calls.length,1);assert.equal(f.session.info().contentRevision,1);assert.equal(f.undos.length,0);
+ f=await fixture('pen');await pen(f,penOpen);f.root.state.currentFrame=1;assert.equal(f.area.fire('pointerdown',{clientX:240,clientY:210}).stopped,true);
+ assert.equal(f.root.NemoNativePenToolController.isDragging(),false,'the next event ends the gesture');assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0);assert.equal(f.session.info().contentRevision,0);
+ for(const [key,value] of [['locked',true],['visible',false]]){
+  f=await fixture('pen');await pen(f,penOpen);await unlockedAgain(f,key,value);
+  f.doc.listeners.get('keydown').forEach(l=>l.fn({key:'Enter',stopImmediatePropagation(){},preventDefault(){}}));
+  assert.equal(f.calls.length,0,key);assert.equal(f.root.NemoNativePenToolController.isDragging(),false,key);assert.equal(f.body.children.length,0,key);assert.equal(f.undos.length,0);
+ }
+});
+test('cancel matrix: Undo with an open Pen path ends the path alone and is consumed; fields keep their text undo; Redo is left to history (#2361)',async()=>{
+ let f=await fixture('pen');await pen(f,penOpen);
+ const typing=keyDown(f,{key:'z',metaKey:true,target:{tagName:'INPUT'}});assert.equal(typing.stopped,false,'a focused field keeps Cmd+Z');
+ const redo=keyDown(f,{key:'Z',metaKey:true,shiftKey:true});assert.equal(redo.stopped,false);assert.equal(f.root.NemoNativePenToolController.isDragging(),true);
+ const undo=keyDown(f,{key:'z',ctrlKey:true});assert.deepEqual([undo.stopped,undo.prevented],[true,true],'history never sees it');
+ assert.equal(f.root.NemoNativePenToolController.isDragging(),false);assert.equal(f.body.children.length,0);assert.equal(f.area.captured.size,0);
+ assert.equal(f.calls.length,0);assert.equal(f.undos.length,0);assert.equal(f.session.info().contentRevision,0,'zero revisions, no history step');
+ assert.equal(keyDown(f,{key:'z',metaKey:true}).stopped,false,'with no open path Undo is the document undo again');
+ const r=await pen(f,[['wait',500],['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(r.status,'applied');assert.equal(f.calls.length,1,'a fresh path draws normally afterwards');
+ // A commit already in flight is not cancelled by Undo: the key reaches history, which queues behind that one revision.
+ f=await fixture('pen');const wait=gate();f.hold(wait);const committing=pen(f,[...penOpen,['pointerdown',240,90]]);await turn();assert.equal(f.calls.length,1);
+ assert.equal(keyDown(f,{key:'z',metaKey:true}).stopped,false);const undone=f.session.historyFromUi('undo');await turn();assert.equal(f.undos.length,0);
+ wait.resolve();assert.equal((await committing).status,'applied');await undone;
+ assert.equal(f.calls.length,1);assert.deepEqual(f.undos,[1]);assert.equal(f.session.info().contentRevision,2);
+});
+test('cancel matrix: lock, hide, frame change and undo mid-shape cancel with zero revisions; a second pointer is ignored (#2361)',async()=>{
+ for(const [name,act] of [['locked',f=>unlockedAgain(f,'locked',true)],['hidden',f=>unlockedAgain(f,'visible',false)],['frame',f=>{f.root.state.currentFrame=1;}],['undo',f=>f.session.historyFromUi('undo')]]){
+  const f=await fixture();f.area.fire('pointerdown');await act(f);const up=f.area.fire('pointerup',{clientX:240,clientY:210});
+  assert.equal(up.stopped,true,name);assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status!=='applied',true,name);
+  assert.equal(f.calls.length,0,name);assert.equal(f.body.children.length,0,name);assert.equal(f.area.captured.size,0,name);
+ }
+ const f=await fixture();f.area.fire('pointerdown');const other={pointerId:2,isPrimary:false,clientX:200,clientY:200};
+ for(const kind of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture'])assert.equal(f.area.fire(kind,other).stopped,true,kind);
+ assert.equal(f.calls.length,0);assert.equal(f.body.children.length,1,'the first pointer still drags');
+ f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status,'applied');
+ assert.equal(f.calls.length,1);assert.deepEqual(pts(f.calls[0].payload.record).length,4);
+});
+
+// #2256 component writes: Draw/Pen/shape create inside an entered component. The component is entered the way the workspace controller holds it
+// (presented context, its own rows); the real tool, Project session, SDK and transport run, only the native owner is simulated.
+function enter(f,id='comp-a',total=8,facts={}){
+ let entered={contextId:id,totalFrames:total,fps:24};
+ f.root.NemoNativeComponentContext={SCENE:'scene-root',presented:()=>entered,contextId:()=>entered?entered.contextId:'scene-root',
+  layerRows:()=>entered?[Object.assign({layerUid:'inner',locked:false,visible:true},facts)]:null,frameBound:(h,pin)=>entered?entered.totalFrames:pin.totalFrames,
+  projectionReady:()=>true,revision:()=>Promise.resolve(true)};
+ // The vector contract reads the held context from the page global (the same object the workspace controller owns).
+ globalThis.NemoNativeComponentContext=f.root.NemoNativeComponentContext;
+ // The real controller (native-component-context.js projectEntered) sets state.activeSymbolId to the entered context, which the old fixture never did (#2361).
+ Object.assign(f.root.state,{layers:[{layerUid:'inner',visible:true,locked:false}],activeLayerIdx:0,currentFrame:2,totalFrames:total,activeSymbolId:id});f.root._layerSel=[0];
+ return ()=>{entered=null;f.root.state.activeSymbolId=null;delete globalThis.NemoNativeComponentContext;};
+}
+test('Draw inside an entered component creates in THAT component through the component route; the scene is not written',async()=>{
+ const f=await fixture('rect');const leave=enter(f);await f.session.presentPreview(2);
+ const result=await f.gesture();assert.equal(result.status,'applied',JSON.stringify(result));
+ assert.equal(f.calls.length,1);const r=f.calls[0].payload.record;
+ assert.deepEqual([r.target.contextId,r.target.layerUid,r.target.frameScope.frame,r.target.strokeId],['comp-a','inner',2,'']);
+ assert.equal(f.records.size,1);
+ leave();
+});
+test('every admitted shape tool (line, rect, ellipse) and Pen draw inside an entered component with state.activeSymbolId set, like the controller (#2361 B-draw-component-context)',async()=>{
+ for(const tool of ['line','rect','ellipse']){
+  const f=await fixture(tool);const leave=enter(f);await f.session.presentPreview(2);
+  assert.equal(f.root.state.activeSymbolId,'comp-a',tool);
+  const result=await f.gesture();assert.equal(result.status,'applied',tool+' '+JSON.stringify(f.log));
+  assert.equal(f.calls.length,1,tool);const r=f.calls[0].payload.record;
+  assert.deepEqual([r.target.contextId,r.target.layerUid,r.target.frameScope.frame],['comp-a','inner',2],tool);
+  assert.equal(f.records.size,1,tool);leave();
+ }
+ const f=await fixture('pen');const leave=enter(f);await f.session.presentPreview(2);
+ const res=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(res.status,'applied',JSON.stringify(f.log));assert.equal(f.calls.length,1);
+ assert.deepEqual([f.calls[0].payload.record.target.contextId,f.calls[0].payload.record.target.layerUid,f.calls[0].payload.record.target.frameScope.frame],['comp-a','inner',2]);leave();
+});
+test('Motion mode draws shapes and Pen on a layer without a Motion transform, at the playhead frame (#2361 B-draw-motion-mode)',async()=>{
+ for(const tool of ['line','rect','ellipse']){
+  const f=await fixture(tool);f.root.state.appMode='motion';f.root.state.currentFrame=3;await f.session.presentPreview(3);
+  const result=await f.gesture();assert.equal(result.status,'applied',tool+' '+JSON.stringify(f.log));
+  assert.equal(f.calls.length,1,tool);assert.deepEqual([f.calls[0].payload.record.target.contextId,f.calls[0].payload.record.target.frameScope.frame],['scene-root',3],tool);
+ }
+ const f=await fixture('pen');f.root.state.appMode='motion';
+ const res=await pen(f,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(res.status,'applied',JSON.stringify(f.log));assert.equal(f.calls.length,1);
+ // Other modes and a layer with its own Motion transform stay refused: the baseline maps the point through the layer's Motion, which native does not yet do.
+ for(const mode of ['storyboard','compose']){const g=await fixture();g.root.state.appMode=mode;assert.equal(g.area.fire('pointerdown').stopped,true);g.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(g.calls.length,0,mode);assert.equal(g.body.children.length,0,mode);}
+});
+// R-lane-a-fixes: a layer that carries Motion (the row says hasMotion; the engine's hit-test listing names its pose) stores the shape in the layer's own space,
+// at the baseline's toLocalPoint (feedback #135); Animation 2D and Motion alike. The preview keeps following the cursor in world space.
+function pose(f,matrix,seen={}){f.root.NemoSelectCanvasIntent={async layerPaths(r,wanted,centres,idx){seen.idx=idx;seen.wanted=wanted({role:'shape'},[0,0,1,1]);
+ return matrix===null?null:{pin:f.session.info(),frame:f.root.state.currentFrame,layerUid:'L1',paths:[],items:[],layerMatrix:matrix};}};}
+test('a layer with Motion stores the shape where the pose maps the pointer back to, in Animation 2D and in Motion',async()=>{
+ for(const mode of ['anim2d','motion']){
+  const f=await fixture('rect',true,{hasMotion:true});f.root.state.appMode=mode;const seen={};pose(f,[1,0,0,1,10,-5],seen);
+  f.area.fire('pointerdown');f.area.fire('pointermove',{clientX:240,clientY:210});
+  assert.match(f.body.firstChild.firstChild.attributes.d,/M 20 20/,'the preview stays at the cursor');
+  f.area.fire('pointerup',{clientX:240,clientY:210});const result=await f.root.NemoNativeShapeToolController.whenSettled();
+  assert.equal(result.status,'applied',mode);assert.equal(f.calls.length,1,mode);assert.equal(seen.idx,0);assert.equal(seen.wanted,false,'no geometry is paged to read a pose');
+  const r=f.calls[0].payload.record;assert.deepEqual(r.geometry.segments.map(s=>[s.point.x,s.point.y]),[[10,25],[90,25],[90,85],[10,85]],mode);
+  assert.deepEqual(r.vectorExt.paramShape.box,{x1:10,y1:25,x2:90,y2:85},mode);
+ }
+ const turned=await fixture('line',true,{hasMotion:true});pose(turned,[0,1,-1,0,0,0]);// a quarter turn: local = inverse of world
+ assert.equal((await turned.gesture()).status,'applied');
+ assert.deepEqual(turned.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,-20],[80,-100]]);
+});
+test('a layer without Motion reads no pose, and a pose that cannot be read draws nothing',async()=>{
+ const plain=await fixture();let reads=0;plain.root.NemoSelectCanvasIntent={async layerPaths(){reads++;return null;}};
+ assert.equal((await plain.gesture()).status,'applied');assert.equal(reads,0);
+ for(const matrix of [null,[1,0,0,1,0,0,0],[0,0,0,0,0,0]]){
+  const f=await fixture('rect',true,{hasMotion:true});pose(f,matrix);const result=await f.gesture();
+  assert.equal(result.status,'unavailable',JSON.stringify(matrix));assert.equal(f.calls.length,0,'nothing is stored at the unmapped position');
+  assert.ok(f.log.some(x=>/Motion transform could not be read/.test(x)),'said out loud');
+ }
+ const gone=await fixture('rect',true,{hasMotion:true});gone.root.NemoSelectCanvasIntent=undefined;assert.equal((await gone.gesture()).status,'unavailable');assert.equal(gone.calls.length,0);
+});
+test('a frame past the entered component is not drawable even though the scene has it',async()=>{
+ const f=await fixture('rect');const leave=enter(f,'comp-a',3);f.root.state.currentFrame=5;
+ const down=f.area.fire('pointerdown');assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0,'no gesture started: '+down.stopped);leave();
+});
+test('a hidden, locked, parented or 3D component layer is not drawable: the gate reads the owner\'s facts like the scene',async()=>{
+ for(const facts of [{visible:false},{locked:true},{parentLayerUid:'other'},{threeD:true}]){
+  const f=await fixture('rect');const leave=enter(f,'comp-a',8,facts);await f.session.presentPreview(2);
+  f.area.fire('pointerdown');assert.equal(f.calls.length,0,JSON.stringify(facts));assert.equal(f.body.children.length,0,'no gesture started: '+JSON.stringify(facts));leave();
+ }
+ const f=await fixture('rect');const leave=enter(f,'comp-a',8,{visible:true,locked:false,parentLayerUid:null,threeD:false,hasMotion:false});await f.session.presentPreview(2);
+ const result=await f.gesture();assert.equal(result.status,'applied','a plain visible unlocked layer still draws');leave();
+});
+
+// #2372 presentation-busy-audit: the native queue hides the presentation while ANY command is pending (queue-pending); a press, a drag and a
+// release must outlast it instead of being dropped or refused with a notice about something that did not happen.
+async function hide(f){const wait=gate(),busy=f.session.runResourceCommand(async()=>{await wait.promise;});await turn();
+ assert.equal(f.session.readPresentedObjectSession(),null,'the queue hides the presentation');return {free:async()=>{wait.resolve();await busy;}};}
+async function until(f,done){for(let i=0;i<80&&!done();i++)await turn();}
+const busyNotice='The canvas is still busy - try again.';
+test('a shape drawn while the queue is busy waits for the presentation and commits once',async()=>{
+ const f=await fixture(),q=await hide(f);
+ const down=f.area.fire('pointerdown');assert.equal(down.stopped,true);f.area.fire('pointermove',{clientX:240,clientY:210});f.area.fire('pointerup',{clientX:240,clientY:210});
+ for(let i=0;i<4;i++)await turn();assert.equal(f.calls.length,0,'held while hidden');assert.ok(!f.log.includes('Native Drawing is not ready.'),'no misleading refusal');
+ await q.free();await until(f,()=>f.calls.length>0);const result=await f.root.NemoNativeShapeToolController.whenSettled();
+ assert.equal(result.status,'applied');assert.equal(f.calls.length,1,'exactly one native create');assert.equal(f.records.size,1);
+ assert.deepEqual(f.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[100,20],[100,80],[20,80]]);
+});
+test('a shape drag survives the queue turning busy mid-gesture and its release commits once',async()=>{
+ const f=await fixture();f.area.fire('pointerdown');f.area.fire('pointermove',{clientX:200,clientY:180});
+ const q=await hide(f);f.area.fire('pointermove',{clientX:240,clientY:210});assert.equal(f.body.children.length,1,'the drag is still drawn');f.area.fire('pointerup',{clientX:240,clientY:210});
+ await q.free();await until(f,()=>f.calls.length>0);const result=await f.root.NemoNativeShapeToolController.whenSettled();
+ assert.equal(result.status,'applied',JSON.stringify(f.log));assert.equal(f.calls.length,1);assert.equal(f.records.size,1);
+});
+test('Pen: the first click during the busy window still opens the path (replayed press and release)',async()=>{
+ const f=await fixture('pen'),q=await hide(f);f.area.fire('pointerdown',{clientX:80,clientY:90});f.area.fire('pointerup',{clientX:80,clientY:90});
+ for(let i=0;i<3;i++)await turn();assert.equal(f.root.NemoNativePenToolController.isDragging(),false,'held');
+ await q.free();await until(f,()=>f.root.NemoNativePenToolController.isDragging());assert.equal(f.root.NemoNativePenToolController.isDragging(),true);
+ f.area.fire('pointerdown',{clientX:240,clientY:90});f.area.fire('pointerup',{clientX:240,clientY:90});f.area.fire('pointerdown',{clientX:240,clientY:90});
+ const r=await f.root.NemoNativePenToolController.whenSettled();assert.equal(r.status,'applied');assert.equal(f.calls.length,1);
+});
+test('a real change during the wait still refuses: the tool left or the playhead moved (silent), or the view changed (the handler says why)',async()=>{
+ const gone=await fixture(),q=await hide(gone);gone.area.fire('pointerdown');gone.area.fire('pointerup',{clientX:240,clientY:210});gone.root.state.tool='select';
+ await q.free();for(let i=0;i<6;i++)await turn();assert.equal(gone.calls.length,0);assert.equal(gone.body.children.length,0);
+ const frame=await fixture(),r=await hide(frame);frame.area.fire('pointerdown');frame.area.fire('pointerup',{clientX:240,clientY:210});frame.root.state.currentFrame=1;
+ await r.free();for(let i=0;i<6;i++)await turn();assert.equal(frame.calls.length,0);assert.equal(frame.body.children.length,0);
+ const moved=await fixture(),m=await hide(moved);moved.area.fire('pointerdown');moved.area.fire('pointerup',{clientX:240,clientY:210});moved.root.state.cameraView=true;
+ await m.free();for(let i=0;i<6;i++)await turn();assert.equal(moved.calls.length,0,'a readable presentation of another view refuses');
+ assert.ok(moved.log.includes('Native Drawing is not ready.'),JSON.stringify(moved.log));assert.equal(moved.body.children.length,0);
+});
+test('a queue that never frees gives one clear notice and draws nothing',async()=>{
+ const f=await fixture(),q=await hide(f);f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});
+ for(let i=0;i<40;i++)await turn();assert.equal(f.log.filter(x=>x===busyNotice).length,1);assert.equal(f.calls.length,0);await q.free();
+});
+
+test('B-draw-perspective-snap: with the guide on, Line snaps its end to the nearest VP axis; Rect and Pen are drawn, not refused',async()=>{
+ // Document points: press (20,20), release (100,23): 2.15 degrees off the axis toward a VP at (1000,20).
+ const l=await fixture('line');l.perspectiveMode('enabled',[[1000,20]]);
+ assert.equal((await l.gesture({clientX:240,clientY:96})).status,'applied');
+ const [a,b]=l.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]);
+ assert.deepEqual(a,[20,20]);assert.equal(b[1],20);assert.equal(b[0],Math.round((20+Math.hypot(80,3))*1000)/1000);
+ // Outside the catch angle the end stays where the pointer is.
+ const far=await fixture('line');far.perspectiveMode('enabled',[[1000,20]]);assert.equal((await far.gesture({clientX:240,clientY:210})).status,'applied');
+ assert.deepEqual(far.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[100,80]]);
+ // The guide off: the same release is not snapped.
+ const off=await fixture('line');assert.equal((await off.gesture({clientX:240,clientY:96})).status,'applied');
+ assert.deepEqual(off.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[100,23]]);
+ // Rect has no single direction: drawn exactly as without the guide.
+ const r=await fixture('rect');r.perspectiveMode('enabled',[[1000,20]]);assert.equal((await r.gesture({clientX:240,clientY:96})).status,'applied');
+ assert.deepEqual(r.calls[0].payload.record.vectorExt.paramShape.box,{x1:20,y1:20,x2:100,y2:23});
+ // Pen: anchors are placed exactly (no snap in the baseline), the gesture is not refused.
+ const penFixture=await fixture('pen');penFixture.perspectiveMode('enabled',[[1000,20]]);
+ const done=await pen(penFixture,[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',240,96],['pointerup',240,96],['pointerdown',240,96]]);
+ assert.equal(done.status,'applied');assert.equal(penFixture.calls.length,1);
+ assert.deepEqual(penFixture.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[20,20],[100,23]]);
+});
+
+// B-pen-continue (pen-bridge.js onDown @1065e9d8): a first press within 10 screen pixels of an open path's endpoint continues THAT path.
+const listed=(strokeId,pts,over={})=>Object.assign({stableTarget:{contextId:'scene-root',frameScope:{kind:'authored',frame:0},layerUid:'L1',strokeId},closed:false,count:pts.length,
+ matrix:[1,0,0,1,0,0],bounds:[0,0,200,200],role:'plain',filled:false,segments:pts.map(p=>({point:p.slice(0,2),handleIn:p[2]||[0,0],handleOut:p[3]||[0,0]}))},over);
+const sendPoints=(rec)=>rec.geometry.segments.map(s=>[s.point.x,s.point.y]);
+// A person's presses are milliseconds apart, so the endpoint search (a read) lands between them: the steps here yield a turn after each.
+async function penSlow(f,steps){let t=1000;const now=Date.now;Date.now=()=>t;
+ try{for(const [kind,x,y,extra] of steps){if(kind==='wait'){t+=x;continue;}f.area.fire(kind,{clientX:x,clientY:y,...(extra||{})});t+=kind==='pointerdown'?1:0;await turn();}}finally{Date.now=now;}
+ return f.root.NemoNativePenToolController.whenSettled();}
+async function penOn(listing,steps){const f=await fixture('pen');f.listing(()=>listing);const r=await penSlow(f,steps);return {f,r};}
+test('B-pen-continue: a press on the LAST point appends to that path as one batch step keeping its id; the path is not recreated',async()=>{
+ const {f,r}=await penOn([listed('native-stroke:0:0',[[20,20],[100,20]])],[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+assert.equal(r.status,'applied');assert.equal(f.calls.length,1);assert.equal(f.calls[0].payload.command,'object.vector.batch');assert.equal(f.batches.length,1);
+ const q=f.calls[0].payload,op=q.ops[0];assert.equal(q.ops.length,1);assert.equal(op.op,'reshape');assert.equal(op.stableTarget.strokeId,'native-stroke:0:0');assert.equal(op.frame,0);
+ assert.equal(q.keyframe,'copy','Animation 2D keys a held frame with a copy');
+ assert.deepEqual(sendPoints({geometry:op.geometry}),[[20,20],[100,20],[100,80]]);assert.equal(op.geometry.closed,false);
+ assert.equal(f.session.info().contentRevision,1,'one revision');
+});
+test('B-pen-continue: a press on the FIRST point reverses the path and appends, swapping every handle pair',async()=>{
+ const path=listed('native-stroke:0:0',[[20,20,[0,0],[10,0]],[100,20,[-4,0],[0,0]]]);
+ const {f,r}=await penOn([path],[['pointerdown',80,90],['pointerup',80,90],['wait',500],['pointerdown',80,210],['pointerup',80,210],['pointerdown',80,210]]);
+ assert.equal(r.status,'applied');const g=f.calls[0].payload.ops[0].geometry;
+ assert.deepEqual(sendPoints({geometry:g}),[[100,20],[20,20],[20,80]]);
+ assert.deepEqual([g.segments[0].handleIn,g.segments[0].handleOut],[{x:0,y:0},{x:-4,y:0}],'the old last anchor, reversed: its handles swap');
+ assert.deepEqual([g.segments[1].handleIn,g.segments[1].handleOut],[{x:10,y:0},{x:0,y:0}],'the pressed end keeps its handles, swapped');
+});
+test('B-pen-continue: clicking back on the far end closes the continued path',async()=>{
+ const {f,r}=await penOn([listed('native-stroke:0:0',[[20,20],[100,20]])],[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['wait',500],['pointerdown',80,90],['pointerup',80,90]]);
+assert.equal(r.status,'applied');const g=f.calls[0].payload.ops[0].geometry;assert.equal(g.closed,true);assert.deepEqual(sendPoints({geometry:g}),[[20,20],[100,20],[100,80]]);
+});
+test('B-pen-continue: a ribbon, a closed path, a fill shape, a texture anchor, a mask and text are never continued; the press starts a new path',async()=>{
+ for(const over of [{role:'ribbon'},{closed:true},{role:'shape'},{role:'brush',brush:'anchor',group:'g'},{role:'mask'},{role:'text'},{role:'fill',owner:'x'}]){
+  const {f,r}=await penOn([listed('native-stroke:0:0',[[20,20],[100,20]],over)],[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+  assert.equal(r.status,'applied',JSON.stringify(over));assert.equal(f.calls[0].payload.command,'object.vector.create',JSON.stringify(over));
+  assert.deepEqual(sendPoints(f.calls[0].payload.record),[[100,20],[100,80]],JSON.stringify(over));
+ }
+});
+test('B-pen-continue: the nearest endpoint within 10 screen pixels wins; farther than that starts a new path',async()=>{
+ const near=listed('native-stroke:0:1',[[100,60],[180,60]]),far=listed('native-stroke:0:0',[[100,20],[100,40]]);
+ // Press at document (100,41): 1 from far's last, 19 from near's first.
+ const a=await penOn([near,far],[['pointerdown',240,132],['pointerup',240,132],['wait',500],['pointerdown',300,200],['pointerup',300,200],['pointerdown',300,200]]);
+ assert.equal(a.f.calls[0].payload.ops[0].stableTarget.strokeId,'native-stroke:0:0');
+ // 5.5 document units = 11 screen pixels from the endpoint: outside the 10 px reach.
+ const b=await penOn([far],[['pointerdown',240,40+51*2-2+22],['pointerup',240,40+51*2-2+22],['wait',500],['pointerdown',300,200],['pointerup',300,200],['pointerdown',300,200]]);
+ assert.equal(b.f.calls[0].payload.command,'object.vector.create');
+ // An exact tie between two paths goes to the earlier one in the listing; first before last of the same path.
+ const t1=listed('native-stroke:0:0',[[100,20],[150,20]]),t2=listed('native-stroke:0:1',[[100,20],[150,40]]);
+ const c=await penOn([t1,t2],[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',300,200],['pointerup',300,200],['pointerdown',300,200]]);
+ assert.equal(c.f.calls[0].payload.ops[0].stableTarget.strokeId,'native-stroke:0:0');
+});
+test('B-pen-continue: a press that adds no anchor writes nothing; an unreadable listing starts a new path',async()=>{
+ const {f,r}=await penOn([listed('native-stroke:0:0',[[20,20],[100,20]])],[['pointerdown',240,90],['pointerup',240,90],['pointerdown',240,90]]);
+ assert.equal(r.status,'cancelled');assert.equal(f.calls.length,0);
+ const g=await fixture('pen');g.listing(()=>{throw new Error('unreadable');});
+ const done=await pen(g,[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+ assert.equal(done.status,'applied');assert.equal(g.calls[0].payload.command,'object.vector.create');
+});
+test('B-pen-continue: Motion edits the key the cell inherits in place (no copy key); a moved layer maps the new anchors through the record matrix',async()=>{
+ const key=listed('native-stroke:0:0',[[20,20],[100,20]],{matrix:[1,0,0,1,0,0]});
+ const f=await fixture('pen');f.root.state.appMode='motion';f.listing(()=>[key]);
+ const r=await pen(f,[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]]);
+ assert.equal(r.status,'applied');assert.equal(f.calls[0].payload.keyframe,undefined);assert.equal(f.calls[0].payload.ops[0].frame,0);
+ // A record shifted by (10,5) in the document: the press at document (110,25) is its last point; new anchors come back in record space.
+ const moved=await fixture('pen');moved.listing(()=>[listed('native-stroke:0:0',[[20,20],[100,20]],{matrix:[1,0,0,1,10,5]})]);
+ const m=await pen(moved,[['pointerdown',260,100],['pointerup',260,100],['wait',500],['pointerdown',260,220],['pointerup',260,220],['pointerdown',260,220]]);
+ assert.equal(m.status,'applied');assert.deepEqual(sendPoints({geometry:moved.calls[0].payload.ops[0].geometry}),[[20,20],[100,20],[100,80]]);
+});
+test('B-pen-continue with Taper ends: the continued path is replaced under its own id by the tapered ribbon of the current style (finalizePen); a moved layer refuses it',async()=>{
+ const steps=[['pointerdown',240,90],['pointerup',240,90],['wait',500],['pointerdown',240,210],['pointerup',240,210],['pointerdown',240,210]];
+ const f=await fixture('pen');paperTaper(f);f.root.state.taperEnds=true;f.listing(()=>[listed('native-stroke:0:0',[[20,20],[100,20]])]);
+ const r=await penSlow(f,steps);assert.equal(r.status,'applied');assert.equal(f.calls.length,1);
+ const op=f.calls[0].payload.ops[0];assert.equal(op.op,'replace');assert.equal(op.record.target.strokeId,'native-stroke:0:0');assert.equal(op.record.target.frameScope.frame,0);
+ assert.ok(op.record.vectorExt.pressure.centerSegments.length>=3,'the ribbon is built on the whole continued centreline');
+ assert.equal(f.calls[0].payload.keyframe,'copy');
+ const moved=await fixture('pen');paperTaper(moved);moved.root.state.taperEnds=true;moved.listing(()=>[listed('native-stroke:0:0',[[20,20],[100,20]],{matrix:[1,0,0,1,10,5]})]);
+ const m=await penSlow(moved,[['pointerdown',260,100],['pointerup',260,100],['wait',500],['pointerdown',260,220],['pointerup',260,220],['pointerdown',260,220]]);
+ assert.equal(m.status,'unavailable');assert.equal(moved.calls.length,0);
 });

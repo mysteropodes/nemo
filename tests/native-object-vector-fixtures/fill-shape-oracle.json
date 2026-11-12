@@ -1,0 +1,276 @@
+{
+ "commit": "fbe4b8a33e6d5a229f014154df2ba21988a9fabc",
+ "generator": "gen-fill-shape-oracle.cjs (outside the repository)",
+ "generatorSha256": "717b4a719d214e09939cdd1b881417109fc9061d68e44e763cccce6471899de6",
+ "slices": {
+  "colorHex8": "ea3c0613f41b0aab3cd1688ee015b3725536e75ccef6ff54ed70cd4807987894",
+  "applyBrushKeyline": "522859148c63935f653fc2563cec9da4dc8ed58c247abf9e87c0a7f470cfb862",
+  "_r3": "a42533c01486ff534d859e116bb8cf48182287f1dae7a679c52765c718911449",
+  "serP": "c71e9d4fbae1837b3f50bec603808a701ed629412eb050c64b9a62b8710e635e",
+  "desP": "e14636767dccba47d429b7f7097bef50d9682658942b9a8373a5b6f403a42044"
+ },
+ "cases": [
+  {
+   "id": "fill-shape",
+   "in": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "opacity": 0.8,
+    "strokeColor": null,
+    "hasRealStroke": false,
+    "fillColor": "#336699",
+    "isFillShape": true
+   },
+   "out": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeColor": "#ffffff",
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": "#336699",
+    "opacity": 0.8,
+    "dashOffset": 0
+   },
+   "out2": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": true,
+    "strokeColor": "#ffffff",
+    "hasRealStroke": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": "#336699",
+    "opacity": 0.8,
+    "dashOffset": 0
+   }
+  },
+  {
+   "id": "fill-shape-shadow",
+   "in": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "opacity": 1,
+    "strokeColor": "#ff8800",
+    "hasRealStroke": true,
+    "fillColor": null,
+    "isFillShape": true,
+    "channelTag": "shadow",
+    "shadowSwatchId": "sh2"
+   },
+   "out": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeColor": "#ff8800",
+    "hasRealStroke": true,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": null,
+    "opacity": 1,
+    "dashOffset": 0,
+    "channelTag": "shadow",
+    "shadowSwatchId": "sh2"
+   },
+   "out2": {
+    "segments": [
+     {
+      "point": [
+       10,
+       20
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     },
+     {
+      "point": [
+       110,
+       70
+      ],
+      "handleIn": [
+       0,
+       0
+      ],
+      "handleOut": [
+       0,
+       0
+      ]
+     }
+    ],
+    "closed": false,
+    "strokeColor": "#ff8800",
+    "hasRealStroke": true,
+    "strokeWidth": 4,
+    "strokeCap": "round",
+    "strokeJoin": "round",
+    "miterLimit": 10,
+    "fillColor": null,
+    "opacity": 1,
+    "dashOffset": 0,
+    "channelTag": "shadow",
+    "shadowSwatchId": "sh2"
+   }
+  }
+ ]
+}

@@ -8,16 +8,27 @@
   'use strict';
   var works=new WeakMap(),pins=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'],CHUNK=1024;
   function same(a,b){return !!a&&!!b&&pins.every(function(k){return a[k]===b[k];});}
+  // #2256: an ENTERED component carries its own {contextId, totalFrames, layers} on the session pins (native-component-cell-selection.js); the scene view has no contextId.
+  function inside(info){return !!info&&typeof info.contextId==='string'&&info.contextId.length>0;}
+  function held(root,info){return (root.state.activeSymbolId||null)===(inside(info)?info.contextId:null);}
+  function sameView(a,b){return same(a,b)&&a.contextId===b.contextId&&a.totalFrames===b.totalFrames;}
   function rows(root,info){
     var selected=root._layerSel;
     if(!Array.isArray(selected)||!selected.length||new Set(selected).size!==selected.length||
        !selected.every(function(i){return Number.isSafeInteger(i)&&i>=0&&i<info.layers.length;}))return null;
     return selected.map(function(i){return [i,info.layers[i].layerUid];});
   }
-  function presented(root,ports,info){
+  // `soft`: a presentation hidden ONLY by the native queue (queue-pending) is "cannot prove it right now", not "changed" (#2372). A gesture already under way
+  // survives that window ({unproven:true}); a press, a dialog commit or any other caller stays strict and gets null.
+  function presented(root,ports,info,soft){
     try{
       if(typeof ports.frameEditPending!=='function'||ports.frameEditPending()!==false)return null;
-      var session=ports.currentSession(),shown=session&&session.readPresentedObjectSession();
+      // A component has no presented-scene lease (the viewport presents its own context): the proof is the owner pins plus the context controller's projection of that very component.
+      if(inside(info)){var own=ports.currentSession();
+        return own&&own.isActive()&&same(own.info(),info)&&held(root,info)&&ports.projectionReady(info)===true?{session:own,shown:'component:'+info.contextId}:null;}
+      var session=ports.currentSession(),why,shown=session&&session.readPresentedObjectSession(function(c){why=c;});
+      if(session&&!shown&&soft&&why==='queue-pending'&&session.isActive()&&same(session.info(),info)&&ports.projectionReady(info)===true)
+        return {session:session,shown:null,unproven:true};
       return session&&session.isActive()&&same(session.info(),info)&&ports.projectionReady(info)===true&&
         shown&&shown.available===true&&same(shown,info)&&same(shown.presentation,info)&&
         shown.presentation.owner==='native'&&shown.presentation.status==='presented'&&
@@ -28,15 +39,15 @@
     w.node&&w.node.parentNode===w.caption&&header.contains(w.caption);}
   function cellsEqual(cells,values){return Array.isArray(cells)&&cells.length===values.length&&
     cells.every(function(cell,i){return cell&&cell.layer===values[i][0]&&cell.frame===values[i][1];});}
-  function sourceCurrent(root,w,c){
-    var p=presented(root,w.ports,c.info),selection=rows(root,c.info);
-    return connected(root,w)&&p&&p.session===c.session&&p.shown===c.presentation&&
-      same(w.info,c.info)&&root.FC===c.fc&&root.state.currentFrame===c.frame&&root.state.appMode===c.mode&&
-      root.state.activeSymbolId==null&&root.state.activeCompositionId==null&&root._sel===c.selection&&
+  function sourceCurrent(root,w,c,soft){
+    var p=presented(root,w.ports,c.info,soft),selection=rows(root,c.info);
+    return connected(root,w)&&p&&p.session===c.session&&(p.unproven||p.shown===c.presentation)&&
+      sameView(w.info,c.info)&&root.FC===c.fc&&root.state.currentFrame===c.frame&&root.state.appMode===c.mode&&
+      held(root,c.info)&&root.state.activeCompositionId==null&&root._sel===c.selection&&
       root._sel.frames===c.frames&&cellsEqual(root._sel.frames,c.cells)&&JSON.stringify(selection)===c.rows&&
       w.node.getBoundingClientRect().left===c.left;
   }
-  function current(root,w,c){return w.capture===c&&sourceCurrent(root,w,c);}
+  function current(root,w,c){return w.capture===c&&sourceCurrent(root,w,c,true);}
   function status(w,text){w.status.textContent=text;w.status.hidden=!text;w.node.setAttribute('aria-busy',text?'true':'false');}
   function pending(root){var w=works.get(root);return !!(w&&(w.capture||w.dialog));}
   function cycle(root,w){
@@ -50,7 +61,7 @@
   function mode(w,on){w.enabled=on;if(w.button){w.button.textContent=on?'Done selecting':'Select frames';w.button.setAttribute('aria-pressed',String(on));}}
   function dismiss(root,w){var d=w.dialog;if(!d)return;w.dialog=null;d.done=true;
     if(d.overlay.parentNode)d.overlay.parentNode.removeChild(d.overlay);cycle(root,w);}
-  function cancel(root,exit){var w=works.get(root);if(!w)return;w.capture=null;if(exit)mode(w,false);
+  function cancel(root,exit){var w=works.get(root);if(!w)return;if(w.gate)w.gate.cancel();w.capture=null;if(exit)mode(w,false);
     dismiss(root,w);
     cycle(root,w);
     if(w.timer!==null){(root.clearTimeout||clearTimeout)(w.timer);w.timer=null;}
@@ -66,6 +77,11 @@
     return to<0?null:{from:from,to:to};
   }
   function paint(root,w){
+    var fc=root.FC;
+    if(!Number.isFinite(fc)||fc<=0)return;
+    paintSelection(root,w);paintLabels(root,w);
+  }
+  function paintSelection(root,w){
     var range=w.capture?interval(w.capture):selected(root,w),fc=root.FC;
     if(!Number.isFinite(fc)||fc<=0)return;
     w.highlight.hidden=!range;
@@ -74,7 +90,9 @@
       'Normal ruler mode: click or drag scrubs. Use Select frames for frame selection';
     if(range)label='Selected frames '+(range.from+1)+' through '+(range.to+1)+' for selected layer bounds. '+label;
     w.node.setAttribute('aria-label',label);w.node.title=label;
-    w.labels.replaceChildren();
+  }
+  function paintLabels(root,w){
+    var fc=root.FC;w.labels.replaceChildren();
     var wrap=root.document.getElementById('fg-wrap'),first=Math.max(0,Math.floor((wrap&&wrap.scrollLeft||0)/fc));
     var width=wrap&&wrap.clientWidth||w.node.getBoundingClientRect().width;
     var last=Math.min(w.info.totalFrames-1,first+Math.ceil(width/fc));
@@ -101,7 +119,7 @@
        !selection.frames.every(function(v){return v&&Number.isSafeInteger(v.layer)&&v.layer>=0&&v.layer<w.info.layers.length&&
          Number.isSafeInteger(v.frame)&&v.frame>=0&&v.frame<w.info.totalFrames;})||
        !Number.isFinite(root.FC)||root.FC<=0||!Number.isFinite(root.FC*w.info.totalFrames)||
-       root.state.activeSymbolId!=null||root.state.activeCompositionId!=null)return;
+       !held(root,w.info)||root.state.activeCompositionId!=null)return;
     var c={info:Object.assign({},w.info),session:p.session,presentation:p.shown,fc:root.FC,
       left:w.node.getBoundingClientRect().left,frame:root.state.currentFrame,mode:root.state.appMode,
       selection:selection,frames:selection.frames,cells:selection.frames.map(function(v){return [v.layer,v.frame];}),
@@ -131,21 +149,39 @@
       w.timer=(root.setTimeout||setTimeout)(function(){w.timer=null;build(root,w,c);},0);return;
     }
     if(!current(root,w,c)){cancel(root);return;}
-    root._sel.frames=c.build;w.capture=null;cycle(root,w);status(w,'');paint(root,w);
+    root._sel.frames=c.build;root._layerActiveExplicit=false;w.capture=null;cycle(root,w);status(w,'');paint(root,w);
     if(typeof root.updateStatusBarHelp==='function')root.updateStatusBarHelp();
   }
   function up(root,w,event){var c=w.capture;if(works.get(root)!==w||!c||c.build)return;
     if(!current(root,w,c)){cancel(root);return;}
     var frame=point(c,event,true);if(frame===null){cancel(root);return;}c.end=frame;c.build=[];build(root,w,c);
   }
+  // #2372: a press that finds the presentation hidden by the native queue is held with the move / release that follow it and replayed once it is readable
+  // (native-presentation-wait.js; only a press can start waiting, so move / release skip the gate unless one is held); a real change while waiting (frame, rows, selection, pin) drops it. Without the helper the events run straight through.
+  function gesture(root,w){
+    var Wait=root.NemoNativePresentationWait;
+    function run(kind,e){if(kind==='down'){if(w.node&&w.node.parentNode===w.caption)down(root,w,e);}else if(kind==='move')move(root,w,e);else up(root,w,e);}
+    function snap(){var s=w.ports.currentSession(),i=s&&s.info();return {node:w.node,fc:root.FC,frame:root.state.currentFrame,mode:root.state.appMode,rows:JSON.stringify(root._layerSel||null),
+      sel:root._sel,pin:i?pins.map(function(k){return i[k];}).join('|'):''};}
+    if(!Wait)return {handle:run,waiting:function(){return false;},cancel:function(){}};
+    return Wait.gate(root,{handle:run,begins:function(kind,e){return kind==='down'&&works.get(root)===w&&w.enabled&&!w.dialog&&e.button===0;},
+      read:function(f){var s=w.ports.currentSession();return s?s.readPresentedObjectSession(f):null;},snapshot:snap,
+      holds:function(t){var n=works.get(root)===w&&snap();return !!n&&Object.keys(t).every(function(k){return n[k]===t[k];});},notice:'The canvas is still busy - try again.'});
+  }
+  function stripWidth(root,info){var wrap=root.document.getElementById('fg-wrap'),fc=root.FC;return Math.max(Number.isFinite(fc)&&fc>0?info.totalFrames*fc:0,wrap&&wrap.clientWidth||0);}
   function mount(root,caption,info,ports){
     var w=works.get(root);
-    if(w){cancel(root);if(!same(w.info,info))mode(w,false);}
+    // #2371: a playback or scrub tick (same revision, same geometry, no gesture) keeps the strip and its ruler cells; only the frame label and highlight move.
+    if(w&&ports&&ports.frameOnly===true&&w.node&&w.frameLabel&&w.caption===caption&&sameView(w.info,info)&&!w.capture&&!w.dialog&&w.fc===root.FC&&w.width===stripWidth(root,info)){
+      w.ports=ports;w.frameLabel.textContent=caption.textContent;caption.style.minWidth='100%';caption.replaceChildren(w.node);paintSelection(root,w);return true;
+    }
+    if(w){cancel(root);if(!same(w.info,info)||w.info.contextId!==info.contextId)mode(w,false);}
     else{
       w={capture:null,timer:null,listeners:[],enabled:false};works.set(root,w);
       function listen(target,name,callback,capture){target.addEventListener(name,callback,capture);w.listeners.push([target,name,callback,capture]);}
-      listen(root.document,'mousemove',function(e){move(root,w,e);});
-      listen(root.document,'mouseup',function(e){up(root,w,e);});
+      w.gate=gesture(root,w);
+      listen(root.document,'mousemove',function(e){if(w.gate.waiting())w.gate.handle('move',e);else move(root,w,e);});
+      listen(root.document,'mouseup',function(e){if(w.gate.waiting())w.gate.handle('up',e);else up(root,w,e);});
       listen(root.document,'keydown',function(e){if(e.key==='Escape'&&(w.capture||w.enabled||w.dialog)){e.preventDefault();e.stopPropagation();cancel(root,true);}},true);
       listen(root.document,'visibilitychange',function(){if(root.document.hidden)cancel(root,true);});
       if(root.addEventListener){listen(root,'blur',function(){cancel(root,true);});listen(root,'pagehide',function(){retire(root);});}
@@ -155,7 +191,7 @@
     var captionText=caption.textContent,fc=root.FC,node=root.document.createElement('div'),labels=root.document.createElement('div');
     var highlight=root.document.createElement('div'),pending=root.document.createElement('span');
     node.className='native-frame-selection-strip';node.setAttribute('role','group');node.tabIndex=0;
-    var wrap=root.document.getElementById('fg-wrap'),width=Math.max(Number.isFinite(fc)&&fc>0?info.totalFrames*fc:0,wrap&&wrap.clientWidth||0);
+    var width=stripWidth(root,info);w.fc=fc;w.width=width;
     caption.style.minWidth='100%';
     Object.assign(node.style,{position:'relative',height:'20px',width:width+'px',
       minWidth:'100%',cursor:'crosshair',userSelect:'none',backgroundImage:'repeating-linear-gradient(to right,transparent 0,transparent '+Math.max(0,fc-1)+'px,var(--border) '+Math.max(0,fc-1)+'px,var(--border) '+fc+'px)'});
@@ -164,7 +200,7 @@
     w.node=node;w.labels=labels;w.highlight=highlight;w.status=pending;
     node.appendChild(highlight);node.appendChild(labels);node.appendChild(pending);caption.replaceChildren(node);
     var frameLabel=root.document.createElement('span');frameLabel.className='native-frame-selection-caption';frameLabel.textContent=captionText;
-    Object.assign(frameLabel.style,{position:'sticky',right:'0',float:'right',lineHeight:'20px',background:'var(--panel2)',pointerEvents:'none'});node.appendChild(frameLabel);
+    Object.assign(frameLabel.style,{position:'sticky',right:'0',float:'right',lineHeight:'20px',background:'var(--panel2)',pointerEvents:'none'});node.appendChild(frameLabel);w.frameLabel=frameLabel;
     var button=root.document.createElement('button');button.type='button';button.className='native-frame-selection-mode';
     button.title='Select frame cells for the selected layer bounds; normal ruler clicks move the playhead';
     Object.assign(button.style,{position:'sticky',right:'0',float:'right',height:'20px',fontSize:'10px',padding:'0 5px'});node.appendChild(button);w.button=button;mode(w,w.enabled);
@@ -172,7 +208,7 @@
     button.addEventListener('click',function(e){if(works.get(root)!==w||w.node!==node)return;e.preventDefault();e.stopPropagation();
       if(!connected(root,w)||!presented(root,w.ports,w.info)||!rows(root,w.info))return;
       cancel(root);mode(w,!w.enabled);paint(root,w);});
-    node.addEventListener('mousedown',function(e){if(w.node===node&&node.parentNode===caption)down(root,w,e);});
+    node.addEventListener('mousedown',function(e){if(w.node===node&&node.parentNode===caption)w.gate.handle('down',e);});
     node.addEventListener('blur',function(){if(works.get(root)===w&&w.node===node&&w.capture)cancel(root);});
     status(w,'');paint(root,w);return true;
   }

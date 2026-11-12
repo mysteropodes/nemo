@@ -478,6 +478,7 @@
   function nativePointer() {
     if (nativePointerIntent) return nativePointerIntent;
     nativePointerIntent = window.NemoSelectCanvasIntent.create({
+      hover: function (e) { if (window.NemoNativeSelectOverlay) window.NemoNativeSelectOverlay.hoverAt(window, e); }, gesture: window.NemoNativeSelectGesture && window.NemoNativeSelectGesture.bind(window), // #2372: marquee, move, scale, rotate
       context: function () {
         var c = window.NemoNativeOpacityCutover;
         if (!c || c.blocksLegacy() !== true) throw new Error('Native canvas authority unavailable');
@@ -490,8 +491,8 @@
       probe: function (e) {
         var c = window.NemoNativeOpacityCutover, prepared = c.prepared();
         var ld = state.layers[state.activeLayerIdx], layer = userLayers[state.activeLayerIdx];
-        if (!prepared || !ld || !layer || prepared.layerUid !== ld.layerUid)
-          return Object.freeze({ mode: 'unavailable' });
+        if (window.NemoSelectCanvasIntent.objectProject(window)) return Object.freeze(state.tool === 'select' && ld ? { mode: 'pick', x: e.clientX, y: e.clientY } : { mode: 'unavailable' }); // #2362: no Paper items
+        if (!prepared || !ld || !layer || prepared.layerUid !== ld.layerUid) return Object.freeze({ mode: 'unavailable' });
         var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY), pt = new Point(w[0], w[1]);
         if (state.appMode === 'motion') {
           var motion = window.SMMotion.probeCanvasIntent({ point: pt, altKey: e.altKey });
@@ -507,12 +508,11 @@
       },
       select: function (intent, shift) {
         if (intent.mode === 'unavailable') return;
+        if (intent.mode === 'pick') { var I = window.NemoSelectCanvasIntent; return void I.resolvePick(window, I, intent, shift, I.pickContext(window), false); }
         var c = window.NemoNativeOpacityCutover, prepared = c.prepared(), identity = c.identity();
         var ld = state.layers[state.activeLayerIdx], layer = userLayers[state.activeLayerIdx];
         if (!prepared || !identity || !ld || !layer || prepared.layerUid !== ld.layerUid) return;
-        var item = intent.mode === 'select' && layer.children.find(function (p) {
-          return p.data && p.data.strokeId === intent.strokeId;
-        });
+        var item = intent.mode === 'select' && layer.children.find(function (p) { return p.data && p.data.strokeId === intent.strokeId; });
         if (intent.mode === 'select' && (!item || intent.layerUid !== ld.layerUid)) return;
         var projected = c.projectSelection({ activeLayerUid: item ? ld.layerUid : null,
           selected: item ? [{ layerUid: ld.layerUid, opacityMode: prepared.opacityMode }] : [] }, state.currentFrame);
@@ -545,6 +545,7 @@
     try {
       var c = window.NemoNativeOpacityCutover;
       if (c && typeof c.blocksLegacy === 'function' && c.blocksLegacy() === false) return false;
+      if (state.tool === 'subselect') return true; // Direct Select owns its native controller (subselect-bridge, document capture): never consume its gesture
       nativePointer()[method](e);
     } catch (_) { e.stopImmediatePropagation(); e.preventDefault(); }
     return true;
@@ -3248,18 +3249,14 @@
         items.push({ label: 'Animer le texte…', action: function () { window.SMTextAnimator.openPanel(state.activeLayerIdx, animGid); } });
       }
     }
-    // Component exposed properties (2026-08-18, "réutilisation dynamique de
-    // component... modifier des properties au dessus" — Figma Component
-    // Properties + AE Master Properties synthesis, confirmed with Cyril).
-    // Only makes sense while EDITING INSIDE a symbol (state.activeSymbolId —
-    // enterSymbol/enterComponentLayer set it, exitToScene clears it) on a
-    // single shape with a real strokeId (multi-select or a not-yet-tagged
-    // item has nothing stable to bind to). v1 scope: opacity (number) and
-    // visibility (boolean, stored 0/100 like every other Motion scalar) —
-    // color is a natural v2 (needs its own swatch row; these two reuse the
-    // fully generic Transform row renderer with zero new UI code, see
-    // propsFor's own comment, motion.js).
-    if (state.activeSymbolId && selectedPaths.length === 1 && p0.data && p0.data.strokeId && window.SM && window.SM.exposeSymbolProperty) {
+    // Component exposed properties (2026-08-18; Figma Component Properties + AE Master Properties): only while EDITING INSIDE a symbol
+    // (state.activeSymbolId) on a single shape with a real strokeId. v1: opacity (number) and visibility (boolean, 0/100); color is v2.
+    // #2256: on a native object project the same entries are the native expose command (native-component-expose-ui.js), never the legacy writer.
+    var nativeExpose = window.NemoNativeComponentExposeUI ? window.NemoNativeComponentExposeUI.menuItems(window, selectedPaths) : null;
+    if (nativeExpose) {
+      if (nativeExpose.length) items.push({ sep: true });
+      nativeExpose.forEach(function (entry) { items.push(entry); });
+    } else if (state.activeSymbolId && selectedPaths.length === 1 && p0.data && p0.data.strokeId && window.SM && window.SM.exposeSymbolProperty) {
       items.push({ sep: true });
       items.push({
         label: 'Exposer l\'opacité comme propriété de Component…', action: function () {
@@ -3564,8 +3561,7 @@
   window.SMSelectBridge = {
     refreshAfterDocumentRestore: function () {
       if (nativePointerIntent) nativePointerIntent.cancel();
-      // Undo/redo rebuilds every Paper item. Any gesture-local object
-      // reference therefore points at removed geometry after the restore.
+      // Undo/redo rebuilds every Paper item: gesture-local object references point at removed geometry after the restore.
       mode = null;
       draggingArc = null;
       arcDragCache = null;
@@ -3620,7 +3616,7 @@
     target.addEventListener('pointercancel', function (e) { if (!nativePointerEvent('cancelEvent', e)) onUp(e); }, { capture: true });
     target.addEventListener('lostpointercapture', function (e) { nativePointerEvent('cancelEvent', e); }, { capture: true });
     window.addEventListener('blur', function () { if (nativePointerIntent) nativePointerIntent.cancel(); });
-    target.addEventListener('contextmenu', function (e) { if (!nativePointerEvent('cancelEvent', e)) onContext(e); }, { capture: true });
+    target.addEventListener('contextmenu', function (e) { if (!nativePointerEvent('cancelEvent', e)) { onContext(e); return; } if (shouldIntercept() && window.NemoNativeSelectMenu) window.NemoNativeSelectMenu.open(window, e); /* #2372: a native project's Select menu */ }, { capture: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

@@ -13,12 +13,24 @@
 //! no-op keeps presence, serialized bytes, history depth and the redo stack. No
 //! history, receipt or clock lives here: ids derive from the revision, keys and
 //! seeds come from the caller, and the one history entry from `NativeObjectHistory`.
+use crate::commands::object_fill_owner::component_owner::object_component_break_apart::{
+    plan_break_apart, precheck,
+};
 use crate::commands::object_fill_owner::component_owner::object_component_convert::plan_convert;
+use crate::commands::object_fill_owner::component_owner::object_component_state_edit::{
+    parse as parse_state_edit, plan_state_edit,
+};
 use crate::commands::object_fill_owner::component_owner::object_component_convert_support::{
     SetupError, SetupPlan,
 };
+use crate::commands::object_fill_owner::component_owner::object_component_instance_set::{
+    plan_instance_set, InstanceEdit,
+};
 use crate::commands::object_fill_owner::component_owner::object_component_place::{
     plan_expose, plan_place, ExposeEntry,
+};
+use crate::commands::object_fill_owner::component_owner::object_duplicator_config::{
+    plan_duplicator_config, ConfigEdit, EffectorMove, StaggerEdit, TimeEdit,
 };
 use crate::commands::object_fill_owner::component_owner::object_duplicator_convert::{
     plan_duplicator_path, plan_duplicator_set, plan_object_duplicator,
@@ -26,15 +38,17 @@ use crate::commands::object_fill_owner::component_owner::object_duplicator_conve
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
 use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::LifecycleError;
-use crate::object_document::ObjectDocument;
+use crate::object_document::{ObjectDocument, Presence};
+use serde_json::Number;
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 
 #[path = "object_component_convert_wire.rs"]
 mod wire;
 use wire::{
-    id_ok, ids_ok, seed_of, ConvertPayload, DuplicatorObjectsPayload, DuplicatorPathPayload,
-    DuplicatorSetPayload, ExposePayload, PlacePayload, MAX_PAYLOAD_BYTES,
+    id_ok, BreakApartPayload, ids_ok, seed_of, ConvertPayload, DuplicatorConfigPayload, DuplicatorObjectsPayload,
+    DuplicatorPathPayload, DuplicatorSetPayload, ExposePayload, InstanceSetPayload, PlacePayload,
+    MAX_PAYLOAD_BYTES,
 };
 
 /// Which setup a payload asks for.
@@ -46,6 +60,10 @@ pub(crate) enum SetupKind {
     DuplicatorSet,
     DuplicatorObjects,
     DuplicatorPath,
+    DuplicatorConfig,
+    InstanceSet,
+    BreakApart,
+    StateEdit,
 }
 
 /// A typed refusal: the receipt vocabulary code, a fixed message and, when a
@@ -81,6 +99,12 @@ fn refusal_of(error: SetupError) -> SetupRefusal {
         SetupError::PathChained(_) => (InvalidRequest, "The path layer is a duplicator."),
         SetupError::PathUnknown(_) => (InvalidRequest, "The path layer is absent."),
         SetupError::SeedRange => (InvalidRequest, "Seed must be an integer in 0..999999."),
+        SetupError::ConfigInvalid => (InvalidRequest, "A duplicator setting is not valid."),
+        SetupError::NotAnInstance(_) => (NotFound, "Layer is not a component instance."),
+        SetupError::BreakApartUnavailable(why) => (Unavailable, *why),
+        SetupError::StateEditInvalid(why) => (InvalidRequest, *why),
+        SetupError::StateTargetMissing(why) => (NotFound, *why),
+        SetupError::PlaybackInvalid => (InvalidRequest, "A component playback setting is not valid."),
         SetupError::V1Document => (Unavailable, "A v1 document cannot hold components."),
         SetupError::NestedContext(_) => (Unavailable, "Close the component first."),
         SetupError::HoldersUnavailable { .. } => (
@@ -94,7 +118,7 @@ fn refusal_of(error: SetupError) -> SetupRefusal {
         SetupError::ObjectScope { .. } => (Unavailable, "Only authored frames can be converted."),
         SetupError::ItemsUnavailable { .. } => (
             Unavailable,
-            "component-convert-items: raster and text items cannot enter a component yet.",
+            "component-convert-items: animated text, brush and mesh-bound items cannot enter a component yet.",
         ),
         SetupError::RevisionOutOfRange | SetupError::IdUnavailable | SetupError::TooMany => {
             (Unavailable, "No identity is available for the new record.")
@@ -159,6 +183,84 @@ fn parse<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, SetupRefusal
             DispatchErrorCode::InvalidRequest,
             "Component setup payload is invalid.",
         )
+    })
+}
+
+fn number_of(value: &Presence<Number>) -> Result<Option<f64>, ()> {
+    match value {
+        Presence::Missing => Ok(None),
+        Presence::Present(n) => n.as_f64().filter(|v| v.is_finite()).map(Some).ok_or(()),
+    }
+}
+fn flag_of(value: &Presence<bool>) -> Option<bool> {
+    value.value().copied()
+}
+/// The request's named members as an edit; `None` when a number is not a finite JSON number.
+fn config_edit(payload: &DuplicatorConfigPayload) -> Option<ConfigEdit> {
+    let seed = match payload.seed.value() {
+        None => None,
+        Some(n) => Some(n.as_u64()?),
+    };
+    let stagger = payload.stagger_random.value().map(|s| StaggerEdit {
+        position: flag_of(&s.position),
+        rotation: flag_of(&s.rotation),
+        scale: flag_of(&s.scale),
+        opacity: flag_of(&s.opacity),
+        hue: flag_of(&s.hue),
+    });
+    let time = match payload.time_offset.value() {
+        None => None,
+        Some(t) => Some(TimeEdit {
+            enabled: flag_of(&t.enabled),
+            offset_frames: number_of(&t.offset_frames).ok()?,
+            direction: t.direction.value().cloned(),
+        }),
+    };
+    let effector_pos = match payload.effector_pos.value() {
+        None => None,
+        Some(e) => Some(EffectorMove {
+            index: e.index.as_u64().and_then(|v| u32::try_from(v).ok())?,
+            x: e.x.as_f64().filter(|v| v.is_finite())?,
+            y: e.y.as_f64().filter(|v| v.is_finite())?,
+        }),
+    };
+    Some(ConfigEdit {
+        mode: payload.mode.value().cloned(),
+        rows: number_of(&payload.rows).ok()?,
+        cols: number_of(&payload.cols).ok()?,
+        spacing_x: number_of(&payload.spacing_x).ok()?,
+        spacing_y: number_of(&payload.spacing_y).ok()?,
+        count: number_of(&payload.count).ok()?,
+        radius: number_of(&payload.radius).ok()?,
+        start_angle: number_of(&payload.start_angle).ok()?,
+        radial_orient: flag_of(&payload.radial_orient),
+        path_align_tangent: flag_of(&payload.path_align_tangent),
+        seed,
+        stagger_random: stagger,
+        time_offset: time,
+        effector_pos,
+    })
+}
+
+/// A native `u32` member of the request; `None` for a negative, fractional or oversized number.
+fn u32_of(value: &Presence<Number>) -> Result<Option<u32>, ()> {
+    match value {
+        Presence::Missing => Ok(None),
+        Presence::Present(n) => n.as_u64().and_then(|v| u32::try_from(v).ok()).map(Some).ok_or(()),
+    }
+}
+/// The request's named members as an edit; `None` when a number is not of its closed kind.
+fn instance_edit(payload: &InstanceSetPayload) -> Option<InstanceEdit> {
+    let placed_at = match payload.placed_at.value() {
+        None => None,
+        Some(n) => Some(i32::try_from(n.as_i64()?).ok()?),
+    };
+    Some(InstanceEdit {
+        mode: payload.mode.value().cloned(),
+        single_frame: u32_of(&payload.single_frame).ok()?,
+        placed_at,
+        speed: number_of(&payload.speed).ok()?,
+        at_frame: u32_of(&payload.at_frame).ok()?,
     })
 }
 
@@ -249,6 +351,47 @@ impl ObjectFillOwner {
                     &payload.layer_uid,
                     payload.path_layer_uid.as_deref(),
                 )
+            }
+            SetupKind::InstanceSet => {
+                let payload: InstanceSetPayload = parse(bytes)?;
+                if payload.command != "object.component.instance.set" || !id_ok(&payload.layer_uid) {
+                    return Err(malformed());
+                }
+                let edit = instance_edit(&payload).ok_or_else(malformed)?;
+                plan_instance_set(document, &payload.layer_uid, &edit)
+            }
+            SetupKind::BreakApart => {
+                let payload: BreakApartPayload = parse(bytes)?;
+                if payload.command != "object.component.breakApart" || !id_ok(&payload.layer_uid) {
+                    return Err(malformed());
+                }
+                if payload.context_id != SCENE_CONTEXT {
+                    return Err(refusal_of(SetupError::NestedContext(payload.context_id)));
+                }
+                precheck(document, &payload.layer_uid).map_err(refusal_of)?;
+                // The evaluation of every frame is the one component join; a build without it cannot bake.
+                #[cfg(feature = "evaluation")]
+                let baked = origin
+                    .bake_component_instance(&payload.layer_uid)
+                    .map_err(|why| refusal_of(SetupError::BreakApartUnavailable(why.0)))?;
+                #[cfg(not(feature = "evaluation"))]
+                let baked: Vec<(u32, Vec<crate::object_document::object_component_record_kernels::object_component_records::Baked>)> =
+                    return Err(refusal_of(SetupError::BreakApartUnavailable(
+                        "component-break-apart: this build cannot evaluate components.",
+                    )));
+                plan_break_apart(document, &payload.layer_uid, &baked)
+            }
+            SetupKind::StateEdit => {
+                let (symbol_id, edit) = parse_state_edit(bytes).ok_or_else(malformed)?;
+                plan_state_edit(document, &symbol_id, &edit)
+            }
+            SetupKind::DuplicatorConfig => {
+                let payload: DuplicatorConfigPayload = parse(bytes)?;
+                if payload.command != "object.duplicator.config" || !id_ok(&payload.layer_uid) {
+                    return Err(malformed());
+                }
+                let edit = config_edit(&payload).ok_or_else(malformed)?;
+                plan_duplicator_config(document, &payload.layer_uid, &edit)
             }
         }
         .map_err(refusal_of)?;

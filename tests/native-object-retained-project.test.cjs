@@ -116,7 +116,7 @@ function host(){
     previewHold={entered:deferred(),release:deferred()};return previewHold;}};
 }
 function fixture(afterCapture){
-  const h=host(),list=new Element('div'),add=new Element('button'),notices=[],renders=[];
+  const h=host(),list=new Element('div'),add=new Element('button'),notices=[],renders=[],surfaces=[],covers=[];
   const document={getElementById:id=>id==='project-tabs-list'?list:id==='project-tab-add'?add:null,
     createElement:tag=>new Element(tag),querySelector:()=>null};
   const root={document,SM:{t:value=>value},state:{activeSymbolId:null,currentFrame:0,totalFrames:8,layers:[],activeLayerIdx:0},
@@ -131,7 +131,8 @@ function fixture(afterCapture){
   let files,tabs,lastAction,nextPath='/saved.json',tabSerial=0;
   const session=Project.create({invoke:h.invoke,frame:()=>root.state.currentFrame,
     mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),
-    changed:info=>{if(Files.hasProjection(root))Files.refreshLayerTable(root,info);}});
+    changed:info=>{if(Files.hasProjection(root))Files.refreshLayerTable(root,info);},
+    surfaceChanged:presentation=>surfaces.push(presentation?'set':null)});
   root.NemoNativeObjectProject={desktop:()=>session};
   function render(){
     if(!files)return;
@@ -141,7 +142,8 @@ function fixture(afterCapture){
     renders.push(list.children.map(el=>({id:el.dataset.tab,dirty:el.className.includes('dirty'),active:el.attributes['aria-selected']})));
   }
   function commit(path,name){current.path=path;current.name=name;const t=current.tabs.find(t=>t.id===current.activeTabId);t.path=path;t.name=name;}
-  files=Files.create(session,{readUI:()=>({handle:current.activeTabId,generation:1}),reveal:async(info,view)=>Files.projectView(root,info,view),
+  files=Files.create(session,{readUI:()=>({handle:current.activeTabId,generation:1}),
+    occlude:()=>{covers.push('occlude');},restore:()=>{covers.push('restore');},reveal:async(info,view)=>Files.projectView(root,info,view),
     opened:path=>{commit(path,root.SMProjectDocument.baseName(path));return true;},
     created:name=>{commit(null,name);return true;},
     commit:(path)=>{commit(path,root.SMProjectDocument.baseName(path));return true;},
@@ -151,7 +153,7 @@ function fixture(afterCapture){
     notice:text=>notices.push(text),render,
     activateTab:(id,path,name)=>{current.activeTabId=id;commit(path,name);}});
   async function click(id){const element=list.children.find(el=>el.dataset.tab===id);assert.ok(element);element.dispatch('click');return lastAction;}
-  return {h,session,files,tabs,root,current,list,notices,renders,click,pick:value=>{nextPath=value;},
+  return {h,session,files,tabs,root,current,list,notices,renders,surfaces,covers,click,pick:value=>{nextPath=value;},
     async open(){assert.equal(await files.openPath('/A.json'),true);render();},
     async prepare(){assert.equal((await tabs.openPath('/B.json')).status,'prepared');return current.tabs.find(t=>t.nativeInactiveProject);},
     async edit(){await session.reference({kind:'attach',id:'reference',sourcePath:'/image.png'});},
@@ -289,3 +291,35 @@ for(const mode of ['outgoing-digest','outgoing-token','outgoing-wrapper-token','
     assert.equal((await f.tabs.reconcile()).status,'indeterminate');
   });
 }
+
+test('#2381: switching tabs never covers the UI with the start screen and never blanks the surface before the next presentation',async()=>{
+  const f=fixture();await f.open();const b=await f.prepare();
+  assert.deepEqual(f.covers,['occlude'],'Open covers the previous project once');
+  const open=f.surfaces.length;
+  assert.equal((await f.click(b.id)).status,'activated');
+  assert.deepEqual(f.covers,['occlude'],'a tab switch neither occludes nor restores');
+  const during=f.surfaces.slice(open);
+  assert.ok(during.length>0&&during.every(v=>v==='set'),'the surface is replaced by the next presentation, never cleared: '+JSON.stringify(during));
+  assert.equal((await f.click('tab-A')).status,'activated');
+  assert.ok(f.surfaces.slice(open).every(v=>v==='set'));
+  assert.deepEqual(f.covers,['occlude']);
+});
+
+test('#2381: a refused tab switch keeps the current surface and never needs a restore',async()=>{
+  const f=fixture();await f.open();const b=await f.prepare();f.h.setMode('refuse-before');
+  const open=f.surfaces.length;
+  assert.equal((await f.click(b.id)).status,'refused');
+  assert.deepEqual(f.covers,['occlude']);assert.equal(f.current.activeTabId,'tab-A');
+  assert.ok(f.surfaces.slice(open).every(v=>v==='set'),'no blank frame on a refusal either');
+});
+
+test('#2381: in-place Save asks the host to replace; Save As and the picker never do',async()=>{
+  const f=fixture();await f.open();
+  assert.equal((await f.files.saveAs('/A.json',{replace:true})).acknowledged,true);
+  f.pick('/A-copy.json');assert.equal((await f.files.saveAs()).acknowledged,true);
+  assert.equal((await f.files.saveAs('/A-app.json')).acknowledged,true);
+  assert.equal((await f.files.saveAs(undefined,{replace:true})).acknowledged,true);
+  assert.deepEqual(f.h.copies.map(r=>[r.destinationPath,r.replace]),[
+    ['/A.json',true],['/A-copy.json',undefined],['/A-app.json',undefined],['/A-copy.json',undefined]]);
+  assert.equal(Object.prototype.hasOwnProperty.call(f.h.copies[1],'replace'),false);
+});

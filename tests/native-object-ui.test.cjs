@@ -92,6 +92,32 @@ test('unadmitted inspector values are hidden explicitly, with original nodes/vis
   assert.equal(Project.paintUI(root),false);assert.equal(panel.children.length,3);assert.equal(panel.children[0],width);
   assert.equal(width.hidden,false);assert.equal(hiddenSection.hidden,true);assert.equal(panel.children[2],foreign);
 });
+test('the ruler playhead and its flag follow the native frame on full and frame-only renders (#2371)',()=>{
+  const root=view(),head=element(),flag=element();root.document.nodes.set('playhead',head);root.document.nodes.set('playhead-flag',flag);
+  root.playheadLeftPx=frame=>frame*30;root.state.currentFrame=2;UI.render(root,metadata(),false,fixturePorts(root));
+  assert.deepEqual([head.style.left,flag.textContent],['60px',3]);
+  root.state.currentFrame=1;UI.render(root,metadata(),true,fixturePorts(root));assert.deepEqual([head.style.left,flag.textContent],['30px',2]);
+});
+test('the ruler strip mount is told when a render is frame-only AND reused its rows, never otherwise (#2371)',()=>{
+  const root=view(),seen=[];root.NemoNativeFrameCellSelection={mount(win,caption,info,ports){seen.push(ports.frameOnly);return true;},retire(){}};
+  const ports=fixturePorts(root);root.state.currentFrame=1;UI.render(root,metadata(),true,ports);   // first paint: nothing to reuse yet
+  root.state.currentFrame=2;UI.render(root,metadata(),true,ports);                                   // playback tick
+  root.state.currentFrame=3;UI.render(root,metadata(),false,ports);                                  // full render
+  root.state.currentFrame=4;root._layerSel=[0,1];UI.render(root,metadata(),true,ports);                // selection changed under a frame-only caller
+  assert.deepEqual(seen,[false,true,false,false]);
+});
+test('the Swatches section stays shown beside the native inspector only when the native palette controller renders it (#2378)',()=>{
+  for(const palette of [true,false]){const root=view(),panel=element(),swatches=element(),other=element();swatches.id='swatches-sec';panel.appendChild(swatches);panel.appendChild(other);
+    if(palette)root.NemoNativePaletteController={};root.document.nodes.set('props-panel',panel);UI.render(root,metadata(),false,fixturePorts(root));
+    assert.equal(swatches.hidden===true,!palette,'swatches');assert.equal(other.hidden,true,'other sections stay hidden');
+    assert.equal(root._lastPropsShow['swatches-sec'],palette,'and it gets a collapsed-rail entry');}
+});
+test('the native inspector hosts the Elements panel on every paint, frame-only included, and retires it with the inspector (#2376)',()=>{
+  const root=view(),panel=element(),calls=[];root.document.nodes.set('props-panel',panel);
+  root.NemoNativeShapeTree={mount(win,container,frameOnly){calls.push(['mount',win===root,container.id,frameOnly]);},retire(win){calls.push(['retire',win===root]);}};
+  UI.render(root,metadata(),false,fixturePorts(root));UI.render(root,metadata(),true,fixturePorts(root));UI.restoreInspector(root);
+  assert.deepEqual(calls,[['mount',true,'native-object-inspector',false],['mount',true,'native-object-inspector',true],['retire',true]],'mounted into the native inspector section, told when only the frame moved, retired on restore');
+});
 test('native inspector reuses actual bound Reference nodes, preserves collapsed layout and restores original parents/styles',async()=>{
   const root=view(),doc=root.document;
   function add(id,parent){const n=element();n.id=id;n.hidden=false;doc.nodes.set(id,n);if(parent)parent.appendChild(n);return n;}
@@ -303,7 +329,11 @@ for(const fault of ['sdk-missing','visibility-refused'])test('eye '+fault+' is a
   if(fault==='sdk-missing')delete h.root.NemoNativeApplicationAdapter;else h.fault(fault);
   assert.equal(await eye(h.root,0).click(),false);assert.equal(h.meta().layers[0].visible,true);assert.equal(h.root.state.layers[0].visible,true);
   assert.equal(h.meta().undoDepth,0);assert.equal(eye(h.root,0).textContent,'Hide');
-  const sent=h.calls.slice(before);assert.equal(sent.filter(c=>c.command==='nemo_native_dispatch').length,fault==='sdk-missing'?0:1);
+  const sent=h.calls.slice(before),publicCalls=sent.filter(c=>c.command==='nemo_native_dispatch');
+  // T11's real read provider refreshes timing after the refused command's preview.
+  assert.deepEqual(publicCalls.map(c=>c.request.operation),fault==='sdk-missing'?[]:
+    ['command.document.object.layer.visibility.set','query.document.object.layer.timing']);
+  assert.equal(publicCalls.filter(c=>c.request.operation.startsWith('command.')).length,fault==='sdk-missing'?0:1);
   assert.equal(sent.filter(c=>c.command==='nemo_native_object_dispatch').length,0);
   assert.ok(h.log.includes('toast:Native layer visibility was not confirmed.'));
 });
@@ -345,7 +375,7 @@ test('production composition reuses frozen callback identities and resolves sess
   h.root.NemoNativeObjectUI={...UI,render(root,info,frameOnly,ports){bindings.push(ports);return render(root,info,frameOnly,ports);}};
   await h.open();const first=bindings[0],old=first.currentSession().info(),button=eye(h.root,0);
   h.root.updateUI(true);assert.equal(eye(h.root,0),button);assert.equal(Object.isFrozen(first),true);
-  assert.deepEqual(Object.keys(first).sort(),['bindPolicyEntries','clearDrawingSelection','currentSession','disposePolicyEntries','editProperty','editPropertyTrack','fontResources','layerPolicy','projectSettings','projectionReady','readProperty','readPropertyMetadata','readShyMode','readTransportGeneration','repaint','selectLayer','setShyMode']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
+  assert.deepEqual(Object.keys(first).sort(),['bindPolicyEntries','clearDrawingSelection','currentSession','disposePolicyEntries','editProperty','editPropertyBatch','editPropertyKeysPaste','editPropertyTrack','fontResources','layerPolicy','projectSettings','projectionReady','readProperty','readPropertyMetadata','readShyMode','readTransportGeneration','repaint','selectLayer','setShyMode']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
   assert.equal(first.fontResources(),null);
   const fontCalls=[],assetId=' opaque font / 雪 ',source={kind:'google',family:'Poppins',weight:700,italic:false},signal={aborted:false};
   h.root.SMVectorText={listNativeFontAssets:async()=>{fontCalls.push(['list']);return [{assetId}];},

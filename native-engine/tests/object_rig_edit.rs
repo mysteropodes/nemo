@@ -390,7 +390,10 @@ fn removals_are_reference_checked_and_reversible() {
 }
 
 #[test]
-fn a_mesh_bind_is_a_typed_unavailable_and_publishes_nothing() {
+fn a_mesh_bind_of_a_mesh_no_raster_carries_is_not_found_and_publishes_nothing() {
+    // The refusal used to be a typed `unavailable` for every mesh bind (the raster record did not exist);
+    // the executed mesh rows live in `object_rig_edit_meshes.rs`. A document without any raster or mesh
+    // store has nothing to bind, and says so with `not_found`, never by guessing a placement.
     let row = oracle::act("move_an_anchor");
     let mut owner = owner_for(&row);
     let initial = state(&owner);
@@ -400,7 +403,7 @@ fn a_mesh_bind_is_a_typed_unavailable_and_publishes_nothing() {
         payload(json!({"kind":"bindMesh","meshId":"im_1"})),
     );
     assert_eq!(reply["ok"], false);
-    assert_eq!(code(&reply), "unavailable");
+    assert_eq!(code(&reply), "not_found");
     assert_eq!(state(&owner), initial);
 }
 

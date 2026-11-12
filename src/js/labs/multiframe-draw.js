@@ -14,9 +14,27 @@
 // add). All inside the committing gesture's own undo snapshot: one Cmd+Z
 // reverts every stamped frame at once.
 (function () {
+  // Native authority (U34, #2362): the native Draw commit asks for the other selected frames of the drawn layer and
+  // stamps them in its own single batch (native-object-shape-tool.js), each held one keyed with what it showed before
+  // the gesture; this prototype only names the frames and reports the count.
+  window.SMLabs.multiframeTargets = function (frame) {
+    if (!window.SMLabs.isOn('multiframe-draw') || typeof _sel === 'undefined' || !_sel.frames || !_sel.frames.length) return [];
+    var seen = {}, out = [];
+    _sel.frames.forEach(function (s) {
+      var f = s && s.frame;
+      if (!Number.isInteger(f) || f < 0 || f >= state.totalFrames || f === frame || seen[f]) return;
+      seen[f] = true;
+      out.push(f);
+    });
+    return out;
+  };
+  window.SMLabs.multiframeStamped = function (stamped) {
+    if (stamped && typeof showToast === 'function') showToast(SM.t('labsToastMultiframePrefix') + stamped + SM.t('labsToastMultiframeSuffix'));
+  };
   window.SMLabs.register('multiframe-draw', {
     flag: 'nemo-labs-multiframe',
     describe: 'labsDescribeMultiframeDraw',
+    nativeDraw: true,
     onStroke: function (path) {
       if (typeof _sel === 'undefined' || !_sel.frames || !_sel.frames.length) return;
       if (typeof serP !== 'function' || typeof getEffectiveStrokes !== 'function') return;

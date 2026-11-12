@@ -30,22 +30,22 @@ async function fixture(options={}){
  if(options.readonly)delete ui.editPropertyTrack;
  const ordinary=Binding.createOrdinary(root,{readContextId:()=>target.contextId,acceptsTarget:()=>true,keyTimelineChanged:reason=>events.push(reason)});
  let latest=null,notifications=0;ordinary.setKeyTimelineListener(()=>{notifications++;latest=ordinary.readKeyTimeline();});
- assert.equal(ordinary.paint(ui,container,header),true);
+ assert.ok(ordinary.render(container,{ports:ui,header,isCurrent:()=>true}));
  async function settle(){for(let i=0;i<8;i++)await tick();}
- await settle();const keyButton=tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Keys');assert.ok(keyButton);
+ await settle();const keyButton=tree(container).find(n=>/\bmotion-stopwatch\b/.test(n.className||''));assert.ok(keyButton);
  return {root,doc,container,ordinary,events,calls,writes,session,target,settle,get latest(){return latest;},get notifications(){return notifications;},
-  async open(){await keyButton.fire('click');await settle();},checks:()=>tree(container).filter(n=>n.type==='checkbox'),
+  async open(){await keyButton.fire('click',{altKey:true});await settle();},checks:()=>tree(container).filter(n=>n.type==='checkbox'),
   ready(v){ready=v;},replace(){info={...info,lifecycleGeneration:2};},retire(){ordinary.dispose();}};
 }
 
 test('actual ordinary property timeline publishes read and shared inspector selections without writer or legacy authority',async()=>{
  const h=await fixture();assert.equal(h.ordinary.readKeyTimeline(),null);await h.open();
  const projection=h.ordinary.readKeyTimeline();assert.ok(projection);assert.strictEqual(h.latest.property,'opacity');assert.deepEqual(copy(projection.target),h.target);
- assert.deepEqual(copy(projection.items),[{frame:-0.5,selected:false},{frame:4.25,selected:false},{frame:12,selected:false}]);
+ assert.deepEqual(copy(projection.items),[{frame:-0.5,selected:false,v:[1]},{frame:4.25,selected:false,v:[2]},{frame:12,selected:false,v:[3]}]);
  const before=h.notifications;assert.equal(projection.selectFrames([4.25]),true);assert.ok(h.notifications>before);assert.equal(projection.isCurrent(),false);
  assert.deepEqual(h.checks().map(n=>n.checked),[false,true,false]);assert.deepEqual(copy(h.ordinary.captureSelectedKeys()).keys,[{target:{kind:'property',target:h.target,property:'opacity'},frame:4.25}]);
  const current=h.ordinary.readKeyTimeline();h.checks()[0].checked=true;await h.checks()[0].fire('change');
- assert.equal(current.isCurrent(),false);assert.deepEqual(copy(h.latest.items),[{frame:-0.5,selected:true},{frame:4.25,selected:true},{frame:12,selected:false}]);
+ assert.equal(current.isCurrent(),false);assert.deepEqual(copy(h.latest.items),[{frame:-0.5,selected:true,v:[1]},{frame:4.25,selected:true,v:[2]},{frame:12,selected:false,v:[3]}]);
  assert.equal(h.writes.length,0);h.retire();assert.equal(h.ordinary.readKeyTimeline(),null);assert.ok(h.events.includes('dispose'));
 });
 
@@ -57,11 +57,12 @@ test('ordinary projection fences pending frame lifecycle and detached inspector 
  }
 });
 
-test('real ordinary full read retains35 keys while a33-key rectangle selection refuses atomically',async()=>{
+test('real ordinary full read retains 35 keys and a 33-key rectangle selection is accepted (baseline has no key limit)',async()=>{
  const h=await fixture({keys:Array.from({length:35},(_,i)=>({frame:i+0.25,v:[i]}))});await h.open();const view=h.ordinary.readKeyTimeline();
  assert.equal(view.items.length,35);assert.equal(view.selectFrames([0.25]),true);const current=h.ordinary.readKeyTimeline();
- assert.equal(current.selectFrames(Array.from({length:33},(_,i)=>i+0.25)),false);
- assert.equal(current.isCurrent(),true);assert.equal(h.checks().filter(n=>n.checked).length,1);assert.equal(h.writes.length,0);h.retire();
+ assert.equal(current.selectFrames(Array.from({length:33},(_,i)=>i+0.25)),true);
+ assert.equal(h.checks().filter(n=>n.checked).length,33);assert.equal(h.writes.length,0);
+ assert.equal(h.ordinary.readKeyTimeline().selectFrames(Array.from({length:4097},(_,i)=>i+0.25)),false,'only a runaway selection is refused');h.retire();
  const readonly=await fixture({readonly:true});await readonly.open();const shown=readonly.ordinary.readKeyTimeline();assert.ok(shown);assert.equal(shown.selectFrames([4.25]),false);assert.equal(readonly.checks().filter(n=>n.checked).length,0);readonly.retire();
 });
 
@@ -90,19 +91,22 @@ async function multiFixture(options={}){
   async editPropertyTrack(payload){writes.push(copy(payload));throw Error('Selection must not write native state');}};
  if(options.readonly)delete ui.editPropertyTrack;
  const ordinary=Binding.createOrdinary(root,{readContextId:()=>layer.contextId,readTargetSelection:()=>({primary:layer,selected:targets}),acceptsTarget:()=>true,keyTimelineChanged:reason=>events.push(reason)});
- let notices=0;ordinary.setKeyTimelineListener(()=>{notices++;ordinary.readKeyTimelines();});assert.equal(ordinary.paint(ui,container,header),true);
+ let notices=0;ordinary.setKeyTimelineListener(()=>{notices++;ordinary.readKeyTimelines();});assert.ok(ordinary.render(container,{ports:ui,header,isCurrent:()=>true}));
  async function settle(){for(let i=0;i<8;i++)await tick();}await settle();
- function row(target,property){return tree(container).find(n=>n.className==='native-motion-property-row'&&n.dataset.property===property&&n.dataset.targetKey===JSON.stringify([target.contextId,target.layerUid,target.strokeId===undefined?null:target.strokeId]));}
+ function row(target,property){return tree(container).find(n=>n.className==='lrow motion-prop-row'&&n.dataset.property===property&&n.dataset.targetKey===JSON.stringify([target.contextId,target.layerUid,target.strokeId===undefined?null:target.strokeId]));}
  return {doc,root,container,ordinary,layer,element,targets,writes,events,reads,settle,get notices(){return notices;},
-  open(target=layer,property='opacity'){const line=row(target,property);assert.ok(line);return tree(line).find(n=>n.tagName==='BUTTON'&&n.textContent==='Keys').fire('click');},
-  inspectors:()=>tree(container).filter(n=>n.className==='native-motion-property-keys'&&!n.hidden),
+  open(target=layer,property='opacity'){const line=row(target,property);assert.ok(line);return tree(line).find(n=>/\bmotion-stopwatch\b/.test(n.className||'')).fire('click',{altKey:true});},
+  // Rows follow the baseline propsFor order (position before opacity) but these assertions index drawers as
+  // layer opacity, layer position, element opacity, so rank them explicitly instead of by DOM order.
+  inspectors:()=>{const rank=n=>{const t=tree(n).map(x=>x._text).find(x=>/ · /.test(x||''))||'';return (/element:/.test(t)?2:0)+(/^position/.test(t)?1:0);};
+   return tree(container).filter(n=>n.className==='native-motion-property-keys'&&!n.hidden).map((n,i)=>[n,i]).sort((x,y)=>rank(x[0])-rank(y[0])||x[1]-y[1]).map(x=>x[0]);},
   checks(index){return tree(this.inspectors()[index]).filter(n=>n.type==='checkbox');},
   hold(property){let resolve;const promise=new Promise(r=>resolve=r);held={property,promise,resolve};return ()=>{const wait=held;held=null;wait.resolve();};},
   ownAction(){const origin=session.readPresentedObjectSession();assert.ok(origin);pending=true;let running=true;
    return {lease:Object.freeze({readPresentedObjectSession:()=>running&&pending&&ready?origin:null}),retire(){running=false;pending=false;}};},
   publicPresentation:()=>session.readPresentedObjectSession(),
   ready(value){ready=value;},replace(){info={...info,lifecycleGeneration:info.lifecycleGeneration+1};},
-  refresh(){ordinary.retire();assert.equal(ordinary.paint(ui,container,header),true);return settle();},retire(){ordinary.dispose();}};
+  refresh(){ordinary.retire();assert.ok(ordinary.render(container,{ports:ui,header,isCurrent:()=>true}));return settle();},retire(){ordinary.dispose();}};
 }
 function address(target,property,frame){return {target:{kind:'property',target,property},frame};}
 function selected(view){return view.tracks.flatMap(track=>track.items.filter(item=>item.selected).map(item=>address(copy(track.target),track.property,item.frame)));}
@@ -116,15 +120,15 @@ test('ordinary plural property timelines retain distinct inspectors and aggregat
  assert.deepEqual(copy(selected(h.ordinary.readKeyTimelines())),keys);assert.equal(h.writes.length,0);h.retire();
 });
 
-test('aggregate32 preflight redistributes selection atomically and checkbox33 refuses without truncation',async()=>{
+test('an aggregate selection above 32 keys across open tracks is accepted and every checkbox toggles it without truncation',async()=>{
  const h=await multiFixture({count:35});await h.open();await h.open(h.layer,'position');
  const a=Array.from({length:32},(_,i)=>address(h.layer,'opacity',i+0.25)),b=Array.from({length:32},(_,i)=>address(h.layer,'position',i+0.25));
  let view=h.ordinary.readKeyTimelines();assert.equal(view.selectKeys(a),true);view=h.ordinary.readKeyTimelines();
  const before=h.notices;assert.equal(view.selectKeys(b),true);assert.equal(h.notices,before+1);assert.deepEqual(copy(h.ordinary.captureSelectedKeys()).keys,b);
  assert.equal(h.checks(0).filter(n=>n.checked).length,0);assert.equal(h.checks(1).filter(n=>n.checked).length,32);
- view=h.ordinary.readKeyTimelines();assert.equal(view.selectKeys([address(h.layer,'opacity',0.25),...b]),false);assert.equal(view.isCurrent(),true);
- const check=h.checks(0)[0];check.checked=true;await check.fire('change');assert.equal(check.checked,false);assert.deepEqual(copy(h.ordinary.captureSelectedKeys()).keys,b);
- assert.equal(view.selectKeys([address(h.layer,'opacity',0.25),...b.slice(1)]),true);assert.equal(h.ordinary.captureSelectedKeys().keys.length,32);assert.equal(h.writes.length,0);h.retire();
+ view=h.ordinary.readKeyTimelines();assert.equal(view.selectKeys([address(h.layer,'opacity',0.25),...b]),true);assert.equal(h.ordinary.captureSelectedKeys().keys.length,33);
+ const check=h.checks(0)[0];assert.equal(check.checked,true);check.checked=false;await check.fire('change');assert.equal(check.checked,false);assert.equal(h.ordinary.captureSelectedKeys().keys.length,32);
+ check.checked=true;await check.fire('change');assert.equal(check.checked,true);assert.equal(h.ordinary.captureSelectedKeys().keys.length,33);assert.equal(h.writes.length,0);h.retire();
 });
 
 test('malformed foreign duplicate and missing property addresses refuse whole aggregate selection',async()=>{
@@ -190,11 +194,12 @@ function createPropertyPanel(options){
  return {ready:panel.refresh(true),
   openProperty(target,property){
    const id=JSON.stringify([target.contextId,target.layerUid,target.strokeId===undefined?null:target.strokeId]);
-   const row=descendants(options.container).find(node=>node.className==='native-motion-property-row'&&node.dataset.targetKey===id&&node.dataset.property===property);
+   const row=descendants(options.container).find(node=>node.className==='lrow motion-prop-row'&&node.dataset.targetKey===id&&node.dataset.property===property);
    if(!row)throw Error('Real property row not present');
-   const button=descendants(row).find(node=>node.tagName==='BUTTON'&&node.textContent==='Keys');
-   if(typeof button.fire==='function')return button.fire('click');
-   button.dispatchEvent(new options.document.defaultView.MouseEvent('click',{bubbles:true}));
+   const button=descendants(row).find(node=>/\bmotion-stopwatch\b/.test(node.className||''));
+   // Double-click opens the drawer; it carries no event fields, so every consumer's minimal DOM model can fire it.
+   if(typeof button.fire==='function')return button.fire('dblclick');
+   button.dispatchEvent(new options.document.defaultView.MouseEvent('dblclick',{bubbles:true}));
   },readKeyTimeline:panel.readKeyTimeline,readKeyTimelines:panel.readKeyTimelines,captureSelectedKeys:panel.captureSelectedKeys,dispose:panel.dispose};
 }
 // END REUSABLE REAL PROPERTY PANEL FIXTURE

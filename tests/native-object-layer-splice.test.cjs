@@ -44,10 +44,10 @@ test('head and tail insertion default names are based on native destination ordi
     next[at].layerUid='tampered';assert.equal(p.added.layerUid,'new');
   }
 });
-test('reorder replacement noncontiguous duplicate and mismatched prior identities refuse without mutating inputs',()=>{
+test('reorder noncontiguous duplicate and mismatched prior identities refuse without mutating inputs',()=>{
   const f=fixture(),before=JSON.stringify(f);
   for(const next of [[f.metadata[1],f.metadata[0],f.metadata[2]],
-    [{layerUid:'x'},f.metadata[1],f.metadata[2]],
+    [{layerUid:'x'},f.metadata[0],f.metadata[2]],
     [{layerUid:'x'},f.metadata[0],{layerUid:'y'},...f.metadata.slice(1)],
     [f.metadata[1]], [f.metadata[0],{layerUid:'a'},f.metadata[2]],
     [f.metadata[0],{layerUid:''},f.metadata[2]], [f.metadata[0],{},f.metadata[2]],null]){
@@ -100,5 +100,29 @@ test('contiguous multirow insertion and inverse removal preserve UID identity at
 test('multirow removal maps removed selection and anchor to a surviving UID neighbor',()=>{
   const f=fixture(),p=Splice.plan(f.uids,f.rows,[f.metadata[2]],1,[0,1],1);
   assert.ok(p);assert.equal(p.delta,-2);assert.equal(p.active,0);assert.deepEqual(p.selection,[0]);assert.equal(p.anchor,0);
-  assert.equal(Splice.plan(f.uids,f.rows,[{layerUid:'x'},f.metadata[2]],0,[0],0),null,'replacement cannot masquerade as removal');
+  const r=Splice.plan(f.uids,f.rows,[{layerUid:'x'},f.metadata[2]],0,[0],0);
+  assert.equal(r.removed,2);assert.deepEqual(r.addedRows.map(row=>row.layerUid),['x'],'a replacement is planned as one, never as a bare removal');
+});
+
+test('merge convert replaces its contiguous source rows with the minted instance and selects it (#2244)',()=>{
+  for(const [uids,at] of [[['a','b'],0],[['b','c'],1],[['a','b','c'],0]]){
+    const f=fixture(),old=f.rows.slice(),instance={layerUid:'native-layer:9:0',name:'Component 1',visible:true};
+    const next=[...f.metadata.slice(0,at),instance,...f.metadata.slice(at+uids.length)];
+    const p=Splice.plan(f.uids,f.rows,next,at,uids.map((_,i)=>at+i),at);
+    assert.ok(p);assert.equal(p.at,at);assert.equal(p.removed,uids.length);assert.deepEqual(p.addedRows,[instance]);
+    assert.equal(p.active,at);assert.deepEqual(p.selection,[at]);assert.equal(p.anchor,at);
+    f.rows.splice(p.at,p.removed,...p.addedRows);
+    assert.deepEqual(f.rows.map(r=>r.layerUid),next.map(r=>r.layerUid));
+    f.rows.forEach((row,i)=>{if(row.layerUid!==instance.layerUid)assert.strictEqual(row,old[f.uids.indexOf(row.layerUid)]);});
+    const undo=Splice.plan(next.map(r=>r.layerUid),f.rows,f.metadata,at,[at],at);
+    assert.ok(undo);assert.equal(undo.removed,1);assert.deepEqual(undo.addedRows.map(r=>r.layerUid),uids);
+    assert.equal(undo.active,at);assert.deepEqual(undo.selection,[at]);
+  }
+});
+test('a surviving selection outside the merged run keeps its UID, and a run that re-adds an old UID refuses',()=>{
+  const f=fixture(),next=[{layerUid:'m'},f.metadata[2]];
+  const p=Splice.plan(f.uids,f.rows,next,2,[2],2);
+  assert.ok(p);assert.equal(p.active,1);assert.deepEqual(p.selection,[1]);assert.equal(p.anchor,1);
+  assert.deepEqual(p.added,{layerUid:'m',name:'Layer 1',visible:true});
+  assert.equal(Splice.plan(f.uids,f.rows,[{layerUid:'m'},f.metadata[0]],0,[0],0),null);
 });

@@ -173,6 +173,19 @@ pub(crate) fn prepare_mesh_geometry(
     source: &MeshSceneSource<'_>,
     store: MeshStoreRef<'_>,
 ) -> Result<Option<MeshGeometry>, MeshSceneError> {
+    prepare_mesh_geometry_posed(rect, pixel_size, opacity, source, store, None)
+}
+
+/// [`prepare_mesh_geometry`] for an image whose item stores a mirror or a shear (#2372): `world_form` is that form as a world affine
+/// (`LocalForm::world`), applied to the deformed vertices after the rect's own scale and turn, exactly as the plain image's placement.
+pub(crate) fn prepare_mesh_geometry_posed(
+    rect: &ImageRect,
+    pixel_size: (u32, u32),
+    opacity: f32,
+    source: &MeshSceneSource<'_>,
+    store: MeshStoreRef<'_>,
+    world_form: Option<[f64; 6]>,
+) -> Result<Option<MeshGeometry>, MeshSceneError> {
     let mesh_id = source.mesh_id;
     if mesh_id.is_empty() {
         return Err(MeshSceneError::EmptyMeshId);
@@ -222,9 +235,14 @@ pub(crate) fn prepare_mesh_geometry(
         height: rect.height,
         rotation: rect.rotation,
     };
-    let Some(payload) = scene_payload(&view, &mesh_rect, source.pose) else {
+    let Some(mut payload) = scene_payload(&view, &mesh_rect, source.pose) else {
         return Ok(None);
     };
+    if let Some(g) = world_form {
+        for v in &mut payload.verts {
+            *v = [g[0] * v[0] + g[2] * v[1] + g[4], g[1] * v[0] + g[3] * v[1] + g[5]];
+        }
+    }
     let draw = plan_draw(&payload, pixel_size, opacity, &source.view);
     Ok(Some(MeshGeometry { payload, draw }))
 }

@@ -28,14 +28,32 @@ async function smConfirm(msg, title) {
 var playInt=null;
 var playRaf=null;
 var nativePlayScheduler=null;
+// D24 (#2358): Flip preview on a native project browses through the native frame navigator (native-flip-preview.js).
+var nativeFlipPreview=null;
+function toggleNativeFlipPreview(controller){
+  if(!nativeFlipPreview)nativeFlipPreview=NemoNativeFlipPreview.createFlipPreview({
+    frame:function(){return state.currentFrame;},fps:function(){return state.fps;},
+    waIn:function(){return state.waIn;},waOut:function(){return state.waOut;},
+    controller:function(){return window.NemoNativeOpacityCutover;},navigate:goToFrame,playing:function(){return state.playing;},stopPlay:function(){stopPlay();},
+    setInterval:function(fn,ms){return window.setInterval(fn,ms);},clearInterval:function(id){window.clearInterval(id);},
+    notify:function(message){showToast(message);}
+  });
+  return nativeFlipPreview.toggle(controller);
+}
 function startNativePlay(controller){
+  // Test-package-only virtual time (P24): defined solely by the opt-in observer bootstrap, null in every normal build.
+  var testPlayClock=function(){try{var o=window.NemoTestPlayObserver;return o&&o.fixedClock||null;}catch(_){return null;}};
   if(!nativePlayScheduler)nativePlayScheduler=NemoNativeOpacityMotionSurface.createPlaybackScheduler({
     frame:function(){return state.currentFrame;},fps:function(){return state.fps;},
     playing:function(){return state.playing;},controller:function(){return window.NemoNativeOpacityCutover;},
     advance:advancePlayFrame,navigate:goToFrame,stop:stopPlay,
-    now:function(){return performance.now();},request:function(step){return window.requestAnimationFrame(step);},cancel:function(id){window.cancelAnimationFrame(id);}
+    now:function(){var c=testPlayClock();return c?c.now():performance.now();},
+    request:function(step){var c=testPlayClock();return c?c.request(step,1000/state.fps):window.requestAnimationFrame(step);},
+    cancel:function(id){var c=testPlayClock();if(c)c.cancel(id);else window.cancelAnimationFrame(id);}
   });
+  // The flip ends only once Play has really started; a refused start leaves the flip running (RV4-FLIPCANCEL).
   if(!nativePlayScheduler.start(controller)){showToast('Native playback is unavailable');return;}
+  if(typeof nativeFlipPreview!=='undefined'&&nativeFlipPreview)nativeFlipPreview.cancel();
   state.playing=true;state.playDir=1;
   try{var observer=window.NemoTestPlayObserver;if(observer)observer.playState(state.playing,state.currentFrame);}catch(_){}
   document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e034}</span>';
@@ -465,6 +483,7 @@ window.SM={
     if(_wasDrawTool&&!_isDrawTool)_snapshotDrawingDefaults();
     state.tool=t;renderArcs();
     if(_isDrawTool&&!_wasDrawTool)_restoreDrawingDefaults();
+    if(t!=='select'&&t!=='subselect')nativeStyleReadbackEnd();
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
     if(window.SMShapeGroup)SMShapeGroup.ensureFront(t);
@@ -553,6 +572,7 @@ window.SM={
   // Select tool active and strokes selected, changing width/style/color/
   // cap/join restyles the selection instead of only future strokes.
   setBrushSize:function(v){
+    if(v>0&&nativeSelStyle({width:v})){state.brushSize=v;return;}
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-brush-size'))return false;
     state.brushSize=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){
@@ -643,6 +663,7 @@ window.SM={
   // A shape with no track at all — every shape in plain Animation 2D — takes
   // the early `false` and behaves exactly as before.
   setStrokeColor:function(v){
+    if(nativeHex(v)&&nativeSelStyle({stroke:v})){state.strokeColor=v;paintStrokeSwatches(v);return;}
     if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';}))&&!n20AllowLegacyWrite('timeline-selection-stroke-color'))return false;
     state.strokeColor=v;paintStrokeSwatches(v);
     if(routeColorToSelectedMotionRow('strokeColor',v)){}
@@ -652,6 +673,7 @@ window.SM={
     // combined shape (that's the whole point of this tool vs plain Select).
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='stroke')return sel;var arc=fsRealizeStrokeSegment(sel,userLayers[state.activeLayerIdx]);arc.strokeColor=v;return{path:arc,kind:'stroke',segStart:0,segEnd:arc.length,closed:arc.closed};});saveActiveLayerFrame();updateUI();}},
   setFillColor:function(v){
+    if(nativeHex(v)&&nativeSelStyle({fill:v})){state.fillColor=v;paintFillSwatches(v);return;}
     if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';}))&&!n20AllowLegacyWrite('timeline-selection-fill-color'))return false;
     state.fillColor=v;paintFillSwatches(v);
     if(routeColorToSelectedMotionRow('fillColor',v)){}
@@ -686,6 +708,7 @@ window.SM={
     });
   },
   setFillEnabled:function(v){
+    if((v?nativeHex(state.fillColor)&&nativeSelStyle({fillEnabled:true,fillWith:state.fillColor}):nativeSelStyle({fillEnabled:false}))){state.fillEnabled=v;window.SM._syncFillEnabledUI(v);return;}
     if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';}))&&!n20AllowLegacyWrite('timeline-selection-fill-enabled'))return false;
     state.fillEnabled=v;window.SM._syncFillEnabledUI(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.fillColor=v?state.fillColor:null;});saveActiveLayerFrame();updateUI();}
@@ -695,6 +718,7 @@ window.SM={
   // the quick phdr toggle button since disabling stroke without it required
   // opening the color popover and hunting for "None".
   setStrokeEnabled:function(v){
+    if((v?nativeHex(state.strokeColor)&&nativeSelStyle({strokeEnabled:true,strokeWith:state.strokeColor}):nativeSelStyle({strokeEnabled:false}))){state.strokeEnabled=v;window.SM._syncStrokeEnabledUI(v);return;}
     if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';}))&&!n20AllowLegacyWrite('timeline-selection-stroke-enabled'))return false;
     state.strokeEnabled=v;window.SM._syncStrokeEnabledUI(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){
@@ -720,6 +744,9 @@ window.SM={
   // selectedPaths on their own). Fill's enabled/disabled state is left
   // alone; only the color VALUES swap.
   swapStrokeFill:function(){
+    // #2372 SEL-STYLE2: a native selection takes the two swapped colours as ONE edit (the stroke colour wins on a ribbon, as the baseline's later write did).
+    var sw=state.strokeColor,fw=state.fillColor;
+    if(nativeHex(sw)&&nativeHex(fw)&&nativeSelStyle({fill:sw,stroke:fw})){state.fillColor=sw;state.strokeColor=fw;paintFillSwatches(sw);paintStrokeSwatches(fw);return;}
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-swap-paint'))return false;
     var s=state.strokeColor,f=state.fillColor;
     window.SM.setFillColor(s);
@@ -727,7 +754,12 @@ window.SM={
   },
   setFillBrushSize:function(v){state.fillBrushSize=Math.max(1,parseInt(v)||40);},
   setBrushPreset:function(v){
-    if(window.__TAURI__&&window.__TAURI__.core)return window.NemoNativeCustomBrushUI?NemoNativeCustomBrushUI.select(window,v):false;
+    if(window.__TAURI__&&window.__TAURI__.core){
+      var picked=window.NemoNativeCustomBrushUI?NemoNativeCustomBrushUI.select(window,v):false;
+      // #2372 SEL-STYLE2: the picked preset also re-textures a native selection (one edit; the engine leaves ribbons and unstroked records as they are).
+      if(picked!==false)nativeSelStyle({brushPreset:state.brushPreset||'none'});
+      return picked;
+    }
     state.brushPreset=v||'none';
     // Restore the saved diameter for a custom preset (feedback #73 — see
     // brush-editor.js's own comment on savedBrushSize for why this is
@@ -763,17 +795,17 @@ window.SM={
     }
   },
   setSmoothing:function(v){state.smoothing=v;},setStabilizer:function(v){state.stabilizer=parseInt(v);},
-  setStrokeCap:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-cap'))return false;state.strokeCap=v;
+  setStrokeCap:function(v){if(nativeSelStyle({cap:v})){state.strokeCap=v;return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-cap'))return false;state.strokeCap=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush))p.strokeCap=v;});saveActiveLayerFrame();}},
-  setStrokeJoin:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-join'))return false;state.strokeJoin=v;
+  setStrokeJoin:function(v){if(nativeSelStyle({join:v})){state.strokeJoin=v;return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-join'))return false;state.strokeJoin=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush))p.strokeJoin=v;});saveActiveLayerFrame();}},
-  setMiterLimit:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-miter-limit'))return false;state.miterLimit=Math.max(1,parseFloat(v)||10);
+  setMiterLimit:function(v){if(nativeSelStyle({miter:Math.max(1,parseFloat(v)||10)})){state.miterLimit=Math.max(1,parseFloat(v)||10);return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-miter-limit'))return false;state.miterLimit=Math.max(1,parseFloat(v)||10);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush))p.miterLimit=state.miterLimit;});saveActiveLayerFrame();}},
-  setPaintOrder:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-paint-order'))return false;state.paintOrder=v;
+  setPaintOrder:function(v){if(nativeSelStyle({paintOrder:v})){state.paintOrder=v;return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-paint-order'))return false;state.paintOrder=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){p.data=p.data||{};p.data.paintOrder=v;});saveActiveLayerFrame();updateUI();}},
-  setDashOffset:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-dash-offset'))return false;state.dashOffset=parseFloat(v)||0;
+  setDashOffset:function(v){if(nativeSelStyle({dashOffset:parseFloat(v)||0})){state.dashOffset=parseFloat(v)||0;return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-dash-offset'))return false;state.dashOffset=parseFloat(v)||0;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush)&&p.dashArray&&p.dashArray.length)p.dashOffset=state.dashOffset;});saveActiveLayerFrame();}},
-  setStrokeStyle:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-style'))return false;state.strokeStyle=v;
+  setStrokeStyle:function(v){if(nativeSelStyle({strokeStyle:v,dashOffset:state.dashOffset||0,miter:state.miterLimit||10,paintOrder:state.paintOrder||'fillFirst'})){state.strokeStyle=v;return;}if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-style'))return false;state.strokeStyle=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush)&&p.strokeColor)applyStrokeStyle(p);});saveActiveLayerFrame();updateUI();}},
   // One-shot "smooth this already-drawn stroke more" action (Stroke panel's
   // Smooth+Apply), distinct from Tool Options' Smooth which only shapes NEW
@@ -789,6 +821,7 @@ window.SM={
   // survives even as the centerline geometry itself gets smoother.
   smoothSelectedStroke:function(amount){
     if(!((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length))return;
+    if(nativeSelStyle({smooth:Math.max(0,parseFloat(amount)||0)}))return;
     if(!n20AllowLegacyWrite('timeline-selection-smooth-stroke'))return false;
     amount=Math.max(0,parseFloat(amount)||0);
     // No Apply button anymore (2026-07: "plus besoin du bouton apply pour
@@ -847,6 +880,7 @@ window.SM={
   // silently ignores from then on.
   setPressureCurve:function(v){state.pressureCurve=['linear','sqrt','cbrt','pow2','pow3'].indexOf(v)>=0?v:'linear';state.pressureCurvePoints=null;},
   setOpacity:function(v){
+    if(isFinite(parseInt(v))&&nativeSelStyle({opacity:Math.max(0,Math.min(100,parseInt(v)))/100})){state.opacity=parseInt(v);return;}
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-opacity'))return false;
     state.opacity=parseInt(v);
     // Unlike setFillColor/setStrokeColor right above, this never applied to
@@ -899,183 +933,19 @@ window.SM={
   setOnionPrevOp:function(v){state.onionPrevOpacity=v;renderOS();},setOnionNextOp:function(v){state.onionNextOpacity=v;renderOS();},
   setOnionMode:function(v){state.onionMode=v;renderOS();},
   setWorkArea:function(inF,outF){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setWorkArea',inFrame:inF,outFrame:outF}):Promise.resolve({status:'unavailable'});},
-  setTotalFrames:function(v){v=Math.max(1,Math.min(999,v));saveAllLayerFrames();for(var i=0;i<state.layers.length;i++){while(state.layers[i].frames.length<v)state.layers[i].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}state.totalFrames=v;window._totalF=v;if(state.waOut>=v)state.waOut=v-1;
-    // waIn had no clamp beside waOut's (2026-08-16): shrinking the timeline
-    // below a moved work-area start left waIn > waOut — not merely out of
-    // range but INVERTED, which draws #wa-bar as a strip starting past the
-    // end of the ruler (reproduced: 120->30 frames with waIn 50 put the whole
-    // work area at 550-880px on a 330px timeline). Clamped after waOut so the
-    // pair can never cross. Per-layer in/out and markers are deliberately NOT
-    // touched here — those are hidden by their own readers instead, so the
-    // user's ranges survive a shrink-and-grow round trip the way the frames
-    // array already does (see layerInPoint/layerOutPoint, app.js).
-    if(state.waIn>=state.waOut)state.waIn=Math.max(0,state.waOut-1);
-    window._waIn=state.waIn;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
+  setTotalFrames:function(v){var length=window.NemoNativeProjectLength;return length?length.setTotalFrames(window,v):Promise.resolve({status:'unavailable'});},
   addLayer:function(){var caller=window.NemoNativeDrawingAddController;return caller&&typeof caller.add==='function'?caller.add():Promise.resolve({status:'unavailable'});},
-  // Null layer (2026-07, Motion) — AE's "Null Object": exists purely as a
-  // parenting/pivot target for other layers (SMMotion's existing
-  // parentLayerUid/parentChainMats — a Null is just any other layer as far
-  // as that mechanism cares), never rendered itself. isNullLayer is the
-  // ONLY thing distinguishing it from a normal empty layer; engine-bridge.js's
-  // buildSceneJson short-circuits it to items:[] before any of the normal
-  // per-layer work, and it's added to the SAME "no real content" guard list
-  // as symbolId/nativeVideo/montageId in saveActiveLayerFrame/
-  // saveAllLayerFrames/getEffectiveStrokes (app.js) so nothing ever tries
-  // to read/write strokes on it.
-  // 2026-08, feedback #59 — a Null created with layers pre-selected now
-  // auto-centers on their combined world bounds and auto-parents them to
-  // it (both AE conveniences; previously a Null always dropped at canvas
-  // center with zero relationship to the selection). createUserLayer always
-  // PUSHES (state.layers.push), so it's appended at the end — the indices
-  // captured in preSel before creation stay valid after, no re-indexing
-  // needed. nullPos/nullShape are the new persisted fields (see the
-  // exportJSON/import + saveActiveLayerFrame/saveAllLayerFrames "no real
-  // content" guard already covering isNullLayer, per CLAUDE.md §1).
-  addNullLayer:function(){
-    saveAllLayerFrames();pushUndoLayers(true);
-    var preSel=_layerSel.slice();
-    var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Null'));
-    var ld=state.layers[idx];
-    ld.isNullLayer=true;
-    ld.nullShape='cross';
-    // Same reasoning as addGuideLayer's own explicit color below: without
-    // this, createUserLayer's nextLayerColor() cycling default gets read
-    // by buildNullLayerItems' marker (it falls back to ld.color first, on
-    // purpose — so a user CAN still recolor a Null later, same as a guide),
-    // giving each new Null an arbitrary/possibly-reused hue instead of a
-    // consistent, recognizable default.
-    ld.color='#ff2d78';
-    var validSel=preSel.filter(function(li){return li!==idx&&state.layers[li];});
-    var center=null;
-    if(window.SMMotion&&validSel.length){
-      var u=SMMotion.layerWorldBoundsUnion(validSel,state.currentFrame);
-      if(u)center=[u.cx,u.cy];
-    }
-    ld.nullPos=center||[state.canvasW/2,state.canvasH/2];
-    if(window.SMMotion&&validSel.length){
-      var nullUid=SMMotion.ensureLayerUid(ld);
-      validSel.forEach(function(li){SMMotion.setLayerParent(li,nullUid);});
-    }
-    activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();
-  },
-  // Pure disclosure toggle (2026-08) — never a mode change, unlike
-  // entering a Component (enterComponentLayer/enterSymbol, CLAUDE.md §8):
-  // a folder's children stay flat, real, directly editable rows in the
-  // SAME list at all times, this only flips whether they're shown.
-  // Re-renders both panels since Motion's own renderLayerListMotion and
-  // Animation 2D's renderLayerList both read the SAME computeLayerRenderOrder.
-  toggleFolderLayerCollapsed:function(li){
-    var ld=state.layers[li];if(!ld||!ld.isFolderLayer)return;
-    ld.folderCollapsed=!ld.folderCollapsed;
-    renderLayerList();renderTimeline();
-  },
-  // Drag-and-drop / menu reparenting entry point (2026-08) — the ONE place
-  // that turns "these layer indices" + "this folder index" into actual
-  // parentLayerUid assignments, so the drag handler (finishLayerReorder,
-  // above) and a future menu action can't drift. Delegates entirely to
-  // SMMotion.setLayerParent — same keep-transform-compensation, same cycle
-  // guard, same uid-based mechanism any other parenting target already
-  // uses; a Folder is just another valid parent, per Cyril's own framing
-  // ("agiront comme un null de control parentage").
-  reparentLayersIntoFolder:function(idxs,folderIdx){
-    var fld=state.layers[folderIdx];
-    if(!fld||!fld.isFolderLayer||!window.SMMotion)return;
-    var folderUid=SMMotion.ensureLayerUid(fld);
-    saveAllLayerFrames();pushUndoLayers(true);
-    var moved=0;
-    idxs.forEach(function(idx){
-      if(idx===folderIdx)return;
-      var ld=state.layers[idx];
-      if(!ld||ld.isFolderLayer)return; // no nested folders in v1 (see engine.rs is_folder_layer)
-      SMMotion.setLayerParent(idx,folderUid);
-      moved++;
-    });
-    if(moved&&fld.folderCollapsed){fld.folderCollapsed=false;} // reveal what was just dropped in
-    loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
-    if(moved){var _fn=fld.name||SM.t('layerKindFolder');showToast(moved>1?SM.t('toastLayersMovedToFolder').replace('{n}',moved).replace('{folder}',_fn):SM.t('toastLayerMovedToFolder').replace('{folder}',_fn));}
-  },
-  // Explicit un-parent (2026-08) — context-menu counterpart to dragging a
-  // layer out via the plain reorder gesture (finishLayerReorder above),
-  // for when the layer isn't easy to drag (long list, small target) or the
-  // user just wants a guaranteed one-click action.
-  removeLayerFromFolder:function(idx){
-    var ld=state.layers[idx];if(!ld||!window.SMMotion)return;
-    if(folderLayerParentIdx(idx)<0)return; // parented to something other than a folder (or not parented) — leave it alone
-    saveAllLayerFrames();pushUndoLayers(true);
-    SMMotion.setLayerParent(idx,null);
-    loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
-    showToast(SM.t('hsLayerRemovedFromFolder'));
-  },
-  // Effect (adjustment) layer (2026-07, Motion) — AE's "Adjustment Layer":
-  // no painted content of its own (frames/strokes ignored on purpose,
-  // same as a Null layer), but its effectType/effectP1/effectP2 apply to
-  // EVERYTHING BELOW IT in the stack via engine.rs's composite_scene
-  // (color_adjust.wgsl / reused blur.wgsl) — see that function's
-  // is_effect_layer branch and engine-bridge.js's buildSceneJson for the
-  // full JS<->Rust wire contract. Defaults to a mild blur so placing one
-  // has an immediately visible (if subtle) effect rather than looking
-  // like a no-op.
-  addEffectLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Effet'));state.layers[idx].isEffectLayer=true;state.layers[idx].effects=[];activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
-  // Guide layer (2026-08, AE feature audit 8.6) — a real layer object
-  // (rotatable/parentable/keyable Transform, colored) instead of a classic
-  // ruler-drag guide: no content of its own (same "no real content" guard
-  // list as Null/Effect above), the line itself is engine-bridge.js's
-  // buildGuideLayerItems, an editor-only overlay derived from the layer's
-  // OWN Position/Rotation Transform (guidePos is the anchor Position
-  // offsets from; Rotation sets the angle) — zero new keyframe machinery.
-  // Defaults to horizontal through canvas center.
-  addGuideLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Guide'));state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=[state.canvasW/2,state.canvasH/2];state.layers[idx].guideOrientation='horizontal';state.layers[idx].color='#00baff';activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
-  // Rig control widgets (2026-08-30, rig-widget.js) — an on-canvas
-  // joystick or slider whose axes ARE ordinary expression controls on the
-  // same layer, so the value is keyable/graphable/readable from any other
-  // layer's expression with no new machinery. The layer itself is created
-  // inside rig-widget.js (it has to create the controls in the same breath
-  // — the widget points AT them and is meaningless without them); these two
-  // are just the menu entry points, thin on purpose so there is exactly one
-  // creation path.
-  addJoystickLayer:function(){if(window.SMRigWidget)SMRigWidget.addWidgetLayer('joystick');},
-  addSliderLayer:function(){if(window.SMRigWidget)SMRigWidget.addWidgetLayer('slider');},
-  // Folder layer (2026-08, "grouper les layer dans des dossiers qui
-  // agiront comme un null de control parentage") — structurally a Null
-  // (isNullLayer:true too, same pivot/no-content/parenting-target
-  // machinery, same nullPos on-canvas marker, added FIRST so a folder is
-  // never mistaken for "just" a null anywhere that checks isNullLayer
-  // alone) PLUS isFolderLayer:true, which is what actually changes
-  // behavior: engine-bridge.js's buildSceneJson gives it a distinct wire
-  // shape (folderChildIndices + its own effects stack scoped to JUST that
-  // subtree, engine.rs's is_folder_layer branch — see that function's own
-  // doc comment for why this is deliberately NOT the same mechanism as
-  // isEffectLayer's "everything below in z-order"), and the layer-list
-  // renderers (motion.js/timeline.js) give it a disclosure triangle +
-  // indented children instead of the plain marker row a bare Null gets.
-  // Explicitly NOT a precomp/Component — children stay flat, ordinary,
-  // directly editable layers in the SAME list at all times; open/close is
-  // a pure visibility toggle (ld.folderCollapsed), never a mode change
-  // (contrast enterComponentLayer/enterSymbol, CLAUDE.md §8).
-  // Same auto-center-on-selection + auto-parent convenience addNullLayer
-  // already has (feedback #59) — dropping a folder around an existing
-  // selection is the overwhelmingly common way this gets used.
-  addFolderLayer:function(){
-    saveAllLayerFrames();pushUndoLayers(true);
-    var preSel=_layerSel.slice();
-    var idx=createUserLayer(nextLayerName().replace(/^Layer/,SM.t('layerKindFolder')));
-    var ld=state.layers[idx];
-    ld.isNullLayer=true;ld.isFolderLayer=true;ld.folderCollapsed=false;
-    ld.nullShape='cross';ld.effects=[];
-    ld.color='#ffb020';
-    var validSel=preSel.filter(function(li){return li!==idx&&state.layers[li];});
-    var center=null;
-    if(window.SMMotion&&validSel.length){
-      var u=SMMotion.layerWorldBoundsUnion(validSel,state.currentFrame);
-      if(u)center=[u.cx,u.cy];
-    }
-    ld.nullPos=center||[state.canvasW/2,state.canvasH/2];
-    if(window.SMMotion&&validSel.length){
-      var folderUid=SMMotion.ensureLayerUid(ld);
-      validSel.forEach(function(li){SMMotion.setLayerParent(li,folderUid);});
-    }
-    activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();
-  },
+  // Layer kinds and folder membership (#2371 D36): Null, Folder, Effect, Guide, Joystick and Slider layers and the move of layers
+  // into and out of a Folder are native project writes only (adapters/native-layer-kinds-ui.js); there is no Paper writer here.
+  toggleFolderLayerCollapsed:function(li){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.toggleFolder(window,li):Promise.resolve({status:'unavailable'});},
+  addNullLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.add(window,'null'):Promise.resolve({status:'unavailable'});},
+  addFolderLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.add(window,'folder'):Promise.resolve({status:'unavailable'});},
+  addEffectLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.add(window,'effect'):Promise.resolve({status:'unavailable'});},
+  addGuideLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.add(window,'guide'):Promise.resolve({status:'unavailable'});},
+  addJoystickLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.addWidget(window,'joystick'):Promise.resolve({status:'unavailable'});},
+  addSliderLayer:function(){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.addWidget(window,'slider'):Promise.resolve({status:'unavailable'});},
+  reparentLayersIntoFolder:function(idxs,folderIdx){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.moveIntoFolder(window,idxs,folderIdx):Promise.resolve({status:'unavailable'});},
+  removeLayerFromFolder:function(idx){var kinds=window.NemoNativeLayerKindsUi;return kinds?kinds.leaveFolder(window,idx):Promise.resolve({status:'unavailable'});},
   deleteLayer:function(){
     // The camera row isn't in state.layers (synthetic pseudo-layer, see
     // camera.js) — the generic layer-panel trash button silently did
@@ -1131,45 +1001,7 @@ window.SM={
   // work area and re-bases frame 0 on its start — layers, keyframes, markers
   // and the camera all shift together, or the trim would silently desync the
   // very things that were timed against it.
-  trimToWorkArea:function(){
-    // 2026-07-30 fix: the only structural layer op with no activeSymbolId/
-    // activeMontageViewId guard (~10 siblings in app.js all refuse with this
-    // same toast — convertLayerToComponent, mergeLayersIntoOne, splitLayer-
-    // IntoElements, etc.). Shrinking totalFrames here writes straight
-    // through to state.layers/state.markers/state.cameraKeys, which correctly
-    // alias the entered symbol's own data while inside one (see enterSymbol) —
-    // but sym.totalFrames is SHARED by every other instance/placement of
-    // that same symbol elsewhere in the project (other layers, other
-    // StoryBoard montages), so trimming it from inside one editing session
-    // silently reshapes all of them with no warning. Inside a montage view
-    // it's actively pointless instead: state.layers there is a throwaway
-    // synthetic per-segment array with no write-back on exit (unlike a
-    // symbol's), so the toast would claim success and every bit of it
-    // reverts the moment you leave.
-    if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
-    if(state.activeMontageViewId){showToast(SM.t('toastCloseMontageFirst'));return;}
-    var inF=state.waIn||0,outF=(state.waOut!=null?state.waOut:state.totalFrames-1);
-    if(outF<=inF){showToast(SM.t('hsWorkAreaTooShort'));return;}
-    if(inF===0&&outF===state.totalFrames-1){showToast(SM.t('toastWorkAreaAlreadyCoversAll'));return;}
-    saveAllLayerFrames();pushUndoLayers(true);
-    var n=outF-inF+1;
-    state.layers.forEach(function(ld,li){
-      ld.frames=ld.frames.slice(inF,outF+1);
-      while(ld.frames.length<n)ld.frames.push({strokes:[],isKeyframe:false,isInterpolated:false});
-      if(ld.inPoint!=null)ld.inPoint=Math.max(0,ld.inPoint-inF);
-      if(ld.outPoint!=null)ld.outPoint=Math.max(0,Math.min(n-1,ld.outPoint-inF));
-      if(ld.markers)ld.markers=ld.markers.map(function(m){return{frame:m.frame-inF,name:m.name,color:m.color};}).filter(function(m){return m.frame>=0&&m.frame<n;});
-      if(window.SMMotion&&SMMotion.shiftLayerMotionKeys)SMMotion.shiftLayerMotionKeys(li,-inF);
-    });
-    if(state.markers)state.markers=state.markers.map(function(m){return{frame:m.frame-inF,name:m.name,color:m.color};}).filter(function(m){return m.frame>=0&&m.frame<n;});
-    if(state.cameraKeys)state.cameraKeys=state.cameraKeys.map(function(k){var c2=JSON.parse(JSON.stringify(k));c2.frame=k.frame-inF;return c2;}).filter(function(k){return k.frame>=0&&k.frame<n;});
-    state.totalFrames=n;window._totalF=n;
-    state.waIn=0;state.waOut=n-1;window._waIn=0;window._waOut=n-1;
-    state.currentFrame=Math.max(0,Math.min(n-1,state.currentFrame-inF));
-    loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
-    if(window.updateWaBar)updateWaBar();
-    showToast(SM.t('toastCompReducedToWorkArea')+n+' frames)');
-  },
+  trimToWorkArea:function(){var length=window.NemoNativeProjectLength;return length?length.trimToWorkArea(window):Promise.resolve({status:'unavailable'});},
   setLayerKeyLock:function(li,mode){
     var ld=state.layers[li==null?state.activeLayerIdx:li];if(!ld)return;
     pushUndo();
@@ -2085,6 +1917,8 @@ window.SM={
     if(_dOrigin>=0){_dLd.frames[_dOrigin].strokes=_collectLayerStrokes(_dLi,_dLd);window._sceneVersion=(window._sceneVersion||0)+1;}else saveActiveLayerFrame();
     updateUI();}},
   flipPreview:function(){
+    var nativeOpacity=window.NemoNativeOpacityCutover;
+    if(nativeOpacity&&nativeOpacity.blocksLegacy()){toggleNativeFlipPreview(nativeOpacity);return;}
     var prev=state.currentFrame;var wa=state.waIn;var wo=state.waOut;
     if(state._flipping){state._flipping=false;return;}
     state._flipping=true;var dir=1;var cur=prev;
@@ -2110,6 +1944,7 @@ window.SM={
     updateUI();showToast(SM.t('toastExposureExtendedPlus')+n);
   },
   flipHorizontal:function(){
+    if(nativeFlip('h'))return;if(!n20AllowLegacyWrite('timeline-selection-flip'))return false;// #2372 A-flip-selection: a native project mirrors the selection as ONE batch
     if(state.tool!=='select'||!selectedPaths.length){showToast(SM.t('toastSelectStrokes'));return;}
     pushUndo();var bounds=null;selectedPaths.forEach(function(p){if(!bounds)bounds=p.bounds.clone();else bounds=bounds.unite(p.bounds);});
     var cx=bounds.center.x;
@@ -2121,6 +1956,7 @@ window.SM={
     saveActiveLayerFrameOrPromote();updateUI();showToast('Flip horizontal');
   },
   flipVertical:function(){
+    if(nativeFlip('v'))return;if(!n20AllowLegacyWrite('timeline-selection-flip'))return false;
     if(state.tool!=='select'||!selectedPaths.length){showToast(SM.t('toastSelectStrokes'));return;}
     pushUndo();var bounds=null;selectedPaths.forEach(function(p){if(!bounds)bounds=p.bounds.clone();else bounds=bounds.unite(p.bounds);});
     var cy=bounds.center.y;
@@ -2834,6 +2670,7 @@ function syncDocFields(){
 // that CHANGED CONTENT must not pass frameOnly — the panel refreshes below
 // still run either way, only the wholesale timeline rebuild is skipped.
 function updateUI(frameOnly){
+  if(window.NemoNativeInspectorUnavailable)window.NemoNativeInspectorUnavailable.sync(window); // #2372 UNAVAIL-NOTICES: mark/unmark the controls with no native owner
   if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly))return;
   syncDocFields();
   // countOnly: this is only ever read for .length just below.
@@ -2886,25 +2723,42 @@ function updateMaskPanel(){
   var layer=p.layer;
   var maxFeather=0;
   if(layer)layer.children.forEach(function(c){if(c.data&&c.data.isMask&&c.data.maskFeather>maxFeather)maxFeather=c.data.maskFeather;});
+  // A native mask (#2372 SEL-MASK) is a transient presented path: the engine's listing already gives the layer's shared feather.
+  if(p.data.nativeStableTarget&&typeof p.data.maskFeather==='number')maxFeather=p.data.maskFeather;
   document.getElementById('p-mask-feather').value=maxFeather;
 }
 document.getElementById('p-mask-mode').addEventListener('change',function(){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
+  // #2372 MASK-NATIVE-REST: on a native object project the mode restyles THIS mask as ONE native batch entry (one history entry).
+  if(p.data.nativeStableTarget&&nativeSelStyle({maskMode:this.value}))return;
+  if(!n20AllowLegacyWrite('timeline-mask-mode'))return false;
   pushUndo();p.data.maskMode=this.value;
   saveActiveLayerFrame();if(window.SMEngineBridge)SMEngineBridge.renderNow();
 });
 document.getElementById('p-mask-feather').addEventListener('input',function(){
-  var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask||!p.layer)return;
-  if(!n20AllowLegacyWrite('timeline-mask-feather'))return false;
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
   var v=Math.max(0,parseFloat(this.value)||0);
+  // #2372 SEL-MASK: on a native object project the feather restyles the layer's masks as ONE native batch entry (one history entry): it is committed by
+  // the 'change' listener below (Enter/blur for a typed value, release for a scrub), never per keystroke, so '12' is one entry and not '1' then '12'.
+  var NS=window.NemoNativeSelectionStyle;
+  if(p.data.nativeStableTarget&&NS&&NS.handles(window))return;
+  if(!p.layer)return;
+  if(!n20AllowLegacyWrite('timeline-mask-feather'))return false;
   // Shared per-layer value (see updateMaskPanel's comment) — every mask on
   // this layer gets the same feather, matching what the engine actually
   // reads (LayerIn.mask_feather, the max across a layer's own masks).
   p.layer.children.forEach(function(c){if(c.data&&c.data.isMask)c.data.maskFeather=v;});
   saveActiveLayerFrame();if(window.SMEngineBridge)SMEngineBridge.renderNow();
 });
+document.getElementById('p-mask-feather').addEventListener('change',function(){
+  var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask||!p.data.nativeStableTarget)return;
+  nativeSelStyle({maskFeather:Math.min(500,Math.max(0,parseFloat(this.value)||0))});
+});
 document.getElementById('btn-mask-unset').addEventListener('click',function(){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask)return;
+  // #2372 MASK-NATIVE-REST: "Remove as mask" turns the native mask back into a normal shape (geometry and paint kept) in ONE batch entry.
+  if(p.data.nativeStableTarget&&nativeSelStyle({unmask:true}))return;
+  if(!n20AllowLegacyWrite('timeline-mask-unset'))return false;
   pushUndo();
   delete p.data.isMask;delete p.data.maskMode;delete p.data.maskFeather;
   saveActiveLayerFrame();updateUI();if(window.SMEngineBridge)SMEngineBridge.renderNow();
@@ -2935,6 +2789,7 @@ document.getElementById('p-corners-link').addEventListener('change',function(){
 });
 function commitCornerEdit(which,val){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='rect')return;
+  if(nativeParamOwned(p))return; // #2372 insp-parametric: a native shape commits on 'change' (nativeParamChange), never per keystroke through a history checkpoint
   pushUndo();
   var ps=p.data.paramShape;
   var v=Math.max(0,parseFloat(val)||0);
@@ -2945,6 +2800,7 @@ function commitCornerEdit(which,val){
 }
 ['tl','tr','br','bl'].forEach(function(which){
   document.getElementById('p-corner-'+which).addEventListener('input',function(){commitCornerEdit(which,this.value);});
+  document.getElementById('p-corner-'+which).addEventListener('change',function(){nativeParamChange(which,this.value,document.getElementById('p-corners-link').checked);});
 });
 // Dynamic shapes, Ellipse (2026-08-18) — same panel pattern as Coins:
 // shown for exactly one selected path that's EITHER already a dynamic
@@ -2975,12 +2831,14 @@ function updateEllipseArcPanel(){
 }
 document.getElementById('btn-ellipse-arc-convert').addEventListener('click',function(){
   var p=selectedPaths[0];if(!p)return;
+  if(nativeParamConvert(p))return;
   pushUndo();
   window.convertToDynamicEllipse(p);
   saveActiveLayerFrame();updateEllipseArcPanel();if(window.SMEngineBridge)SMEngineBridge.renderNow();
 });
 function commitArcEdit(field,val,isPercent){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='ellipse')return;
+  if(nativeParamOwned(p))return;
   pushUndo();
   var ps=p.data.paramShape;
   var v=parseFloat(val)||0;
@@ -2991,6 +2849,7 @@ function commitArcEdit(field,val,isPercent){
 document.getElementById('p-arc-start').addEventListener('input',function(){commitArcEdit('startAngle',this.value,false);});
 document.getElementById('p-arc-sweep').addEventListener('input',function(){commitArcEdit('sweep',this.value,false);});
 document.getElementById('p-arc-inner').addEventListener('input',function(){commitArcEdit('innerRadius',this.value,true);});
+[['p-arc-start','startAngle'],['p-arc-sweep','sweep'],['p-arc-inner','innerRadius']].forEach(function(f){document.getElementById(f[0]).addEventListener('change',function(){nativeParamChange(f[1],this.value);});});
 // Dynamic shapes, Star/Polygon (2026-08-18) — same panel pattern as
 // Coins/Camembert. pointCount stays a plain field (no stopwatch/Motion
 // row) — a fractional point count between two integer keyframes has no
@@ -3012,6 +2871,7 @@ function updateStarPanel(){
 }
 function commitStarEdit(field,val,isPercent){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.paramShape||p.data.paramShape.kind!=='star')return;
+  if(nativeParamOwned(p))return;
   pushUndo();
   var ps=p.data.paramShape;
   var v=parseFloat(val)||0;
@@ -3024,6 +2884,13 @@ function commitStarEdit(field,val,isPercent){
 document.getElementById('p-star-points').addEventListener('input',function(){commitStarEdit('pointCount',this.value);});
 document.getElementById('p-star-inner').addEventListener('input',function(){commitStarEdit('innerRatio',this.value);});
 document.getElementById('p-star-corner').addEventListener('input',function(){commitStarEdit('cornerRadius',this.value);});
+[['p-star-points','pointCount'],['p-star-inner','innerRatio'],['p-star-corner','cornerRadius']].forEach(function(f){document.getElementById(f[0]).addEventListener('change',function(){nativeParamChange(f[1],this.value);});});
+// #2372 insp-parametric: on a native object project the Rounded corners / Ellipse arc / Star fields commit the selected dynamic shape through ONE
+// native parametric edit (adapters/native-parametric-panel.js): a typed value on change (Enter / blur), a scrub once at release (the fields are marked
+// static below), never a Paper rebuild or a history checkpoint a native project refuses.
+function nativeParamOwned(p){var N=window.NemoNativeParametricPanel;return !!N&&N.owns(window,p);}
+function nativeParamChange(field,raw,linked){var p=selectedPaths[0];if(nativeParamOwned(p))window.NemoNativeParametricPanel.edit(window,field,raw,{linked:linked});}
+function nativeParamConvert(p){var N=window.NemoNativeParametricPanel;if(!N||!p.data||!p.data.nativeStableTarget)return false;N.convertUnavailable(window);return true;}
 // Team review Accept/Reject panel — shown when exactly one selected item is
 // either an active (non-ghost) revision (data.revisionParentId) or a
 // delete-revision ghost (data.isRevisionGhost && revisionAction==='delete').
@@ -3138,12 +3005,13 @@ function statusbarHelpRender(desc,sc){
   var el=document.getElementById('statusbar-help');
   if(!el)return;
   var html=desc?desc+' ':'';
-  html+=sc.map(function(pair){return '<span class="sc">'+pair[0]+'</span>'+pair[1];}).join(' ');
+  html+=sc.filter(function(pair){return pair[0];}).map(function(pair){return '<span class="sc">'+pair[0]+'</span>'+pair[1];}).join(' ');
   el.innerHTML=html;
 }
 function getStatusbarDefaultSc(){
   var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
-  return [['F5',tt('scFrame')],['F6',tt('scKey')],['F7',tt('scBlank')],['T',tt('scTween')],['D',tt('scDupli')],['F',tt('scFlip')],['X',tt('scMirror')],['Enter',tt('scPlay')]];
+  var rb=shortcutHint;
+  return [[rb('cmdInsertFrame','F5'),tt('scFrame')],[rb('cmdInsertKey','F6'),tt('scKey')],[rb('cmdInsertBlankKey','F7'),tt('scBlank')],[rb('cmdTween',''),tt('scTween')],[rb('cmdDuplicateKey',''),tt('scDupli')],[rb('cmdFlipPreview','F'),tt('scFlip')],['X',tt('scMirror')],['Enter',tt('scPlay')]].filter(function(p){return p[0];});
 }
 function updateStatusBarHelp(){
   var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};
@@ -3163,7 +3031,7 @@ function updateStatusBarHelp(){
   // 3. A timeline keyframe cell (or span) is selected.
   if(typeof _sel!=='undefined'&&_sel.frames&&_sel.frames.length>0){
     var kn=_sel.frames.length;
-    statusbarHelpRender(kn+' '+tt(kn>1?'thKeyframesSelected':'thKeyframeSelected')+' —',[['F6',tt('scKey')],['F7',tt('scBlank')],['T',tt('scTween')],['D',tt('scDupli')],['F',tt('scFlip')],['X',tt('scMirror')],[tt('scDelete'),tt('thErase')]]);
+    statusbarHelpRender(kn+' '+tt(kn>1?'thKeyframesSelected':'thKeyframeSelected')+' —',[[shortcutHint('cmdInsertKey','F6'),tt('scKey')],[shortcutHint('cmdInsertBlankKey','F7'),tt('scBlank')],[shortcutHint('cmdTween',''),tt('scTween')],[shortcutHint('cmdDuplicateKey',''),tt('scDupli')],[shortcutHint('cmdFlipPreview','F'),tt('scFlip')],['X',tt('scMirror')],[tt('scDelete'),tt('thErase')]]);
     return;
   }
   // 4. The active tool's own help.
@@ -3631,6 +3499,7 @@ function _snapshotDrawingDefaults(){
     strokeCap:state.strokeCap,strokeJoin:state.strokeJoin,
     miterLimit:state.miterLimit,dashOffset:state.dashOffset,
     paintOrder:state.paintOrder,brushSize:state.brushSize,
+    strokeStyle:state.strokeStyle,brushPreset:state.brushPreset,
   };
 }
 function _restoreDrawingDefaults(){
@@ -3651,12 +3520,16 @@ function _restoreDrawingDefaults(){
   var _mlEl=document.getElementById('p-miterlimit');if(_mlEl)_mlEl.value=state.miterLimit;
   var _doEl=document.getElementById('p-dashoffset');if(_doEl)_doEl.value=state.dashOffset;
   var _swEl=document.getElementById('p-sw');if(_swEl)_swEl.value=Math.round(state.brushSize);
+  // The Stroke Style and brush preset are drawing defaults too: a selection's readback (nativeStyleReadback) must not leak into the next stroke.
+  if(d.strokeStyle!==undefined){state.strokeStyle=d.strokeStyle;var _ssEl=document.getElementById('p-strokestyle');if(_ssEl)_ssEl.value=state.strokeStyle;}
+  if(d.brushPreset!==undefined){state.brushPreset=d.brushPreset;if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(state.brushPreset);}
 }
 // Populates the Transform section's fields (position/size/rotation/point-
 // type/boolean-op rows) — visibility itself is now owned by
 // updatePropsContext(), called separately.
 function updateSelPropsPanel(){
-  if((state.tool!=='select'&&state.tool!=='subselect')||!selectedPaths.length){_selPropsSig='';return;}
+  markNativeScrubFields();markNativeXformFields();
+  if((state.tool!=='select'&&state.tool!=='subselect')||!selectedPaths.length){_selPropsSig='';nativeStyleReadbackEnd();return;}
   // Subselect + vertices picked: show/drive THEIR bounds, not the whole
   // path's (activeXformBounds/Vertex mode, wired further down alongside
   // wireLiveXformField) — 2026-07, "la position du panneau doivent driver
@@ -3683,7 +3556,7 @@ function updateSelPropsPanel(){
     // go through setFillColor/setFillEnabled (those mutate every selected
     // path's fill, which is for user edits, not for passively reflecting
     // the existing selection).
-    var ref=selectedPaths[0];
+    var ref=nativeStyleView(selectedPaths[0]);
     if(ref){
       // Restore the rotate/scale anchor from the (re)selected stroke's OWN
       // data (2026-07, "la position du point d'ancrage n'est pas mise en
@@ -3779,6 +3652,8 @@ function updateSelPropsPanel(){
           }
         }
       }
+      // A native image or unfilled stroke shows its item opacity in the Fill opacity field (the baseline wrote it to p.opacity when no fill existed).
+      if(typeof ref.nativeOpacity==='number'&&!ref.fillColor&&!isBrushShape){var nOpEl=document.getElementById('p-opacity');if(nOpEl&&document.activeElement!==nOpEl)nOpEl.value=Math.round(ref.nativeOpacity*100);}
       // Same staleness fix for Cap/Join/Paint Order/Miter Limit/Dash Offset —
       // reflect the selected path's actual values instead of leaving
       // whatever the tool-default last was.
@@ -3790,6 +3665,7 @@ function updateSelPropsPanel(){
         paintIconGroup('p-paintorder-grp',state.paintOrder);syncMiterLimitEnabled();
         document.getElementById('p-miterlimit').value=state.miterLimit;
         document.getElementById('p-dashoffset').value=state.dashOffset;
+        nativeStyleReadback(ref);
       }
       // Stroke Width staleness fix (2026-08-21, feedback #34: "tous les
       // paramètres stroke ne fonctionnent pas pour modifié la stroke") —
@@ -3908,6 +3784,8 @@ function updateFsSelPanel(){
 // edits get routed back to each proxy's own frame instead of the current one).
 var _ghostProxyActive=false;
 function selectGhostAll(){
+  // #2372 UNAVAIL-NOTICES: multi-frame ghost selection has no native owner - one stable notice, before pushUndo / desP / any Paper write.
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'btn-ghost-select'))return;
   // Used to silently no-op unless Ghost All (btn-ghost-all) had already
   // been turned on first — an invisible prerequisite (the button looked
   // identically clickable either way, `disabled` had no CSS styling of its
@@ -4767,6 +4645,9 @@ function openTweenCurveInset(li,fA,fB){
 // editTweenSegForCell) — regenerate just this span and refresh every
 // display that could be showing it (strips, onion, arcs).
 function onTweenPairCurveChanged(li,fA){
+  // Native object project: the span's easing is one native reassign command (native-object-tween-ui.js).
+  var nativeCurve=window.NemoNativeTweenUI&&window.NemoNativeTweenUI.pairCurve(window,li,fA);
+  if(nativeCurve)return nativeCurve;
   selClear();selAdd(li,fA);
   generateTweens();
   selClear();
@@ -5350,9 +5231,9 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
     {label:SM.t('ctxPaste'),shortcut:'⌘V',disabled:!hasClip,action:function(){window.SM.pasteFrames();}},
     {label:SM.t('ctxDuplicateSelection'),action:function(){window.SM.duplicateSelectedFrames();}},
     {sep:true},
-    {label:SM.t('ctxInsertFrame'),shortcut:'F5',action:function(){insertFrame();}},
-    {label:SM.t('ctxInsertKeyframe'),shortcut:'F6',action:function(){insertKeyframe();}},
-    {label:SM.t('ctxInsertBlankKeyframe'),shortcut:'F7',action:function(){insertBlankKeyframe();}},
+    {label:SM.t('ctxInsertFrame'),shortcut:shortcutHint('cmdInsertFrame'),action:function(){insertFrame();}},
+    {label:SM.t('ctxInsertKeyframe'),shortcut:shortcutHint('cmdInsertKey'),action:function(){insertKeyframe();}},
+    {label:SM.t('ctxInsertBlankKeyframe'),shortcut:shortcutHint('cmdInsertBlankKey'),action:function(){insertBlankKeyframe();}},
     {label:SM.t('ctxConvertToKeyframes'),action:function(){window.SM.convertToKeyframes();}},
     {label:SM.t('ctxClearKeyframe'),action:function(){window.SM.clearKeyframe();}},
     {sep:true},
@@ -5778,7 +5659,7 @@ function computeLayerRenderOrder(){
 // when they're already CONSECUTIVE in layer order (computeLayerRenderOrder
 // derives a folder's membership purely from adjacency, so a non-contiguous
 // selection would render wrong: reorder first, like Animate requires too).
-function groupSelectionIntoFolder(){
+function groupSelectionIntoFolder(){if(window.NemoNativeLayerRowUi&&window.NemoNativeLayerRowUi.group(window))return;
   if(_layerSel.length<2){showToast(SM.t('toastSelectAtLeast2LayersCap'));return;}
   var sorted=_layerSel.slice().sort(function(a,b){return a-b;});
   for(var k=1;k<sorted.length;k++)if(sorted[k]!==sorted[k-1]+1){showToast(SM.t('toastLayersMustBeConsecutive'));return;}
@@ -6040,6 +5921,8 @@ function startParentPickwhip(li,fromEl,ev){
     var t=rowUnder(e.clientX,e.clientY);
     cleanup();
     if(!t)return; // dropped on nothing / itself / a descendant — no-op, no undo entry
+    var natP=nativeLayerParent();
+    if(natP){natP.api.parentChosen(window,natP.adapter,li,t.idx,function(){renderLayerList();renderTimeline();});return;}
     pushUndo();
     M.setLayerParent(li,M.ensureLayerUid(state.layers[t.idx]));
     renderLayerList(); renderTimeline();
@@ -6056,7 +5939,12 @@ function startParentPickwhip(li,fromEl,ev){
 // Parent B picker menu contain," so the two surfaces can never drift apart
 // (CLAUDE.md §3). `onChanged()` fires after every write, before the caller's
 // own re-render — each surface refreshes only what it actually shows.
+// #2372 U12: on a native object project Parent A, Link time and Follow path are each one native edit (command.document.object.layer.
+// parent.set / timeLink.set / followPath.set); Parent B reports unavailable. The adapter keeps all the logic (src/js/adapters/native-layer-parent.js).
+function nativeLayerParent(){try{var a=window.NemoNativeLayerParent,d=a&&typeof a.desktop==='function'?a.desktop(window):null;return d?{api:a,adapter:d}:null;}catch(_){return null;}}
+window.nativeLayerParent=nativeLayerParent;
 function buildParentMenuItems(li,ld,onChanged){
+  var natP=nativeLayerParent();if(natP)return natP.api.parentMenuItems(window,natP.adapter,li,onChanged);
   var M=window.SMMotion;
   if(!M||!M.setLayerParent)return [{label:'Parentage indisponible',disabled:true}];
   var bad=parentDescendants(li);
@@ -6108,6 +5996,7 @@ window.buildParentMenuItems=buildParentMenuItems;
 // comment explains why a cycle here just means each side ignores the
 // other's contribution, not infinite recursion).
 function buildFollowPathMenuItems(li,ld,onChanged){
+  var natP=nativeLayerParent();if(natP)return natP.api.followPathMenuItems(window,natP.adapter,li,onChanged);
   var M=window.SMMotion;
   if(!M||!M.setLayerFollowPath)return [{label:'Chemin indisponible',disabled:true}];
   var items=[{label:'Chemin : Aucun',disabled:!(ld.followPath&&ld.followPath.targetLayerUid),action:function(){
@@ -6139,6 +6028,7 @@ window.buildFollowPathMenuItems=buildFollowPathMenuItems;
 // here — 'in'/'out'-only refinement stays on the existing Temps-row select
 // and the on-bar anchor dots.
 function buildTimeLinkMenuItems(li,ld,onChanged){
+  var natP=nativeLayerParent();if(natP)return natP.api.timeLinkMenuItems(window,natP.adapter,li,onChanged);
   var M=window.SMMotion;
   if(!M||!M.setLayerTimeLink)return [{label:SM.t('ctxParentInTimeUnavailable'),disabled:true}];
   var items=[{label:SM.t('ctxTimeNoneUnlink'),disabled:!ld.timeLink,action:function(){
@@ -6189,7 +6079,11 @@ window.matteSourceIndicesInUse=matteSourceIndicesInUse;
 // confirmed with Cyril). Picking a source with no mode set defaults the
 // mode to 'alpha' so the pick has a visible effect immediately.
 function buildMatteMenuItems(li,ld,onChanged){
-  var items=[{label:'Matte : Aucune (retirer)',disabled:!ld.matteMode,action:function(){
+  // #2372: on a native project each pick is one native compositing edit and the stored values are read from the project info.
+  var nat=nativeCompositing();
+  function viaNative(promise){promise.then(function(){onChanged();nativeCompositingRefresh();},nativeCompositingRefused);}
+  var items=[{label:'Matte : Aucune (retirer)',disabled:nat?nat.matteOf(li)==='none':!ld.matteMode,action:function(){
+    if(nat){viaNative(nat.setMatteMode(li,'none'));return;}
     pushUndo();
     delete ld.matteMode;delete ld.matteSourceLayerUid;delete ld.mattesMore;
     onChanged();
@@ -6197,12 +6091,14 @@ function buildMatteMenuItems(li,ld,onChanged){
   }}];
   state.layers.forEach(function(other,oi){
     if(oi===li)return; // a layer can't matte itself
-    var uid=(window.SMMotion&&SMMotion.ensureLayerUid)?SMMotion.ensureLayerUid(other):(other.layerUid||(other.layerUid='ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6)));
-    var isCur=ld.matteSourceLayerUid===uid;
+    var uid=nat?nat.layerUid(oi):((window.SMMotion&&SMMotion.ensureLayerUid)?SMMotion.ensureLayerUid(other):(other.layerUid||(other.layerUid='ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6))));
+    if(!uid)return;
+    var isCur=(nat?nat.sourceOf(li):ld.matteSourceLayerUid)===uid;
     items.push({
       label:'Source : '+(other.name||('Layer '+(oi+1)))+(isCur?'  ✓':''),
       disabled:isCur,
       action:function(){
+        if(nat){viaNative(nat.setMatteSource(li,uid));return;}
         pushUndo();
         ld.matteSourceLayerUid=uid;
         if(!ld.matteMode||ld.matteMode==='none')ld.matteMode='alpha';
@@ -6254,6 +6150,8 @@ function buildParentCell(row,ld,li){
   // (once per slot) with no faster path at all.
   cell.addEventListener('contextmenu',function(e){
     e.preventDefault();e.stopPropagation();
+    var natP=nativeLayerParent();
+    if(natP){if(natP.adapter.parentUidOf(li))natP.api.parentCleared(window,natP.adapter,li,function(){renderLayerList();renderTimeline();});return;}
     if(!pName&&!pbName)return; // nothing to clear
     var M=window.SMMotion;if(!M||!M.setLayerParent)return;
     pushUndo();
@@ -6326,6 +6224,72 @@ function routeColorToMotion(p,prop,hex){
   var li=userLayers.indexOf(p.parent);
   if(li<0)return false;
   return SMMotion.writeElementColorFromPicker(li,p.data.strokeId,prop,hex);
+}
+// #2372 SEL-STYLE: on a native object project the right panel restyles the Select selection through ONE native batch (adapters/native-selection-style.js),
+// never through the legacy Paper writers the n20 gates below refuse. True when the edit was handed to it (the caller then only updates the tool defaults).
+function nativeFlip(axis){var T=window.NemoNativeSelectionTransform;if(!T||!T.native(window))return false;T.flip(window,axis);return true;}
+function nativeSelStyle(style){
+  var A=window.NemoNativeSelectionStyle;
+  if(!A||!A.handles(window))return false;
+  A.apply(window,style);return true;
+}
+// The numeric fields a native Select selection owns scrub on ui.js's static path (one change at release, no legacy checkpoint, no live writes): the
+// legacy path pushes an undo before it raises _scrubLiveActive, which a native project refuses, so a paused drag would commit mid-gesture and again at release.
+var NATIVE_SCRUB_FIELDS=['p-sw','p-opacity','p-stroke-alpha','p-poststroke-smooth','p-miterlimit','p-dashoffset','p-mask-feather',
+  'p-corner-tl','p-corner-tr','p-corner-br','p-corner-bl','p-arc-start','p-arc-sweep','p-arc-inner','p-star-points','p-star-inner','p-star-corner'];
+function markNativeScrubFields(){
+  var A=window.NemoNativeSelectionStyle,own=!!A&&A.handles(window);
+  NATIVE_SCRUB_FIELDS.forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    if(own)el.dataset.nativeOpacityScrub='static';
+    else if(el.dataset.nativeOpacityScrub==='static')delete el.dataset.nativeOpacityScrub;
+  });
+}
+// A field marked static gets ONE 'change' at the end of a scrub and no 'input'; a typed edit fires 'input' first and 'change' after. The change of a typed
+// edit has been applied already (nativeTypedInput recorded its value), so only a scrub's change is applied here.
+var _nativeTyped={};
+function nativeTypedInput(el){_nativeTyped[el.id]=el.value;}
+function nativeScrubChange(el,apply){
+  var typed=_nativeTyped[el.id];delete _nativeTyped[el.id];
+  if(el.dataset.nativeOpacityScrub!=='static'||typed===el.value)return;
+  apply();
+}
+function nativeHex(v){return typeof v==='string'&&/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)?v:null;}
+// What updateSelPropsPanel reads from the first selected item: the style the engine listed for a native item (the presented Paper path only
+// carries placeholder paint for hit testing), shaped as the live item the panel code was written against.
+function nativeStyleView(p){
+  var A=window.NemoNativeSelectionStyle,st=A&&p?A.shown(p):null;
+  if(!st)return p;
+  var ribbon=st.role==='ribbon',data=Object.assign({},p.data);
+  if(ribbon){data.isVectorBrush=true;data.widthProfile=[{width:st.width||0}];}
+  if(st.paintOrder)data.paintOrder=st.paintOrder;
+  return {id:p.id,data:data,fillColor:st.fill?new Color(st.fill):null,strokeColor:!ribbon&&st.stroke?new Color(st.stroke):null,strokeWidth:st.width||0,nativeOpacity:st.opacity,
+    strokeCap:st.cap,strokeJoin:st.join,miterLimit:st.miter,dashOffset:st.dashOffset,nativeListed:true,strokeStyle:st.strokeStyle,
+    brushPreset:st.role==='plain'||st.role==='brush'?st.brushPreset||'none':undefined};
+}
+// #2372 INSP-READBACK: the Stroke Style and brush preset controls show the listed selection's own values (the engine reads the style back from the dash
+// pattern and names a texture anchor's preset), not the tool defaults left by the last pick. DISPLAY ONLY: state.strokeStyle / state.brushPreset are the
+// drawing defaults of the next stroke and are never written here, so no path out of Select (tool change, Motion/Anim mode switch, selection cleared) can
+// leak the selection's values into the next stroke; nativeStyleReadbackEnd() repaints the two controls from the defaults when the selection stops driving them.
+// Neither goes through the setters (they would re-apply onto the selection). A legacy path (no listed style) is left as it was.
+var _styleReadbackShown=false;
+function nativeStyleReadback(ref){
+  if(!ref||!ref.nativeListed)return;
+  if(typeof ref.strokeStyle==='string'){
+    var ss=document.getElementById('p-strokestyle');if(ss)ss.value=ref.strokeStyle;
+    _styleReadbackShown=true;
+  }
+  if(typeof ref.brushPreset==='string'){
+    if(window.BrushPresetPicker)window.BrushPresetPicker.paintButton(ref.brushPreset);
+    _styleReadbackShown=true;
+  }
+}
+function nativeStyleReadbackEnd(){
+  if(!_styleReadbackShown)return;
+  _styleReadbackShown=false;
+  var ss=document.getElementById('p-strokestyle');if(ss&&state.strokeStyle!==undefined)ss.value=state.strokeStyle;
+  if(window.BrushPresetPicker&&state.brushPreset!==undefined)window.BrushPresetPicker.paintButton(state.brushPreset);
 }
 function paintStrokeSwatches(v){
   var sw=document.getElementById('stroke-well'); if(sw)sw.style.background=v;
@@ -7092,7 +7056,9 @@ function finishLayerReorder(){
 window.addEventListener('mouseup',finishLayerReorder);
 window.addEventListener('pointerup',finishLayerReorder);
 function renderSymbolTabs(){
-  var bar=document.getElementById('symbol-tabs');if(!bar)return;bar.innerHTML='';
+  var bar=document.getElementById('symbol-tabs');if(!bar)return;
+  if(window.NemoNativeComponentContext&&window.NemoNativeComponentContext.renderTabs(window,bar))return; // a native document: the tabs are the native workspace's
+  bar.innerHTML='';
   var scene=document.createElement('div');scene.className='sym-tab'+((state.activeSymbolId||state.activeMontageViewId)?'':' act');scene.textContent='Scene';
   scene.addEventListener('click',function(){
     if(state.activeSymbolId)window.SM.exitToScene();
@@ -7189,6 +7155,7 @@ function updateFootagePanel(){
   repBtn.disabled=(kind.key==='video'&&ld.nativeVideo&&ld.nativeVideo.isWeb);
 }
 function updateCompInstancePanel(){
+  if(window.NemoNativeComponentInstancePanel&&NemoNativeComponentInstancePanel.sync(window))return; // #2256 Q5: a native object project owns the panel
   var sec=document.getElementById('comp-instance-sec');
   if(state.activeSymbolId){sec.style.display='none';return;}
   var ld=state.layers[state.activeLayerIdx];
@@ -7299,6 +7266,7 @@ function renderCompFrameStrip(ld){
 // file, next to #comp-playmode's own) and write into ld.duplicator.* then
 // reload the frame.
 function updateDuplicatorPanel(){
+  if(window.NemoNativeObjectDuplicatorPanel&&NemoNativeObjectDuplicatorPanel.sync(window))return; // #2256 Q4: a native object project owns the panel
   var sec=document.getElementById('duplicator-sec');
   if(!sec)return;
   var ld=state.layers[state.activeLayerIdx];
@@ -7559,17 +7527,24 @@ function showToast(m){var el=document.getElementById('toast');el.textContent=m;e
 // Tables, override persistence and the pure lookups all live in
 // shortcut-registry.js (P30/#1032) now; onOverrideChanged wires a rebind back
 // to the left-rail badge, exactly what setShortcutKey called directly before.
-var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,onOverrideChanged:function(action){syncToolButtonShortcutBadge(action);}});
+var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,onOverrideChanged:function(action){syncToolButtonShortcutBadge(action);refreshShortcutHints();},onReset:function(){syncAllToolButtonShortcutBadges();refreshShortcutHints();}});
+var toolRailBadges=NemoToolRail.createBadges({doc:document,registry:shortcutRegistry});
 // COMMAND_SHORTCUTS is pure {action,key,cat,label} data (P30/#1032, review on
 // #1114); dispatch by action lives here, same pattern as runToolShortcut below.
-function runCommandShortcutAction(action,e){if(window.NemoNativeFrameEditDesktop&&window.NemoNativeFrameEditDesktop.install(window).shortcut(action,e))return;switch(action){case'cmdPrevKey':if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdNextKey':if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdPrevFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame-1);return;case'cmdNextFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame+1);return;case'cmdGoStart':if(state.playing)stopPlay();goToFrame(0);return;case'cmdGoEnd':if(state.playing)stopPlay();goToFrame(state.totalFrames-1);return;case'cmdInsertFrame':e.preventDefault();insertFrame();return;case'cmdInsertKey':e.preventDefault();insertKeyframe();return;case'cmdInsertBlankKey':e.preventDefault();insertBlankKeyframe();return;case'cmdDuplicateKey':window.SM.duplicateKeyframe();return;case'cmdExtendExposure':window.SM.extendExposure(1);return;case'cmdTween':window.SM.generateTweens();return;case'cmdFlipPreview':if(!e.shiftKey)window.SM.flipPreview();return;case'cmdResetView':e.preventDefault();window.SM.resetView();return;case'cmdRenameLayer':e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);return;}}
+function runCommandShortcutAction(action,e){if(window.NemoNativeLayerRowUi&&window.NemoNativeLayerRowUi.shortcut(window,action,e))return;if(window.NemoNativeFrameEditDesktop&&window.NemoNativeFrameEditDesktop.install(window).shortcut(action,e))return;switch(action){case'cmdPrevKey':if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdNextKey':if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdPrevFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame-1);return;case'cmdNextFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame+1);return;case'cmdGoStart':if(state.playing)stopPlay();goToFrame(0);return;case'cmdGoEnd':if(state.playing)stopPlay();goToFrame(state.totalFrames-1);return;case'cmdInsertFrame':e.preventDefault();insertFrame();return;case'cmdInsertKey':e.preventDefault();insertKeyframe();return;case'cmdInsertBlankKey':e.preventDefault();insertBlankKeyframe();return;case'cmdDuplicateKey':window.SM.duplicateKeyframe();return;case'cmdExtendExposure':window.SM.extendExposure(1);return;case'cmdTween':window.SM.generateTweens();return;case'cmdFlipPreview':if(!e.shiftKey)window.SM.flipPreview();return;case'cmdResetView':e.preventDefault();window.SM.resetView();return;case'cmdRenameLayer':e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);return;}}
+// U04 (#2370): on desktop every rebindable shortcut has a declared target; an unavailable one shows its reason (shortcut-targets.js).
+function shortcutAllowed(action){
+  var Targets=window.NemoShortcutTargets;if(Targets)return Targets.allow(window,action);
+  if(window.__TAURI__&&window.__TAURI__.core){showToast('Keyboard shortcuts are unavailable.');return false;}
+  return true;
+}
 function runCommandShortcut(k,event){
   var lk=(k||'').toLowerCase();
   if(!lk)return false;
   var commands=shortcutRegistry.commandShortcuts();
   for(var i=0;i<commands.length;i++){
     var c=commands[i];
-    if((shortcutRegistry.keyFor(c.action)||'').toLowerCase()===lk){runCommandShortcutAction(c.action,event);return true;}
+    if((shortcutRegistry.keyFor(c.action)||'').toLowerCase()===lk){if(shortcutAllowed(c.action))runCommandShortcutAction(c.action,event);return true;}
   }
   return false;
 }
@@ -7582,23 +7557,19 @@ function runCommandShortcut(k,event){
 // the prose title= attribute — those aren't all "(X)"-suffixed the same
 // way (e.g. Hand's is "(H or Space)"), so rewriting them generically here
 // would be more likely to mangle one than to fix it.
-function syncToolButtonShortcutBadge(action){
-  var btn=document.querySelector('.tool-btn[data-tool="'+action+'"]');
-  if(!btn)return;
-  var sk=btn.querySelector('.sk');
-  if(!sk)return;
-  var key=shortcutRegistry.keyFor(action);
-  sk.textContent=key?key.toUpperCase():'';
-}
-function syncAllToolButtonShortcutBadges(){
-  shortcutRegistry.toolShortcuts().forEach(function(s){syncToolButtonShortcutBadge(s.action);});
-}
+function syncToolButtonShortcutBadge(action){return toolRailBadges.sync(action);}
+function syncAllToolButtonShortcutBadges(){toolRailBadges.syncAll();}
+// U04a (#2370): the context menu and the status bar show the CURRENT binding, so a remap (Insert Frame off F5 on a Mac without
+// F-keys) shows there too. An unbound command shows no hint rather than a stale default.
+function shortcutHint(action,fallback){return shortcutRegistry?shortcutRegistry.hintFor(action):(fallback||'');}
+function refreshShortcutHints(){try{if(typeof updateStatusBarHelp==='function')updateStatusBarHelp();}catch(e){/* the status bar redraws on its next event */}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',syncAllToolButtonShortcutBadges);else syncAllToolButtonShortcutBadges();
 function runToolShortcut(k){
   var lk=(k||'').toLowerCase();
   var tools=shortcutRegistry.toolShortcuts();
   for(var i=0;i<tools.length;i++){
     if(shortcutRegistry.keyFor(tools[i].action)===lk){
+      if(!shortcutAllowed(tools[i].action))return true;
       if(tools[i].action==='toggleOnion')window.SM.toggleOnion();
       else window.SM.setTool(tools[i].action);
       return true;
@@ -7607,112 +7578,10 @@ function runToolShortcut(k){
   return false;
 }
 // ---- Settings modal: shortcut rebinding UI ----
-function renderShortcutsList(){
-  var list=document.getElementById('shortcuts-list');if(!list)return;
-  list.innerHTML='';
-  // Filtre de recherche + regroupement par catégorie (2026-09) : la liste
-  // était une seule colonne de 21 lignes sans en-têtes ni recherche, et ne
-  // montrait QUE les outils — impossible d'y retrouver une commande, encore
-  // moins de vérifier ce qu'une touche fait déjà. Elle liste maintenant les
-  // outils, les commandes réassignables et, en lecture seule, les touches
-  // câblées ailleurs : le panneau est la carte complète du clavier.
-  var q='';
-  var search=document.createElement('input');
-  search.type='search';search.className='pi';
-  search.placeholder=SM.t('shortcutSearchPlaceholder');
-  search.style.cssText='width:100%;margin-bottom:8px;';
-  list.appendChild(search);
-  var body=document.createElement('div');
-  body.style.cssText='display:flex;flex-direction:column;gap:2px;';
-  list.appendChild(body);
-  function matches(label,key){
-    if(!q)return true;
-    return (label||'').toLowerCase().indexOf(q)>=0||(key||'').toLowerCase().indexOf(q)>=0;
-  }
-  function keyRow(label,keyText,onAssign){
-    var row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:4px;font-size:11px;';
-    var lbl=document.createElement('span');lbl.textContent=label;lbl.style.cssText='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-    row.appendChild(lbl);
-    if(!onAssign){
-      var ro=document.createElement('span');
-      ro.textContent=keyText;
-      ro.title=SM.t('shortcutNotRebindableTitle');
-      ro.style.cssText='min-width:60px;text-align:center;font-family:monospace;font-size:10px;color:var(--text-dim);border:1px dashed var(--border);border-radius:4px;padding:2px 6px;';
-      row.appendChild(ro);
-    }else{
-      var keyBtn=document.createElement('button');
-      keyBtn.className='pbtn';keyBtn.style.cssText='min-width:60px;font-family:monospace;text-transform:uppercase;';
-      keyBtn.textContent=keyText;
-      keyBtn.title=SM.t('shortcutClickThenPressTitle');
-      keyBtn.addEventListener('click',function(){
-        keyBtn.textContent='…';keyBtn.classList.add('ac');
-        function capture(ev){
-          ev.preventDefault();ev.stopPropagation();
-          onAssign(ev,keyBtn);
-          keyBtn.classList.remove('ac');
-          document.removeEventListener('keydown',capture,true);
-        }
-        document.addEventListener('keydown',capture,true);
-      });
-      row.appendChild(keyBtn);
-    }
-    return row;
-  }
-  function assignFor(def){
-    return function(ev,keyBtn){
-      if(ev.key==='Escape'){keyBtn.textContent=shortcutRegistry.keyFor(def.action)||'—';return;}
-      var clash=shortcutRegistry.clashFor(def.action,ev.key);
-      if(clash){
-        showToast(SM.t('shortcutKeyClashToast').replace('{label}',clash.label&&clash.label.indexOf('shortcut')===0?SM.t(clash.label):clash.label));
-        keyBtn.textContent=shortcutRegistry.keyFor(def.action)||'—';
-      }else{
-        shortcutRegistry.setKey(def.action,ev.key);
-        keyBtn.textContent=ev.key.toLowerCase();
-      }
-    };
-  }
-  function draw(){
-    body.innerHTML='';
-    var shown=0;
-    shortcutRegistry.categories().forEach(function(cat){
-      var rows=[];
-      if(cat.id==='tools'){
-        shortcutRegistry.toolShortcuts().forEach(function(d){
-          var key=shortcutRegistry.keyFor(d.action)||'';
-          if(matches(d.label,key))rows.push(keyRow(d.label,key||'—',assignFor(d)));
-        });
-      }
-      shortcutRegistry.commandShortcuts().forEach(function(d){
-        if(d.cat!==cat.id)return;
-        var label=SM.t(d.label),key=shortcutRegistry.keyFor(d.action)||'';
-        if(matches(label,key))rows.push(keyRow(label,key||'—',assignFor(d)));
-      });
-      shortcutRegistry.readonlyShortcuts().forEach(function(d){
-        if(d.cat!==cat.id)return;
-        var label=SM.t(d.label);
-        if(matches(label,d.keys))rows.push(keyRow(label,d.keys,null));
-      });
-      if(!rows.length)return;
-      var hdr=document.createElement('div');
-      hdr.className='phdr';
-      hdr.style.cssText='padding:8px 0 3px 0;font-size:9px;color:var(--text-dim);';
-      hdr.textContent=SM.t(cat.label);
-      body.appendChild(hdr);
-      rows.forEach(function(r){body.appendChild(r);shown++;});
-    });
-    if(!shown){
-      var none=document.createElement('div');
-      none.style.cssText='font-size:10px;color:var(--text-dim);padding:8px 4px;';
-      none.textContent=SM.t('shortcutNoMatch');
-      body.appendChild(none);
-    }
-  }
-  search.addEventListener('input',function(){q=search.value.trim().toLowerCase();draw();});
-  // La saisie de la recherche ne doit pas déclencher les raccourcis eux-mêmes.
-  search.addEventListener('keydown',function(e){e.stopPropagation();});
-  draw();
-}
+// The pane is a presenter over the registry (application/shortcut-pane.js, U04a #2370): a rebind is stored by the registry,
+// the rail badge and the menu/status hints follow through refreshShortcutHints, and a conflict shows the existing notice.
+var shortcutPane=NemoShortcutPane.create({doc:document,win:window,registry:shortcutRegistry,translate:function(key){return SM.t(key);},notify:function(text){showToast(text);}});
+function renderShortcutsList(){shortcutPane.render(document.getElementById('shortcuts-list'));}
 // Team review: anchored comment pins. `_activeComment` is either an
 // existing entry from state.comments (edit-in-place) or a fresh draft
 // object not yet pushed to the array — Save decides which by checking
@@ -8730,9 +8599,48 @@ function textPropsRoot(){
   var allMatch=selectedPaths.every(function(p){return p.data&&p.data.groupId===first.data.groupId;});
   return allMatch?root:null;
 }
+// #2372 insp-text-props: with ONE native text block selected on a native object project the same tp-* section shows that block's stored settings
+// (the native text inspect read) and each change commits as ONE object.text.edit (adapters/native-text-props-panel.js), never a vector-text rebuild.
+var NATIVE_TEXT_SCRUB_FIELDS=['tp-size','tp-letter-spacing','tp-line-height','tp-word-spacing','tp-fixed-width'];
+function nativeTextOwned(){var N=window.NemoNativeTextPropsPanel;return !!N&&N.owns(window);}
+function nativeTextEdit(field,value){if(!nativeTextOwned())return false;window.NemoNativeTextPropsPanel.edit(window,field,value);return true;}
+function markNativeTextScrubFields(own){
+  NATIVE_TEXT_SCRUB_FIELDS.forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    if(own)el.dataset.nativeOpacityScrub='static';
+    else if(el.dataset.nativeOpacityScrub==='static')delete el.dataset.nativeOpacityScrub;
+  });
+}
+function fillNativeTextProps(b){
+  var active=document.activeElement,fam=b.font&&b.font.kind==='bundled'?String(b.font.fontKey).replace(/-(Bold|Regular)$/,''):'';
+  function put(id,v,prop){var el=document.getElementById(id);if(el&&active!==el)el[prop||'value']=v;return el;}
+  put('tp-content',b.text||'');
+  put('tp-font',fam);
+  put('tp-size',b.size||48);
+  var colorEl=put('tp-color',(b.color||'#000000').slice(0,7));
+  if(colorEl)colorEl.dataset.hex8=b.color||'#000000';
+  document.querySelectorAll('.tp-align-btn').forEach(function(x){x.classList.toggle('ac',x.dataset.val===(b.align||'left'));});
+  document.querySelectorAll('.tp-style-btn').forEach(function(x){x.classList.toggle('ac',!!b[x.dataset.flag]);});
+  document.querySelectorAll('.tp-case-btn').forEach(function(x){x.classList.toggle('ac',x.dataset.val===(b.textCase||'none'));});
+  put('tp-letter-spacing',b.letterSpacing||0);
+  put('tp-line-height',b.lineHeightMult||1.25);
+  put('tp-word-spacing',b.wordSpacing||0);
+  var fixed=typeof b.fixedWidth==='number'&&b.fixedWidth>0;
+  document.querySelectorAll('.tp-width-btn').forEach(function(x){x.classList.toggle('ac',(x.dataset.val==='fixed')===fixed);});
+  var fw=document.getElementById('tp-fixed-width');
+  if(fw){fw.style.display=fixed?'':'none';if(active!==fw)fw.value=fixed?b.fixedWidth:300;}
+}
 function updateTextPropsPanel(){
   var sec=document.getElementById('text-props-sec');
   if(!sec)return;
+  var nativeText=nativeTextOwned();
+  markNativeTextScrubFields(nativeText);
+  if(nativeText){
+    sec.style.display='';
+    window.NemoNativeTextPropsPanel.sync(window,fillNativeTextProps);
+    return;
+  }
   var root=textPropsRoot();
   sec.style.display=root?'':'none';
   if(!root)return;
@@ -8779,6 +8687,7 @@ function updateTextPropsPanel(){
 // than flooding the undo stack per intermediate value (the exact bug
 // already found and fixed once this session for the easing-curve drag).
 function applyTextPropsEdit(){
+  if(nativeTextOwned())return; // a native text block commits through nativeTextEdit, never the vector rebuild below
   var root=textPropsRoot();
   if(!root||!window.SMVectorText)return;
   var d=root.data;
@@ -8841,30 +8750,31 @@ function applyTextPropsEdit(){
 (function(){
   var contentEl=document.getElementById('tp-content');
   if(!contentEl)return; // this file is also loaded in contexts without the full panel markup
-  contentEl.addEventListener('blur',applyTextPropsEdit);
-  ['tp-font','tp-size','tp-color','tp-letter-spacing','tp-line-height','tp-word-spacing','tp-fixed-width'].forEach(function(id){
-    document.getElementById(id).addEventListener('change',applyTextPropsEdit);
+  contentEl.addEventListener('blur',function(){if(!nativeTextEdit('text',contentEl.value))applyTextPropsEdit();});
+  [['tp-font','font'],['tp-size','size'],['tp-color','color'],['tp-letter-spacing','letterSpacing'],['tp-line-height','lineHeightMult'],['tp-word-spacing','wordSpacing'],['tp-fixed-width','fixedWidth']].forEach(function(f){
+    var el=document.getElementById(f[0]);
+    el.addEventListener('change',function(){if(!nativeTextEdit(f[1],el.value))applyTextPropsEdit();});
   });
   document.querySelectorAll('.tp-align-btn').forEach(function(b){
     b.addEventListener('click',function(){
       document.querySelectorAll('.tp-align-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
-      applyTextPropsEdit();
+      if(!nativeTextEdit('align',b.dataset.val))applyTextPropsEdit();
     });
   });
   document.querySelectorAll('.tp-style-btn').forEach(function(b){
-    b.addEventListener('click',function(){b.classList.toggle('ac');applyTextPropsEdit();});
+    b.addEventListener('click',function(){b.classList.toggle('ac');if(!nativeTextEdit(b.dataset.flag,b.classList.contains('ac')))applyTextPropsEdit();});
   });
   document.querySelectorAll('.tp-case-btn').forEach(function(b){
     b.addEventListener('click',function(){
       document.querySelectorAll('.tp-case-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
-      applyTextPropsEdit();
+      if(!nativeTextEdit('textCase',b.dataset.val))applyTextPropsEdit();
     });
   });
   document.querySelectorAll('.tp-width-btn').forEach(function(b){
     b.addEventListener('click',function(){
       document.querySelectorAll('.tp-width-btn').forEach(function(o){o.classList.toggle('ac',o===b);});
       document.getElementById('tp-fixed-width').style.display=(b.dataset.val==='fixed')?'':'none';
-      applyTextPropsEdit();
+      if(!nativeTextEdit('fixedWidth',b.dataset.val==='fixed'?(parseFloat(document.getElementById('tp-fixed-width').value)||300):null))applyTextPropsEdit();
     });
   });
   // Live Google Fonts (2026-08-28) — "+" reveals a name field instead of
@@ -8906,7 +8816,7 @@ function applyTextPropsEdit(){
           fontSel.appendChild(opt);
         }
         fontSel.value=value;
-        applyTextPropsEdit();
+        if(!nativeTextEdit('font',value))applyTextPropsEdit();
         if(window.showToast)showToast(SM.t('toastGoogleFontAdded').replace('{family}',family),'success');
       }).catch(function(e){
         fontAddConfirm.disabled=false;fontAddInput.disabled=false;
@@ -9002,7 +8912,7 @@ function settingsPreferencesUiInstance(){
     document:document,readProfile:function(){return state.userProfile;},
     setProfileField:function(key,value){state.userProfile[key]=value;},saveProfile:function(){return saveUserProfile();},
     setHex8Input:function(input,value){return setHex8Input(input,value);},
-    renderShortcuts:function(){return renderShortcutsList();},resetShortcuts:function(){return shortcutRegistry.reset();},
+    renderShortcuts:function(){return renderShortcutsList();},resetShortcuts:function(){return shortcutRegistry.reset();},cancelShortcutCapture:function(){return typeof shortcutPane!=='undefined'&&!!shortcutPane&&shortcutPane.cancelCapture();},
     refreshFeedback:function(){return refreshFeedbackList();},
     renderLabs:function(){var render=window.renderLabsPanel;if(render)return render();},
     showToast:function(text){return showToast(text);},translate:function(key){return SM.t(key);},
@@ -9091,10 +9001,10 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       // thing in that section with no action of its own.
       {label:(window.SMProject&&window.SMProject.getCurrentLabel)?window.SMProject.getCurrentLabel():tt('menuUntitledNotSaved'),disabled:true},
       {sep:true},
-      {label:tt('menuNewProject'),shortcut:'⌘N',action:function(){clickEl('project-tab-add');}},
-      {label:tt('menuOpen'),shortcut:'⌘O',action:function(){if(window.SMProject)window.SMProject.open();}},
-      {label:tt('menuSave'),shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
-      {label:tt('menuSaveAs'),shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
+      {label:tt('menuNewProject'),id:'ctx-new-project',shortcut:'⌘N',action:function(){clickEl('project-tab-add');}},
+      {label:tt('menuOpen'),id:'ctx-open',shortcut:'⌘O',action:function(){if(window.SMProject)window.SMProject.open();}},
+      {label:tt('menuSave'),id:'ctx-save',shortcut:'⌘S',action:function(){if(window.SMProject)window.SMProject.save();}},
+      {label:tt('menuSaveAs'),id:'ctx-save-as',shortcut:'⇧⌘S',action:function(){if(window.SMProject)window.SMProject.saveAs();}},
       {label:tt('menuFromKitsu'),id:'ctx-kitsu-open',action:function(){clickEl('btn-kitsu-open');}},
       // Nemo's own extensibility (nemo-script.js / nemo-plugin.js) — this
       // app's model in this app's vocabulary, so it ships.
@@ -9105,11 +9015,11 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       // Duplicate canvas viewer (2026-08, AE feature audit 8.4 "New
       // Viewer") — a second panel on the same comp, independently panned/
       // zoomed and optionally locked to a frame.
-      {label:tt('menuNewView'),action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
+      {label:tt('menuNewView'),id:'ctx-new-view',action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}},
       {label:tt('menuVersionHistory'),id:'ctx-history',action:function(){clickEl('btn-history');}},
       {sep:true},
-      {label:tt('menuImportImg'),action:function(){clickEl('btn-import-img');}},
-      {label:tt('menuImportVideo'),action:function(){clickEl('btn-import-video');}},
+      {label:tt('menuImportImg'),id:'ctx-import-img',action:function(){clickEl('btn-import-img');}},
+      {label:tt('menuImportVideo'),id:'ctx-import-video',action:function(){clickEl('btn-import-video');}},
       {label:tt('menuImportPsd'),id:'ctx-import-psd',action:function(){clickEl('btn-import-psd');}},
       // SVG sits with the other importers now, not behind a Labs flag and a
       // floating button (2026-07-27): it is the only import path that yields
@@ -9138,13 +9048,13 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       {label:tt('menuExport'),id:'ctx-export',action:function(){clickEl('btn-export');}},
       {label:tt('menuRenderManager'),id:'ctx-render-manager',action:function(){if(window.SMRenderManager)SMRenderManager.open();}},
       {sep:true},
-      {label:tt('menuSettings'),action:function(){clickEl('btn-settings');}},
-      {label:tt('menuKeyboardShortcuts'),action:function(){
+      {label:tt('menuSettings'),id:'ctx-settings',action:function(){clickEl('btn-settings');}},
+      {label:tt('menuKeyboardShortcuts'),id:'ctx-shortcuts',action:function(){
         clickEl('btn-settings');
         var t=document.querySelector('#settings-tabs .settings-tab[data-tab="shortcuts"]');
         if(t)t.click();
       }},
-      {label:tt('menuAboutNemo'),action:function(){
+      {label:tt('menuAboutNemo'),id:'ctx-about',action:function(){
         clickEl('btn-settings');
         var t=document.querySelector('#settings-tabs .settings-tab[data-tab="about"]');
         if(t)t.click();
@@ -9159,7 +9069,10 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       items.splice(1,0,{label:'Kitsu: '+ks.projectName+(ks.sequenceName?' / '+ks.sequenceName:'')+' / '+ks.shotName+(ks.taskName?' ('+ks.taskName+')':''),disabled:true});
       items.splice(2,0,{label:tt('menuPublishToKitsu'),id:'ctx-kitsu-publish',action:function(){clickEl('btn-kitsu-publish');}});
     }
-    window.showContextMenu(r.left,r.bottom+4,items);
+    // U04 (#2370): on desktop every action has a declared target; unavailable ones show their reason (app-menu-targets.js).
+    var Targets=window.NemoAppMenuTargets,desktop=!!(window.__TAURI__&&window.__TAURI__.core);
+    if(desktop&&!Targets){showToast('The app menu is unavailable.');return;}
+    window.showContextMenu(r.left,r.bottom+4,Targets?Targets.guard(window,items):items);
   });
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initAppMenu);else initAppMenu();
@@ -9475,61 +9388,39 @@ function onKeyDown(event){
   // Figma): field focused → Ctrl+Z is text-level undo; blur/Esc first
   // for app-level undo. Ctrl+S stays global — native "save page" is
   // never what anyone wants here.
-  var inField=event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable;
-  // Enter in a (single-line) field confirms AND releases focus — same
-  // convention as AE/Figma, and the necessary complement to the in-field
-  // Ctrl+Z guard below: without the blur, focus stayed in the field after
-  // Enter, so the very next Ctrl+Z was still treated as text-level undo
-  // instead of undoing the just-committed value.
-  if(event.key==='Enter'&&event.target.tagName==='INPUT'){event.target.blur();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='z'){if(inField)return;event.preventDefault();if(event.shiftKey)redo();else undo();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='s'){event.preventDefault();if(event.shiftKey)window.SMProject.saveAs();else window.SMProject.save();return;}
-  // ⌘C/⌘X/⌘V routes to whichever clipboard is relevant: a live canvas shape
-  // selection (selectedPaths, Select/Subselect tool) takes priority over a
-  // timeline keyframe-cell selection (_sel.frames) when BOTH happen to be
-  // non-empty — matches how ⌘D (duplicate, below) and Delete already treat
-  // a canvas selection as the more specific/intentional one. Paste has no
-  // "current selection" to disambiguate from, so it follows whichever
-  // clipboard was filled most recently (2026-07, "vérifie que copier/
-  // couper/coller existe pour tous les éléments... les keyframes" — canvas
-  // shapes had NO copy/cut/paste at all before this, only keyframes did).
-  // A Motion keyframe selection is the most specific thing ⌘C can mean, so it
-  // wins over shapes and frame cells — same "more specific selection wins"
-  // rule the shape-vs-frame split below already follows. Gated on there BEING
-  // a keyframe selection, so ⌘C is unchanged everywhere else.
-  // Cmd/Ctrl+Shift+C — AE's "Precompose" (→ convert to Component). Checked
-  // BEFORE the plain Cmd+C below, which never excluded shiftKey and would
-  // otherwise silently swallow this combo as a copy (2026-07-31 AE/Animate
-  // shortcut-parity sweep).
-  if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.key==='c'||event.key==='C')){if(inField)return;event.preventDefault();window.SM.convertActiveLayerToComponent();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='c'){if(inField)return;event.preventDefault();
-    if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()){SMMotion.copySelectedKeys();return;}
-    if(selectedPaths.length)copySelection();else window.SM.copyFrames();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='x'){if(inField)return;event.preventDefault();if(selectedPaths.length)cutSelection();else window.SM.cutFrames();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='v'){if(inField)return;
-    // SVG on the SYSTEM clipboard (2026-09, feedback #749 — Figma's and
-    // Illustrator's "Copy as SVG"). Reaching it needs the browser's OWN
-    // paste event, which never fires if this handler calls preventDefault
-    // — and reading the clipboard directly (navigator.clipboard.readText)
-    // is refused without the clipboard-read permission, confirmed live:
-    // NotAllowedError. So when Nemo's own clipboard is EMPTY, this lets
-    // the default through, svg-import.js's listener gets the data with no
-    // permission at all, and a short timer restores the ordinary
-    // "paste frames" fallback if what arrived wasn't SVG.
-    var _hasInternalClip = (state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard())
-      || !!(_canvasClip&&_canvasClip.snaps.length) || !!(_sel.clipboard&&_sel.clipboard.length);
-    if(!_hasInternalClip&&window.SMSvgImport){
-      if(window._svgPasteFallback)clearTimeout(window._svgPasteFallback);
-      window._svgPasteFallback=setTimeout(function(){window._svgPasteFallback=null;window.SM.pasteFrames();},80);
-      return;
+  // Focus and clipboard arbitration lives in application/keyboard-arbiter.js (U05, #2370); this runs its decision.
+  var inField=NemoKeyboardArbiter.inField(event.target);
+  var arb=NemoKeyboardArbiter.decide(event,function(){var NK=window.NemoNativeMotionKeyEdit&&NemoNativeMotionKeyEdit.current(document);return {
+    motionKeySelection:state.appMode==='motion'&&(NK?NK.hasSelection():!!(window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection())),
+    shapeSelection:selectedPaths.length>0,
+    motionKeyClipboard:state.appMode==='motion'&&(NK?NemoNativeMotionKeyEdit.hasClip():!!(window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard())),
+    canvasClipboard:!!(_canvasClip&&_canvasClip.snaps.length)||!!(window.NemoNativeSelectionClipboard&&NemoNativeSelectionClipboard.native(window)&&NemoNativeSelectionClipboard.hasClip(window)),frameClipboard:!!(_sel.clipboard&&_sel.clipboard.length),
+    lastClipKind:window._lastClipKind,svgImport:!!window.SMSvgImport};});
+  if(arb){
+    if(arb.preventDefault)event.preventDefault();
+    switch(arb.kind){
+      case'blurField':event.target.blur();return;
+      case'undo':undo();return;
+      case'redo':redo();return;
+      case'save':window.SMProject.save();return;
+      case'saveAs':window.SMProject.saveAs();return;
+      case'convertToComponent':window.SM.convertActiveLayerToComponent();return;
+      case'copyKeys':var nk=window.NemoNativeMotionKeyEdit&&NemoNativeMotionKeyEdit.current(document);if(nk){nk.run({kind:'copy'}).catch(function(){});return;}SMMotion.copySelectedKeys();return;
+      case'copyShapes':copySelection();return;
+      case'copyFrames':window.SM.copyFrames();return;
+      case'cutShapes':cutSelection();return;
+      case'cutFrames':window.SM.cutFrames();return;
+      case'pasteSvgFallback':
+        // Nemo's own clipboard is empty: the browser's paste event (svg-import.js) gets the system clipboard, and a short
+        // timer restores the ordinary "paste frames" fallback if what arrived wasn't SVG (feedback #749).
+        if(window._svgPasteFallback)clearTimeout(window._svgPasteFallback);
+        window._svgPasteFallback=setTimeout(function(){window._svgPasteFallback=null;window.SM.pasteFrames();},80);
+        return;
+      case'pasteKeys':var nk2=window.NemoNativeMotionKeyEdit&&NemoNativeMotionKeyEdit.current(document);if(nk2){nk2.run({kind:'paste'}).catch(function(){});return;}SMMotion.pasteKeys();return;
+      case'pasteShapes':pasteSelection();return;
+      case'pasteFrames':window.SM.pasteFrames();return;
+      default:return;
     }
-    event.preventDefault();
-    if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard()){SMMotion.pasteKeys();return;}
-    if(window._lastClipKind==='canvas'&&_canvasClip&&_canvasClip.snaps.length)pasteSelection();
-    else if(window._lastClipKind==='frames'&&_sel.clipboard&&_sel.clipboard.length)window.SM.pasteFrames();
-    else if(_canvasClip&&_canvasClip.snaps.length)pasteSelection();
-    else window.SM.pasteFrames();
-    return;
   }
   // UI/UX audit (2026-07): Ctrl/Cmd+A "select all" existed nowhere in the
   // app — a near-universal convention in every creative tool. Selects
@@ -9541,6 +9432,12 @@ function onKeyDown(event){
   // drawings). Scoped to the Select/Subselect tools only: select-all while
   // Brush/Pen/etc are active would be a silent, confusing side effect with
   // no visible feedback for what tool is active.
+  // #2371: on a native object project the layer has no Paper children; the native Select module lists the presented layer itself and owns the answer
+  // (a refusal is its own notice) - the legacy branch below never runs there, and still runs everywhere else (selectAll returns false).
+  if((event.metaKey||event.ctrlKey)&&(event.key==='a'||event.key==='A')&&window.NemoNativeSelectGesture&&window.NemoNativeSelectGesture.selectAll&&window.NemoNativeSelectGesture.selectAll(window)){
+    event.preventDefault();
+    return;
+  }
   if((event.metaKey||event.ctrlKey)&&(event.key==='a'||event.key==='A')&&(state.tool==='select'||state.tool==='subselect')&&userLayers[state.activeLayerIdx]){
     event.preventDefault();
     clearSel();
@@ -9616,7 +9513,8 @@ function onKeyDown(event){
   var _gLayerRows=!!window._layerActiveExplicit&&typeof _layerSel!=='undefined'&&_layerSel.length>=2;
   if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&!event.shiftKey&&!_gLayerRows&&window.selectedPaths&&selectedPaths.length>=2){
     event.preventDefault();
-    if(window.SMGroup)SMGroup.groupSelection();
+    if(window.NemoNativeSelectGroup&&NemoNativeSelectGroup.native(window))NemoNativeSelectGroup.group(window); // #2372: native owner, one transaction
+    else if(window.SMGroup)SMGroup.groupSelection();
     return;
   }
   // Ctrl/Cmd+Shift+G "ungroup" — free shortcut (unused elsewhere), only
@@ -9624,7 +9522,8 @@ function onKeyDown(event){
   // otherwise falls through (currently nothing else claims this combo).
   if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&event.shiftKey&&window.selectedPaths&&selectedPaths.length){
     event.preventDefault();
-    if(window.SMGroup)SMGroup.ungroupSelection();
+    if(window.NemoNativeSelectGroup&&NemoNativeSelectGroup.native(window))NemoNativeSelectGroup.ungroup(window);
+    else if(window.SMGroup)SMGroup.ungroupSelection();
     return;
   }
   // Ctrl/Cmd+G "group into folder" — the action already existed
@@ -9812,16 +9711,8 @@ function onKeyDown(event){
   // means plain Space (the only gesture this handler is actually for) is
   // unaffected; the window-blur listener below is a second-layer safety net
   // for any other modifier combo that steals focus the same way.
-  else if(k===' '&&!event.metaKey&&!event.ctrlKey){
-    event.preventDefault();
-    if(!state.spaceDown){
-      state.spaceDown=true;
-      state._spaceAt=(window.performance&&performance.now)?performance.now():Date.now();
-      state.spaceUsedForPan=false;
-      canvasEl.style.cursor='grab';
-    }
-  }
-  else if(k==='Alt'){state.altDown=true;}
+  else if(k===' '&&!event.metaKey&&!event.ctrlKey){toolHolds.spaceKeyDown(event);}
+  else if(k==='Alt'){toolHolds.altKeyDown();}
   // Rig: Enter-to-finish / Escape-to-cancel an in-progress bone (2026-07-29
   // fix, QA-confirmed "on ne sait pas comment finir les traits de bones") —
   // rig-bridge.js's bone drawing otherwise ONLY finished via double-click or
@@ -9873,6 +9764,9 @@ function onKeyDown(event){
     var nudgeStep=event.shiftKey?10:1;
     var ndx=k==='ArrowLeft'?-nudgeStep:k==='ArrowRight'?nudgeStep:0;
     var ndy=k==='ArrowUp'?-nudgeStep:k==='ArrowDown'?nudgeStep:0;
+    // #2372 insp-transform-fields: on a native object project the nudge is ONE native batch per press (or a notice saying why not), never the
+    // legacy writer below whose history checkpoint a native project refuses.
+    if(window.NemoNativeSelectionTransform&&NemoNativeSelectionTransform.native(window)){NemoNativeSelectionTransform.nudge(window,ndx,ndy,{repeat:!!event.repeat});return;}
     // Motion (2026-09 QA sweep): the canvas drag of this same selection
     // writes the layer's Motion Position (select-bridge's motion branch),
     // never the geometry — a nudge went straight to selPropsApplyMove and
@@ -9978,30 +9872,7 @@ function onKeyDown(event){
     // Figma convention) — previously had NO handler at all here, so Delete
     // silently did nothing while a node was selected with the subselect
     // tool (reported as "impossible d'enlever le point de la ligne").
-    else if(state.tool==='subselect'&&_nodeSel.length>0){
-      event.preventDefault();
-      var ntp=nodeEditTargetPath();
-      if(ntp){
-        var isCenter=!!(ntp.data&&ntp.data.isVectorBrush&&ntp.data.centerSegments);
-        var curLen=isCenter?ntp.data.centerSegments.length:ntp.segments.length;
-        var minPts=isCenter?2:(ntp.closed?3:2);
-        if(curLen-_nodeSel.length<minPts){showToast(SM.t('toastNotEnoughPointsLeft'));}
-        else{
-          pushUndo();
-          var idxsDesc=_nodeSel.slice().sort(function(a,b){return b-a;});
-          idxsDesc.forEach(function(i){
-            if(isCenter)ntp.data.centerSegments.splice(i,1);
-            else ntp.removeSegment(i);
-          });
-          if(isCenter)rebuildVectorBrushOutline(ntp);
-          _nodeSel=[];
-          renderNodeHandles();
-          fillRegenerateLinked(userLayers[state.activeLayerIdx],ntp);
-          saveActiveLayerFrame();renderArcs();updateUI();
-          if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
-        }
-      }
-    }
+    else if(state.tool==='subselect'&&_nodeSel.length>0){event.preventDefault();}// #2356: vertex delete is native-only (subselect-bridge); the Paper writer is retired
     // Same rule as Cmd+D (feedback #803, see that branch): a timeline row
     // click auto-selects the layer's whole content, so this branch fired
     // for a LAYER selection too and Delete emptied the drawing instead of
@@ -10037,101 +9908,15 @@ function onKeyDown(event){
   // a Shift+/ distinction (AE's fit-to-window) is unreachable for French
   // layouts — fit already has Ctrl+Alt+0.
 }
-// Longest hold still read as a tap. Generous enough to survive a slow
-// keypress, short enough that parking a thumb on Space to pan and thinking
-// better of it never starts playback.
-var SPACE_TAP_MS=250;
-function onKeyUp(event){if(event.key===' '){
-  // wasDown gates the whole thing: onKeyDown returns before its Space branch
-  // whenever a field has focus, so without this a Space typed into a text
-  // input would still reach here and start playback on release.
-  var wasDown=state.spaceDown;
-  var held=((window.performance&&performance.now)?performance.now():Date.now())-(state._spaceAt||0);
-  var tapped=wasDown&&!state.spaceUsedForPan&&held<SPACE_TAP_MS;
-  state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false;
-  var cc={draw:'crosshair',pen:'crosshair',line:'crosshair',rect:'crosshair',ellipse:'crosshair',select:'default',subselect:'default',eraser:'crosshair',fill:'crosshair',fillbrush:'crosshair',eyedropper:'crosshair',hand:'grab',zoom:'zoom-in',rotate:'grab',perspective:'crosshair'};canvasEl.style.cursor=cc[state.tool]||'default';
-  // Mid-path the Pen tool owns Enter/Escape to finish or cancel; starting
-  // playback under it would strand a half-drawn path, so Space stays inert
-  // there — the one place the tap gesture is suppressed.
-  if(tapped&&!(state.tool==='pen'&&_pen.path))togglePlay();
-}else if(event.key==='Alt'){state.altDown=false;}}
-// Second-layer safety net for the same stuck-spaceDown class of bug as the
-// Cmd/Ctrl+Space exclusion above: if focus ever leaves the window while
-// spaceDown/altDown is armed (any OS shortcut that steals focus before its
-// keyup reaches us — Spotlight is only the one actually reported), force a
-// clean reset on return rather than leaving the app permanently stuck in
-// "everything pans" / "everything rotates".
-window.addEventListener('blur',function(){
-  state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false;state.altDown=false;
-});
-// One capture-phase listener marks "the Space hold was actually used", rather
-// than touching either pan implementation: panning lives in BOTH tools.js
-// (Paper.js path) and viewtools-bridge.js (Rust engine path), and any pointer
-// press while Space is held belongs to the pan gesture whether or not it ends
-// up moving far enough to shift the view.
-document.addEventListener('pointerdown',function(){if(state.spaceDown)state.spaceUsedForPan=true;},true);
-
-document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
-// Cmd/Ctrl-HOLD temporarily switches to Select (2026-08-27, feedback #64
-// — "pomme en cliquant pour passer a l'outil selection", and Cyril:
-// "command est utilisé un peu dans tout logiciel, voit comment mettre ça
-// en place sans faire de conflit"). Illustrator/Photoshop convention:
-// hold Cmd while using another tool, canvas clicks act like Select;
-// release, back to what you were doing.
-//
-// The hazard: Cmd/Ctrl is the FIRST key of ~15 shortcuts already in
-// onKeyDown (Z, S, C, X, V, A, G, D, L…) — a real keypress of any combo
-// fires a genuine 'keydown' with key:'Meta'/'Control' the instant the
-// modifier itself goes down, BEFORE the letter's own keydown. Switching
-// tools on that alone would flicker the tool (and its cursor) on every
-// single Cmd+shortcut the user already relies on.
-// Fix: a short arm-delay (matches the SPACE_TAP_MS precedent above for
-// the exact same class of tap-vs-hold ambiguity). The modifier alone
-// only counts as "hold to select" if it's STILL down, with no other key
-// pressed meanwhile, after this delay — a real shortcut's letter always
-// lands well inside that window. Any other keydown while armed cancels
-// immediately (this is what actually prevents the conflict, the delay
-// alone is just what makes cancellation possible in the first place).
-var _cmdHoldTimer=null,_cmdHoldPrevTool=null,_cmdHoldDown=false;
-var CMD_HOLD_MS=180;
-function _cmdHoldEligible(){
-  return !(document.activeElement&&(document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='SELECT'||document.activeElement.tagName==='TEXTAREA'||document.activeElement.isContentEditable))
-    &&!state.playing&&state.tool!=='select'&&state.tool!=='subselect'
-    &&!(_pen&&_pen.path)&&!state.spaceDown;
-}
-document.addEventListener('keydown',function(e){
-  if(e.key==='Meta'||e.key==='Control'){
-    if(_cmdHoldDown)return; // already tracking this hold (no native repeat for modifiers, but stay safe)
-    _cmdHoldDown=true;
-    if(!_cmdHoldEligible())return;
-    _cmdHoldTimer=setTimeout(function(){
-      _cmdHoldTimer=null;
-      if(!_cmdHoldDown||!_cmdHoldEligible())return; // released, or state changed during the wait
-      _cmdHoldPrevTool=state.tool;
-      window.SM.setTool('select');
-    },CMD_HOLD_MS);
-  }else if(_cmdHoldTimer){
-    // A real key landed while the modifier was still just "maybe about to
-    // be a hold" — this IS a shortcut combo, not a hold gesture. Cancel
-    // silently; the shortcut's own Cmd+<key> handler (already gated on
-    // event.metaKey/ctrlKey) fires completely normally afterward.
-    clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;
-  }
-});
-document.addEventListener('keyup',function(e){
-  if(e.key!=='Meta'&&e.key!=='Control')return;
-  _cmdHoldDown=false;
-  if(_cmdHoldTimer){clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;return;} // never actually armed — nothing to restore
-  if(_cmdHoldPrevTool){window.SM.setTool(_cmdHoldPrevTool);_cmdHoldPrevTool=null;}
-});
-// Same stuck-modifier safety net as state.spaceDown's own window-blur
-// listener above (e.g. Cmd+Tab stealing focus mid-hold) — without this,
-// losing focus while armed would leave the tool stuck on Select forever.
-window.addEventListener('blur',function(){
-  if(_cmdHoldTimer){clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;}
-  _cmdHoldDown=false;
-  if(_cmdHoldPrevTool){window.SM.setTool(_cmdHoldPrevTool);_cmdHoldPrevTool=null;}
-});
+// U06 (#2370): the Space, Alt and Cmd/Ctrl holds live in application/tool-holds.js. Space taps play (a quick release with no
+// pointer press), holds pan; Cmd/Ctrl held past the arm delay with no other key switches to Select until release; a lost keyup
+// (window blur, page hidden) resets all three and restores the held tool exactly once.
+function onKeyUp(event){toolHolds.keyUp(event);}
+var toolHolds=NemoToolHolds.create({state:state,doc:document,win:window,
+  setTool:function(t){window.SM.setTool(t);},togglePlay:function(){togglePlay();},
+  penActive:function(){return !!(_pen&&_pen.path);},setCursor:function(c){canvasEl.style.cursor=c;}});
+NemoKeyboardArbiter.mount(document,{keydown:onKeyDown,keyup:onKeyUp});
+toolHolds.mount();
 document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});
 // Shape-tool group (2026-08, "regrouper les shape dans un mini menu comme
 // dans illustrator ou rive... click un peu longtemps ça affiche le menu").
@@ -10147,52 +9932,10 @@ document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('c
 // tutorial.js call before spotlighting a grouped tool, so a step targeting
 // e.g. '[data-tool="ellipse"]' fronts it FIRST — otherwise the real click
 // tutorial.js waits for would land on a hidden, unclickable button.
-(function(){
-  var SHAPE_TOOLS=['rect','line','ellipse','speechbubble','star'];
-  var LPRESS_MS=450,pressTimer=null,suppressClick=false,flyoutEl=null;
-  function ensureFront(tool){
-    if(SHAPE_TOOLS.indexOf(tool)<0)return;
-    SHAPE_TOOLS.forEach(function(t){
-      var b=document.querySelector('.tool-btn[data-tool="'+t+'"]');
-      if(b)b.classList.toggle('stack-front',t===tool);
-    });
-  }
-  window.SMShapeGroup={ensureFront:ensureFront};
-  function closeFlyout(){if(flyoutEl){flyoutEl.remove();flyoutEl=null;}document.removeEventListener('pointerdown',onOutsideDown,true);}
-  function onOutsideDown(e){if(flyoutEl&&!flyoutEl.contains(e.target))closeFlyout();}
-  function openFlyout(originBtn){
-    closeFlyout();
-    var rect=originBtn.getBoundingClientRect();
-    flyoutEl=document.createElement('div');
-    flyoutEl.className='shape-tool-flyout';
-    SHAPE_TOOLS.forEach(function(t){
-      var src=document.querySelector('.tool-btn[data-tool="'+t+'"]');
-      if(!src)return;
-      var item=document.createElement('button');
-      item.className='shape-tool-flyout-item'+(t===state.tool?' active':'');
-      item.innerHTML=src.innerHTML.replace(/<span class="sk">.*?<\/span>/,'');
-      item.title=src.title;
-      item.addEventListener('click',function(ev){ev.stopPropagation();ensureFront(t);window.SM.setTool(t);closeFlyout();});
-      flyoutEl.appendChild(item);
-    });
-    document.body.appendChild(flyoutEl);
-    var fr=flyoutEl.getBoundingClientRect();
-    flyoutEl.style.left=Math.min(rect.right+6,window.innerWidth-fr.width-4)+'px';
-    flyoutEl.style.top=Math.max(4,Math.min(rect.top,window.innerHeight-fr.height-4))+'px';
-    setTimeout(function(){document.addEventListener('pointerdown',onOutsideDown,true);},0);
-  }
-  var stack=document.getElementById('shape-tool-stack');
-  if(stack){
-    stack.addEventListener('pointerdown',function(e){
-      var btn=e.target.closest('.tool-btn');
-      if(!btn)return;
-      suppressClick=false;
-      pressTimer=setTimeout(function(){suppressClick=true;openFlyout(btn);},LPRESS_MS);
-    });
-    ['pointerup','pointerleave'].forEach(function(ev){stack.addEventListener(ev,function(){clearTimeout(pressTimer);});});
-    stack.addEventListener('click',function(ev){if(suppressClick){ev.stopImmediatePropagation();suppressClick=false;}},true);
-  }
-})();
+// U06 (#2370): the group and its flyout live in application/tool-rail.js; window.SMShapeGroup keeps its ensureFront contract.
+var shapeGroup=NemoToolRail.createShapeGroup({doc:document,win:window,getTool:function(){return state.tool;},setTool:function(t){window.SM.setTool(t);}});
+window.SMShapeGroup={ensureFront:shapeGroup.ensureFront};
+shapeGroup.attach(document.getElementById('shape-tool-stack'));
 document.getElementById('p-sw').addEventListener('change',function(){window.SM.setBrushSize(parseInt(this.value));});
 // Actively picking a fill color also ENABLES fill (Graphite behavior) —
 // without this, the default-off fill state made "I set my fill to red, drew,
@@ -10218,7 +9961,9 @@ document.getElementById('pm-stroke-c').addEventListener('input',function(){var v
 // tool's own default when nothing is selected) — this is a per-shape
 // property with no meaningful "future stroke" default the way a flat
 // color has.
-function applyStrokeGradAlongToSelection(mutate){
+function applyStrokeGradAlongToSelection(mutate,id){
+  // #2372 UNAVAIL-NOTICES: no native record slot for a stroke gradient along the path - notice, no pushUndo / saveActiveLayerFrame.
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,id||'p-strokegrad-along'))return;
   if(!selectedPaths.length)return;
   pushUndo();
   selectedPaths.forEach(function(p){mutate(p);});
@@ -10227,6 +9972,7 @@ function applyStrokeGradAlongToSelection(mutate){
 }
 document.getElementById('p-strokegrad-along').addEventListener('change',function(){
   var on=this.checked;
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'p-strokegrad-along')){this.checked=!on;return;}
   applyStrokeGradAlongToSelection(function(p){
     if(on){
       var fromC=document.getElementById('p-strokegrad-from-c').value;
@@ -10235,23 +9981,25 @@ document.getElementById('p-strokegrad-along').addEventListener('change',function
     }else{
       delete p.data.strokeGradientAlongPath;
     }
-  });
+  },'p-strokegrad-along');
 });
 document.getElementById('p-strokegrad-from-c').addEventListener('input',function(){
   var v=this.value;
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'p-strokegrad-from-c'))return;
   document.getElementById('p-strokegrad-from').style.background=v;
   applyStrokeGradAlongToSelection(function(p){
     if(!p.data.strokeGradientAlongPath)return;
     p.data.strokeGradientAlongPath.from=v;
-  });
+  },'p-strokegrad-from-c');
 });
 document.getElementById('p-strokegrad-to-c').addEventListener('input',function(){
   var v=this.value;
+  if(window.NemoNativeInspectorUnavailable&&window.NemoNativeInspectorUnavailable.refuse(window,'p-strokegrad-to-c'))return;
   document.getElementById('p-strokegrad-to').style.background=v;
   applyStrokeGradAlongToSelection(function(p){
     if(!p.data.strokeGradientAlongPath)return;
     p.data.strokeGradientAlongPath.to=v;
-  });
+  },'p-strokegrad-to-c');
 });
 // Figma-style color row (2026-07, "les couleurs ça peut être un système
 // comme [Figma]") — inline eye toggles + editable hex/alpha text fields
@@ -10299,13 +10047,15 @@ document.getElementById('p-stroke-hex').addEventListener('change',function(){
 // "opacity" field the way Fill does (#p-opacity), so its Figma-style
 // opacity% box writes straight into the stroke COLOR's own hex8 alpha
 // byte instead, keeping RGB untouched.
-document.getElementById('p-stroke-alpha').addEventListener('input',function(){
-  var pct=Math.max(0,Math.min(100,parseInt(this.value)||0));
+function applyStrokeAlphaField(el){
+  var pct=Math.max(0,Math.min(100,parseInt(el.value)||0));
   var rgb=(state.strokeColor||'#000000').replace('#','').slice(0,6);
   var a=Math.round(pct/100*255).toString(16).padStart(2,'0').toUpperCase();
   window.SM.setStrokeColor('#'+rgb+(pct<100?a:''));
   if(!state.strokeEnabled)window.SM.setStrokeEnabled(true);
-});
+}
+document.getElementById('p-stroke-alpha').addEventListener('input',function(){nativeTypedInput(this);applyStrokeAlphaField(this);});
+document.getElementById('p-stroke-alpha').addEventListener('change',function(){nativeScrubChange(this,function(){applyStrokeAlphaField(this);}.bind(this));});
 ['p-fill-hex','p-stroke-hex'].forEach(function(id){
   var el=document.getElementById(id);
   el.addEventListener('keydown',function(e){if(e.key==='Enter')this.blur();});
@@ -10358,7 +10108,8 @@ if(window.ColorPicker){
     {wrap:'pm-fill',input:'pm-fill-c',onNone:function(){window.SM.setFillEnabled(false);},onEyedrop:function(){window.SM.setTool('eyedropper');}},
   ]);
 }
-document.getElementById('p-opacity').addEventListener('input',function(){window.SM.setOpacity(this.value);});
+document.getElementById('p-opacity').addEventListener('input',function(){nativeTypedInput(this);window.SM.setOpacity(this.value);});
+document.getElementById('p-opacity').addEventListener('change',function(){nativeScrubChange(this,function(){window.SM.setOpacity(this.value);}.bind(this));});
 document.getElementById('p-smooth').addEventListener('input',function(){window.SM.setSmoothing(parseInt(this.value));});
 document.getElementById('p-stab').addEventListener('change',function(){window.SM.setStabilizer(this.value);});
 document.getElementById('p-strokestyle').addEventListener('change',function(){window.SM.setStrokeStyle(this.value);});
@@ -10491,8 +10242,42 @@ document.getElementById('p-vecbrush').addEventListener('change',function(){windo
 // one per tick.
 function wireLiveXformField(id,apply){
   var el=document.getElementById(id),started=false;
-  el.addEventListener('input',function(){apply(this,started);started=true;});
-  el.addEventListener('change',function(){started=false;});
+  el.addEventListener('input',function(){
+    if(nativeXformOwned()){nativeTypedInput(this);nativeXformEdit(id,this);return;}
+    apply(this,started);started=true;
+  });
+  el.addEventListener('change',function(){
+    if(nativeXformOwned()){nativeScrubChange(this,function(){nativeXformEdit(id,el);});started=false;return;}
+    started=false;
+  });
+}
+// #2372 insp-transform-fields: on a native object project the fields commit the Select selection through ONE native batch
+// (adapters/native-selection-transform.js, coalesced per field), never through selPropsApply* whose history checkpoint a native project refuses.
+var NATIVE_XFORM_FIELDS={'sp-x':'x','sp-y':'y','sp-w':'w','sp-h':'h','sp-rot':'rot'};
+// The Transform fields scrub like the style ones on a native project: one change at release -> one native batch.
+function markNativeXformFields(){
+  var T=window.NemoNativeSelectionTransform,own=!!T&&T.native(window)&&selectedPaths.length>0;
+  Object.keys(NATIVE_XFORM_FIELDS||{}).forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    if(own)el.dataset.nativeOpacityScrub='static';
+    else if(el.dataset.nativeOpacityScrub==='static')delete el.dataset.nativeOpacityScrub;
+  });
+}
+function nativeXformOwned(){var T=window.NemoNativeSelectionTransform;return !!T&&T.native(window);}
+function nativeXformRead(){
+  var b=xformSelBounds();if(!b)return null;
+  var a=xformAnchorPoint(b);
+  return {bounds:{x:b.x,y:b.y,width:b.width,height:b.height},anchor:{x:a.x,y:a.y},rotAccum:state.selRotAccum||0};
+}
+function nativeXformEdit(id,el){
+  var T=window.NemoNativeSelectionTransform,field=NATIVE_XFORM_FIELDS[id],v=parseFloat(el.value);
+  if((field==='w'||field==='h')&&_spSizeLockOn){
+    // the locked partner field follows at once, as the baseline did (the batch itself is committed when the typing stops)
+    var b=xformSelBounds(),other=document.getElementById(field==='w'?'sp-h':'sp-w');
+    if(b&&other&&b.width>=0.01&&b.height>=0.01){var f=Math.max(0.01,v||(field==='w'?b.width:b.height))/(field==='w'?b.width:b.height);other.value=Math.round((field==='w'?b.height:b.width)*f);}
+  }
+  T.edit(window,{field:field,value:v,lock:_spSizeLockOn,vertex:activeXformVertexMode(),read:nativeXformRead});
 }
 // Subselect tool + at least one vertex picked (_nodeSel) drives THOSE
 // vertices' bounds/move/scale/rotate instead of the whole path's — 2026-07,
@@ -10554,19 +10339,27 @@ function renderXformAnchorGrid(){
     btn.classList.toggle('xa-active',!state.xformAnchorCustom&&btn.dataset.key===state.xformAnchorKey);
   });
 }
-document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
-  btn.addEventListener('click',function(e){
-    e.stopPropagation();
-    state.xformAnchorKey=btn.dataset.key;
-    state.xformAnchorCustom=null; // explicit preset pick always wins back over a custom point
+// #2372 xform-anchor-grid: on a native selection the pivot is a session preference only (selection-transform read() derives the anchor from state),
+// so a pick never stamps the strokes nor reaches saveActiveLayerFrame (a legacy writer a native project refuses).
+function xformAnchorPick(key){
+  var NS=window.NemoNativeSelectionStyle,own=!!NS&&NS.handles(window);
+  state.xformAnchorKey=key;
+  state.xformAnchorCustom=null; // explicit preset pick always wins back over a custom point
+  if(!own){
     // Persist per-stroke (2026-07, same fix as select-bridge.js's canvas
     // Alt-drag path) so picking a preset here ALSO survives a deselect+
     // reselect, not just the canvas gesture.
-    selectedPaths.forEach(function(p){if(p&&p.data){p.data.xformAnchorKey=btn.dataset.key;delete p.data.xformAnchorCustom;}});
+    selectedPaths.forEach(function(p){if(p&&p.data){p.data.xformAnchorKey=key;delete p.data.xformAnchorCustom;}});
     if(selectedPaths.length)saveActiveLayerFrame();
-    renderXformAnchorGrid();
-    if(window.renderTransformHandles)renderTransformHandles();
-    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }
+  renderXformAnchorGrid();
+  if(window.renderTransformHandles)renderTransformHandles();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
+  btn.addEventListener('click',function(e){
+    e.stopPropagation();
+    xformAnchorPick(btn.dataset.key);
   });
 });
 renderXformAnchorGrid();
@@ -10579,11 +10372,16 @@ document.querySelectorAll('#align-toolbar .align-btn[data-distribute]').forEach(
 document.getElementById('btn-pt-corner').addEventListener('click',function(){window.SM.setPointType('corner');});
 document.getElementById('btn-pt-smooth').addEventListener('click',function(){window.SM.setPointType('smooth');});
 document.getElementById('btn-pt-symmetric').addEventListener('click',function(){window.SM.setPointType('symmetric');});
+document.getElementById('btn-pt-collapse').addEventListener('click',function(){window.SM.setPointType('collapse');});
 // Alt/Option+click = non-destructive combine-group (2026-07-29, mirrors
 // Illustrator's own Alt+Pathfinder "Compound Shape" convention) — plain
 // click keeps the existing destructive booleanOp byte-for-byte unchanged.
 function wireBoolBtn(id,mode){
   document.getElementById(id).addEventListener('click',function(e){
+    // #2372 insp-boolean-ops: on a native object project both gestures go to the native owner (booleanApply / combine, one history entry each)
+    // and never reach the legacy Paper writers whose history checkpoint a native project refuses.
+    var nativeBool=window.NemoNativeSelectionBoolean;
+    if(nativeBool&&nativeBool.native(window)){if(e.altKey)nativeBool.combine(window,mode);else nativeBool.apply(window,mode);return;}
     if(e.altKey&&window.SMGroup)SMGroup.combineSelection(mode);
     else window.SM.booleanOp(mode);
   });
@@ -10644,8 +10442,8 @@ document.getElementById('p-maskmode-type').addEventListener('change',function(){
 document.getElementById('p-cw').addEventListener('change',function(){window.SM.setCanvasSize(parseInt(this.value),_dimsLockRatio?Math.max(1,Math.round(parseFloat(this.value)/_dimsLockRatio)):state.canvasH);});
 document.getElementById('p-ch').addEventListener('change',function(){window.SM.setCanvasSize(_dimsLockRatio?Math.max(1,Math.round(parseFloat(this.value)*_dimsLockRatio)):state.canvasW,parseInt(this.value));});
 document.getElementById('p-cbg').addEventListener('input',function(){var c=this.dataset.hex8;window.SM.setCanvasBg(c&&c.slice(0,7).toLowerCase()===this.value.toLowerCase()?c:this.value);});
-document.getElementById('btn-clip').addEventListener('click',function(){window.SM.setCanvasClip(!state.canvasClip);this.classList.toggle('active',state.canvasClip);});
-document.getElementById('btn-safety').addEventListener('click',function(){window.SM.setSafetyZones(!state.safetyZones);this.classList.toggle('active',state.safetyZones);});
+document.getElementById('btn-clip').addEventListener('click',function(){if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'clip',this))return;window.SM.setCanvasClip(!state.canvasClip);this.classList.toggle('active',state.canvasClip);});
+document.getElementById('btn-safety').addEventListener('click',function(){if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'safety',this))return;window.SM.setSafetyZones(!state.safetyZones);this.classList.toggle('active',state.safetyZones);});
 var _btnRulers=document.getElementById('btn-rulers');
 if(_btnRulers){
   _btnRulers.classList.toggle('active',!!state.rulersOn);
@@ -10665,6 +10463,7 @@ if(_btnRulers){
 var _btnAlphaBg=document.getElementById('btn-alphabg');
 if(_btnAlphaBg){
   _btnAlphaBg.addEventListener('click',function(){
+    if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'alpha',this))return;
     state.previewAlphaBg=!state.previewAlphaBg;
     this.classList.toggle('active',state.previewAlphaBg);
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
@@ -10681,6 +10480,12 @@ if(_btnAlphaBg){
 // no-op stub (rather than deleted outright) since labs-float-panel.js's
 // cycleMode still calls it after a Symmetry mode change.
 window.syncSymmetryPanelVisibility=function(){};
+// #2372: on a native object project the blend and matte pickers write ONE native compositing edit on commit and never touch
+// the legacy layer model; a hover is a UI-local label preview only (no document, ld or engine write).
+function nativeCompositing(){try{var a=window.NemoNativeObjectLayerCompositing;return a&&typeof a.desktop==='function'?a.desktop(window):null;}catch(_){return null;}}
+function nativeCompositingRefused(){if(window.showToast)showToast('Native layer compositing command was refused.');}
+function nativeCompositingRefresh(){try{if(window.SMMotion&&SMMotion.renderMotionPropsPanel)SMMotion.renderMotionPropsPanel();if(window.renderLayerList)renderLayerList();if(window.renderTimeline)renderTimeline();}catch(_){}}
+window.nativeCompositing=nativeCompositing;window.nativeCompositingRefused=nativeCompositingRefused;window.nativeCompositingRefresh=nativeCompositingRefresh;
 // Custom blend-mode dropdown (feedback #17): hovering an option in the open
 // list applies that blend mode to the active layer IMMEDIATELY as a live
 // canvas preview; clicking commits it (with undo), while closing any other
@@ -10694,6 +10499,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
   var origMode=null; // layer's mode when the list opened — the revert target while previewing
   function currentLd(){return state.layers[state.activeLayerIdx];}
   function applyPreview(v){
+    if(nativeCompositing()){dd.textContent=BLEND_MODE_LABELS[v]||v;return;} // #2372: native hover = label only
     var ld=currentLd();if(!ld)return;
     // Keyed layers (feedback #207, Duik-inspired hold-only Blend keys) skip
     // the live hover preview here — layerBlendModeAt (motion.js) ignores
@@ -10722,6 +10528,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
     // #207), not the (irrelevant once keyed) static field.
     var keyedAtOpen=!!(ld.blendKeys&&ld.blendKeys.length);
     origMode=keyedAtOpen?((window.SMMotion&&SMMotion.layerBlendModeAt)?SMMotion.layerBlendModeAt(state.activeLayerIdx,state.currentFrame):(ld.blendMode||'normal')):(ld.blendMode||'normal');
+    var natOpen=nativeCompositing();if(natOpen)origMode=natOpen.blendOf(state.activeLayerIdx,state.currentFrame);
     pop.innerHTML='';
     Object.keys(BLEND_MODE_LABELS).forEach(function(v){
       var it=document.createElement('div');
@@ -10730,6 +10537,12 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
       it.addEventListener('mouseenter',function(){applyPreview(v);});
       it.addEventListener('click',function(e){
         e.stopPropagation();
+        var nat=nativeCompositing();
+        if(nat){ // #2372: one native edit, no ld write, no pushUndo
+          var from=origMode;origMode=null;close(false);
+          nat.setBlend(state.activeLayerIdx,v,state.currentFrame).then(function(){setLabel(v);nativeCompositingRefresh();},function(){setLabel(from||'normal');nativeCompositingRefused();});
+          return;
+        }
         var ld2=currentLd();if(!ld2){close(false);return;}
         if(ld2.blendKeys&&ld2.blendKeys.length){
           // Duik-style hold key: SNAP the mode at the current frame instead
@@ -10811,6 +10624,7 @@ function matteModeLabel(mode){
   var origMode=null;
   function currentLd(){return state.layers[state.activeLayerIdx];}
   function applyPreview(v){
+    if(nativeCompositing()){dd.textContent=matteModeLabel(v)||v;return;} // #2372: native hover = label only
     var ld=currentLd();if(!ld)return;
     ld.matteMode=v==='none'?undefined:v;
     window._sceneVersion=(window._sceneVersion||0)+1;
@@ -10843,6 +10657,7 @@ function matteModeLabel(mode){
       return;
     }
     origMode=ld.matteMode||'none';
+    var natOpen=nativeCompositing();if(natOpen)origMode=natOpen.matteOf(state.activeLayerIdx);
     pop.innerHTML='';
     MATTE_MODES.forEach(function(v){
       var it=document.createElement('div');
@@ -10851,6 +10666,12 @@ function matteModeLabel(mode){
       it.addEventListener('mouseenter',function(){applyPreview(v);});
       it.addEventListener('click',function(e){
         e.stopPropagation();
+        var nat=nativeCompositing();
+        if(nat){ // #2372: one native edit (None clears the matte; a pick freezes the adjacent source in the same write)
+          var from=origMode;origMode=null;close(false);
+          nat.setMatteMode(state.activeLayerIdx,v).then(function(){setLabel(v);nativeCompositingRefresh();},function(){setLabel(from||'none');nativeCompositingRefused();});
+          return;
+        }
         var ld2=currentLd();if(ld2)ld2.matteMode=origMode==='none'?undefined:origMode;
         pushUndo();
         applyPreview(v);
@@ -11060,13 +10881,19 @@ document.getElementById('btn-bake-cache').addEventListener('click',function(){ma
 })();
 document.getElementById('btn-tween-curves').addEventListener('click',function(){window.SM.toggleTweenCurves();});
 document.getElementById('btn-ghost-select').addEventListener('click',function(){selectGhostAll();});
-document.getElementById('btn-shadow-guides').addEventListener('click',function(){window.SM.toggleShadowGuides();});
+document.getElementById('btn-shadow-guides').addEventListener('click',function(){
+  // #2373: on a native object project the switch rides the next preview request (view-only; a refused hide lights the button again).
+  if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'shadow',this))return;
+  window.SM.toggleShadowGuides();
+});
 // Team review view filter — cycles All -> Mine -> Corrections, purely a
 // render-time filter in engine-bridge.js's buildSceneJson (never touches
 // the document), so switching is instant and always reversible.
 var REVISION_VIEW_LABELS={all:'Tout',mine:'Mes traits',revisions:'Corrections'};
 var REVISION_VIEW_ORDER=['all','mine','revisions'];
 document.getElementById('btn-revision-view').addEventListener('click',function(){
+  // #2371: a native object project has no legacy scene filter behind this cycle; the unavailable table says so and nothing changes.
+  if(window.NemoNativeInspectorUnavailable&&NemoNativeInspectorUnavailable.refuse(window,'btn-revision-view'))return;
   var idx=REVISION_VIEW_ORDER.indexOf(state.revisionView);
   state.revisionView=REVISION_VIEW_ORDER[(idx+1)%REVISION_VIEW_ORDER.length];
   this.textContent=REVISION_VIEW_LABELS[state.revisionView];
@@ -11081,6 +10908,8 @@ var currentOutlineChk=document.getElementById('p-current-outline');
 if(currentOutlineChk){
   currentOutlineChk.checked=!!state.currentFrameOutline;
   currentOutlineChk.addEventListener('change',function(){
+    // #2372: on a native object project the flag rides the next preview request (view-only; a refusal unchecks the box).
+    if(window.NemoNativeViewAids&&window.NemoNativeViewAids.toggle(window,'outline',this))return;
     state.currentFrameOutline=this.checked;
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   });
@@ -11248,8 +11077,8 @@ document.getElementById('btn-al').addEventListener('click',function(e){
     {label:SM.t('ctxInsertLayerSlider'),action:function(){window.SM.addSliderLayer();}},
   ]);
 });
-document.getElementById('btn-dl').addEventListener('click',function(){window.SM.deleteLayer();});
-document.getElementById('btn-dupl').addEventListener('click',function(){window.SM.duplicateLayer();});
+document.getElementById('btn-dl').addEventListener('click',function(){if(window.NemoNativeLayerRowUi&&window.NemoNativeLayerRowUi.toolbar(window,'delete'))return;window.SM.deleteLayer();});
+document.getElementById('btn-dupl').addEventListener('click',function(){if(window.NemoNativeLayerRowUi&&window.NemoNativeLayerRowUi.toolbar(window,'duplicate'))return;window.SM.duplicateLayer();});
 document.getElementById('btn-comp').addEventListener('click',function(){window.SM.convertActiveLayerToComponent();});
 document.getElementById('btn-comp-enter').addEventListener('click',function(){var ld=state.layers[state.activeLayerIdx];if(ld&&ld.symbolId)window.SM.enterSymbol(ld.symbolId);});
 document.getElementById('btn-comp-detach').addEventListener('click',function(){window.SM.convertComponentToLayer();});
@@ -11362,6 +11191,7 @@ window.renderRigModeUI=renderRigModeUI;
     });
   });
   document.getElementById('btn-rig-auto-assign').addEventListener('click',function(){
+    if(window.NemoNativeObjectRigUI&&NemoNativeObjectRigUI.panel(window,'autoAssign'))return;
     var ld=state.layers[state.activeLayerIdx];
     if(!ld)return;
     if(!canEditActiveLayer())return;
@@ -11391,10 +11221,12 @@ window.renderRigModeUI=renderRigModeUI;
     else showToast(res.n+(window.SM&&SM.t?SM.t('rigAutoAssignedToast'):SM.t('toastShapesAutoAssignedSuffix')));
   });
   document.getElementById('btn-rig-commit').addEventListener('click',function(){
+    if(window.NemoNativeObjectRigUI&&NemoNativeObjectRigUI.panel(window,'commit'))return;
     var ld=state.layers[state.activeLayerIdx];
     if(ld)rigCommitFrame(ld);
   });
   document.getElementById('btn-rig-reset').addEventListener('click',function(){
+    if(window.NemoNativeObjectRigUI&&NemoNativeObjectRigUI.panel(window,'reset'))return;
     var ld=state.layers[state.activeLayerIdx];
     if(!ld||!ld.rig)return;
     if(!canEditActiveLayer())return;
@@ -11417,6 +11249,7 @@ function updateCombinePanel(){
   var existingRow=document.getElementById('combine-existing-row');
   var btns=Object.keys(COMBINE_MODE_BTN_IDS).map(function(m){return document.getElementById(COMBINE_MODE_BTN_IDS[m]);});
   if(!existingRow||btns.some(function(b){return !b;}))return;
+  if(window.NemoNativeSelectGroup&&NemoNativeSelectGroup.native(window)){NemoNativeSelectGroup.syncPanel(window);return;} // #2372: the group is read from the native listing
   var li=state.activeLayerIdx,ld=state.layers[li],layer=userLayers[li];
   var gid=null;
   if(ld&&ld.groups&&sel&&sel.length){
@@ -11473,6 +11306,7 @@ window.updateCombinePanel=updateCombinePanel;
     });
   });
   document.getElementById('btn-combine-remove').addEventListener('click',function(){
+    if(window.NemoNativeSelectGroup&&NemoNativeSelectGroup.native(window)){NemoNativeSelectGroup.removeMember(window);return;}
     var sel=window.selectedPaths;
     if(!sel||sel.length!==1||!window.SMGroup)return;
     var li=state.activeLayerIdx;
@@ -11480,6 +11314,7 @@ window.updateCombinePanel=updateCombinePanel;
     updateCombinePanel();
   });
   document.getElementById('btn-combine-flatten').addEventListener('click',function(){
+    if(window.NemoNativeSelectGroup&&NemoNativeSelectGroup.native(window)){NemoNativeSelectGroup.flatten(window);return;}
     var gid=activeCombineGid();
     if(!gid||!window.SMGroup)return;
     var li=state.activeLayerIdx;
@@ -11601,14 +11436,17 @@ window.updateCombinePanel=updateCombinePanel;
       onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);},
       onRiveProgress:function(msg){progEl.style.display='block';progEl.textContent=msg;}};
     var nativeAuthority=window.NemoNativeOpacityCutover;
-    var nativeExport=(fmtSel.value==='png'||fmtSel.value==='svg')&&nativeAuthority&&nativeAuthority.blocksLegacy();
+    var nativeHeld=!!(nativeAuthority&&nativeAuthority.blocksLegacy());
+    var nativeExport=(fmtSel.value==='png'||fmtSel.value==='svg')&&nativeHeld;
     var nativePng=fmtSel.value==='png'&&nativeExport;
     nativePngAbort=nativePng?new AbortController():null;if(nativePngAbort)opts.signal=nativePngAbort.signal;
     runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');cancelBtn.disabled=false;cancelBtn.style.display=(nativePng||fmtSel.value==='svg'&&!nativeExport&&window.SMExport.isAvailable())?'':'none';
     try{
       // Native PNG/SVG read a pinned Rust revision. Saving Paper frames
-      // here would either be denied or create a second document writer.
-      if(!nativeExport)saveAllLayerFrames();
+      // here would either be denied or create a second document writer, so
+      // no format saves them while native authority holds the document: one
+      // with no native exporter (Lottie) refuses typed in export.js (#2343 B1).
+      if(!nativeHeld)saveAllLayerFrames();
       var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie',rive:'exportRive','ae-camera':'exportAECamera'}[fmtSel.value];
       var res=await window.SMExport[fn](opts);
       if(res.cancelled){progEl.textContent=SM.t('exportCancelled');}

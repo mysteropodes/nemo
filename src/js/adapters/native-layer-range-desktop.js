@@ -1,4 +1,4 @@
-/* Native read-only bar rows and one ordered gesture. Rust owns range/Motion/content/Arc/history. */
+/* Native bar rows, one ordered gesture and the bar menu. Rust owns range/Motion/content/Arc/history. */
 (function(root,factory){
   var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeLayerRangeDesktop=api;
 }(typeof globalThis==='object'?globalThis:this,function(){
@@ -67,7 +67,17 @@
     value.items.forEach(function(k){if(!k||!Number.isFinite(k.frame)||k.frame<=previous||typeof k.selected!=='boolean')throw Error('Invalid native key projection');previous=k.frame;});
     return value;
   }
+  // #2377: the property key read with the Time Remap lanes of the video placements added (native-time-remap-keys.js).
   function keyViews(root,w){
+    var real=propertyViews(root,w),Remap=root.NemoNativeTimeRemapKeys;
+    return Remap&&root.state.appMode==='motion'?Remap.merge(root,w.info,real):real;
+  }
+  // The key route: the selected Time Remap keys when they are the selection, else the property key editor.
+  function editRoute(root,w){
+    var Remap=root.NemoNativeTimeRemapKeys,real=w.ports&&w.ports.editSelectedKeys;
+    return typeof real!=='function'?real:Remap?Remap.route(root,real):real;
+  }
+  function propertyViews(root,w){
     var plural=w&&w.ports&&w.ports.readMotionKeyTimelines;
     if(typeof plural!=='function'){
       var one=keyView(root,w);if(!one)return null;
@@ -91,7 +101,7 @@
     value.tracks.map(function(track){return [trackIdentity(track),track.items.map(function(k){return k.frame;})];})]);}
   function keyAddress(track,frame){return {target:{kind:'property',target:track.target,property:track.property},frame:frame};}
   function selectedAddresses(value){var keys=[];value.tracks.forEach(function(track){track.items.forEach(function(key){if(key.selected)keys.push(keyAddress(track,key.frame));});});return keys;}
-  function clearKeys(w){(w.keyNodes||[]).forEach(function(n){if(n.parentNode)n.parentNode.removeChild(n);});w.keyNodes=[];}
+  function clearKeys(w){(w.keyNodes||[]).concat(w.spanNodes||[]).forEach(function(n){if(n.parentNode)n.parentNode.removeChild(n);});w.keyNodes=[];w.spanNodes=[];w.keySig=null;if(w.box)w.box.remove();}
   function keyRows(root,w,layout){
     if(layout.length&&(!w.ports||typeof w.ports.setKeyTimelineRows!=='function'||w.ports.setKeyTimelineRows(layout,w.info)!==true))throw Error('Native property label rows unavailable');
     if(!layout.length&&w.ports&&typeof w.ports.setKeyTimelineRows==='function')w.ports.setKeyTimelineRows([],w.info);
@@ -99,12 +109,51 @@
       row.style.height=((1+extra)*22)+'px';var bar=row.querySelector('.layer-inout-bar');if(bar){bar.style.bottom=extra?'auto':'2px';bar.style.height=extra?'18px':'';}
     });
   }
-  function refreshKeys(root){
-    var w=works.get(root);if(!w)return;clearKeys(w);
+  // #2377: the frames a drag may snap to beyond the playhead, work area and composition markers (the baseline snapMotionFrame): every key track in the
+  // key read (open drawers and Time Remap lanes), the markers of each layer ('Repère calque'), the keys of each layer's effect stack, the keys of every
+  // layer's own property holders (the dragged keys left out) and the BPM beats while the grid is shown.
+  function snapLists(range){
+    var own=function(o,k){return Object.prototype.hasOwnProperty.call(o,k);},frames=function(k){return !own(range,k)||Array.isArray(range[k])&&range[k].length<=512&&range[k].every(function(f){return Number.isSafeInteger(f)&&f>=0;});};
+    return (!own(range,'markers')||Array.isArray(range.markers)&&range.markers.length<=64&&range.markers.every(function(m){return !!m&&typeof m==='object'&&Number.isSafeInteger(m.frame)&&m.frame>=0&&
+      Object.keys(m).every(function(k){return k==='frame'||k==='name';})&&(!own(m,'name')||typeof m.name==='string'&&m.name.length>=1&&m.name.length<=32);}))&&frames('effectKeys')&&frames('keyFrames');
+  }
+  // The selected property keys of the key read per layer and frame: the keys a drag is moving, which must not be a snap target of themselves.
+  function draggedKeys(v){
+    var out=new Map();
+    ((v&&v.tracks)||[]).forEach(function(t){if(t.remap)return;t.items.forEach(function(k){if(!k.selected)return;
+      var m=out.get(t.target.layerUid)||new Map();m.set(k.frame,(m.get(k.frame)||0)+1);out.set(t.target.layerUid,m);});});
+    return out;
+  }
+  // Baseline collectMotionSnapCandidates: state.bpmShow beats ('Temps BPM'), read from the native composition projection through SMBpm.
+  function beatCandidates(root){
     try{
-      keyRows(root,w,[]);
-      if(!w.node||root.state.appMode!=='motion'||!ready(root,session(root),w.info))return;
-      var value=keyViews(root,w),fc=root.FC;if(!value||!Number.isFinite(fc)||fc<=0)return;
+      var bpm=root.SMBpm,ctl=root.NemoNativeCompositionController,p=ctl&&typeof ctl.read==='function'?ctl.read():null,c=p&&p.composition;
+      if(!bpm||typeof bpm.beatFrames!=='function'||!c||c.effectiveBpmShow!==true||!(c.effectiveBpm>0)||!(root.state.fps>0))return [];
+      return bpm.beatFrames().map(function(b){return {frame:b.frame,label:'Temps BPM'};});
+    }catch(_){return [];}
+  }
+  function snapView(root,w){
+    var v=keyViews(root,w),extra=[],dragged=draggedKeys(v);
+    w.rows.forEach(function(row,i){var r=row.nativeRange&&same(row.nativeRange.pin,w.info)?row.nativeRange.range:null;if(!r)return;
+      (r.markers||[]).forEach(function(m){extra.push({frame:m.frame,label:m.name||'Repère calque'});});
+      (r.effectKeys||[]).forEach(function(f){extra.push({frame:f,label:'Clé'});});
+      var mine=dragged.get(w.info.layers[i].layerUid),skipped=new Map();
+      (r.keyFrames||[]).forEach(function(f){var out=mine&&mine.get(f)||0,seen=skipped.get(f)||0;
+        if(seen<out){skipped.set(f,seen+1);return;}extra.push({frame:f,label:'Clé'});});});
+    beatCandidates(root).forEach(function(b){extra.push(b);});
+    return v||extra.length?{tracks:v?v.tracks:[],extra:extra}:null;
+  }
+  function resetKeys(root,w){clearKeys(w);keyRows(root,w,[]);}
+  // The key buttons depend on the key frames, selection, lanes and zoom, not on which frame is shown: a playback tick whose projection prints the same
+  // signature keeps its buttons (#2371) and only swaps the live value their handlers read.
+  function keySignature(root,w,fc,layout,positions){
+    return JSON.stringify([fc,layout,positions.map(function(p){return [p.index,w.rows[p.index].hidden,trackIdentity(p.track),p.key.frame,p.key.selected,p.key.color||null,p.key.v||null,p.left,p.top];})]);
+  }
+  function refreshKeys(root){
+    var w=works.get(root);if(!w)return;
+    try{
+      var live=w.node&&root.state.appMode==='motion'&&ready(root,session(root),w.info),value=live?keyViews(root,w):null,fc=root.FC;
+      if(!value||!Number.isFinite(fc)||fc<=0){resetKeys(root,w);return;}
       var groups=new Map(),layout=[],positions=[];
       value.tracks.forEach(function(track){
         var index=w.info.layers.findIndex(function(l){return l.layerUid===track.target.layerUid;});if(index<0)throw Error('Foreign native key layer');
@@ -119,26 +168,108 @@
           positions.push({track:track,key:key,index:index,left:left,top:top});
         });});
       });
-      keyRows(root,w,layout);
+      var signature=keySignature(root,w,fc,layout,positions);
+      if(w.keySig===signature&&w.keyNodes.every(function(n){return !!n.parentNode;})){w.keyValue=value;return;}
+      resetKeys(root,w);keyRows(root,w,layout);w.keyValue=value;
+      // #2377: the duration blocks and connector bars behind the keys, tinted like the keys (baseline motion.js trackRowHtml).
+      if(root.NemoNativeMotionKeySpans){
+        var byRow=new Map();positions.forEach(function(position){var list=byRow.get(position.index)||[];if(!list.some(function(e){return e.track===position.track;}))list.push({track:position.track,top:position.top});byRow.set(position.index,list);});
+        byRow.forEach(function(entries,index){if(w.rows[index].hidden)return;
+          w.spanNodes=w.spanNodes.concat(root.NemoNativeMotionKeySpans.draw(root.document,w.rows[index],entries,fc,function(event,track,a,b){pickSpan(root,w,event,track,a,b);}));});
+      }
       positions.forEach(function(position){
         var track=position.track,key=position.key,row=w.rows[position.index];if(row.hidden)return;
         var node=root.document.createElement('button');node.type='button';node.className='motion-key layer-inout-key native-motion-property-key';
         Object.assign(node.style,{position:'absolute',left:position.left+'px',top:position.top+'px',padding:'0',cursor:'pointer',zIndex:'7'});
-        node.dataset.frame=String(key.frame);node.dataset.keyTrack=trackIdentity(track);node.classList.toggle('sel',key.selected);
+        node.dataset.frame=String(key.frame);node.dataset.keyTrack=trackIdentity(track);node.dataset.selected=String(key.selected);node.classList.toggle('sel',key.selected);
+        if(key.color){node.classList.add('tinted');if(typeof node.style.setProperty==='function')node.style.setProperty('--key-color',key.color);else node.style['--key-color']=key.color;}
         node.setAttribute('aria-label',track.property+' key at frame '+String(key.frame));node.setAttribute('aria-pressed',String(key.selected));
         function choose(event){
           event.preventDefault();event.stopPropagation();if(event.button!==undefined&&event.button!==0)return;
           try{
-            if(root.state.appMode!=='motion'||node.parentNode!==row||w.rows[position.index]!==row||root.FC!==fc||w.down||w.marquee||!ready(root,session(root),w.info)||!value.isCurrent())throw Error('Stale native key selection');
-            var keys=event.ctrlKey||event.metaKey||event.shiftKey?selectedAddresses(value):[],address=keyAddress(track,key.frame),id=JSON.stringify(address);
+            var live=w.keyValue;
+            if(root.state.appMode!=='motion'||node.parentNode!==row||w.rows[position.index]!==row||root.FC!==fc||w.down||w.marquee||!ready(root,session(root),w.info)||!live||live.frame!==root.state.currentFrame||!live.isCurrent())throw Error('Stale native key selection');
+            var modified=event.ctrlKey||event.metaKey||event.shiftKey;
+            // A plain press on an already selected key keeps the group, so it can be dragged as one (baseline onDragMove).
+            var keys=modified||key.selected?selectedAddresses(live):[],address=keyAddress(track,key.frame),id=JSON.stringify(address);
             var at=keys.findIndex(function(k){return JSON.stringify(k)===id;});if(at>=0&&(event.ctrlKey||event.metaKey))keys.splice(at,1);else if(at<0)keys.push(address);
-            if(value.selectKeys(keys)!==true)throw Error('Native key selection refused');refreshKeys(root);
+            if(live.selectKeys(keys)!==true)throw Error('Native key selection refused');refreshKeys(root);
+            if(!modified&&event.detail!==0)dragKeys(root,w,fc,event,node);
           }catch(_){notice(root,'Native key selection is unavailable or stale.');}
         }
         node.addEventListener('mousedown',choose);node.addEventListener('click',function(event){if(event.detail===0)choose(event);});
+        node.addEventListener('contextmenu',function(event){keyMenu(root,w,track,key,event);});
         row.appendChild(node);w.keyNodes.push(node);
       });
+      w.keySig=signature;
+      boxUpdate(root,w);
     }catch(_){clearKeys(w);try{keyRows(root,w,[]);}catch(_){}notice(root,'Native key timeline coordinates are unavailable.');}
+  }
+  // A press on a connector selects its two end keys (baseline: "le trait est une cible") and moves the playhead to the first of them.
+  function pickSpan(root,w,event,track,a,b){
+    event.preventDefault();event.stopPropagation();if(event.button!==undefined&&event.button!==0)return;
+    try{
+      var live=w.keyValue;
+      if(root.state.appMode!=='motion'||!live||live.frame!==root.state.currentFrame||!live.isCurrent())throw Error('Stale native key selection');
+      if(live.selectKeys([keyAddress(track,a.frame),keyAddress(track,b.frame)])!==true)throw Error('Native key selection refused');
+      refreshKeys(root);
+      if(event.detail!==0)dragSpan(root,w,event,track,a,b);
+      // Baseline motion.js: the press then moves the playhead to the connector's first key (goToFrame(keyA.frame)).
+      if(a.frame!==root.state.currentFrame&&typeof root.goToFrame==='function'){
+        var jump=root.goToFrame(a.frame);if(jump&&typeof jump.catch==='function')jump.catch(function(){notice(root,'The playhead could not move to the key.');});
+      }
+    }catch(_){notice(root,'Native key selection is unavailable or stale.');}
+  }
+  // #2377: dragging a connector moves its two end keys by one delta; Alt retimes the second key alone (baseline motion.js connector drag).
+  function dragSpan(root,w,event,track,a,b){
+    var gesture=root.NemoNativeMotionKeyGesture,drag=root.NemoNativeMotionConnectorDrag;
+    if(!gesture||!drag||!w.ports||typeof w.ports.editSelectedKeys!=='function'||w.keyDrag)return;
+    var id=trackIdentity(track);
+    w.keyDrag=drag.start({gesture:gesture,doc:root.document,event:event,fc:root.FC,total:w.info.totalFrames,track:track,a:a,b:b,address:keyAddress,
+      view:function(){try{return keyViews(root,w);}catch(_){return null;}},edit:editRoute(root,w),refresh:function(){refreshKeys(root);},
+      nodes:function(frames){return (w.keyNodes||[]).filter(function(n){return n.dataset.keyTrack===id&&frames.indexOf(Number(n.dataset.frame))>=0;});},
+      snap:{first:event.altKey?b.frame:a.frame,on:function(){try{return root.localStorage.getItem('nemo-motion-snap')!=='0';}catch(_){return true;}},
+        frames:function(){try{return gesture.snapCandidates(root,snapView(root,w),w.info.totalFrames);}catch(_){return [];}}},
+      onEnd:function(){w.keyDrag=null;}});
+  }
+  // #2524: dragging selected keys previews a shift and commits ONE native shift on release (baseline motion.js onDragMove/onDragUp).
+  function dragKeys(root,w,fc,event,node){
+    var gesture=root.NemoNativeMotionKeyGesture;if(!gesture||!w.ports||typeof w.ports.editSelectedKeys!=='function'||w.keyDrag)return;
+    // Alt + drag of a selected key skews like the bottom edge of the selection box (baseline), when the keys sit on 2+ rows.
+    if(event.altKey&&w.box&&w.box.update()){w.box.start(event,'bottom');return;}
+    var snapFirst=Number(node&&node.dataset&&node.dataset.frame);
+    w.keyDrag=gesture.beginDrag({doc:root.document,startX:event.clientX,fc:fc,total:w.info.totalFrames,edit:editRoute(root,w),
+      nodes:function(){return (w.keyNodes||[]).filter(function(n){return n.dataset.selected==='true';});},
+      snap:Number.isFinite(snapFirst)?{first:snapFirst,on:function(){try{return root.localStorage.getItem('nemo-motion-snap')!=='0';}catch(_){return true;}},
+        frames:function(){try{return gesture.snapCandidates(root,snapView(root,w),w.info.totalFrames);}catch(_){return [];}}}:null,
+      tracks:function(){try{var v=keyViews(root,w);return v&&v.tracks;}catch(_){return null;}},onEnd:function(){w.keyDrag=null;}});
+  }
+  // #2377: the selection box over keys on 2+ property rows. It reads the key buttons; every gesture ends in one native warp or shift.
+  function boxUpdate(root,w){
+    if(!root.NemoNativeMotionKeyBox||!w.ports||typeof w.ports.editSelectedKeys!=='function')return;
+    if(!w.box)w.box=root.NemoNativeMotionKeyBox.attach({doc:root.document,host:root,
+      nodes:function(){return (w.keyNodes||[]).filter(function(n){return n.parentNode&&!n.parentNode.hidden;}).map(function(n){return {node:n,id:n.dataset.keyTrack,frame:Number(n.dataset.frame),selected:n.dataset.selected==='true',rect:typeof n.getBoundingClientRect==='function'?n.getBoundingClientRect():null};});},
+      view:function(){try{return keyViews(root,w);}catch(_){return null;}},fc:function(){return root.FC;},last:function(){return w.info.totalFrames-1;},
+      rank:function(track){var id=trackIdentity(track),n=(w.keyNodes||[]).find(function(k){return k.dataset.keyTrack===id;}),r=n&&typeof n.getBoundingClientRect==='function'?n.getBoundingClientRect():null;return r?r.top:0;},
+      edit:editRoute(root,w),toast:function(m){notice(root,m);}});
+    w.box.update();
+  }
+  // The key menu acts on a selection read when it opened; a click after the selection changed commits nothing.
+  function keyMenu(root,w,track,key,event){
+    event.preventDefault();event.stopPropagation();
+    try{
+      var gesture=root.NemoNativeMotionKeyGesture,live=keyViews(root,w),edit=editRoute(root,w);
+      if(!gesture||typeof root.showContextMenu!=='function'||typeof edit!=='function'||!live||!ready(root,session(root),w.info))throw Error('Native key menu unavailable');
+      var address=keyAddress(track,key.frame);
+      if(!key.selected){if(live.selectKeys([address])!==true)throw Error('Native key selection refused');refreshKeys(root);live=keyViews(root,w);}
+      var opened=JSON.stringify(selectedAddresses(live));
+      function same_(){var now=keyViews(root,w);return !!now&&JSON.stringify(selectedAddresses(now))===opened&&now.isCurrent()===true;}
+      var ctx={view:live,remap:track.remap===true,hold:key.hold===true,showMenu:function(items){root.showContextMenu(event.clientX+8,event.clientY+8,items);},toast:function(m){notice(root,m);},refresh:function(){refreshKeys(root);},
+        prompt:function(m,d){return typeof root.prompt==='function'?root.prompt(m,d):null;},
+        edit:function(action){if(!same_()){notice(root,'Native key selection changed; open the key menu again.');return false;}return edit(action);},
+        selectOnly:function(){if(!same_()||live.selectKeys([address])!==true)return false;var now=keyViews(root,w);opened=JSON.stringify(selectedAddresses(now));return true;}};
+      root.showContextMenu(event.clientX,event.clientY,gesture.menuItems(root,ctx));
+    }catch(_){notice(root,'Native key menu is unavailable or stale.');}
   }
   function marqueeKeys(root,w,m,x0,y0,x1,y1){
     var value=keyViews(root,w);
@@ -153,8 +284,8 @@
     if(value.selectKeys(keys)!==true)throw Error('Native key marquee refused');
     m.keyView=keyViews(root,w);if(keyIdentity(m.keyView)!==m.keyIdentity)throw Error('Native key marquee changed view');refreshKeys(root);
   }
-  function cancel(root){var w=works.get(root);if(w&&w.marquee){var m=w.marquee;w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);}if(w&&w.capture){w.capture.valid=false;w.capture=null;}if(w)w.down=false;}
-  function retire(root){var w=works.get(root);if(!w)return;cancel(root);clearKeys(w);try{keyRows(root,w,[]);}catch(_){}w.serial++;w.rows=[];if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);w.node=null;w.grid=null;}
+  function cancel(root){var w=works.get(root);if(w&&w.keyDrag)w.keyDrag.cancel();if(w&&w.box)w.box.cancel();if(w&&w.marquee){var m=w.marquee;w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);}if(w&&w.capture){w.capture.valid=false;w.capture=null;}if(w)w.down=false;}
+  function retire(root){var w=works.get(root);if(!w)return;cancel(root);clearKeys(w);if(w.box){w.box.dispose();w.box=null;}try{keyRows(root,w,[]);}catch(_){}w.serial++;w.rows=[];if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);w.node=null;w.grid=null;}
   function selection(root,w,li,part,event){
     var info=w.info,uid=info.layers[li].layerUid,values=bars(root,info)||[];
     if(event.metaKey||event.ctrlKey){var i=values.findIndex(function(v){return v.layerUid===uid;});if(i>=0)values.splice(i,1);else values.push({layerUid:uid,part:'both'});w.anchor=uid;}
@@ -165,6 +296,7 @@
     return values;
   }
   function down(root,li,row,part,event){
+    if(event.button!==undefined&&event.button!==0)return true; // a right-click opens the bar menu; it starts no drag
     event.preventDefault();event.stopPropagation();
     var w=works.get(root),s=session(root),info=s&&s.info(),controller;
     try{controller=root.NemoNativeFrameEditDesktop.install(root);}catch(_){notice(root);return true;}
@@ -240,12 +372,23 @@
     bar.classList.toggle('full-range',!r.hasCustomRange);bar.classList.toggle('has-timelink',r.hasTimeLink);
     bar.setAttribute('aria-disabled','false');return true;
   }
+  // #2371/#2372: the baseline bar menu over the pinned native rows (native-layer-range-menu.js); the revision it was built from guards every write.
+  function barMenu(root,event,li,row){
+    var menu=root.NemoNativeLayerRangeMenu,w=works.get(root),s=session(root),info=s&&s.info(),selection;
+    if(!menu||!w||!w.barUiReady||w.rows[li]!==row||!ready(root,s,info)||!same(w.info,info)||w.down||w.marquee||w.capture||
+       root.state.activeSymbolId!=null||root.state.activeCompositionId!=null){notice(root,'Native range menus are unavailable.');return;}
+    try{selection=bars(root,info);}catch(_){notice(root,'Native range menus are unavailable.');return;}
+    var rows=w.rows.map(function(r,i){var v=r.nativeRange;
+      return {layerUid:info.layers[i].layerUid,hidden:!!r.hidden,rawIn:v&&same(v.pin,info)?v.range.rawInPoint:0};});
+    menu.open(root,event,{info:info,li:li,uid:info.layers[li].layerUid,selection:selection,rows:rows,setSelection:function(values){
+      w.ports.barUi.setBarSelection(values.map(function(v){return {li:info.layers.findIndex(function(l){return l.layerUid===v.layerUid;}),part:v.part};}));}});
+  }
   function buildBar(root,row,li){var w=works.get(root);if(!w||w.rows[li]!==row)return true;
     var bar=root.document.createElement('div');bar.className='layer-inout-bar';bar.setAttribute('aria-disabled','true');
     ['in','out'].forEach(function(part){var handle=root.document.createElement('div');handle.className='layer-inout-handle '+(part==='in'?'left':'right');
       handle.addEventListener('mousedown',function(event){w.ports.barUi.onDown(li,row,part,event,handle);});bar.appendChild(handle);});
     bar.addEventListener('mousedown',function(event){if(event.target===bar)w.ports.barUi.onDown(li,row,'both',event);});
-    bar.addEventListener('contextmenu',function(event){event.preventDefault();event.stopPropagation();notice(root,'Native range menus and links are unavailable.');});
+    bar.addEventListener('contextmenu',function(event){event.preventDefault();event.stopPropagation();barMenu(root,event,li,row);});
     row.appendChild(bar);row.addEventListener('mousedown',function(event){if(event.target===row){event.preventDefault();event.stopPropagation();startMarquee(root,event);}});paint(root,row,li);return true;
   }
   function owns(root,grid,noticeNode){var w=works.get(root);return !!w&&w.grid===grid&&w.node&&w.node.parentNode===grid&&grid.children.length===2&&grid.children[0]===noticeNode&&grid.children[1]===w.node;}
@@ -254,27 +397,38 @@
     var ui=ports&&ports.barUi,barUiReady=!!ui&&['getBarSelection','setBarSelection','marqueeSelect','onDown','buildBar'].every(function(k){return typeof ui[k]==='function';});
     if(!w){w={serial:0,rows:[],capture:null,down:false};works.set(root,w);
       root.document.addEventListener('mousemove',function(e){move(root,e);});root.document.addEventListener('mouseup',function(e){up(root,e);});
+      // #2377: Delete / Alt+arrows / F9 over selected Time Remap keys (the property key editor owns them for property keys).
+      if(root.NemoNativeTimeRemapKeys)root.NemoNativeTimeRemapKeys.install(root,function(){var x=works.get(root);return !!x&&!!x.node&&!!x.node.parentNode&&root.state.appMode==='motion'&&ready(root,session(root),x.info);});
       if(root.addEventListener){root.addEventListener('blur',function(){cancel(root);});root.addEventListener('pagehide',function(){cancel(root);});}}
-    if(w.node&&w.node.parentNode===grid&&same(w.info,info)&&w.frame===frame&&w.rows.length===info.layers.length){w.ports=ports;w.barUiReady=barUiReady;refreshKeys(root);return;}
+    // #2371: a frame-only change (same revision pin, same rows) keeps the painted rows and bars; rebuilding them per playback tick
+    // reset every bar and re-read every range, which is the timeline flicker. Only a row whose range never arrived asks again.
+    if(w.node&&w.node.parentNode===grid&&same(w.info,info)&&w.rows.length===info.layers.length){
+      w.ports=ports;w.barUiReady=barUiReady;
+      if(w.frame!==frame){w.frame=frame;if(s&&typeof s.readLayerRange==='function')w.rows.forEach(function(row,li){if(!row.nativeRange&&row.rangeAsked!==frame)askRange(root,s,w,row,li,info,frame,w.node);});}
+      refreshKeys(root);return;}
     var ownPending=w.capture&&owner(w.capture.info,info)&&info.contentRevision===w.capture.info.contentRevision+1&&!w.down;
     if(!ownPending)cancel(root);
     w.serial++;var ticket=w.serial;w.info=info;w.frame=frame;w.grid=grid;w.ports=ports;w.barUiReady=barUiReady;
     clearKeys(w);if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);
     var node=root.document.createElement('div');node.className='native-layer-range-rows';w.node=node;
     w.rows=info.layers.map(function(layer,li){var row=root.document.createElement('div');row.className='frow native-layer-range-row';row.dataset.layer=String(li);row.dataset.layerUid=layer.layerUid;
-      row.style.position='relative';row.style.height='22px';row.style.width=(info.totalFrames*root.FC)+'px';row.hidden=!!(root.state.hideShy&&layer.shy);
+      row.style.position='relative';row.style.height='22px';row.style.width=(info.totalFrames*root.FC)+'px';row.hidden=!!(root.state.hideShy&&layer.shy)||!!(root.NemoNativeLayerListPresenter&&root.NemoNativeLayerListPresenter.hiddenByFolder(info,layer));
       return row;});
     w.rows.forEach(function(row,li){node.appendChild(row);if(w.barUiReady)w.ports.barUi.buildBar(row,li);});grid.appendChild(node);refreshKeys(root);
     if(!s||typeof s.readLayerRange!=='function')return;
-    w.rows.forEach(function(row,li){Promise.resolve(s.readLayerRange(info.layers[li].layerUid,frame,info)).then(function(result){
+    w.rows.forEach(function(row,li){askRange(root,s,w,row,li,info,frame,node);});
+  }
+  function askRange(root,s,w,row,li,info,frame,node){
+    var ticket=w.serial;row.rangeAsked=frame;
+    Promise.resolve(s.readLayerRange(info.layers[li].layerUid,frame,info)).then(function(result){
       if(ticket!==w.serial||w.rows[li]!==row||row.parentNode!==node||!ready(root,s,info)||!result||result.kind!=='layerRange'||
         result.instanceId!==info.instanceId||result.documentId!==info.documentId||result.atRevision!==info.contentRevision||result.documentSnapshotId!==info.documentSnapshotId||
         result.contextId!=='scene-root'||result.layerUid!==info.layers[li].layerUid||result.frame!==frame)return;
       var range=result.range,fields=['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'];
-      if(!range||Object.keys(range).length!==6||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||
+      if(!range||!Object.keys(range).every(function(k){return fields.includes(k)||k==='markers'||k==='effectKeys'||k==='keyFrames';})||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||!snapLists(range)||
         !fields.slice(0,4).every(function(k){return Number.isFinite(range[k]);})||typeof range.hasCustomRange!=='boolean'||typeof range.hasTimeLink!=='boolean')return;
       row.nativeRange=freeze({pin:Object.assign({},info),range:JSON.parse(JSON.stringify(range))});paint(root,row,li);
-    }).catch(function(){});});
+    }).catch(function(){});
   }
   return Object.freeze({active:active,mount:mount,refreshKeys:refreshKeys,retire:retire,owns:owns,buildBar:buildBar,paint:paint,down:down,startMarquee:startMarquee,isGestureCurrent:isGestureCurrent});
 }));

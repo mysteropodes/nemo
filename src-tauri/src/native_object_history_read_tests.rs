@@ -83,7 +83,9 @@ fn common_public_history_observes_real_edit_undo_redo_and_repeated_reads_preserv
         let response = dispatch(&state, r.clone());
         assert_eq!(
             response["result"],
-            json!({"atRevision":3,"documentSnapshotId":before.1,"undoDepth":1,"redoDepth":1})
+            json!({"atRevision":3,"documentSnapshotId":before.1,"undoDepth":1,"redoDepth":1,
+                "offset":0,"entries":[{"index":0,"label":"Property: Opacity"},
+                {"index":1,"label":"Property: Opacity"}]})
         );
     }
     assert_eq!(

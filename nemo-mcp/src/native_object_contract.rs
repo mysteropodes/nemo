@@ -4,14 +4,25 @@ use super::{exact, frame, revision};
 use serde_json::Value;
 
 fn target(value: &Value) -> bool {
+    target_in(value, false)
+}
+/// #2256: the target of a presented-stroke read (Select's hit-test view and geometry in an entered component): the scene root, or the id of
+/// a component context. Only the native owner knows which components the document declares; this bounds the shape.
+pub(super) fn view_target(value: &Value) -> bool {
+    target_in(value, true)
+}
+fn target_in(value: &Value, component: bool) -> bool {
     exact(
         value,
         &["contextId", "frameScope", "layerUid", "strokeId"],
         &[],
     )
     .is_some_and(|value| {
-        value.get("contextId").and_then(Value::as_str) == Some("scene-root")
-            && ["layerUid", "strokeId"].iter().all(|key| {
+        (if component {
+            value.get("contextId").is_some_and(crate::native_contract::vector::context)
+        } else {
+            value.get("contextId").and_then(Value::as_str) == Some("scene-root")
+        }) && ["layerUid", "strokeId"].iter().all(|key| {
                 value
                     .get(*key)
                     .and_then(Value::as_str)
@@ -29,6 +40,27 @@ fn target(value: &Value) -> bool {
 }
 
 pub(super) fn request(value: &Value) -> bool {
+    if value.get("subselect").is_some() {
+        return subselect::request(value);
+    }
+    if value["view"]["kind"] == "subselect" {
+        return subselect::view_request(value);
+    }
+    if widget_read::widget_view(value) {
+        return widget_read::request(value);
+    }
+    if ghost_read::ghost_view(value) {
+        return ghost_read::request(value);
+    }
+    if rig_read::rig_view(value) {
+        return rig_read::request(value);
+    }
+    if image_mesh::presentation_view(value) {
+        return image_mesh::presentation_request(value);
+    }
+    if image_mesh::image_mesh_view(value) {
+        return image_mesh::image_mesh_request(value);
+    }
     exact(value, &["atRevision", "stableTarget"], &[]).is_some_and(|value| {
         revision(value.get("atRevision")).is_some() && value.get("stableTarget").is_some_and(target)
     })
@@ -65,6 +97,9 @@ pub(super) fn timing_request(value: &Value) -> bool {
     if value.get("view").is_some_and(|view| view == "placement") {
         return layer_placement::request(value);
     }
+    if value.get("view").is_some_and(|view| view == "cells") {
+        return layer_cells::request(value);
+    }
     if value.get("view").is_some() {
         return layer_range::request(value);
     }
@@ -74,6 +109,9 @@ pub(super) fn timing_request(value: &Value) -> bool {
 pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) -> bool {
     if payload.get("view").is_some_and(|view| view == "placement") {
         return layer_placement::result(document_id, payload, result);
+    }
+    if payload.get("view").is_some_and(|view| view == "cells") {
+        return layer_cells::result(document_id, payload, result);
     }
     if payload.get("view").is_some() {
         return layer_range::result(document_id, payload, result);
@@ -111,7 +149,7 @@ pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) 
             .and_then(Value::as_str)
             .is_some_and(crate::contract::bounded_identifier)
             && value.get("documentId").and_then(Value::as_str) == Some(document_id)
-            && value.get("contextId").and_then(Value::as_str) == Some("scene-root")
+            && value.get("contextId").is_some_and(crate::native_contract::vector::context)
             && [
                 "atRevision",
                 "documentSnapshotId",
@@ -134,8 +172,12 @@ pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) 
 }
 
 pub(super) fn visibility_request(value: &Value) -> bool {
-    exact(value, &["command", "layerUid", "visible"], &[]).is_some_and(|value| {
+    exact(value, &["command", "layerUid", "visible"], &["contextId"]).is_some_and(|value| {
         value.get("command").and_then(Value::as_str) == Some("object.layer.visibility.set")
+            // #2256: the declared component the toggle works inside; absent is the scene root.
+            && value
+                .get("contextId")
+                .is_none_or(|id| id.as_str().is_some_and(|id| !id.is_empty()))
             && value
                 .get("layerUid")
                 .and_then(Value::as_str)
@@ -162,8 +204,13 @@ pub(super) fn history_request(operation: &str, value: &Value) -> bool {
         "command.document.object.redo" => "object.redo",
         _ => return false,
     };
-    exact(value, &["command"], &[])
-        .is_some_and(|value| value.get("command").and_then(Value::as_str) == Some(command))
+    // Optional `steps`: move that many entries as one restore (the History panel's jump).
+    exact(value, &["command"], &["steps"]).is_some_and(|value| {
+        value.get("command").and_then(Value::as_str) == Some(command)
+            && value
+                .get("steps")
+                .is_none_or(|steps| revision(Some(steps)).is_some_and(|steps| steps >= 1))
+    })
 }
 
 pub(super) fn history_result(value: &Value) -> bool {
@@ -174,8 +221,12 @@ pub(super) fn history_result(value: &Value) -> bool {
 }
 
 pub(super) fn create_request(value: &Value) -> bool {
-    exact(value, &["command", "name"], &[]).is_some_and(|value| {
+    exact(value, &["command", "name"], &["contextId"]).is_some_and(|value| {
         value.get("command").and_then(Value::as_str) == Some("object.layer.create")
+            // #2256: the declared component the new layer joins; absent is the scene root.
+            && value
+                .get("contextId")
+                .is_none_or(|id| id.as_str().is_some_and(|id| !id.is_empty()))
             && value.get("name").is_some_and(Value::is_string)
     })
 }
@@ -268,6 +319,27 @@ fn record(value: &Value) -> bool {
 }
 
 pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool {
+    if payload.get("subselect").is_some() {
+        return subselect::result(document_id, payload, result);
+    }
+    if payload["view"]["kind"] == "subselect" {
+        return subselect::view_result(document_id, payload, result);
+    }
+    if widget_read::widget_view(payload) {
+        return widget_read::result(document_id, payload, result);
+    }
+    if ghost_read::ghost_view(payload) {
+        return ghost_read::result(document_id, payload, result);
+    }
+    if rig_read::rig_view(payload) {
+        return rig_read::result(document_id, payload, result);
+    }
+    if image_mesh::presentation_view(payload) {
+        return image_mesh::presentation_result(document_id, payload, result);
+    }
+    if image_mesh::image_mesh_view(payload) {
+        return image_mesh::image_mesh_result(document_id, payload, result);
+    }
     request(payload)
         && exact(result, &["atRevision", "documentSnapshotId", "object"], &[]).is_some_and(
             |value| {
@@ -288,7 +360,44 @@ pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool
 #[path = "native_object_contract_tests.rs"]
 mod tests;
 
+#[path = "native_layer_cells_contract.rs"]
+mod layer_cells;
 #[path = "native_layer_placement_contract.rs"]
 mod layer_placement;
 #[path = "native_layer_range_contract.rs"]
 mod layer_range;
+
+#[path = "native_image_mesh_read_contract.rs"]
+mod image_mesh;
+
+#[cfg(test)]
+#[path = "native_image_mesh_read_contract_tests.rs"]
+mod image_mesh_tests;
+
+#[cfg(test)]
+#[path = "native_presentation_read_contract_tests.rs"]
+mod presentation_transport_tests;
+
+#[path = "native_widget_read_contract.rs"]
+mod widget_read;
+
+#[path = "native_ghost_read_contract.rs"]
+mod ghost_read;
+
+#[cfg(test)]
+#[path = "native_ghost_read_contract_tests.rs"]
+mod ghost_read_tests;
+
+#[cfg(test)]
+#[path = "native_widget_read_contract_tests.rs"]
+mod widget_read_tests;
+
+#[path = "native_rig_read_contract.rs"]
+mod rig_read;
+
+#[cfg(test)]
+#[path = "native_rig_read_contract_tests.rs"]
+mod rig_read_tests;
+
+#[path = "native_subselect_contract.rs"]
+pub(crate) mod subselect;

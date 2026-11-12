@@ -46,7 +46,12 @@ test('production command preserves main scope, serializer authority and no-repla
   assert.match(producer, /create_new\(true\)/);
   assert.match(producer, /file.sync_all\(\)\?/);
   assert.match(producer, /fs::hard_link\(&staged, &destination\)/);
-  assert.doesNotMatch(producer, /native_engine::|active_mut|encode_project|fs::rename|truncate\(true\)/);
+  assert.doesNotMatch(producer, /native_engine::|active_mut|encode_project|truncate\(true\)/);
+  // The default publication never replaces. The only rename is the explicit in-place Save of a titled project (#2381): it is
+  // gated by the request's own `replace` flag, and the no-replace hard link stays the unconditional fall-through.
+  assert.equal(producer.match(/fs::rename\(/g).length, 1);
+  assert.match(producer, /if request\.replace \{[\s\S]*?return fs::rename\(&staged, &destination\);\s*\}\s*\/\/ Atomic no-replace publication[\s\S]*?fs::hard_link\(&staged, &destination\)/);
+  assert.match(producer, /replace: bool/);
   assert.match(read(controls), /bootstrap_request\(&state/);
   assert.match(read(controls), /#\[path = "native_object_save_failure_tests.rs"\]/);
   assert.match(read(failures), /use crate::native_object_bootstrap::save_tests::\*;/);

@@ -21,11 +21,30 @@
 
   window.SMLabs.referenceFillAtPointer = function () {
     if (!lastPtr || !window.SMEngineBridge) return false;
+    // #2362: a native object project maps the pointer through its own presentation, as Select and the knife do; the
+    // legacy view transform can disagree with what is on screen.
+    var Intent = window.NemoSelectCanvasIntent, shown = Intent && typeof Intent.presentedState === 'function' && Intent.presentedState(window);
+    if (shown) { var p = Intent.worldPoint(window, lastPtr[0], lastPtr[1], shown.pin, shown.presentation); return window.SMLabs.referenceFill(p.x, p.y); }
     var w = SMEngineBridge.screenToWorld(lastPtr[0], lastPtr[1]);
     return window.SMLabs.referenceFill(w[0], w[1]);
   };
 
+  // Native authority (U36, #2362): the ordinary native bucket fill with the other visible layers as walls, one history
+  // entry; the call returns a Promise of the same boolean. The code after the branch is the baseline path.
+  function nativeReferenceFill(native, wx, wy) {
+    var toast = function (key) { if (typeof showToast === 'function') showToast(SM.t(key)); };
+    var layerUid = native.layerUid(state.activeLayerIdx);
+    if (!layerUid) { toast('labsToastActiveLayerInvalidLocked'); return Promise.resolve(false); }
+    return native.referenceFill({ layerUid: layerUid, frame: state.currentFrame, point: [+wx, +wy],
+      color: NemoNativeObjectLabs.hex8(state.fillColor), opacity: state.opacity / 100 }).then(function (receipt) {
+      toast(receipt && receipt.applied ? 'labsToastFillPlacedAllLayers' : 'labsToastNoClosedAreaAllLayers');
+      return !!(receipt && receipt.applied);
+    }, function () { toast('labsToastActiveLayerInvalidLocked'); return false; });
+  }
+
   window.SMLabs.referenceFill = function (wx, wy) {
+    var native = window.NemoNativeObjectLabs && NemoNativeObjectLabs.desktop(window);
+    if (native) return nativeReferenceFill(native, wx, wy);
     var li = state.activeLayerIdx;
     var ld = state.layers[li];
     if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastActiveLayerInvalidLocked')); return false; }

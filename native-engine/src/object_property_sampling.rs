@@ -194,6 +194,16 @@ impl PropertyRecord {
         sample_keys(&self.property, keys, at).map(|v| v[0])
     }
 }
+/// Raw value of one scalar key track that is not a property record (the Time Remap an instance carries): no expression, no target.
+/// `None` for a track without keys (baseline `timeRemapValue` answers null) or a value that cannot be sampled.
+pub(crate) fn sample_scalar_keys_raw(keys: &[OrderKey], at: f64) -> Option<f64> {
+    if keys.is_empty() || !at.is_finite() {
+        return None;
+    }
+    sample_keys("timeRemap", keys, at)
+        .ok()
+        .and_then(|v| v.first().copied())
+}
 fn sample_keys(
     property: &str,
     keys: &[OrderKey],

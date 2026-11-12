@@ -106,7 +106,7 @@
     }
     switch (intent.kind) {
       case 'rangeDrag':
-        if(!intent.gesture||intent.gesture.frame!==state.frame||intent.gesture.activeLayerUid!==uid(state.active)||intent.gesture.contextId!=='scene-root'||
+        if(!intent.gesture||intent.gesture.frame!==state.frame||intent.gesture.activeLayerUid!==uid(state.active)||intent.gesture.contextId!==(typeof info.contextId==='string'?info.contextId:'scene-root')||
            info.layers.every(function(l){return l.layerUid!==intent.gesture.layerUid;}))return {code:CODES.stale};
         return {op:P+'layer.range.drag',payload:intent.gesture};
       case 'insertBlankKey': return { op: P + 'layer.key.blank', payload: { command: 'object.layer.key.blank', layerUid: uid(state.active), cell: state.frame } };
@@ -197,6 +197,14 @@
     async function run(value) {
       if (retired) return unavailable(CODES.retired);
       if (pending) return Object.freeze({ status: 'busy' });
+      // #2372: a frame action right after another command finds the presentation hidden by the queue (queue-pending): wait it out (bounded) before the checks below,
+      // which stay strict - a presentation that really differs still refuses.
+      var Wt = typeof globalThis === 'object' ? globalThis.NemoNativePresentationWait : null, idle = Wt && ports.currentSession();
+      if (idle && typeof idle.readPresentedObjectSession === 'function' && Wt.busy(function (f) { return idle.readPresentedObjectSession(f); })) {
+        await Wt.await(null, { read: function (f) { return idle.readPresentedObjectSession(f); }, holds: function () { return !retired && !pending && ports.currentSession() === idle; } });
+        if (retired) return unavailable(CODES.retired);
+        if (pending) return Object.freeze({ status: 'busy' });
+      }
       var intent, session, before, state, write, step, clipboardToken;
       try {
         intent = action(value);
@@ -241,7 +249,7 @@
         if (!after || after.instanceId !== before.instanceId || after.documentId !== before.documentId || after.lifecycleGeneration !== before.lifecycleGeneration ||
             after.contentRevision !== receipt.contentRevision || !Array.isArray(after.layers) || !sameList(layers, after.layers.map(function (row) { return row.layerUid; })) ||
             (length === null ? !(after.totalFrames >= before.totalFrames) : after.totalFrames !== length) || ports.available(session, after) !== true ||
-            !whole(playhead, 0, after.totalFrames - 1) || !presented(session, after, playhead)) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
+            !whole(playhead, 0, after.totalFrames - 1) || !(Wt ? await Wt.until(null, session, function () { return presented(session, after, playhead); }, function () { return ports.currentSession() === session; }) : presented(session, after, playhead))) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
         var out = { status: applied ? 'applied-presented' : 'unchanged', applied: applied }, hint = applied ? playheadHint(step.op, frame, after.totalFrames) : null;
         if(intent.kind==='rangeDrag'){
           var shiftedState=readState(ports,after);
@@ -283,5 +291,6 @@
     }
     return Object.freeze({ run: run, isPending: function () { return pending; }, dispose: function () { retired = true; } });
   }
-  return Object.freeze({ create: create, CODES: CODES, KINDS: Object.freeze(Object.keys(FIELDS)) });
+  // plan / readState / action are pure (no port, no session): the entered-component route (native-component-frame-edit.js) runs them against the component's rows.
+  return Object.freeze({ create: create, CODES: CODES, KINDS: Object.freeze(Object.keys(FIELDS)), action: action, readState: readState, plan: plan });
 }));
