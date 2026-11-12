@@ -388,7 +388,7 @@
       },
       changed:function(info,lease){if(root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.hasProjection(root))return publishRevision(info,lease);
         else{if(root.SMReference)root.SMReference.refreshNative();if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();}},
-      notice:function(message){if(root.showToast)root.showToast(message);},
+      notice:function(message){if(root.showToast)root.showToast(message);},historyGroups:root.NemoScriptNativeGroups?root.NemoScriptNativeGroups.shared:null,
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
   }
   return Object.freeze({createPorts:createPorts,attemptObserver:attemptObserver,didPaintUI:didPaintUI,openDiagnostic:openDiagnostic,settingsDiagnostic:settingsDiagnostic,bindUIComposition:bindUIComposition,composeUI:composeUI,withActionPresentation:withActionPresentation,bindCameraUI:bindCameraUI,renderCameraViewLock:renderCameraViewLock});

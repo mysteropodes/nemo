@@ -2,13 +2,13 @@
 // CS8-SDK (#2354): the real SMScript.run on the desktop host never reads or writes state.layers.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const SOURCE=fs.readFileSync(path.join(__dirname,'../src/js/nemo-script.js'),'utf8'),Native=require('../src/js/application/script-native-api.js');
-function boot({session,tauri=true,native=true,writes=null,extra=null,controller=undefined,solo=false}){
+function boot({session,tauri=true,native=true,writes=null,extra=null,controller=undefined,solo=false,groups=undefined}){
   const calls=[],toasts=[];
   const state={};Object.defineProperty(state,'layers',{get(){throw Error('LEGACY state.layers read');}});
   let info=session&&{instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,fps:24,canvasW:8,canvasH:8,totalFrames:4,
     layers:[{layerUid:'a',name:'A',visible:true},{layerUid:'b',name:'B',visible:true}]};
   const s=session&&{blocksLegacy:()=>true,isActive:()=>true,info:()=>info,...(extra||{})};
-  const context=vm.createContext({console,state,NemoScriptNativeWrites:writes?{create:(root,s)=>writes(()=>info,v=>{info=v;},s)}:undefined,_layerSel:[0],NemoScriptNativeApi:native?Native:undefined,NemoNativeLayerPlayheadCutUI:{scripting:()=>function(){}},NemoNativeLayerSolo:solo?require('../src/js/adapters/native-layer-solo.js'):undefined,goToFrame(){},showToast:m=>toasts.push(m),
+  const context=vm.createContext({console,state,NemoScriptNativeGroups:groups,NemoScriptNativeWrites:writes?{create:(root,s)=>writes(()=>info,v=>{info=v;},s)}:undefined,_layerSel:[0],NemoScriptNativeApi:native?Native:undefined,NemoNativeLayerPlayheadCutUI:{scripting:()=>function(){}},NemoNativeLayerSolo:solo?require('../src/js/adapters/native-layer-solo.js'):undefined,goToFrame(){},showToast:m=>toasts.push(m),
     __TAURI__:tauri?{core:{invoke(){}}}:undefined,NemoNativeObjectProject:{desktop:()=>s||null},NemoNativeCompositionController:controller,
     SM:{toggleLayerVis(index){calls.push(['vis',index]);info={...info,layers:info.layers.map((l,i)=>i===index?{...l,visible:!l.visible}:l)};return Promise.resolve(true);},
       toggleLayerLock(){calls.push(['lock']);return Promise.resolve(true);},toggleLayerShy(){calls.push(['shy']);return Promise.resolve(true);},t:k=>k}});
@@ -126,4 +126,37 @@ test('the real run answers a track, timing and composition read through the sess
   const none=await boot({session:true}).SMScript.run('nemo.layer("A").keys("opacity")');
   assert.equal(none.ok,false);assert.match(none.error,/native-entry-absent/);
   assert.deepEqual(h.calls,[],'reads never write');
+});
+
+test('a run over the real session is ONE undo group: the undo depth is read around the drain and the entries are recorded for the UI undo (I33)',async()=>{
+  const Groups=require('../src/js/application/script-native-groups.js'),groups=Groups,o=owned();let depth=3,h;Groups.shared.forget();
+  const extra={readHistory:()=>Promise.resolve({info:{instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:h.info.contentRevision,documentSnapshotId:'s'},undoDepth:depth,redoDepth:0})};
+  h=boot({session:true,writes:(get,set)=>{const w=o.writes(get,set);return {...w,rename:async(uid,name)=>{depth+=1;return w.rename(uid,name);},marker:async spec=>{depth+=1;return w.marker(spec);}};},extra,groups});
+  const r=h.SMScript.run('nemo.layer("A").name="One"; nemo.markers.add(2,"M"); nemo.undoGroup(function(){ nemo.layer("B").name="Two"; })');
+  assert.equal(r.ok,true);
+  assert.deepEqual({...(await r.committed)},{ok:true,applied:3,pending:0});
+  assert.equal(groups.shared.plan('undo',{instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:3}),3,'one UI undo moves the three entries');
+  assert.equal(groups.shared.plan('undo',{instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:4}),1,'but not once the document moved on');
+  const quiet=boot({session:true,extra:{...extra,readHistory:undefined},groups}).SMScript.run('nemo.layer("A").visible=false');
+  await quiet.committed;assert.equal(groups.shared.depth(),0,'a session that cannot read its history records nothing');
+});
+
+test('an async script is awaited before its drain: late writes join the run, a rejection sends nothing, and a replaced document gets no write (I33)',async()=>{
+  const o=owned(),h=boot({session:true,writes:o.writes});
+  const ok=await h.SMScript.run('(async function(){ await Promise.resolve(); nemo.layer("A").name="Late"; return "done"; })()');
+  assert.equal(ok.ok,true);assert.equal(ok.value,'done');assert.deepEqual({...(await ok.committed)},{ok:true,applied:1,pending:0});assert.deepEqual(o.sent,[['rename','a','Late']]);
+  const o2=owned(),h2=boot({session:true,writes:o2.writes});
+  const bad=await h2.SMScript.run('(async function(){ nemo.layer("A").name="x"; await Promise.resolve(); throw new Error("later"); })()');
+  assert.equal(bad.ok,false);assert.match(bad.error,/later/);assert.deepEqual(o2.sent,[]);
+  const o4=owned();let replace=null,open;const gate=new Promise(r=>{open=r;});
+  globalThis.__gate=gate;const h4=boot({session:true,writes:(get,set)=>{replace=()=>set({...get(),documentId:'other'});return o4.writes(get,set);}});
+  const pending=h4.SMScript.run('(async function(){ nemo.layer("A").name="z"; await __gate; })()');
+  replace();open();const res=await pending;delete globalThis.__gate;
+  assert.equal(res.ok,true,res.error);assert.deepEqual({...(await res.committed)},{ok:false,applied:0,pending:1,error:'document-replaced'});assert.deepEqual(o4.sent,[]);
+});
+
+test('the legacy API builder is not handed out on a native host, and plugin help is the native one (I34)',()=>{
+  const h=boot({session:true});
+  assert.throws(()=>h.SMScript.api(),/unavailable on a native host/);
+  const help=h.SMScript.help();assert.equal(help.ok,true);assert.ok(help.value.includes('Layer.visible'));
 });

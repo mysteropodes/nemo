@@ -691,5 +691,11 @@
     inp.click();
   }
 
-  window.SMScript = { run: run, openFile: openFile, api: buildApi, help: function () { return buildApi().help(); } };
+  // CS8-SDK (#2354): the legacy builder writes state.layers, so a native host never hands it out (plugins reach the native facade through SMPlugin.hostApi).
+  function nativeHost() { return !!(window.__TAURI__ || window.NemoScriptNativeApi && NemoScriptNativeApi.owns(window)); }
+  function api() {
+    if (nativeHost()) throw new Error('nemo: the legacy script API is unavailable on a native host; scripts and plugins run over the native API');
+    return buildApi();
+  }
+  window.SMScript = { run: run, openFile: openFile, api: api, help: function () { return nativeHost() ? run('nemo.help()') : buildApi().help(); } };
 })();
