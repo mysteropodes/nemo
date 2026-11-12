@@ -1,6 +1,7 @@
 'use strict';
 // Row selection and execution. A row is judged only from what it asserted: it passes when every assertion passed AND at least
-// one assertion is an independent observation (a read, a pixel or a file), never on "the command returned ok" alone.
+// one assertion is an independent observation of the row's own (a read, a pixel or a file that is not kit bookkeeping), never
+// on "the command returned ok" alone. Setup and the per-command revision and history deltas are bookkeeping and do not count.
 const { createWire, EvidenceError } = require('./wire.cjs');
 const K = require('./kit.cjs');
 
@@ -34,7 +35,9 @@ function selectRows({ lanes, rows } = {}, catalog = allRows()) {
   }
   const chosen = catalog.filter(r => (lanes === undefined || lanes.includes(r.lane)) && (rows === undefined || rows.includes(r.id)));
   if (chosen.length === 0) throw new Error('the selection matches no row');
-  return { rows: chosen, lanes: [...new Set(chosen.map(r => r.lane))], omitted: catalog.filter(r => !chosen.includes(r)).map(r => r.id) };
+  const catalogRows = {};
+  for (const row of catalog) catalogRows[row.lane] = (catalogRows[row.lane] || 0) + 1;
+  return { rows: chosen, lanes: [...new Set(chosen.map(r => r.lane))], omitted: catalog.filter(r => !chosen.includes(r)).map(r => r.id), catalogRows };
 }
 
 const brief = error => String((error && error.message) || error).replace(/\s+/g, ' ').slice(0, 160);
@@ -54,7 +57,7 @@ async function runRows({ rows, session, now = () => Date.now() }) {
       await row.run(ctx);
       try { await session.recheck(); } catch (error) { throw new EvidenceError('foreign', 'after the row: ' + brief(error)); }
       if (ctx.assertions.length === 0) { verdict = 'fail'; reason = 'the row made no assertion'; }
-      else if (ctx.assertions.every(a => a.kind === 'reply')) { verdict = 'fail'; reason = 'the row made no independent observation (read, pixel or file)'; }
+      else if (!ctx.assertions.some(a => a.kind !== 'reply' && !a.bookkeeping)) { verdict = 'fail'; reason = 'the row made no independent observation (read, pixel or file) beyond setup and command bookkeeping'; }
     } catch (error) {
       if (error instanceof K.AssertionFailure) { verdict = 'fail'; reason = error.message; }
       else if (error instanceof EvidenceError && error.kind === 'unavailable') { verdict = 'unrun'; reason = brief(error); }

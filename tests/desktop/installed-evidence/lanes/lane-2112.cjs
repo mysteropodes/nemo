@@ -32,14 +32,46 @@ const rows = [
       ctx.eq('reply', 'identical bytes resolve to the same asset id', second.result.assetId, r.assetId);
       const { saved, items } = await savedRaster(ctx, 'two-placements');
       ctx.eq('file', 'the catalog holds one asset for two placements', [Array.isArray(saved.document.assets) ? saved.document.assets.length : null, items.length], [1, 2]);
-      // Negative controls: no revision, no history, no partial publication.
+      // Negative controls: no revision, no history, no partial publication. Each is a typed refusal by the native owner.
       await attach(ctx, 'attach a corrupt PNG', K.stage(ctx, 'corrupt.png', K.corruptPng()), 'corrupt', { refused: true });
-      await attach(ctx, 'attach an oversize PNG', K.stage(ctx, 'oversize.png', K.oversizePng()), 'oversize', { refused: true });
-      await attach(ctx, 'attach a missing file', ctx.work + '/does-not-exist.png', 'missing', { refused: true });
-      await K.apply(ctx, 'remove an unknown asset', () => K.pinned(ctx, ({ pin }) => P.assetRemove(pin, 'asset-that-does-not-exist')), { refused: true });
+      // A VALID PNG one pixel wider than the admitted 8192: only a size cap refuses it (it is not a decode failure).
+      await attach(ctx, 'attach a decodable PNG wider than the admitted dimension', K.stage(ctx, 'oversize.png', K.oversizePng()), 'oversize', { refused: true });
+      // A missing source is the host's typed "source unavailable", not dispatched: the attach operation itself answered above.
+      await attach(ctx, 'attach a missing file', ctx.work + '/does-not-exist.png', 'missing', { refused: true, codes: ['unavailable'],
+        details: error => !!error.details && error.details.disposition === 'notDispatched' && error.details.committed === false && /image source/.test(String(error.message)) });
+      // Removing an asset the catalog does not hold is a no-op by contract (not a refusal): no revision, no history.
+      await K.apply(ctx, 'remove an unknown asset', () => K.pinned(ctx, ({ pin }) => P.assetRemove(pin, 'asset-that-does-not-exist')), { noop: true });
       const after = await savedRaster(ctx, 'after-refusals');
       ctx.eq('file', 'refusals left the catalog and placements as they were', [after.saved.document.assets.length, after.items.length], [1, 2]);
       ctx.eq('pixel', 'refusals left the export untouched', (await K.exportPng(ctx, 'after-refusals')).digest, e0.digest);
+    } },
+
+  { id: '2112-asset-remove-lifetime', title: 'asset removal and resource lifetime: an asset in use is refused, an unreferenced one is removed in one revision, undo and redo restore it, an absent one is a no-op', tasks: ['G01'],
+    async run(ctx) {
+      await K.fresh(ctx);
+      const file = K.stage(ctx, 'teal.png', K.solidPng(160, 100, [...TEAL, 255]));
+      const made = await attach(ctx, 'attach a PNG as a new layer', file, 'evidence-image');
+      const { assetId } = made.result, layer = made.result.target.layerUid;
+      const removeIt = (label, opts) => K.apply(ctx, label, () => K.pinned(ctx, ({ pin }) => P.assetRemove(pin, assetId)), opts);
+      const catalog = async tag => (await K.saveAs(ctx, tag)).document.assets.map(a => a.id || a.assetId || a.name);
+      const e0 = await K.exportPng(ctx, 'attached');
+      ctx.eq('file', 'the catalog holds the asset', (await catalog('held')).length, 1);
+      await removeIt('remove the asset while a placement uses it', { refused: true });
+      ctx.eq('file', 'a refused removal left the asset in the catalog', (await catalog('in-use')).length, 1);
+      await K.apply(ctx, 'delete the layer that holds the placement', P.layerDelete(layer));
+      ctx.eq('pixel', 'the deleted placement leaves no ink', probe.inkBounds((await K.exportPng(ctx, 'no-placement')).image), null);
+      await removeIt('remove the now unreferenced asset');
+      ctx.eq('file', 'the removed asset is gone from the catalog', (await catalog('removed')).length, 0);
+      await K.step(ctx, 'undo the removal', 'undo');
+      ctx.eq('file', 'undo puts the asset back in the catalog', (await catalog('restored')).length, 1);
+      await K.step(ctx, 'redo the removal', 'redo');
+      ctx.eq('file', 'redo removes it again', (await catalog('removed-again')).length, 0);
+      await K.step(ctx, 'undo the removal again', 'undo');
+      await K.step(ctx, 'undo the layer delete', 'undo');
+      ctx.eq('pixel', 'the restored placement paints the original export', (await K.exportPng(ctx, 'restored')).digest, e0.digest);
+      await removeIt('remove the asset while the restored placement uses it', { refused: true });
+      await K.apply(ctx, 'remove an asset id the catalog never held', () => K.pinned(ctx, ({ pin }) => P.assetRemove(pin, 'asset-never-held')), { noop: true });
+      await K.roundTrip(ctx, 'lifetime', e0);
     } },
 
   { id: '2112-raster-edit-save-reopen', title: 'raster move, resize, rotate, opacity measured in pixels; asset bytes survive save and reopen without the staging file', tasks: ['G02'],

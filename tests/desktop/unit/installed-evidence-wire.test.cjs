@@ -47,7 +47,7 @@ test('a real pass: every assertion passes, kinds are mixed, operations carry req
   assert.ok(row.operations.length > 20 && row.operations.every(o => /^[0-9a-f]{64}$/.test(o.requestDigest) && /^[0-9a-f]{64}$/.test(o.replyDigest)));
   assert.ok(row.operations.some(o => o.operation === 'project.export') && row.operations.some(o => o.operation === 'command.document.object.undo'));
   const receipt = buildReceipt({ candidate: { sourceHead: 'x' }, selection: { lanes: ['9001'] }, rows: [row], cleanup: { ok: true } });
-  assert.deepEqual([receipt.verdict, receipt.totals.overall, receipt.totals.byLane['9001']], ['pass', { rows: 1, pass: 1, fail: 0, unrun: 0 }, { rows: 1, pass: 1, fail: 0, unrun: 0 }]);
+  assert.deepEqual([receipt.verdict, receipt.totals.overall, receipt.totals.byLane['9001']], ['pass', { rows: 1, pass: 1, fail: 0, unrun: 0 }, { rows: 1, pass: 1, fail: 0, unrun: 0, catalogRows: null, complete: false }]);
   assert.equal(exitStatus(receipt.verdict), 0);
   assert.ok(receipt.statement.includes('not the CS7') && receipt.residualHandsOn.length > 0);
   assert.ok(app.state.calls.includes('nemo_discover'));
@@ -93,19 +93,21 @@ test('an unavailable operation makes the row unrun with its reason; the run exit
   const receipt = buildReceipt({ rows, cleanup: { ok: true } });
   assert.equal(receipt.verdict, 'unrun');
   assert.equal(exitStatus('unrun'), EXIT.unrun);
-  assert.ok(new Set([EXIT.pass, EXIT.fail, EXIT.refused, EXIT.unrun]).size === 4 && EXIT.unrun !== 3);
+  assert.ok(new Set(Object.values(EXIT)).size === 5 && !Object.values(EXIT).includes(3));
 });
 
-test('"the command returned ok" is never a pass: a row of replies only, or of nothing, fails', async t => {
+test('"the command returned ok" is never a pass: a row of replies only, of setup and bookkeeping only, or of nothing, fails', async t => {
   const { session } = setup(t);
+  // fresh() and apply() record read assertions too, but as kit bookkeeping: they are not an observation of the row's behaviour.
   const replyOnly = { id: 'reply-only', lane: '9001', issue: 1, title: 'x', async run(ctx) { await K.fresh(ctx); await K.apply(ctx, 'create', P.vectorCreate(P.vectorRecord({ layerUid: 'L1', segments: P.rectSegments(1, 1, 9, 9), fill: [1, 0, 0, 1] }))); ctx.ok('reply', 'only a reply', true, 'ok'); } };
   const silent = { id: 'silent', lane: '9001', issue: 1, title: 'x', async run() {} };
-  // fresh() and apply() also record read assertions, so isolate the reply-only case with a wire-level row.
   const bare = { id: 'bare', lane: '9001', issue: 1, title: 'x', async run(ctx) { ctx.ok('reply', 'only a reply', true, 'ok'); } };
-  const rows = await runRows({ rows: [bare, silent, replyOnly], session });
-  assert.deepEqual(rows.map(r => r.verdict), ['fail', 'fail', 'pass']);
+  const observed = { id: 'observed', lane: '9001', issue: 1, title: 'x', async run(ctx) { await K.fresh(ctx); ctx.ok('read', 'a read of the row\'s own', true, 'ok'); } };
+  const rows = await runRows({ rows: [bare, silent, replyOnly, observed], session });
+  assert.deepEqual(rows.map(r => r.verdict), ['fail', 'fail', 'fail', 'pass']);
   assert.match(rows[0].reason, /no independent observation/);
   assert.match(rows[1].reason, /no assertion/);
+  assert.match(rows[2].reason, /no independent observation/);
 });
 
 test('an unexpected row error is a failure naming its class, never a pass', async t => {
@@ -163,4 +165,21 @@ test('png probes measure ink, colours, differences and coverage on decoded pixel
   assert.deepEqual(probe.over(half, 1, 1), [227, 127, 127]);
   assert.ok(Math.abs(probe.coverageRatio(image, half, [0, 0, 19, 9]) - 0.5) < 0.05);
   assert.throws(() => probe.decodeExport(Buffer.from('nope')), /not a PNG/);
+});
+
+test('a subset run is never a full pass: selection and the expected row count are in the receipt, the verdict is subset-pass with its own exit status', () => {
+  const row = (id, lane, verdict) => ({ id, lane, issue: Number(lane), title: id, tasks: [], verdict, operations: [], assertions: [] });
+  const pass = [row('2107-a', '2107', 'pass')];
+  const subset = buildReceipt({ rows: pass, selection: { lanes: ['2107'], rows: ['2107-a'], omitted: ['2107-b', '2108-a'], catalogRows: { 2107: 2, 2108: 1 } }, cleanup: { ok: true } });
+  assert.equal(subset.verdict, 'subset-pass');
+  assert.equal(exitStatus(subset.verdict), EXIT['subset-pass']);
+  assert.notEqual(EXIT['subset-pass'], EXIT.pass);
+  assert.deepEqual(subset.totals.byLane['2107'], { rows: 1, pass: 1, fail: 0, unrun: 0, catalogRows: 2, complete: false });
+  assert.deepEqual(subset.selection.omitted, ['2107-b', '2108-a']);
+  const full = buildReceipt({ rows: pass, selection: { lanes: ['2107'], rows: ['2107-a'], omitted: [], catalogRows: { 2107: 1 } }, cleanup: { ok: true } });
+  assert.deepEqual([full.verdict, exitStatus(full.verdict), full.totals.byLane['2107'].complete], ['pass', 0, true]);
+  const omitted = ['x'];
+  assert.equal(buildReceipt({ rows: [row('a', '2107', 'fail')], selection: { omitted }, cleanup: { ok: true } }).verdict, 'fail', 'a failure outranks a subset');
+  assert.equal(buildReceipt({ rows: [row('a', '2107', 'unrun')], selection: { omitted }, cleanup: { ok: true } }).verdict, 'unrun');
+  assert.equal(buildReceipt({ rows: pass, selection: { omitted }, cleanup: { ok: false } }).verdict, 'fail');
 });

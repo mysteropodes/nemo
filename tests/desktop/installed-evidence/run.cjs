@@ -6,8 +6,9 @@
 //   lockf -k /tmp/nemo-heavy-job.lock node tests/desktop/installed-evidence/run.cjs \
 //     --app /abs/Nemo.app --build-proof /abs/build-proof.json --report-dir /abs/empty-dir [--lane 2107,2108] [--row id,id] [--reserve gpu-reference|none]
 //
-// Exit status: 0 all selected rows passed; 1 a row failed (or cleanup was incomplete); 2 refused before any row (usage, not the
-// candidate); 4 no row failed but at least one is unrun (an operation is unavailable).
+// Exit status: 0 every catalog row ran and passed; 1 a row failed (or cleanup was incomplete); 2 refused before any row (usage, not
+// the candidate); 4 no row failed but at least one is unrun (an operation is unavailable); 5 the selected rows all passed but the
+// selection left catalog rows out (`subset-pass`: not a lane receipt).
 const fs = require('node:fs');
 const path = require('node:path');
 const { isCheckRefusal } = require('../native-harness.cjs');
@@ -47,7 +48,7 @@ async function main(config, deps = {}) {
   } catch (error) { return { exit: EXIT.refused, refused: refusalReason(error), receipt: null }; }
   const write = (name, value, extra = {}) => fs.writeFileSync(path.join(config.reportDir, name), value, { flag: 'wx', mode: 0o600, ...extra });
   const transcript = [];
-  const sel = { lanes: selection.lanes, rows: selection.rows.map(r => r.id), omitted: selection.omitted };
+  const sel = { lanes: selection.lanes, rows: selection.rows.map(r => r.id), omitted: selection.omitted, catalogRows: selection.catalogRows };
   let candidate;
   try { candidate = await (deps.openCandidate || require('./candidate.cjs').openCandidate)(config, deps); }
   catch (error) {
@@ -69,7 +70,7 @@ async function main(config, deps = {}) {
   write('installed-client-evidence.json', JSON.stringify(receipt, null, 2) + '\n');
   write('transcript.jsonl', transcript.map(entry => JSON.stringify(entry)).join('\n') + (transcript.length ? '\n' : ''));
   const exit = exitStatus(receipt.verdict);
-  (deps.stdout || process.stdout).write(JSON.stringify({ verdict: receipt.verdict, totals: receipt.totals, cleanup, candidate: { sourceHead: receipt.candidate.sourceHead, buildId: receipt.candidate.buildId } }) + '\n');
+  (deps.stdout || process.stdout).write(JSON.stringify({ verdict: receipt.verdict, selection: { lanes: sel.lanes, rows: sel.rows.length, omitted: sel.omitted.length, catalogRows: sel.catalogRows }, totals: receipt.totals, uncoveredIds: Object.fromEntries(Object.entries(receipt.coverage).map(([lane, c]) => [lane, c.uncoveredIds])), cleanup, candidate: { sourceHead: receipt.candidate.sourceHead, buildId: receipt.candidate.buildId } }) + '\n');
   return { exit, receipt };
 }
 

@@ -74,7 +74,7 @@ test('a passing run writes the receipt and transcript, cleans up once, and exits
   assert.equal(exit, 0);
   assert.deepEqual([receipt.verdict, f.state.opened, f.state.cleaned], ['pass', 1, 1]);
   const written = JSON.parse(fs.readFileSync(path.join(f.reportDir, 'installed-client-evidence.json'), 'utf8'));
-  assert.equal(written.schema, 'nemo.installed-client-evidence/1');
+  assert.equal(written.schema, 'nemo.installed-client-evidence/2');
   assert.ok(written.rows[0].assertions.length >= 4 && written.rows[0].assertions.every(a => a.verdict === 'pass'));
   assert.ok(fs.readFileSync(path.join(f.reportDir, 'transcript.jsonl'), 'utf8').split('\n').filter(Boolean).every(line => JSON.parse(line).requestDigest));
   assert.equal(JSON.parse(f.out[0]).verdict, 'pass');
@@ -139,4 +139,17 @@ test('command line: lanes and rows parse, unknown flags refuse, exit status is t
   assert.equal(await cli(['--nope'], { stderr: sink }), 2);
   const f = fixture(t);
   assert.equal(await cli(['--app', f.config.app, '--build-proof', f.config.buildProof, '--report-dir', f.config.reportDir], f.deps), 0);
+});
+
+test('running one row of a larger catalog exits 5 (subset-pass) and says so on stdout and in the receipt; the full catalog exits 0', async t => {
+  const mk = (f, id) => f.row(id, async ctx => { await K.fresh(ctx); const e = await K.exportPng(ctx, 'blank'); ctx.eq('pixel', 'blank', probe.inkBounds(e.image), null); });
+  const first = fixture(t, { rows: [], over: {} });
+  const catalog = [mk(first, '9001-one'), mk(first, '9001-two')];
+  const subset = fixture(t, { rows: catalog, over: { config: { rows: ['9001-one'] } } });
+  const { exit, receipt } = await main(subset.config, subset.deps);
+  assert.deepEqual([exit, receipt.verdict, receipt.selection.omitted, receipt.totals.byLane['9001'].catalogRows], [5, 'subset-pass', ['9001-two'], 2]);
+  const line = JSON.parse(subset.out[0]);
+  assert.deepEqual([line.verdict, line.selection.rows, line.selection.omitted, line.selection.catalogRows], ['subset-pass', 1, 1, { 9001: 2 }]);
+  const whole = fixture(t, { rows: catalog });
+  assert.deepEqual([(await main(whole.config, whole.deps)).exit], [0]);
 });
