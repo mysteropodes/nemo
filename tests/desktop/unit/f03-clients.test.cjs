@@ -47,7 +47,7 @@ const reasonOf = (receipt, id) => receipt.rows.find(r => r.id === id).reason;
 test('pass: both clients complete the workflow and the harness confirms it from its own reads and the saved files', async () => {
   const h = harness();
   const { exit, receipt } = await main(h.config, h.deps);
-  assert.equal(exit, 0);
+  assert.equal(exit, 0, JSON.stringify(receipt.rows.map(r => r.reason)));
   assert.equal(receipt.verdict, 'pass');
   assert.deepEqual(receipt.rows.map(r => [r.id, r.verdict]), [['f03-codex', 'pass'], ['f03-claude', 'pass']]);
   assert.equal(h.opened.length, 2, 'one fresh isolated session per client');
@@ -62,6 +62,12 @@ test('pass: both clients complete the workflow and the harness confirms it from 
   }
   assert.equal(JSON.parse(fs.readFileSync(path.join(h.reportDir, 'f03-clients-receipt.json'), 'utf8')).schema, 'nemo.installed-client-f03/1');
   for (const name of ['codex', 'claude']) for (const ext of ['stream.jsonl', 'stderr.txt', 'wire.jsonl']) assert.ok(fs.existsSync(path.join(h.reportDir, name + '.' + ext)));
+});
+
+test('one client selected and passing is a subset pass, never the full result', async () => {
+  const h = harness();
+  const { exit, receipt } = await main({ ...h.config, clients: ['claude'] }, h.deps);
+  assert.equal(exit, 5); assert.equal(receipt.verdict, 'subset-pass'); assert.deepEqual(receipt.selection.omitted, ['f03-codex']);
 });
 
 test('product failure: an application that accepts an out-of-date write, saves the wrong value or accepts a replaced project fails the half', async () => {

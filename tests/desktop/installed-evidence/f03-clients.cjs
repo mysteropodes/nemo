@@ -10,7 +10,7 @@
 //   lockf -k /tmp/nemo-heavy-job.lock node tests/desktop/installed-evidence/f03-clients.cjs \
 //     --app /abs/Nemo.app --build-proof /abs/build-proof.json --report-dir /abs/empty-dir [--client codex,claude] [--timeout-min 20]
 //
-// Exit status as run.cjs: 0 both halves passed; 1 a half failed or cleanup was incomplete; 2 refused before anything ran;
+// Exit status as run.cjs: 0 both halves passed (5 when only one client was selected and it passed); 1 a half failed or cleanup was incomplete; 2 refused before anything ran;
 // 4 nothing failed but a half is unrun (client missing, unauthenticated or over quota, or an operation unavailable).
 const fs = require('node:fs');
 const path = require('node:path');
@@ -98,7 +98,7 @@ async function main(config, deps = {}) {
   const failed = cleanups.filter(c => !c.ok);
   const cleanup = failed.length ? { ok: false, reason: failed.map(c => c.reason).join('; ') } : { ok: true };
   const candidate = first ? Object.fromEntries(COMMON.map(k => [k, first[k]])) : null;
-  const receipt = { ...buildReceipt({ candidate, selection: { lanes: ['f03'], rows: rows.map(r => r.id), omitted: [] }, rows, cleanup, refusal }),
+  const receipt = { ...buildReceipt({ candidate, selection: { lanes: ['f03'], rows: rows.map(r => r.id), omitted: C.NAMES.filter(n => !names.includes(n)).map(n => 'f03-' + n), catalogRows: { f03: C.NAMES.length } }, rows, cleanup, refusal }),
     schema: SCHEMA, statement: STATEMENT, clients: rows.filter(r => r.client).map(r => ({ row: r.id, ...r.client })), limitations: LIMITATIONS };
   delete receipt.residualHandsOn;
   fs.writeFileSync(path.join(config.reportDir, 'f03-clients-receipt.json'), JSON.stringify(receipt, null, 2) + '\n', { flag: 'wx', mode: 0o600 });

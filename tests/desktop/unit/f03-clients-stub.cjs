@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const INSTANCE = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', BUILD = '1.2.3:' + 'a'.repeat(40), UID = 'r08_curve_layer';
 
 function createApp(flags = {}) {
-  const state = { doc: null, seq: 0, closed: false, calls: [] };
+  const state = { doc: null, seq: 0, gen: 0, closed: false, calls: [] };
   const env = (v, req, extra) => ({ apiVersion: v, requestId: req.requestId, instanceId: INSTANCE, documentId: state.doc ? state.doc.id : '',
     ...(v === 2 ? { contentRevision: state.doc ? state.doc.rev : 0 } : { revision: state.doc ? state.doc.rev : 0 }), ...extra });
   const ok = (v, req, result) => env(v, req, { ok: true, result });
@@ -22,6 +22,7 @@ function createApp(flags = {}) {
     const p = req.payload;
     if (req.operation === 'project.open') {
       const layer = JSON.parse(fs.readFileSync(p.path, 'utf8')).layers[0];
+      state.gen += 1;
       state.doc = { id: 'doc-' + (++state.seq), rev: 0, value: layer.motionStatic.opacity[0], keys: layer.motion && layer.motion.opacity && layer.motion.opacity.keys, undo: [], redo: [] };
       return ok(1, req, { documentId: state.doc.id, contentRevision: 0, layers: [{ layerUid: UID }] });
     }
@@ -54,7 +55,7 @@ function createApp(flags = {}) {
       const wrap = value => ({ result: { structuredContent: value } });
       if (name === 'nemo_discover') {
         return wrap({ instances: [{ instanceId: INSTANCE, buildId: BUILD, nativeHostStatus: { instanceId: INSTANCE, available: !!state.doc,
-          ...(state.doc ? { documentId: state.doc.id, contentRevision: state.doc.rev, lifecycleGeneration: 1 } : {}) } }] });
+          ...(state.doc ? { documentId: state.doc.id, contentRevision: state.doc.rev, lifecycleGeneration: state.gen } : {}) } }] });
       }
       return wrap(args.apiVersion === 1 ? v1(args) : v2(args));
     },
