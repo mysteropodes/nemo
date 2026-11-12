@@ -22,10 +22,10 @@ This is the single operating plan for the current remediation. It supersedes the
 This amendment changes how work is sized, evidenced and reported. **It does not relax any acceptance criterion, the 100% desktop baseline-parity obligation, the single-authority rule, independent review or branch protection.**
 
 1. **Frozen commencement baseline.**
-   - For §9 parity accounting, this proposal changes §0: the functional baseline is the source at the native-only separation, `1065e9d8d9c48e66d9b44bb4de446e8f4e887040`. The operational source/build preserved for recovery remains a distinct reference; this proposal does not conflate it with the original agreed baseline or the accepted remediation source.
+   - For §9 parity accounting, this proposal changes §0: it uses the source at the native-only separation, `1065e9d8d9c48e66d9b44bb4de446e8f4e887040`, as the proposed functional reference. This does not discard any originally agreed workflow absent at that SHA. The operational source/build preserved for recovery remains a distinct reference, as does the accepted remediation source.
    - Defects present at `1065e9d8` receive explicit dispositions. The 453 medium/low mapping rows remain pending until a human has reviewed them.
    - The surface inventory is regenerated there once, with stable identifiers (not source line numbers), and frozen at `engineering/inventory/parity/baseline-surfaces.json`.
-   - The 228 original task IDs and every frozen surface are joined in generated `engineering/inventory/parity/matrix.json` with a `--check` gate. This matrix, not the fixed baseline-workflow denominator, is the parity denominator of §9.
+   - The 228 original task IDs and every frozen surface are joined in generated `engineering/inventory/parity/matrix.json` with a `--check` gate. The matrix accounts for the fixed baseline-workflow denominator in §9; it does not replace or reduce it. Agreed workflows without surface rows, including real-client behavior, workload and recovery acceptance, and final promotion, remain required by §9 and are reconciled explicitly.
 2. **Chain-level outcomes (supersedes the 30–90-minute sizing in §3).**
    - One owner stays accountable for a dependency chain until its matrix rows are accepted: components and storyboard, scene and paint, mesh and rig, text, media and import, frames, expressions/parenting (R18.2), and Motion.
    - Work not listed in a chain remains in leaves; leaves also remain for genuinely independent work.
