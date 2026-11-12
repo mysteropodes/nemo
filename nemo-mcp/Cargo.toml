@@ -6,6 +6,8 @@ license = "GPL-3.0-or-later"
 description = "Bundled MCP transport for Nemo application services"
 
 [dependencies]
+# Runtime request validation uses the same locked draft-2020-12 implementation as contract tests.
+jsonschema = { version = "=0.56.0", default-features = false }
 rmcp = { version = "=3.2.0", features = ["server", "transport-io"] }
 serde = { version = "1", features = ["derive"] }
 # The standalone stdio binary parses object-valued reproduction requests itself.
@@ -21,7 +23,6 @@ dirs = "6"
 [dev-dependencies]
 tempfile = "3"
 rmcp = { version = "=3.2.0", features = ["client", "transport-child-process"] }
-jsonschema = { version = "=0.56.0", default-features = false }
 
 [[bin]]
 name = "nemo-mcp-schema"

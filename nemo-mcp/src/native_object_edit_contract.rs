@@ -15,131 +15,13 @@ const MAX_NAME: usize = 256;
 const MAX_LABEL: usize = 64;
 const MAX_ITEMS: usize = 1024;
 
-#[derive(Clone, Copy)]
-enum K {
-    /// Authored stable identity: non-empty, at most 128 UTF-8 bytes, no control character.
-    Uid,
-    /// Opaque layer identity: any non-empty string.
-    Opaque,
-    /// One to 1024 distinct opaque layer identities.
-    Opaques,
-    Gap,
-    Selection,
-    Name,
-    GroupName,
-    Frame,
-    /// Stroke identities: at least this many, at most 1024.
-    Strokes(usize),
-    Combine,
-    Boolean,
-    EditMode,
-    Labels,
-    Clip,
-    Footprint,
-    /// An Alt-drag duplicate's distance: a finite `[dx, dy]` pair, each component at most 1e6.
-    Offset,
-    /// A multi-layer duplicate's other layers: one to 32 `{layerUid, strokeIds}` with distinct layers and one or more distinct stroke identities each.
-    Others,
-    Fill(fill::Field),
-}
+#[path = "native_object_edit_fields.rs"]
+mod fields;
+use fields::{Member, K, SPECS};
 
-/// (operation suffix, command, "member:kind ..." in wire order). Every operation is a revisioned command; only a
-/// duplicate names its minted identity; copy/cut carry a bounded clipboard; other receipts are compact.
-static SPECS: [(&str, &str, &str); 21] = [
-    // `contextId:uid?` (#2256): the declared component whose layers the edit works on; absent is the scene root.
-    (
-        "layer.delete",
-        "object.layer.delete",
-        "selection:selection contextId:uid?",
-    ),
-    (
-        "layer.duplicate",
-        "object.layer.duplicate",
-        "layerUid:opaque contextId:uid?",
-    ),
-    (
-        "layer.rename",
-        "object.layer.rename",
-        "layerUid:opaque name:name",
-    ),
-    (
-        "layer.reorder",
-        "object.layer.reorder",
-        "layerUids:opaques gap:gap selection:selection contextId:uid?",
-    ),
-    (
-        "group.create",
-        "object.group.create",
-        "layerUid:uid contextId:uid groupId:uid name:groupName strokeIds:strokes1",
-    ),
-    (
-        "group.ungroup",
-        "object.group.ungroup",
-        "layerUid:uid contextId:uid strokeIds:strokes1",
-    ),
-    (
-        "group.combine",
-        "object.group.combine",
-        "layerUid:uid contextId:uid groupId:uid mode:combine strokeIds:strokes1",
-    ),
-    (
-        "group.mode.set",
-        "object.group.mode.set",
-        "layerUid:uid contextId:uid groupId:uid mode:combine",
-    ),
-    (
-        "group.rename",
-        "object.group.rename",
-        "layerUid:uid contextId:uid groupId:uid name:groupName",
-    ),
-    (
-        "group.member.remove",
-        "object.group.member.remove",
-        "layerUid:uid contextId:uid strokeId:uid",
-    ),
-    (
-        "selection.delete",
-        "object.selection.delete",
-        "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0",
-    ),
-    (
-        "selection.duplicate",
-        "object.selection.duplicate",
-        "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0 offset:offset? others:others?",
-    ),
-    (
-        "layer.split",
-        "object.layer.split",
-        "contextId:uid layerUid:uid frame:frame labels:labels",
-    ),
-    (
-        "clipboard.paste",
-        "object.clipboard.paste",
-        "contextId:uid layerUid:uid frame:frame mode:editMode clip:clip",
-    ),
-    (
-        "boolean.apply",
-        "object.boolean.apply",
-        "mode:boolean layerUid:uid contextId:uid frame:frame strokeIds:strokes2",
-    ),
-    (
-        "boolean.erase",
-        "object.boolean.erase",
-        "layerUid:uid contextId:uid frame:frame strokeId:uid footprint:footprint joinHistory:flag?",
-    ),
-    (
-        "boolean.flatten",
-        "object.boolean.flatten",
-        "layerUid:uid contextId:uid frame:frame groupId:uid",
-    ),
-    ("fill.trace","object.fill.trace","layerUid:uid contextId:uid frame:frame point:point color:color opacity:opacity remove:flag"),
-    ("fill.brush","object.fill.brush","layerUid:uid contextId:uid frame:frame outline:outline color:color opacity:opacity placement:placement mask:mask copies:copies stamps:stamps"),
-    ("clipboard.copy", "object.clipboard.copy", "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0"),
-    ("clipboard.cut", "object.clipboard.cut", "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0"),
-];
 const PREFIX: &str = "command.document.object.";
 
-fn spec(operation: &str) -> Option<(&'static str, &'static str)> {
+fn spec(operation: &str) -> Option<(&'static str, &'static [Member])> {
     let suffix = operation.strip_prefix(PREFIX)?;
     SPECS
         .iter()
@@ -226,31 +108,6 @@ fn offset(value: &Value) -> bool {
     })
 }
 
-fn kind(token: &str) -> Option<K> {
-    Some(match token {
-        "uid" => K::Uid,
-        "opaque" => K::Opaque,
-        "opaques" => K::Opaques,
-        "gap" => K::Gap,
-        "selection" => K::Selection,
-        "name" => K::Name,
-        "groupName" => K::GroupName,
-        "frame" => K::Frame,
-        "strokes0" => K::Strokes(0),
-        "strokes1" => K::Strokes(1),
-        "strokes2" => K::Strokes(2),
-        "combine" => K::Combine,
-        "boolean" => K::Boolean,
-        "editMode" => K::EditMode,
-        "labels" => K::Labels,
-        "clip" => K::Clip,
-        "footprint" => K::Footprint,
-        "offset" => K::Offset,
-        "others" => K::Others,
-        _ => K::Fill(fill::kind(token)?),
-    })
-}
-
 fn check(kind: K, value: &Value) -> bool {
     match kind {
         K::Uid => uid(value),
@@ -294,24 +151,17 @@ pub(super) fn request(operation: &str, payload: &Value) -> bool {
     let Some((command, members)) = spec(operation) else {
         return false;
     };
-    let members: Vec<(&str, &str)> = members
-        .split(' ')
-        .filter_map(|member| member.split_once(':'))
-        .collect();
-    // A token ending in `?` names an optional member: absent is valid, present must pass its check.
-    let optional = |token: &str| token.ends_with('?');
+    // The field kinds are compiler-checked constants. Missing required keys and
+    // unknown keys are rejected before member checks; only declared optional
+    // keys may be absent. No request can introduce an unknown field-kind token.
     let mut required = vec!["command"];
-    required.extend(members.iter().filter(|member| !optional(member.1)).map(|member| member.0));
-    let allowed: Vec<&str> = members.iter().filter(|member| optional(member.1)).map(|member| member.0).collect();
+    required.extend(members.iter().filter(|member| !member.2).map(|member| member.0));
+    let allowed: Vec<_> = members.iter().filter(|member| member.2).map(|member| member.0).collect();
     exact(payload, &required, &allowed).is_some_and(|object| {
         object.get("command").and_then(Value::as_str) == Some(command)
-            && members.iter().all(|(name, token)| {
-                let token = token.trim_end_matches('?');
-                match (object.get(*name), kind(token)) {
-                    (Some(value), Some(k)) => check(k, value),
-                    (None, Some(_)) => members.iter().any(|m| m.0 == *name && optional(m.1)),
-                    _ => false,
-                }
+            && members.iter().all(|(name, kind, optional)| match object.get(*name) {
+                Some(value) => check(*kind, value),
+                None => *optional,
             })
     })
 }

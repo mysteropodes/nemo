@@ -94,6 +94,9 @@ mod tests {
             json!({"kind":"setTotalFrames","frames":12,"extra":1}),
             json!({"kind":"trimToWorkArea","frames":12}),
             json!({"kind":"setFps","fps":24,"path":"private"}),
+            json!({"kind":"notAnOwnerAction"}),
+            json!({}),
+            json!({"kind":7}),
         ] {
             let p = payload(a);
             assert!(!request(&p));

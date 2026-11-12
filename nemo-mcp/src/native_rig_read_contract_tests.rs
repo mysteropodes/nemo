@@ -478,3 +478,16 @@ fn the_transport_schema_admits_a_held_pose_drag_and_the_world_map_and_refuses_wh
     posed["items"] = json!([[0, 1, 2, 3]]);
     assert!(!schema.is_valid(&wrapped(posed, true)), "a posed vertex is nine numbers");
 }
+
+#[test]
+fn posed_outline_closed_flag_is_a_wire_integer_bit() {
+    let p=payload("posed",0,0,8);
+    let q: crate::contract::NativeApplicationRequest=serde_json::from_value(json!({"apiVersion":2,"requestId":"rig-flag","instanceId":"instance","documentId":"document","operation":OP,"payload":p})).unwrap();
+    let accepted=|closed: Value| {
+        let body=response("posed",0,0,vec![json!([0,2,20.5,-3,0,0,5.25,1,closed])],1,Value::Null,Value::Null);
+        let r=serde_json::from_value(json!({"apiVersion":2,"requestId":q.request_id,"instanceId":q.instance_id,"documentId":q.document_id,"contentRevision":7,"ok":true,"result":body})).unwrap();
+        crate::wire::validate_native_response(&r,&q).is_ok()
+    };
+    assert!(accepted(json!(0)));assert!(accepted(json!(1)));
+    for bad in [json!(2),json!(-1),Value::Null,json!(false),json!("1")] { assert!(!accepted(bad)); }
+}
