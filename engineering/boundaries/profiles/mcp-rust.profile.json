@@ -11,6 +11,8 @@
         "src/contract.rs",
         "src/contract_tests.rs",
         "src/native_request_input.rs",
+        "src/native_request_schema.rs",
+        "src/native_request_schema_tests.rs",
         "src/native_request_input_tests.rs",
         "src/lib.rs",
         "src/main.rs",
