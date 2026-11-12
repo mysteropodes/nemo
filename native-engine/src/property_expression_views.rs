@@ -324,3 +324,7 @@ pub(crate) fn bind_for_test(
     };
     bind_parts(identity, document, metadata, target, property)
 }
+
+// D17 (#2072): self/alias in/out points and contentBox over the pinned snapshot.
+#[path = "property_expression_self_extent.rs"]
+pub(crate) mod self_extent;
