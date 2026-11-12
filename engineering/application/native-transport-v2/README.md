@@ -10,7 +10,8 @@ Each `capabilities-v2/<name>.json` descriptor owns the matching
 there is no central fragment registration. A fragment declares its capability ID,
 `definitions` and `requests`. Every declared transport operation must occur exactly
 once in its owner's request variants. A const or enum operation branch is retained
-whole; the generator does not rewrite constraints or generate runtime validators.
+whole; assembly preserves its constraints. MCP compiles those constraints as
+described below.
 
 A definition entry is `{ "schema": <JSON Schema>, "order": <optional integer> }`.
 A request entry has the same shape. Historical ordinals preserve the original
@@ -45,7 +46,7 @@ freshness through its existing `native-capability-catalog` gate. The Tauri
 preserving the private-Labs guard. Neither gate silently rewrites the contract. Generation publishes the complete
 aggregate by exclusive sibling temporary file and atomic rename.
 Direct Cargo invocations do not run the Tauri hook; use the schema check explicitly
-for those source workflows. No Rust build dependency or runtime validator changed.
+for those source workflows.
 
 The one-time migration comparison and digest belong in the PR receipt, rather
 than a permanent wire-contract pin. Ongoing
@@ -57,3 +58,40 @@ issue's complete handler/runtime fresh-agent acceptance remains separate.
 The existing v2 declaration schema requires at least one operation even when a
 capability is temporarily unavailable. Availability does not suppress its request
 variants; the generator preserves this discovery and refusal contract.
+
+## MCP request validation
+
+The actual original-byte MCP request decoder reaches `validate_input`, which now
+uses these schema-derived payload and envelope validators. `build.rs` discovers
+all sibling `.schema.json` resources in sorted order and embeds them locally;
+a new capability or sibling contract requires no central Rust resource list.
+Sibling refs cannot escape that directory or retrieve remote resources. The
+assembler checks the supported two-part `allOf` envelope/property representation
+before generation, and runtime compilation errors are cached refusals with an
+internal diagnostic, rather than traffic-triggered panics.
+
+The cached payload validator uses the complete schema's original definition refs.
+Envelope validation keeps identity, cancellation and revision policy from the same
+branch; it does not copy or validate large payloads a second time. An independent
+source test compares the two projections with the complete Request union for every
+descriptor example and metadata/payload mutations. Another compiles both validators
+for every declared operation, including operations without examples. Existing raw
+member, byte, typed input, diagnostic, registration and availability gates remain.
+
+Pure request rules for layer policy, visibility, object undo/redo, pinned
+serialize/evaluate and empty diagnostics/reproduction payloads now use the schema.
+Other family predicates remain for semantic protections, including byte lengths,
+uniqueness, correlated targets and non-singular transforms. Native execution
+validation is authoritative and unchanged. JavaScript and native-engine validators
+are separate consumers; this source delivery does not make those schema-derived.
+
+The chosen `jsonschema` 0.56.0 crate was already pinned for source tests. Its default
+features are disabled, including network retrieval. Reusing its full refs, regex
+and conditional semantics avoids introducing another partial JSON Schema matcher.
+Static predicates or compact tables would reduce runtime dependencies but would
+need their own equivalent keyword compiler and negative controls. The measured
+tradeoff on the source candidate is 66 to 109 normal MCP dependency nodes, with
+Rust 1.85 required by jsonschema versus the checked local 1.91.1 toolchain. A cold
+isolated debug test measured 31.84 ms including registry preparation, 10,000 cached
+trivial checks took 4.04 ms, and the whole test process peaked at 24.25 MB RSS.
+These are source-test observations, not packaged release size or app timing.

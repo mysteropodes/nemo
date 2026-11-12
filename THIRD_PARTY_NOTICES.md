@@ -56,6 +56,25 @@ permissive and all redistributable inside a GPL-3.0-or-later work.
 Both `Cargo.toml` files declare `license = "GPL-3.0-or-later"` so tooling reports
 Nemo's own crates correctly instead of `N/A`.
 
+### CS1 request-schema validation runtime addition (2026-11-12)
+
+`nemo-mcp` now links its previously test-only `jsonschema` 0.56.0 validator
+(MIT), with default features disabled: external schema retrieval is disabled.
+The same dependency graph is linked through the desktop application's shared
+MCP library. Existing dependencies are preserved except the required
+`regex-automata` 0.4.14 to 0.4.18 (`fancy-regex` requires at least 0.4.16) and
+`zmij` 1.0.21 to 1.0.23 (`jsonschema-value` requires at least 1.0.23).
+
+The scoped addition was inspected through the existing
+`cargo license --avoid-dev-deps --json --manifest-path src-tauri/Cargo.toml`
+mechanism. All 26 newly present package/version entries declare MIT, MIT-0, Apache-2.0,
+or Apache-2.0 OR MIT; use the MIT arm where offered.
+Their exact versions, authors, license expressions and upstream repositories
+are appended as the dated CS1 section of
+[the Rust desktop license inventory](THIRD_PARTY_LICENSES_RUST_TAURI.txt).
+The older inventory remains a dated baseline rather than a regenerated audit
+of unrelated dependencies. No installed bundle inspection is implied.
+
 ### T06 MCP tracing addition (2026-10-04)
 
 The 2026-08-30 raw license files above are audit snapshots, not a live count

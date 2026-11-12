@@ -6,7 +6,7 @@ const ROOT = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const nonblank = (text) => text.split('\n').filter((line) => line.trim()).length;
 const FAMILIES = ['layer-lifecycle', 'group', 'selection-edit', 'boolean', 'fill'];
-const RUST = ['src/native_object_edit_contract.rs', 'src/native_object_edit_clipboard.rs', 'src/native_object_edit_contract_tests.rs', 'src/native_object_edit_receipt_tests.rs'];
+const RUST = ['src/native_object_edit_contract.rs', 'src/native_object_edit_fields.rs', 'src/native_object_edit_clipboard.rs', 'src/native_object_edit_contract_tests.rs', 'src/native_object_edit_receipt_tests.rs'];
 const MODULES = [
   ['app.native.object.edit.contract', 'domain', 'native-object-edit-contract.js', 'Domain/application'],
   ['app.native.object.edit.intent.core', 'domain', 'native-object-edit-intent-core.js', 'Domain/application'],

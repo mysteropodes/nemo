@@ -1,6 +1,6 @@
 'use strict';
 // #2363: capability-owned schema inputs; the committed aggregate remains the
-// public contract. No runtime validator or transport trust boundary is changed.
+// public contract and feeds the cached MCP request-schema validators.
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
@@ -14,6 +14,14 @@ const json = (value) => JSON.stringify(value, null, 2) + '\n';
 const demand = (condition, message) => { if (!condition) throw new Error(message); };
 
 function operations(branch) {
+  demand(branch && Object.keys(branch).length === 1 && Array.isArray(branch.allOf) && branch.allOf.length === 2,
+    'request variant must use the supported envelope/payload allOf representation');
+  const [envelope, body] = branch.allOf;
+  demand(envelope && Object.keys(envelope).length === 1 && /^#\/\$defs\/[A-Za-z][A-Za-z0-9]*$/.test(envelope.$ref),
+    'request variant must reference a local envelope definition');
+  demand(body && Object.keys(body).length === 1 && body.properties &&
+    Object.keys(body.properties).length === 2 && Object.hasOwn(body.properties, 'payload') && Object.hasOwn(body.properties, 'operation'),
+    'request variant needs only operation/payload properties; envelope projection changes need explicit support');
   const op = branch?.allOf?.[1]?.properties?.operation;
   const values = op && ('const' in op ? [op.const] : op.enum);
   demand(Array.isArray(values) && values.length && values.every((v) => typeof v === 'string' && v), 'request variant needs operation const/enum');
@@ -86,7 +94,8 @@ function assemble(root = ROOT) {
     if (!node || typeof node !== 'object') return;
     if (typeof node.$ref === 'string') {
       const [file, pointer = ''] = node.$ref.split('#');
-      demand(!file.includes('://'), `unsupported remote ref ${node.$ref}`);
+      demand(!file || /^(?:\.\/)?[A-Za-z0-9._-]+\.schema\.json$/.test(file),
+        `schema resource must be a sibling .schema.json file: ${node.$ref}`);
       let target = file ? read(root, path.posix.join(APP, file)) : schema;
       demand(!pointer || pointer.startsWith('/'), `unsupported ref ${node.$ref}`);
       for (const part of pointer ? pointer.slice(1).split('/') : []) {
