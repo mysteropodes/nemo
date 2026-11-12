@@ -20,6 +20,7 @@ const drift = require('../scripts/nemo/lib/capability-drift.cjs');
 const REPO = path.join(__dirname, '..');
 const APP = path.join('engineering', 'application');
 const RUST = path.join('nemo-mcp', 'src', 'capabilities.rs');
+const rawClientLib = require('../scripts/nemo/lib/capability-raw-client.cjs');
 const CLIENT = path.join('src-tauri', 'src', 'native_object_client.rs');
 
 // A faithful copy of exactly the inputs the checker reads.
@@ -343,7 +344,7 @@ test('native-raw-client-allowlist passes and names the 11 flagged operations', (
   assert.match(r.reason, /^11 rawClient operation\(s\)/);
 });
 
-test('native-raw-client-allowlist MUTATION — unflagging any operation fails (OPERATIONS lists it)', () => {
+test('native-raw-client-allowlist MUTATION — unflagging any operation fails (the generated list still has it)', () => {
   const all = drift.nativeDescriptorFiles(REPO).flatMap((f) => Object.keys(readJson(f).rawClient || {}));
   assert.strictEqual(all.length, 11);
   for (const op of all) {
@@ -359,22 +360,42 @@ test('native-raw-client-allowlist MUTATION — unflagging any operation fails (O
   }
 });
 
-test('native-raw-client-allowlist fails on a flagged operation OPERATIONS does not list', () => {
+test('native-raw-client-allowlist fails on a flagged operation the generated list lacks', () => {
   withFixture((root) => {
     editDescriptor(root, 'native.object.fill', (d) => { d.rawClient['command.document.object.fill.trace'] = { revisionDelta: 1 }; });
     const r = drift.checkRawClient(root);
     assert.strictEqual(r.status, 'fail');
-    assert.match(r.reason, /missing from OPERATIONS: command\.document\.object\.fill\.trace/);
+    assert.match(r.reason, /missing from native-raw-client\.json .*: command\.document\.object\.fill\.trace/);
   });
 });
 
-test('native-raw-client-allowlist fails when OPERATIONS grows or its length goes stale', () => {
+test('native-raw-client-allowlist fails when the generated list grows or a delta goes stale', () => {
+  const edit = (root, fn) => {
+    const f = path.join(root, rawClientLib.ARTIFACT);
+    const d = readJson(f);
+    fn(d);
+    writeJson(f, d);
+  };
   withFixture((root) => {
-    setClient(root, (src) => src.replace('"command.document.object.layer.cut",\n];', '"command.document.object.layer.cut",\n    "command.document.object.sneaky",\n];'));
+    edit(root, (d) => d.operations.push({ operation: 'command.document.object.sneaky', revisionDelta: 1 }));
     const r = drift.checkRawClient(root);
     assert.strictEqual(r.status, 'fail');
-    assert.match(r.reason, /declares length 11 but lists 12/);
     assert.match(r.reason, /no rawClient flag in any descriptor: command\.document\.object\.sneaky/);
+  });
+  withFixture((root) => {
+    edit(root, (d) => { d.operations.find((o) => o.operation === 'query.document.object').revisionDelta = 1; });
+    assert.match(drift.checkRawClient(root).reason, /revisionDelta for query\.document\.object is stale/);
+  });
+});
+
+test('native-raw-client-allowlist fails when the Rust client keeps a hand list or stops embedding the artifact', () => {
+  withFixture((root) => {
+    setClient(root, (src) => src + '\nconst OPERATIONS: [&str; 1] = ["command.document.object.sneaky"];\n');
+    assert.match(drift.checkRawClient(root).reason, /hand-maintained OPERATIONS list/);
+  });
+  withFixture((root) => {
+    setClient(root, (src) => src.replace('native-raw-client.json', 'elsewhere.json'));
+    assert.match(drift.checkRawClient(root).reason, /must embed the generated/);
   });
 });
 
@@ -425,7 +446,7 @@ test('native-raw-client-allowlist fails when the schema or the Rust allowlist is
     assert.match(drift.checkRawClient(root).reason, /missing .*capability-v2\.schema\.json/);
   });
   withFixture((root) => {
-    setClient(root, (src) => src.replace('const OPERATIONS', 'const NOT_OPERATIONS'));
-    assert.match(drift.checkRawClient(root).reason, /cannot find the OPERATIONS const/);
+    fs.rmSync(path.join(root, rawClientLib.ARTIFACT));
+    assert.match(drift.checkRawClient(root).reason, /missing engineering\/application\/native-raw-client\.json/);
   });
 });

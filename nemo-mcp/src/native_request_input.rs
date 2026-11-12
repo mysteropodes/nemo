@@ -5,11 +5,9 @@ use super::{
 };
 
 impl NativeApplicationRequest {
-    /// Check the typed shape, byte bounds and operation registration only.
-    /// Public callers must use `validate` to enforce capability availability;
-    /// this does not admit a document, authorize dispatch or prove an owner.
-    /// Raw duplicate-member checks must precede typed/Value deserialization.
-    pub fn validate_input(&self) -> Result<(), RequestError> {
+    /// The envelope rules shared by every request: apiVersion, bounded identifiers
+    /// and the safe-integer revision ceiling. No payload or operation semantics.
+    pub fn validate_envelope(&self) -> Result<(), RequestError> {
         if self.api_version != NATIVE_API_VERSION {
             return Err(RequestError::InvalidRequest(
                 "native request requires apiVersion 2".into(),
@@ -35,6 +33,15 @@ impl NativeApplicationRequest {
                 "expectedRevision exceeds the transport maximum".into(),
             ));
         }
+        Ok(())
+    }
+
+    /// Check the typed shape, byte bounds and operation registration only.
+    /// Public callers must use `validate` to enforce capability availability;
+    /// this does not admit a document, authorize dispatch or prove an owner.
+    /// Raw duplicate-member checks must precede typed/Value deserialization.
+    pub fn validate_input(&self) -> Result<(), RequestError> {
+        self.validate_envelope()?;
         if self.expected_revision.is_some()
             && crate::native_contract::forbids_expected_revision(&self.operation)
         {

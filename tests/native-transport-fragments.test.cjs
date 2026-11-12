@@ -7,6 +7,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const transport = require('../scripts/nemo/lib/native-transport-schema.cjs');
 const drift = require('../scripts/nemo/lib/capability-drift.cjs');
+const raw = require('../scripts/nemo/lib/capability-raw-client.cjs');
 const ROOT = path.resolve(__dirname, '..');
 const APP = 'engineering/application';
 const read = (root, name) => JSON.parse(fs.readFileSync(path.join(root, name), 'utf8'));
@@ -17,7 +18,7 @@ function fixture(t) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.cpSync(path.join(ROOT, APP), path.join(root, APP), { recursive: true });
   fs.mkdirSync(path.join(root, 'scripts/nemo/lib'), { recursive: true });
-  for (const name of ['native-transport-schema.cjs', 'util.cjs']) fs.copyFileSync(path.join(ROOT, 'scripts/nemo/lib', name), path.join(root, 'scripts/nemo/lib', name));
+  for (const name of ['native-transport-schema.cjs', 'util.cjs', 'capability-raw-client.cjs', 'capability-schema.cjs']) fs.copyFileSync(path.join(ROOT, 'scripts/nemo/lib', name), path.join(root, 'scripts/nemo/lib', name));
   return root;
 }
 function cli(root, flag) {
@@ -146,32 +147,64 @@ test('a new capability adds its own descriptor and fragment without a central re
   assert.deepEqual(after.$defs.FixturePayload, { $ref: 'fixture-capability.schema.json#/$defs/Payload' });
 });
 
+test('a new raw-client capability reaches the Tauri allowlist from its own folder with no central Rust edit', (t) => {
+  const root = fixture(t);
+  const client = path.join(root, ...raw.CLIENT_RS);
+  fs.mkdirSync(path.dirname(client), { recursive: true });
+  fs.copyFileSync(path.join(ROOT, ...raw.CLIENT_RS), client);
+  const centralRust = fs.readFileSync(client, 'utf8');
+  const before = read(root, raw.ARTIFACT).operations.map((o) => o.operation);
+  const descriptor = read(root, `${APP}/capabilities-v2/native-opacity.json`);
+  descriptor.id = 'native.fixture';
+  descriptor.operations = ['command.fixture.edit', 'query.fixture.read'];
+  descriptor.rawClient = { 'command.fixture.edit': { revisionDelta: 1 }, 'query.fixture.read': { revisionDelta: 0 } };
+  write(root, `${APP}/capabilities-v2/native-fixture.json`, descriptor);
+  const branch = (operation) => ({ allOf: [{ $ref: '#/$defs/RequestBase' }, { properties: { operation: { const: operation }, payload: { type: 'object', additionalProperties: false } } }] });
+  write(root, `${transport.INPUT}/native-fixture.json`, { capability: descriptor.id, definitions: {}, requests: [{ schema: branch('command.fixture.edit') }, { schema: branch('query.fixture.read') }] });
+  // Neither the aggregate nor the allowlist is silently regenerated, and the drift gate names both.
+  assert.match(transport.check(root).problems.join('; '), /is stale/);
+  assert.match(drift.checkRawClient(root).reason, /missing from native-raw-client\.json .*command\.fixture\.edit/);
+  assert.equal(cli(root, '--write').status, 0);
+  assert.equal(cli(root, '--check').status, 0);
+  const after = read(root, raw.ARTIFACT).operations;
+  assert.deepEqual(after.map((o) => o.operation), [...before, 'command.fixture.edit', 'query.fixture.read'].sort());
+  assert.deepEqual(after.filter((o) => o.operation.includes('fixture')).map((o) => o.revisionDelta), [1, 0]);
+  assert.equal(drift.checkRawClient(root).status, 'pass', drift.checkRawClient(root).reason);
+  assert.equal(fs.readFileSync(client, 'utf8'), centralRust);
+  assert.deepEqual(raw.clientConsumesArtifact(root), []);
+  // The generator, not a person, owns the order and the revision delta.
+  descriptor.rawClient['command.fixture.edit'].revisionDelta = 0;
+  write(root, `${APP}/capabilities-v2/native-fixture.json`, descriptor);
+  assert.throws(() => transport.write(root), /command .* must declare revisionDelta 1/);
+});
+
 test('normal packaged build checks the same aggregate before compiling the sidecar', () => {
   const command = read(ROOT, 'src-tauri/tauri.conf.json').build.beforeBuildCommand;
   assert.equal(command, 'python3 scripts/assert-no-private-labs.py && node scripts/nemo/lib/native-transport-schema.cjs --check && node scripts/build-mcp-sidecar.cjs');
 });
 
-test('aggregate publication renames a complete exclusive sibling and cleans up a failed rename', (t) => {
+test('generated outputs are published by renaming a complete exclusive sibling and clean up a failed rename', (t) => {
   const root = fixture(t);
-  const destination = path.join(root, transport.OUTPUT);
-  const original = fs.readFileSync(destination, 'utf8');
+  const names = [transport.OUTPUT, raw.ARTIFACT];
+  const originals = new Map(names.map((name) => [path.join(root, name), fs.readFileSync(path.join(root, name), 'utf8')]));
   const rename = fs.renameSync;
   let renames = 0;
   try {
     fs.renameSync = (source, target) => {
-      assert.equal(path.dirname(source), path.dirname(destination));
-      assert.equal(target, destination);
-      assert.equal(fs.readFileSync(source, 'utf8'), original);
-      assert.equal(fs.readFileSync(destination, 'utf8'), original);
+      assert.equal(path.dirname(source), path.dirname(target));
+      assert.equal(fs.readFileSync(source, 'utf8'), originals.get(target));
+      assert.equal(fs.readFileSync(target, 'utf8'), originals.get(target));
       renames++;
       return rename(source, target);
     };
     transport.write(root);
-    assert.equal(renames, 1);
+    assert.equal(renames, names.length);
     fs.renameSync = () => { throw new Error('fixture rename failure'); };
     assert.throws(() => transport.write(root), /fixture rename failure/);
-    assert.equal(fs.readFileSync(destination, 'utf8'), original);
-    assert.deepEqual(fs.readdirSync(path.dirname(destination)).filter((f) => f.endsWith('.tmp')), []);
+    for (const [destination, original] of originals) {
+      assert.equal(fs.readFileSync(destination, 'utf8'), original);
+      assert.deepEqual(fs.readdirSync(path.dirname(destination)).filter((f) => f.endsWith('.tmp')), []);
+    }
   } finally { fs.renameSync = rename; }
 });
 

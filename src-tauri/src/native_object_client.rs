@@ -8,22 +8,34 @@ use serde_json::{json, Value};
 
 const MAX_BYTES: usize = 4096;
 const MAX_REVISION: u64 = 9_007_199_254_740_991;
-/// Must equal the operations flagged `rawClient` (with their `revisionDelta`) in
-/// engineering/application/capabilities-v2/*.json; the drift checker
-/// (`native-raw-client-allowlist`) and an admission test both hold that.
-pub(super) const OPERATIONS: [&str; 11] = [
-    "query.document.object",
-    "command.document.object.fill.set",
-    "command.document.object.undo",
-    "command.document.object.redo",
-    "query.document.object.serialize",
-    "command.document.object.layer.visibility.set",
-    "command.document.object.project.settings.edit",
-    "command.document.object.layer.policy.edit",
-    "command.document.object.project.placement.edit",
-    "command.document.object.audio.track.edit",
-    "command.document.object.layer.cut",
-];
+/// Operations whose admission has client-specific semantics below. Each must be
+/// flagged `rawClient` like any other; the flag, not this list, admits them.
+const READ: &str = "query.document.object";
+const SERIALIZE: &str = "query.document.object.serialize";
+const VISIBILITY: &str = "command.document.object.layer.visibility.set";
+/// Generated from the operations flagged `rawClient` (with their `revisionDelta`)
+/// in engineering/application/capabilities-v2/*.json by
+/// `node scripts/nemo/lib/native-transport-schema.cjs --write`; its `--check` (run
+/// by the Tauri beforeBuildCommand and `npm run check`) fails when it is stale.
+/// An unreadable embed admits nothing, never everything.
+const GENERATED: &str = include_str!("../../engineering/application/native-raw-client.json");
+pub(super) fn operations() -> &'static [&'static str] {
+    static LIST: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
+    LIST.get_or_init(|| {
+        let rows = serde_json::from_str::<Value>(GENERATED).ok();
+        let mut list: Vec<&'static str> = rows
+            .as_ref()
+            .and_then(|v| v["operations"].as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|row| row["operation"].as_str())
+            .map(|name| &*Box::leak(name.to_owned().into_boxed_str()))
+            .collect();
+        list.sort_unstable();
+        list.dedup();
+        list
+    })
+}
 
 /// Only original-byte admission can construct this token. Public typed dispatch
 /// continues to use full catalog availability, without this private admission.
@@ -33,40 +45,23 @@ impl AdmittedObjectRequest {
         self.0
     }
 }
-fn identifier(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    !bytes.is_empty()
-        && bytes.len() <= 128
-        && bytes[0].is_ascii_alphanumeric()
-        && bytes
-            .iter()
-            .all(|byte| byte.is_ascii_alphanumeric() || b"._:/-".contains(byte))
-}
 pub(super) fn admit_raw(raw: &str) -> Result<AdmittedObjectRequest, String> {
     if !raw.trim_start().starts_with('{') {
         return Err("object client requires a JSON object".into());
     }
     let request: NativeApplicationRequest = wire::decode_json_bounded(raw.as_bytes(), MAX_BYTES)
         .map_err(|_| "invalid raw object client request")?;
-    if request.api_version != NATIVE_API_VERSION
-        || !OPERATIONS.contains(&request.operation.as_str())
-        || [
-            &request.request_id,
-            &request.instance_id,
-            &request.document_id,
-        ]
-        .iter()
-        .any(|id| !identifier(id))
-        || request.expected_revision.is_some_and(|r| r > MAX_REVISION)
+    if !operations().contains(&request.operation.as_str())
+        || request.validate_envelope().is_err()
         || !request.payload.is_object()
     {
         return Err("invalid object client envelope".into());
     }
-    if request.operation == OPERATIONS[0] {
+    if request.operation == READ {
         // Registered read shape only, never global capability availability.
         request.validate_input().map_err(|e| e.to_string())?;
     }
-    if request.operation == OPERATIONS[4]
+    if request.operation == SERIALIZE
         && (request.expected_revision.is_some()
             || request.payload.as_object().is_none_or(|p| p.len() != 1)
             || !request
@@ -104,14 +99,14 @@ pub(super) fn client_status(state: &ApplicationMcp) -> Result<Value, String> {
             instance_id: state.instance_id().into(),
             document_id: active.document_id().into(),
             expected_revision: None,
-            operation: OPERATIONS[0].into(),
+            operation: READ.into(),
             payload: json!({"atRevision":active.content_revision(),"stableTarget":{
                 "contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
                 "layerUid":"route-probe","strokeId":"route-probe"}}),
             cancelled_before_dispatch: false,
         };
         let mut visibility = query.clone();
-        visibility.operation = OPERATIONS[5].into();
+        visibility.operation = VISIBILITY.into();
         visibility.expected_revision = Some(active.content_revision());
         visibility.payload = json!({"command":"object.layer.visibility.set",
             "layerUid":"route-probe","visible":false});
@@ -119,7 +114,7 @@ pub(super) fn client_status(state: &ApplicationMcp) -> Result<Value, String> {
     });
     Ok(json!({"apiVersion":2,"instanceId":state.instance_id(),
         "available":owner.is_some(),"route":"nemo_native_object_dispatch",
-        "operations":if owner.is_some(){OPERATIONS.as_slice()}else{&[]},
+        "operations":if owner.is_some(){operations()}else{&[]},
         "documentId":owner.map(|(_,a)|a.document_id()),
         "contentRevision":owner.map(|(_,a)|a.content_revision()),
         "lifecycleGeneration":owner.map(|(g,_)|g),

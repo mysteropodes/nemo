@@ -1,0 +1,48 @@
+{
+  "operations": [
+    {
+      "operation": "command.document.object.audio.track.edit",
+      "revisionDelta": 1
+    },
+    {
+      "operation": "command.document.object.fill.set",
+      "revisionDelta": 1
+    },
+    {
+      "operation": "command.document.object.layer.cut",
+      "revisionDelta": 1
+    },
+    {
+      "operation": "command.document.object.layer.policy.edit",
+      "revisionDelta": 1
+    },
+    {
+      "operation": "command.document.object.layer.visibility.set",
+      "revisionDelta": 1
+    },
+    {
+      "operation": "command.document.object.project.placement.edit",
+      "revisionDelta": 1
+    },
+    {
+      "operation": "command.document.object.project.settings.edit",
+      "revisionDelta": 1
+    },
+    {
+      "operation": "command.document.object.redo",
+      "revisionDelta": 1
+    },
+    {
+      "operation": "command.document.object.undo",
+      "revisionDelta": 1
+    },
+    {
+      "operation": "query.document.object",
+      "revisionDelta": 0
+    },
+    {
+      "operation": "query.document.object.serialize",
+      "revisionDelta": 0
+    }
+  ]
+}
