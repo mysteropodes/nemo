@@ -290,6 +290,27 @@ fn element_matrices(
     Ok(result)
 }
 
+/// Legacy unframed readers add this dense array to stored points. Publish it
+/// only when that operation EXACTLY reproduces evaluated paint, including
+/// topology/closure and unchanged handles. Frame-aware readers use paint once.
+pub(crate) fn legacy_vertex_offsets(
+    packet:&ObjectFramePacket, source:&ObjectRecord, painted:&ObjectRecord,
+)->Result<Option<Vec<[f64;2]>>,&'static str> {
+    if source.is_pressure_ribbon() || !is_vector_record(source)
+        || source.geometry.closed!=painted.geometry.closed
+        || source.geometry.segments.len()!=painted.geometry.segments.len() {return Ok(None)};
+    let offsets=crate::evaluation::object_vector_kernels::render_vector_eval::vertex::vertex_offsets(packet.snapshot(),source,packet.frame()).map_err(|e|e.message())?;
+    if !offsets.iter().any(|(i,p)|*i<source.geometry.segments.len()&&*p!=[0.,0.]) {return Ok(None)};
+    let mut dense=vec![[0.,0.];source.geometry.segments.len()];
+    for (i,offset) in offsets {if let Some(at)=dense.get_mut(i){*at=offset;}}
+    for ((a,b),offset) in source.geometry.segments.iter().zip(&painted.geometry.segments).zip(&dense) {
+        if a.point.x.as_f64().ok_or("Subselect source point is unavailable")?+offset[0]!=b.point.x.as_f64().ok_or("Subselect painted point is unavailable")? || a.point.y.as_f64().ok_or("Subselect source point is unavailable")?+offset[1]!=b.point.y.as_f64().ok_or("Subselect painted point is unavailable")?
+            || [a.handle_in.x.as_f64(),a.handle_in.y.as_f64(),a.handle_out.x.as_f64(),a.handle_out.y.as_f64()]
+                !=[b.handle_in.x.as_f64(),b.handle_in.y.as_f64(),b.handle_out.x.as_f64(),b.handle_out.y.as_f64()] {return Ok(None)};
+    }
+    Ok(Some(dense))
+}
+
 // Its support module (object_vector_edit_support.rs) drives the real history owner.
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_subselect_projection.rs"]

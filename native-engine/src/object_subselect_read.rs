@@ -74,8 +74,8 @@ impl ObjectSnapshot {
         {
             return refused(DispatchErrorCode::InvalidRequest, "Invalid subselect hit-test selector.");
         }
-        if !payload.subselect.at_frame.missing() && (!hit_test || center) {
-            return refused(DispatchErrorCode::InvalidRequest, "Evaluated contour requires hitTest without center.");
+        if !payload.subselect.at_frame.missing() && !hit_test {
+            return refused(DispatchErrorCode::InvalidRequest, "Evaluated geometry requires hitTest.");
         }
         // #2256: a component's records live in its own context: Select's hit-test read and Direct Select's editable and preview reads of an
         // entered component resolve the record there (the baseline edited the symbol's shapes while `state.activeSymbolId` was set).
@@ -98,6 +98,17 @@ impl ObjectSnapshot {
         let mut types: Option<Vec<&'static str>> = None;
         let geometry = planned.and_then(|r| {
             if center {
+                let mut r=r;
+                if let Some(frame)=payload.subselect.at_frame.value() {
+                    let context=ContextSource::of_document(self.document()).context(&r.target.context_id).map_err(|_|Refusal::Unsupported)?;
+                    if *frame>=context.total_frames(){return Err(Refusal::Invalid)};
+                    let layer=context.layers().iter().find(|l|l.layer_uid()==r.target.layer_uid).ok_or(Refusal::Unsupported)?;
+                    use crate::evaluation::object_vector_kernels::render_vector_eval;
+                    render_vector_eval::painted_record(self,&r,layer,*frame).map_err(|_|Refusal::Unsupported)?;
+                    let center=render_vector_eval::vertex::presented_center(self,&r,*frame).map_err(|_|Refusal::Unsupported)?;
+                    let pressure=r.vector_ext.value_mut().and_then(|e|e.pressure.value_mut()).ok_or(Refusal::Unsupported)?;
+                    pressure.center_segments=Presence::Present(center);
+                }
                 let (anchors, w) = record::center_anchors(&r)?;
                 widths = w;
                 return Ok((false, anchors));

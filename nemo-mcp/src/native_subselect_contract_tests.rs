@@ -453,3 +453,15 @@ fn a_hit_test_listing_may_carry_the_layers_pose_as_six_finite_non_singular_numbe
     plain["layerMatrix"] = json!([1, 0, 0, 1, 7, -3]);
     assert!(!public_read(&plain_q, &plain));
 }
+
+#[test]
+fn evaluated_ribbon_center_pages_correlate_the_presented_frame_and_widths() {
+    let mut q=query();q["subselect"]["hitTest"]=json!(true);q["subselect"]["center"]=json!(true);q["subselect"]["atFrame"]=json!(10);
+    let mut r=page();r["subselect"]["hitTest"]=json!(true);r["subselect"]["center"]=json!(true);r["subselect"]["atFrame"]=json!(10);r["subselect"]["widths"]=json!([3,7]);
+    assert!(request(&q));assert!(public_read(&q,&r));
+    for value in [json!(0),json!(11),json!(null)] {let mut bad=r.clone();bad["subselect"]["atFrame"]=value;assert!(!public_read(&q,&bad));}
+    let mut bad=r.clone();bad["subselect"].as_object_mut().unwrap().remove("atFrame");assert!(!public_read(&q,&bad));
+    for value in [json!(-1),json!(1.5),json!(4294967296u64),json!(null)] {let mut bad=q.clone();bad["subselect"]["atFrame"]=value;assert!(!request(&bad));}
+    let mut bad=q.clone();bad["subselect"]["paint"]=json!(true);assert!(!request(&bad));
+    let mut bad=r.clone();bad["subselect"]["widths"]=json!([3]);assert!(!public_read(&q,&bad));
+}

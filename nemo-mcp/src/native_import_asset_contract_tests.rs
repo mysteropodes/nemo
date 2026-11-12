@@ -431,3 +431,46 @@ fn object_order_is_closed_exact_and_independent_of_canonical_receipts() {
     reordered["objects"].as_array_mut().unwrap().reverse();
     assert!(!receipt_matches(&payload, &reordered));
 }
+
+#[test]
+fn desktop_import_retains_select_pivots_and_text_layout_at_original_byte_admission() {
+    let admitted = |payload: Value| {
+        let mut encoded = examples()[0]["request"].clone();
+        encoded["payload"] = payload;
+        crate::wire::decode_native_request(&serde_json::to_vec(&encoded).unwrap()).is_ok()
+    };
+    let base = mixed();
+    for preset in ["tl","tc","tr","ml","mc","mr","bl","bc","br"] {
+        let mut value=base.clone(); value["raster"][0]["entry"]["item"]["xformAnchorKey"]=json!(preset);
+        value["raster"][0]["entry"]["item"]["xformAnchorCustom"]=json!([-12.5,40]);
+        value["raster"][0]["entry"]["item"]["skew"]=json!(-89.5);
+        assert!(admitted(value),"preset {preset}");
+    }
+    for (path,member) in [
+        ("/raster/0/entry/item/xformAnchorKey",json!("middle")),
+        ("/raster/0/entry/item/xformAnchorKey",Value::Null),
+        ("/raster/0/entry/item/xformAnchorCustom",json!([1])),
+        ("/raster/0/entry/item/xformAnchorCustom",json!([1,"2"])),
+        ("/raster/0/entry/item/xformAnchorCustom",json!({"x":1,"y":2})),
+        ("/raster/0/entry/item/skew",json!(90)),
+        ("/raster/0/entry/item/skew",json!(-90)),
+        ("/raster/0/entry/item/skew",json!("15")),
+        ("/text/0/entry/block/font",json!({"kind":"url","url":"https://example.invalid/font"})),
+        ("/text/0/entry/block/align",json!("justify")),
+        ("/text/0/entry/block/color",json!("#12345z")),
+        ("/text/0/entry/block/textCase",json!("title")),
+    ] {
+        let mut value=base.clone();
+        let (parent,key)=path.rsplit_once('/').unwrap();value.pointer_mut(parent).unwrap()[key]=member;
+        assert!(!admitted(value),"{path}");
+    }
+    for text in ["\u{2000}Title", "\u{FEFF}Caption", "\u{2028}Row", "\u{205F}Label"] {
+        let mut value=base.clone(); value["text"][0]["entry"]["block"]["text"]=json!(text);
+        value["text"][0]["entry"]["block"]["align"]=json!("right");
+        value["text"][0]["entry"]["block"]["textCase"]=json!("capitalize");
+        assert!(admitted(value));
+    }
+    for text in ["\u{2000}","\u{FEFF}","\u{2028}","\u{205F}"] {
+        let mut value=base.clone();value["text"][0]["entry"]["block"]["text"]=json!(text);assert!(!admitted(value));
+    }
+}

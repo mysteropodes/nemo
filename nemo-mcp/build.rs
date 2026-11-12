@@ -53,8 +53,46 @@ fn native_capability_sources() {
     fs::write(&target, out).unwrap_or_else(|error| panic!("write {}: {error}", target.display()));
 }
 
+/// Embed local schema resources by discovery so a capability's new sibling
+/// contract never requires another central Rust include list.
+fn native_request_resources() {
+    let manifest = env::var("CARGO_MANIFEST_DIR").expect("cargo sets CARGO_MANIFEST_DIR");
+    let dir = Path::new(&manifest).join("../engineering/application");
+    println!("cargo:rerun-if-changed={}", dir.display());
+    let mut files: Vec<_> = fs::read_dir(&dir)
+        .expect("application contracts directory")
+        .map(|entry| entry.expect("readable schema entry").path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|s| s.to_str())
+                .is_some_and(|name| {
+                    name.ends_with(".schema.json") && name != "native-transport-v2.schema.json"
+                })
+        })
+        .collect();
+    files.sort();
+    let mut out = String::from("const RESOURCES: &[(&str, &str)] = &[\n");
+    for file in files {
+        let file = file.canonicalize().expect("canonical schema resource path");
+        println!("cargo:rerun-if-changed={}", file.display());
+        out.push_str(&format!(
+            "    ({:?}, include_str!({:?})),\n",
+            file.file_name().unwrap().to_string_lossy(),
+            file.display().to_string()
+        ));
+    }
+    out.push_str("];\n");
+    fs::write(
+        Path::new(&env::var("OUT_DIR").expect("cargo sets OUT_DIR"))
+            .join("native_request_resources.rs"),
+        out,
+    )
+    .expect("write native schema resources");
+}
+
 fn main() {
     native_capability_sources();
+    native_request_resources();
     let sha = git(&["rev-parse", "HEAD"]).unwrap_or_else(|| "source-unknown".into());
     let dirty = git(&["status", "--porcelain", "--untracked-files=no"])
         .map(|status| !status.is_empty())

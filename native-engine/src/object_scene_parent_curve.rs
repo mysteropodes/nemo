@@ -151,6 +151,7 @@ impl SceneParentChains {
             } else {
                 self.record_path(source, record)?
             };
+            if path.elements().is_empty() { continue; }
             let rect = path.bounding_box();
             own = Some(own.map_or(rect, |o| o.union(rect)));
         }
@@ -162,6 +163,7 @@ impl SceneParentChains {
         if is_vector_record(record) {
             let evaluated = evaluate_vector_rest(self.packet.snapshot(), source, self.packet.frame())
                 .map_err(|_| ChainUnavailable::VectorGeometry)?;
+            if evaluated.segments.is_empty() { return Ok(BezPath::new()); }
             return curve_path(&evaluated.segments.iter().map(|s| (s.point, s.handle_in, s.handle_out)).collect::<Vec<_>>(), evaluated.closed);
         }
         if record_layer_has_active_path_fx(&self.packet, record) {

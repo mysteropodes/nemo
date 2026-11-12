@@ -37,7 +37,7 @@ mod contours;
 mod graph;
 #[path = "tween_pressure_outline.rs"]
 mod outline;
-pub(crate) use outline::{pressure_outline, profiled_outline, width_at_frac};
+pub(crate) use outline::{pressure_outline, profiled_outline, width_at_frac, sample_centerline, outline_samples, outline_samples_raw};
 
 #[cfg(test)]
 #[path = "../tests/pressure_geometry.rs"]

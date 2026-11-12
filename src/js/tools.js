@@ -1163,7 +1163,9 @@ function renderNodeHandles(){
 // box as a whole — scale from 8 box handles, rotate from the handle above
 // the box, exactly like Illustrator/Animate's free-transform box).
 var xformHandles=[];
-var _xform={active:false,type:null,dir:null,anchor:null,center:null,origHandlePos:null,lastSx:1,lastSy:1,startAngle:0,lastAngle:0};
+var _xform={active:false,type:null,dir:null,anchor:null,origHandlePos:null,lastSx:1,lastSy:1};
+function nativePaperSelectOwner(){var c=window.NemoNativeOpacityCutover,b=window.SMEngineBridge;try{return !!(state.tool==='select'&&c&&typeof c.blocksLegacy==='function'&&c.blocksLegacy()===true&&(!b||!b.isEnabled||!b.isEnabled()));}catch(_){return false;}}
+function nativePaperSelectUnavailable(){var c=window.NemoNativeOpacityCutover,b=window.SMEngineBridge;try{if(state.tool!=='select'||(b&&b.isEnabled&&b.isEnabled())||!Object.prototype.hasOwnProperty.call(window,'NemoNativeOpacityCutover'))return false;return !c||typeof c.blocksLegacy!=='function'||c.blocksLegacy()!==false;}catch(_){return true;}}
 function xformSelBounds(){
   if(!selectedPaths.length)return null;
   var b=null;
@@ -7099,6 +7101,8 @@ function onMouseDown(event){
   if(state.playing){stopPlay();return;}
   if(state.tool==='hand'||state.spaceDown){_nativeToolNavigation=nativeViewportNavigation('begin-pan',event.event);state.isPanning=true;return;}
   if(state.tool==='zoom'){if(nativeViewportNavigation('zoom',event.event,null,event.event.altKey ? 0.8 : 1.25))return;if(event.event.altKey)view.zoom=Math.max(.05,view.zoom*.8);else view.zoom=Math.min(20,view.zoom*1.25);updZoom();renderArcs();return;}
+  if(nativePaperSelectOwner()){var G=window.NemoNativeSelectGesture;if(G&&G.paperTool)G.paperTool(window,'down',event.event,window.SMSelectBridge && window.SMSelectBridge.cancelMarquee);else showToast('Native Select gestures are unavailable.');return;}
+  if(nativePaperSelectUnavailable()){showToast('Native Select gestures are unavailable.');return;}
   if((state.tool==='select'||state.tool==='subselect'||state.tool==='fsselect')&&!allowLegacySelectionEdit(event.event,state.tool))return;
   // Motion mode (motion.js) is a persistent app-mode, not a tool value —
   // unlike the camera row below (a dedicated 'camera' tool that REPLACES
@@ -7339,11 +7343,9 @@ function onMouseDown(event){
       if(!xb){ xformHandles=[]; bestXh=null; }
     }
     if(bestXh){
+      if(bestXh.type==='rotate'){showToast('Native Select rotation is unavailable right now.');return;}
       pushUndo();
-      if(bestXh.type==='rotate'){
-        _xform.active=true;_xform.type='rotate';_xform.center=xb.center.clone();
-        _xform.startAngle=Math.atan2(event.point.y-_xform.center.y,event.point.x-_xform.center.x)*180/Math.PI;_xform.lastAngle=0;
-      }else{
+      {
         var anchorMap={nw:'se',ne:'sw',sw:'ne',se:'nw',n:'s',s:'n',e:'w',w:'e'};
         var xbx=orientedSelBox()||{b:xb,angle:0,pivot:xb.center};
         var anchors={nw:selBoxPt(xbx.b.left,xbx.b.top,xbx),ne:selBoxPt(xbx.b.right,xbx.b.top,xbx),sw:selBoxPt(xbx.b.left,xbx.b.bottom,xbx),se:selBoxPt(xbx.b.right,xbx.b.bottom,xbx),n:selBoxPt(xbx.b.center.x,xbx.b.top,xbx),s:selBoxPt(xbx.b.center.x,xbx.b.bottom,xbx),e:selBoxPt(xbx.b.right,xbx.b.center.y,xbx),w:selBoxPt(xbx.b.left,xbx.b.center.y,xbx)};
@@ -7561,6 +7563,7 @@ function onMouseDown(event){
   }
 }
 function onMouseDrag(event){
+  if(window.NemoNativeSelectGesture&&window.NemoNativeSelectGesture.paperTool(window,'move',event.event))return;
   if(state.playing)return;
   if(state.isPanning||state.spaceDown){if(_nativeToolNavigation){nativeViewportNavigation('drag',event.event,_nativeToolNavigation.token);return;}var dx=event.event.movementX||0;var dy=event.event.movementY||0;view.center=view.center.subtract(new Point(dx,dy).divide(view.zoom));return;}
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onDrag(event);return;}
@@ -7711,19 +7714,7 @@ function onMouseDrag(event){
     }
   }else if(state.tool==='select'){
     if(_xform.active){
-      if(_xform.type==='rotate'){
-        var curAngle=Math.atan2(event.point.y-_xform.center.y,event.point.x-_xform.center.x)*180/Math.PI;
-        var deltaFromStart=curAngle-_xform.startAngle;
-        var stepAngle=deltaFromStart-_xform.lastAngle;
-        selectedPaths.forEach(function(p){
-          p.rotate(stepAngle,_xform.center);
-          if(p.data&&p.data.isVectorBrush&&p.data.centerSegments){rotateCenterSegments(p.data.centerSegments,stepAngle,_xform.center.x,_xform.center.y);rebuildVectorBrushOutline(p);}
-          if(p.data&&p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){if(!c.removed)c.rotate(stepAngle,_xform.center);});
-        });
-        _xform.lastAngle=deltaFromStart;
-        selectedPaths.forEach(function(p){if(p)p.data.boxAngle=(((p.data&&p.data.boxAngle)||0)+stepAngle)%360;}); // orientation lives on the stroke
-        symGestureAccumulate(new Matrix().rotate(stepAngle,_xform.center));
-      }else{
+      {
         var anchor=_xform.anchor,dir=_xform.dir,sx=1,sy=1;
         if(dir==='nw'||dir==='ne'||dir==='sw'||dir==='se'){
           var origDX=_xform.origHandlePos.x-anchor.x,origDY=_xform.origHandlePos.y-anchor.y;
@@ -7812,6 +7803,7 @@ function onMouseDrag(event){
   }
 }
 function onMouseUp(event){
+  if(window.NemoNativeSelectGesture&&window.NemoNativeSelectGesture.paperTool(window,'up',event.event))return;
   if(state.isPanning){state.isPanning=false;_nativeToolNavigation=null;return;}if(state.playing)return;
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
   if(selectionGestureActive()&&!allowLegacySelectionEdit(event.event,state.tool))return;

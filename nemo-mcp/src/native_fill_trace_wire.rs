@@ -17,20 +17,6 @@ pub(super) enum Field {
     /// Labs multi-frame stamps: up to 256 distinct frame indices.
     Stamps,
 }
-pub(super) fn kind(token: &str) -> Option<Field> {
-    match token {
-        "point" => Some(Field::Point),
-        "color" => Some(Field::Color),
-        "opacity" => Some(Field::Opacity),
-        "flag" => Some(Field::Flag),
-        "outline" => Some(Field::Outline),
-        "placement" => Some(Field::Placement),
-        "mask" => Some(Field::Mask),
-        "copies" => Some(Field::Copies),
-        "stamps" => Some(Field::Stamps),
-        _ => None,
-    }
-}
 pub(super) fn check(field: Field, value: &Value) -> bool {
     match field {
         Field::Point => value.as_array().is_some_and(|p| {

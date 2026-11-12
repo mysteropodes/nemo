@@ -23,7 +23,7 @@ function harness(tool){
   root.document=doc;root.addEventListener=()=>{};root.state.tool=tool;
   const read=f.s.readSubselect;f.s.readSubselect=async(...a)=>{counts.subselect++;return read(...a);};
   // select-bridge side: the real nativePointerEvent and its real listener registration, on canvas-area.
-  const sandbox={window:root,state:root.state,nativePointerIntent:null,
+  const sandbox={window:root,state:root.state,nativePointerIntent:null,nativePaperToolPointer:null,
     nativePointer:()=>{const hit=e=>{counts.select++;e.stopImmediatePropagation();e.preventDefault();};return {down:hit,move:hit,up:hit,cancelEvent:hit};},
     onDown:()=>counts.legacy++,onMove:()=>{},onUp:()=>{},target:area};
   root.NemoNativeOpacityCutover={blocksLegacy:()=>true};

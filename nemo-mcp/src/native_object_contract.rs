@@ -172,18 +172,7 @@ pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) 
 }
 
 pub(super) fn visibility_request(value: &Value) -> bool {
-    exact(value, &["command", "layerUid", "visible"], &["contextId"]).is_some_and(|value| {
-        value.get("command").and_then(Value::as_str) == Some("object.layer.visibility.set")
-            // #2256: the declared component the toggle works inside; absent is the scene root.
-            && value
-                .get("contextId")
-                .is_none_or(|id| id.as_str().is_some_and(|id| !id.is_empty()))
-            && value
-                .get("layerUid")
-                .and_then(Value::as_str)
-                .is_some_and(|uid| !uid.is_empty())
-            && value.get("visible").and_then(Value::as_bool).is_some()
-    })
+    super::request_schema::payload("command.document.object.layer.visibility.set", value) == Some(true)
 }
 
 pub(super) fn visibility_result(value: &Value) -> bool {
@@ -199,18 +188,8 @@ pub(super) fn visibility_result(value: &Value) -> bool {
 }
 
 pub(super) fn history_request(operation: &str, value: &Value) -> bool {
-    let command = match operation {
-        "command.document.object.undo" => "object.undo",
-        "command.document.object.redo" => "object.redo",
-        _ => return false,
-    };
-    // Optional `steps`: move that many entries as one restore (the History panel's jump).
-    exact(value, &["command"], &["steps"]).is_some_and(|value| {
-        value.get("command").and_then(Value::as_str) == Some(command)
-            && value
-                .get("steps")
-                .is_none_or(|steps| revision(Some(steps)).is_some_and(|steps| steps >= 1))
-    })
+    matches!(operation, "command.document.object.undo" | "command.document.object.redo")
+        && super::request_schema::payload(operation, value) == Some(true)
 }
 
 pub(super) fn history_result(value: &Value) -> bool {

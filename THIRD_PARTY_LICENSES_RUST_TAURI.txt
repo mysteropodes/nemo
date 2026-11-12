@@ -29,3 +29,243 @@ MPL-2.0 (5): cssparser, cssparser-macros, dtoa-short, option-ext, selectors
 N/A (1): nemo
 Unicode-3.0 (18): icu_collections, icu_locale_core, icu_normalizer, icu_normalizer_data, icu_properties, icu_properties_data, icu_provider, litemap, potential_utf, tinystr, writeable, yoke, yoke-derive, zerofrom, zerofrom-derive, zerotrie, zerovec, zerovec-derive
 Zlib (1): foldhash
+
+2026-11-12 CS1 request-schema runtime additions
+Source: cargo license --avoid-dev-deps --json --manifest-path src-tauri/Cargo.toml
+Scope: package/version entries newly present compared with a24be71c7.
+[
+  {
+    "name": "ahash",
+    "version": "0.8.12",
+    "authors": "Tom Kaitchuck <Tom.Kaitchuck@gmail.com>",
+    "repository": "https://github.com/tkaitchuck/ahash",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "description": "A non-cryptographic hash function using AES-NI for high performance"
+  },
+  {
+    "name": "borrow-or-share",
+    "version": "0.2.4",
+    "authors": "Scallop Ye <yescallop@gmail.com>",
+    "repository": "https://github.com/yescallop/borrow-or-share",
+    "license": "MIT-0",
+    "license_file": null,
+    "description": "Traits for either borrowing or sharing data."
+  },
+  {
+    "name": "bytecount",
+    "version": "0.6.9",
+    "authors": "Andre Bogus <bogusandre@gmail.de>|Joshua Landau <joshua@landau.ws>",
+    "repository": "https://github.com/llogiq/bytecount",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "description": "count occurrences of a given byte, or the number of UTF-8 code points, in a byte slice, fast"
+  },
+  {
+    "name": "data-encoding",
+    "version": "2.11.1",
+    "authors": null,
+    "repository": "https://github.com/ia0/data-encoding",
+    "license": "MIT",
+    "license_file": null,
+    "description": "Efficient and customizable data-encoding functions like base64, base32, and hex"
+  },
+  {
+    "name": "email_address",
+    "version": "0.2.9",
+    "authors": "Simon Johnston <johnstonskj@gmail.com>",
+    "repository": "https://github.com/johnstonskj/rust-email_address.git",
+    "license": "MIT",
+    "license_file": null,
+    "description": "A Rust crate providing an implementation of an RFC-compliant `EmailAddress` newtype."
+  },
+  {
+    "name": "fancy-regex",
+    "version": "0.19.2",
+    "authors": "Raph Levien <raph@google.com>|Robin Stocker <robin@nibor.org>|Keith Hall <keith.hall@available.systems>",
+    "repository": "https://github.com/fancy-regex/fancy-regex",
+    "license": "MIT",
+    "license_file": null,
+    "description": "An implementation of regexes, supporting a relatively rich set of features, including backreferences and look-around. Aims to be compatible with Oniguruma syntax when the relevant flag is set."
+  },
+  {
+    "name": "fluent-uri",
+    "version": "0.4.1",
+    "authors": "Scallop Ye <yescallop@gmail.com>",
+    "repository": "https://github.com/yescallop/fluent-uri-rs",
+    "license": "MIT",
+    "license_file": null,
+    "description": "A generic URI/IRI handling library compliant with RFC 3986/3987."
+  },
+  {
+    "name": "fraction",
+    "version": "0.17.0",
+    "authors": "dnsl48 <dnsl48@gmail.com>",
+    "repository": "https://github.com/dnsl48/fraction.git",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "description": "Lossless fractions and decimals; drop-in float replacement"
+  },
+  {
+    "name": "jsonschema",
+    "version": "0.56.0",
+    "authors": "Dmitry Dygalo <dmitry@dygalo.dev>",
+    "repository": "https://github.com/Stranger6667/jsonschema",
+    "license": "MIT",
+    "license_file": null,
+    "description": "JSON schema validaton library"
+  },
+  {
+    "name": "jsonschema-regex",
+    "version": "0.56.0",
+    "authors": "Dmitry Dygalo <dmitry@dygalo.dev>",
+    "repository": "https://github.com/Stranger6667/jsonschema",
+    "license": "MIT",
+    "license_file": null,
+    "description": "ECMA 262 regex translation for the jsonschema crate"
+  },
+  {
+    "name": "jsonschema-value",
+    "version": "0.56.0",
+    "authors": "Dmitry Dygalo <dmitry@dygalo.dev>",
+    "repository": "https://github.com/Stranger6667/jsonschema",
+    "license": "MIT",
+    "license_file": null,
+    "description": "JSON value representations and semantics shared by the jsonschema validator and its bindings"
+  },
+  {
+    "name": "micromap",
+    "version": "0.3.0",
+    "authors": null,
+    "repository": "https://github.com/yegor256/micromap",
+    "license": "MIT",
+    "license_file": null,
+    "description": "The fastest alternative to HashMap, for maps smaller than 20 keys"
+  },
+  {
+    "name": "num",
+    "version": "0.4.3",
+    "authors": "The Rust Project Developers",
+    "repository": "https://github.com/rust-num/num",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "description": "A collection of numeric types and traits for Rust, including bigint, complex, rational, range iterators, generic integers, and more!"
+  },
+  {
+    "name": "num-bigint",
+    "version": "0.4.8",
+    "authors": "The Rust Project Developers",
+    "repository": "https://github.com/rust-num/num-bigint",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "description": "Big integer implementation for Rust"
+  },
+  {
+    "name": "num-cmp",
+    "version": "0.1.0",
+    "authors": "Kang Seonghoon <public+git@mearie.org>",
+    "repository": "https://github.com/lifthrasiir/num-cmp",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "description": "Comparison between differently typed numbers"
+  },
+  {
+    "name": "num-complex",
+    "version": "0.4.6",
+    "authors": "The Rust Project Developers",
+    "repository": "https://github.com/rust-num/num-complex",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "description": "Complex numbers implementation for Rust"
+  },
+  {
+    "name": "num-rational",
+    "version": "0.4.2",
+    "authors": "The Rust Project Developers",
+    "repository": "https://github.com/rust-num/num-rational",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "description": "Rational numbers implementation for Rust"
+  },
+  {
+    "name": "outref",
+    "version": "0.5.2",
+    "authors": null,
+    "repository": "https://github.com/Nugine/outref",
+    "license": "MIT",
+    "license_file": null,
+    "description": "Out reference"
+  },
+  {
+    "name": "referencing",
+    "version": "0.56.0",
+    "authors": "Dmitry Dygalo <dmitry@dygalo.dev>",
+    "repository": "https://github.com/Stranger6667/jsonschema",
+    "license": "MIT",
+    "license_file": null,
+    "description": "An implementation-agnostic JSON reference resolution library for Rust."
+  },
+  {
+    "name": "regex-automata",
+    "version": "0.4.18",
+    "authors": "The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>",
+    "repository": "https://github.com/rust-lang/regex",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "description": "Automata construction and matching using regular expressions."
+  },
+  {
+    "name": "strum",
+    "version": "0.28.0",
+    "authors": "Peter Glotfelty <peter.glotfelty@microsoft.com>",
+    "repository": "https://github.com/Peternator7/strum",
+    "license": "MIT",
+    "license_file": null,
+    "description": "Helpful macros for working with enums and strings"
+  },
+  {
+    "name": "strum_macros",
+    "version": "0.28.0",
+    "authors": "Peter Glotfelty <peter.glotfelty@microsoft.com>",
+    "repository": "https://github.com/Peternator7/strum",
+    "license": "MIT",
+    "license_file": null,
+    "description": "Helpful macros for working with enums and strings"
+  },
+  {
+    "name": "unicode-general-category",
+    "version": "1.1.0",
+    "authors": "YesLogic Pty. Ltd. <info@yeslogic.com>",
+    "repository": "https://github.com/yeslogic/unicode-general-category",
+    "license": "Apache-2.0",
+    "license_file": null,
+    "description": "Fast lookup of the Unicode General Category property for char"
+  },
+  {
+    "name": "uuid-simd",
+    "version": "0.8.0",
+    "authors": null,
+    "repository": "https://github.com/Nugine/simd",
+    "license": "MIT",
+    "license_file": null,
+    "description": "SIMD-accelerated UUID operations"
+  },
+  {
+    "name": "vsimd",
+    "version": "0.8.0",
+    "authors": null,
+    "repository": "https://github.com/Nugine/simd",
+    "license": "MIT",
+    "license_file": null,
+    "description": "SIMD utilities"
+  },
+  {
+    "name": "zmij",
+    "version": "1.0.23",
+    "authors": "David Tolnay <dtolnay@gmail.com>",
+    "repository": "https://github.com/dtolnay/zmij",
+    "license": "MIT",
+    "license_file": null,
+    "description": "A double-to-string conversion algorithm based on Schubfach and xjb"
+  }
+]

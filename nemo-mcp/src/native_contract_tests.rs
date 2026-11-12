@@ -268,21 +268,10 @@ fn declared_native_operations() -> Vec<String> {
 }
 
 #[test]
-fn request_validation_is_explicit_or_pinned_forwarded() {
-    let mut actual: Vec<_> = declared_native_operations()
-        .into_iter()
-        .filter(|operation| !has_request_validator(operation))
-        .collect();
-    actual.sort_unstable();
-    let mut pinned: Vec<_> = MCP_REQUEST_FORWARDED
-        .iter()
-        .map(|op| op.to_string())
-        .collect();
-    pinned.sort_unstable();
-    assert_eq!(
-        actual, pinned,
-        "MCP_REQUEST_FORWARDED must equal the declared operations without a request validator"
-    );
+fn every_declared_request_has_schema_validation() {
+    for operation in declared_native_operations() {
+        assert!(has_request_validator(&operation), "{operation}");
+    }
 }
 
 #[test]
@@ -304,17 +293,10 @@ fn result_validation_is_explicit_or_pinned_unchecked() {
 }
 
 #[test]
-fn forwarded_and_undeclared_operations_route_as_documented() {
-    // A newly declared operation with neither a validator nor a forward is caught
-    // by request_validation_is_explicit_or_pinned_forwarded; this pins the rest.
-    let declared = declared_native_operations();
-    let forwarded = declared
-        .iter()
-        .find(|op| MCP_REQUEST_FORWARDED.contains(&op.as_str()))
-        .expect("a forwarded operation");
-    assert!(!has_request_validator(forwarded));
-    assert!(validate_request(forwarded, &json!({})));
-    assert!(!MCP_REQUEST_FORWARDED.contains(&"command.document.object.cs1.unlisted"));
+fn schema_validated_and_undeclared_operations_route_as_documented() {
+    assert!(has_request_validator("query.document.opacity"));
+    assert!(!validate_request("query.document.opacity", &json!({})));
+    assert!(validate_request("query.document.opacity", &json!({"stableTarget":{"layerUid":"layer"}})));
     // Undeclared operations are left to the registration check.
     assert!(validate_request(
         "command.document.object.cs1.unlisted",
@@ -360,4 +342,23 @@ fn native_catalog_sources_are_discovered_from_the_declaration_directory() {
         crate::capabilities::NATIVE_CAPABILITY_SOURCES.len(),
         crate::capabilities::native_catalog().descriptors().len()
     );
+}
+
+#[test]
+fn migrated_request_shapes_remain_closed_in_the_public_response_correlation_gate() {
+    let cases = [
+        ("command.document.object.layer.visibility.set", json!({"command":"object.layer.visibility.set","layerUid":"layer","visible":true}), json!({"applied":true,"historyEntriesAdded":1})),
+        ("command.document.object.undo", json!({"command":"object.undo"}), json!({"applied":true,"historyEntriesAdded":0})),
+        (layer_policy::OP, json!({"command":"object.layer.policy.edit","layerUid":"layer","flag":"locked","value":true}), json!({"applied":true,"historyEntriesAdded":1})),
+        ("query.document.serialize", json!({"atRevision":0}), serialized(document())),
+        ("query.document.evaluate", json!({"atRevision":0,"contextId":"scene-root","frame":0}), json!({"documentSnapshotId":"snapshot","documentId":"doc","contentRevision":0,"contextId":"scene-root","frame":0,"layers":[]})),
+        ("query.diagnostics.recent", json!({}), json!({"records":[],"truncated":false})),
+    ];
+    for (operation,payload,result) in cases {
+        assert!(validate_result(operation,"doc",&payload,&result),"valid {operation}");
+        let mut extra=payload.clone(); extra["extra"]=json!(true);
+        for malformed in [Value::Null,json!([]),json!("encoded"),extra] {
+            assert!(!validate_result(operation,"doc",&malformed,&result),"{operation}: {malformed}");
+        }
+    }
 }

@@ -81,3 +81,15 @@ test('a degenerate item matrix is refused with a notice and no write', async () 
   h.fire('pointerdown', h.ev(10, 10)); h.fire('pointermove', h.ev(30, 30)); h.fire('pointerup', h.ev(30, 30)); await settle();
   assert.equal(h.edits.length, 0); assert.equal(h.toasts.length, 1);
 });
+
+test('a pressure ribbon draws and keys centerline indices instead of baked-outline indices',async()=>{
+  const h=harness();h.path.data.isVectorBrush=true;
+  h.path.data.centerSegments=[{point:[25,35],width:3,handleIn:[0,0],handleOut:[5,0]},{point:[80,90],width:7,handleIn:[-5,0],handleOut:[0,0]}];
+  Vertices.open(h.win,TARGET);const svg=el('svg');
+  Vertices.draw(h.win,svg,{V:[1,0,0,1,0,0],pin:{canvasW:200},bounds:{width:200}},[h.path]);
+  assert.equal(svg.children.length,2,'two authored nodes despite four outline anchors');
+  const outline=h.ev(10,10);h.fire('pointerdown',outline);assert.equal(outline.stopped,undefined,'outline corner is not vtx0');
+  h.fire('pointerdown',h.ev(80,90));h.fire('pointermove',h.ev(90,95));h.fire('pointerup',h.ev(90,95));await settle();
+  assert.equal(h.edits.length,1);assert.equal(h.edits[0].property,'vtx1');assert.deepEqual(h.edits[0].action.values,[11,6]);
+  assert.deepEqual(h.path.data.centerSegments.map(s=>s.width),[3,7],'presentation never changes stored widths');
+});

@@ -21,7 +21,7 @@
 // rotate transform box with opposite-corner anchoring, and group move are
 // all ported too.
 (function () {
-  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | 'null-drag' | 'cornerRadius' | null
+  var mode = null; // 'xform-scale' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | 'null-drag' | 'cornerRadius' | null
   // Animation 2D hover-highlight box (2026-08, feedback: "roll hover n'existe
   // pas sur animation 2D" — Motion mode already has this, see SMMotion's own
   // _hoverLi/onHoverMove/hoverOverlayItems; this is the same idea for a plain
@@ -417,7 +417,6 @@
   // to draw the ACTUAL warped quad instead of the static pre-distort
   // rectangle while dragging.
   var distortDstQuad = null;
-  var rotCenter = null, rotStartAngle = 0, rotLastAngle = 0;
   var marqueeStart = null;
   var moveStarted = false;
   // Shift axis-lock (2026-09, Illustrator-style: hold Shift while dragging
@@ -474,7 +473,7 @@
 
   function allowLegacySelectionEdit(e,k){var c=window.NemoNativeOpacityCutover,b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{if(c!==undefined&&(!c||typeof c.blocksLegacy!=='function'||c.blocksLegacy()!==false)){if(e){e.stopImmediatePropagation();e.preventDefault();}return false;}a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){a=false;}if(!a&&e){e.stopImmediatePropagation();e.preventDefault();}return a;}
   function guardMenuItems(a){return a.map(function(i){if(i.action){var f=i.action;i.action=function(){if(allowLegacySelectionEdit(null,'select'))return f.apply(this,arguments);};}return i;});}
-  var nativePointerIntent = null, nativeLayersRef = null, nativeLayersEpoch = 0;
+  var nativePointerIntent = null, nativeLayersRef = null, nativeLayersEpoch = 0, nativePaperToolPointer = null;
   function nativePointer() {
     if (nativePointerIntent) return nativePointerIntent;
     nativePointerIntent = window.NemoSelectCanvasIntent.create({
@@ -533,7 +532,23 @@
     });
     return nativePointerIntent;
   }
+  function cancelPaperToolPointer() {
+    if (nativePaperToolPointer === null) return;
+    nativePaperToolPointer = null;
+    window.NemoNativeSelectGesture.paperTool(window, 'cancel');
+  }
+  function cancelNativeSelection() {
+    cancelPaperToolPointer();
+    if (nativePointerIntent) nativePointerIntent.cancel();
+  }
   function nativePointerEvent(method, e) {
+    if (nativePaperToolPointer !== null) {
+      if (e.pointerId !== undefined && e.pointerId !== nativePaperToolPointer) {
+        e.stopImmediatePropagation(); e.preventDefault(); return true;
+      }
+      if (method === 'cancelEvent') { cancelPaperToolPointer(); return true; }
+      if (method === 'down' || method === 'move' || method === 'up') return false;
+    }
     if(window.NemoNativeCommentsUI&&NemoNativeCommentsUI.handle(window,method,e,nativePointerIntent&&nativePointerIntent.cancel))return true;
     if(window.NemoNativeTextToolDesktop&&window.NemoNativeTextToolDesktop.handle(window,method,e,nativePointerIntent&&nativePointerIntent.cancel))return true;
     if (nativePointerIntent && nativePointerIntent.snapshot()) {
@@ -544,11 +559,34 @@
     if (!Object.prototype.hasOwnProperty.call(window, 'NemoNativeOpacityCutover')) return false;
     try {
       var c = window.NemoNativeOpacityCutover;
-      if (c && typeof c.blocksLegacy === 'function' && c.blocksLegacy() === false) return false;
+      var owns = c && typeof c.blocksLegacy === 'function' ? c.blocksLegacy() : null;
+      if (owns === false) return false;
       if (state.tool === 'subselect') return true; // Direct Select owns its native controller (subselect-bridge, document capture): never consume its gesture
+      if (owns === true && state.tool === 'select' && method === 'down' && Number.isSafeInteger(e.pointerId) && !(window.SMEngineBridge && typeof window.SMEngineBridge.isEnabled === 'function' && window.SMEngineBridge.isEnabled()) && nativePaperRotateRingPress(e)) { nativePaperToolPointer = e.pointerId; return false; }
       nativePointer()[method](e);
-    } catch (_) { e.stopImmediatePropagation(); e.preventDefault(); }
+    } catch (_) {
+      if (method === 'down' && window.showToast) showToast('Native Select gestures are unavailable.');
+      e.stopImmediatePropagation(); e.preventDefault();
+    }
     return true;
+  }
+
+  // The engine-off Paper Tool entry is reserved only for a native rotate ring press. Selection, click and all other handles
+  // stay on the existing pointer intent, which owns picking and movement arbitration.
+  function nativePaperRotateRingPress(e) {
+    var I = window.NemoSelectCanvasIntent, O = window.NemoNativeSelectOverlay, G = window.NemoNativeSelectGesture, P = window.NemoNativeSelectPivot;
+    try {
+      if (e.button !== 0 || state.spaceDown || state.appMode === 'motion' || !I || !O || !G || !P || !I.objectProject(window) || O.selectionContext(window) !== I.pickContext(window)) return false;
+      var paths = (selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; });
+      if (!paths.length || paths.length !== selectedPaths.length) return false;
+      var shown = I.presentedState(window), box = O.boxOf(window, paths);
+      if (!shown || !box) return false;
+      var at = I.worldPoint(window, e.clientX, e.clientY, shown.pin, shown.presentation), next = I.worldPoint(window, e.clientX + 1, e.clientY, shown.pin, shown.presentation);
+      var wpp = Math.hypot(next.x - at.x, next.y - at.y) || at.perPixel, pivot = P.pointOf(window, box);
+      if (e.altKey && P.grabs(window, box, at, wpp)) return false;
+      var hit = G.hitHandle(box, at, wpp, pivot);
+      return !!hit && hit.type === 'rotate';
+    } catch (_) { return false; }
   }
 
   // Same handle-position math as buildTransformBoxItems() in
@@ -771,6 +809,7 @@
 
   var lastPt = null, motionGesture = false;
   function onDown(e) {
+    if (nativePaperToolPointer !== null) return;
     // Right/middle-click never drives select/marquee/move/Motion-drag — a
     // pre-existing gap (no button check at all) that used to go unnoticed
     // since a right-click did nothing visible either way; surfaced once
@@ -987,11 +1026,11 @@
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
     lastPt = pt;
-    window.SMEngineBridge.suspend();
 
     var mlBox = multiLayerSelectionBox();
     var mlHit = multiLayerHit(mlBox, pt);
     if (mlBox && mlHit) {
+      window.SMEngineBridge.suspend();
       // Materialize held frames for every participating layer before taking
       // object references; _insertKeyframeCore/loadFrame rebuilds all Paper
       // items and would otherwise leave the snapshot stale.
@@ -1022,6 +1061,7 @@
       var HIT_R0 = 10 / view.zoom, hitCorner0 = null;
       window.SMParamShapeHandles.handleNamesFor(pshp0).forEach(function (c) { if (!hitCorner0 && pt.getDistance(hp0[c]) < HIT_R0) hitCorner0 = c; });
       if (hitCorner0) {
+        window.SMEngineBridge.suspend();
         mode = 'cornerRadius';
         pushUndo();
         _cornerDrag = { path: pshp0, corner: hitCorner0 };
@@ -1030,6 +1070,7 @@
     }
     var ah = hitTestArc(pt);
     if (ah) {
+      window.SMEngineBridge.suspend();
       mode = 'arc';
       // One undo entry per arc-handle GESTURE (2026-09 QA sweep): dragging
       // a motion-arc handle rewrote state.motionArcs with no snapshot at
@@ -1058,6 +1099,7 @@
     // down (this block's own 2026-08-21 fix comment).
     var hh = (state.appMode === 'motion') ? null : hitTestHandles(pt, e.altKey);
     if (hh && hh.type === 'anchor') {
+      window.SMEngineBridge.suspend();
       // Direct drag of the anchor crosshair — same UI-preference-not-
       // document-edit reasoning as the Alt+click path a bit further down
       // (no pushUndo, no ensureKeyframe): only state.xformAnchorCustom
@@ -1065,11 +1107,15 @@
       mode = 'xform-anchor-drag';
       return;
     }
+    if (hh && hh.type === 'rotate') {
+      if (window.showToast) showToast('Selection rotation requires the native gesture owner; this fallback cannot rotate selections.');
+      return;
+    }
+    window.SMEngineBridge.suspend();
     if (hh && e.ctrlKey && hh.type === 'scale' && (hh.dir === 'nw' || hh.dir === 'ne' || hh.dir === 'sw' || hh.dir === 'se') && distortEligibleCornerAt(pt) === hh.dir) {
       // If beginDistort() fails (computeHandles() returned null), `mode`
       // stays null — onUp()'s `if (!mode) return;` would then skip the
-      // resume() at its tail entirely, leaving the engine suspended forever
-      // (suspend() already ran a few lines above, unconditionally).
+      // resume() at its tail entirely, leaving the engine suspended forever.
       if (!beginDistort(hh.dir)) window.SMEngineBridge.resume();
       return;
     }
@@ -1110,24 +1156,7 @@
         selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
       }
       var h = computeHandles();
-      if (hh.type === 'rotate') {
-        mode = 'xform-rotate';
-        // Rotation pivots around the redesign's 9-dot anchor widget
-        // (tools.js xformAnchorPoint, state.xformAnchorKey) instead of
-        // always the bounding-box center — defaults to center so existing
-        // behavior is unchanged until the artist actually picks a corner.
-        // xformAnchorPoint works in the box's de-rotated space (h.bounds)
-        // — map the pivot back to world through the box angle.
-        var apr = xformAnchorPoint(h.bounds);
-        // Custom pivot (Alt+click) is already world — don't re-rotate it,
-        // but DO pull it back to geometry space if a Motion transform is on.
-        rotCenter = (h.box && !state.xformAnchorCustom) ? selBoxPt(apr.x, apr.y, h.box) : apr.clone();
-        xformMap = h.map;
-        if (state.xformAnchorCustom && h.map) { var rcg = h.map.inv(rotCenter.x, rotCenter.y); rotCenter = new Point(rcg[0], rcg[1]); }
-        var ptg0 = xformMap ? (function () { var g = xformMap.inv(pt.x, pt.y); return new Point(g[0], g[1]); })() : pt;
-        rotStartAngle = Math.atan2(ptg0.y - rotCenter.y, ptg0.x - rotCenter.x) * 180 / Math.PI;
-        rotLastAngle = 0;
-      } else if (hh.type === 'skew') {
+      if (hh.type === 'skew') {
         mode = 'xform-skew';
         xformSkewEdge = hh.edge;
         // Same opposite-edge anchor convention as scale's ANCHOR_MAP (the
@@ -1780,6 +1809,7 @@
   }
 
   function onMove(e) {
+    if (nativePaperToolPointer !== null) return;
     if (state.appMode === 'motion' && window.SMMotion) {
       var w1 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
       // shiftKey travels with the point (2026-09, #802): Motion's own drags
@@ -2440,59 +2470,13 @@
     } else if (mode === 'arc') {
       setArcHandle(draggingArc.fA, draggingArc.fB, draggingArc.matchIdx, draggingArc.which, draggingArc.ptA, draggingArc.ptB, pt.x, pt.y);
       renderArcs(arcDragCache);
-    } else if (mode === 'xform-rotate') {
-      var ptR = pt;
-      if (xformMap) { var ptgR = xformMap.inv(pt.x, pt.y); ptR = new Point(ptgR[0], ptgR[1]); }
-      var curAngle = Math.atan2(ptR.y - rotCenter.y, ptR.x - rotCenter.x) * 180 / Math.PI;
-      var deltaFromStart = curAngle - rotStartAngle;
-      // Shift = snap to 15° increments of TOTAL rotation from where the
-      // drag started (UI/UX audit, 2026-07) — Illustrator/Figma
-      // convention, absent before this. Snapping deltaFromStart (not the
-      // raw angle) is what makes it land on clean values relative to the
-      // shape's own starting orientation, not clean values in absolute
-      // canvas space.
-      if (e.shiftKey) deltaFromStart = Math.round(deltaFromStart / 15) * 15;
-      var stepAngle = deltaFromStart - rotLastAngle;
-      // Motion mode: same reasoning as 'move'/'xform-scale' above — the
-      // per-tick angle STEP goes into ld.motion.rotation, raw geometry
-      // untouched. Same pivot note as scale: renders around bounds-center
-      // + Motion Anchor Point regardless of which corner/custom pivot this
-      // particular drag rotated around.
-      if (state.appMode === 'motion') {
-        rotLastAngle = deltaFromStart;
-        var mrLi = state.activeLayerIdx;
-        var mrCur = SMMotion.getLayerValue(mrLi, 'rotation');
-        SMMotion.setLayerValue(mrLi, 'rotation', [mrCur[0] + stepAngle]);
-        window._sceneVersion++;
-        lastPt = pt;
-        // feedback #211 — same cheap in-place field sync as the layer-body
-        // drag above, needed here too since this writes Rotation through the
-        // identical setLayerValue path.
-        if (window.SMMotion && SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
-        window.SMEngineBridge.renderNow();
-        return;
-      }
-      selectedPaths.forEach(function (p) {
-        p.rotate(stepAngle, rotCenter);
-        transformFillGradient(p, function (gp) { return gp.rotate(stepAngle, rotCenter); });
-        if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
-          rotateCenterSegments(p.data.centerSegments, stepAngle, rotCenter.x, rotCenter.y);
-          rebuildVectorBrushOutline(p);
-        }
-        // See the identical companion-transform comment in xform-scale above.
-        if (p.data && p.data.brushCompanions) {
-          p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.rotate(stepAngle, rotCenter); });
-        }
-      });
-      rotLastAngle = deltaFromStart;
-      selectedPaths.forEach(function (p) { if (p) p.data.boxAngle = (((p.data && p.data.boxAngle) || 0) + stepAngle) % 360; }); // orientation lives on the stroke
-      symGestureAccumulate(new Matrix().rotate(stepAngle, rotCenter));
     }
     lastPt = pt;
     window.SMEngineBridge.renderNow();
   }
 
   function onUp(e) {
+    if (nativePaperToolPointer !== null) { nativePaperToolPointer = null; return; }
     if ((mode || draggingArc || motionGesture) && !allowLegacySelectionEdit(e, 'select')) return;
     // See onDown's comment — clears _motionDrag if a motion handle/dot/
     // anchor drag was in progress; no-ops otherwise. Must run even though
@@ -2569,7 +2553,7 @@
       draggingArc = null;
       arcDragCache = null;
       generateTweens(undefined,true);
-    } else if (mode === 'xform-scale' || mode === 'xform-rotate' || mode === 'xform-skew') {
+    } else if (mode === 'xform-scale' || mode === 'xform-skew') {
       // Motion mode: geometry was never touched during this gesture (see
       // onMove's early-return) — none of the fork/regenerate/save-frame
       // work below applies to anything this drag actually changed, and
@@ -2694,13 +2678,13 @@
       renderArcs(); updateUI();
     } else if (mode === 'xform-distort') {
       selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
-      // See the xform-scale/xform-rotate branch's own comment above — same
+      // See the xform-scale branch's own comment above — same
       // "manual edit must stay put" unlink, same reason.
       selectedPaths.forEach(function (p) { fsUnlinkFillRegen(p); });
-      // Per-path calls, not one null call — see the xform-scale/xform-rotate
+      // Per-path calls, not one null call — see the xform-scale
       // branch's own comment above for why.
       selectedPaths.forEach(function (p) { fillRegenerateLinked(userLayers[state.activeLayerIdx], p); });
-      // Same re-bake as the xform-scale/xform-rotate tail above — a corner-pin
+      // Same re-bake as the xform-scale tail above — a corner-pin
       // distort warps the path's own segments live, but never touched the
       // bitmap-brush raster companion (not a simple scale/rotate, so onMove
       // above leaves it untouched during the drag); without this it stays
@@ -2837,7 +2821,7 @@
           if (window.SMEngineBridge) SMEngineBridge.renderNow();
         }
       }
-      // Motion mode: same reasoning as the xform-scale/xform-rotate guard
+      // Motion mode: same reasoning as the xform-scale guard
       // above — this gesture never touched geometry (onMove's early
       // return), so re-loading/re-saving frame content here would be pure
       // unrelated side effect risk, not a no-op.
@@ -2869,7 +2853,7 @@
         // a plain click-release never touched geometry, nothing to unlink.
         if (didMove) selectedPaths.forEach(function (p) { fsUnlinkFillRegen(p); });
         // Per-path calls (not one null call) when something actually moved —
-        // see the xform-scale/xform-rotate branch's own comment above for
+        // see the xform-scale branch's own comment above for
         // why touchedPath=null can't reach fillRegenerateLinked's own last-
         // resort retry rung. A plain click-release (didMove false) never
         // touched geometry, so the cheap unconditional null call is still
@@ -2877,7 +2861,7 @@
         if (didMove) selectedPaths.forEach(function (p) { fillRegenerateLinked(userLayers[state.activeLayerIdx], p); });
         else fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
         saveActiveLayerFrame();
-        // Same stale-onion-ghost fix as the xform-scale/xform-rotate branch
+        // Same stale-onion-ghost fix as the xform-scale branch
         // above — a plain move commits through this branch too.
         if (didMove) renderOS();
         // Every sibling commit branch in this handler (xform-scale/rotate,
@@ -3560,7 +3544,7 @@
   // pre-distort rectangle while a corner-pin drag is in progress.
   window.SMSelectBridge = {
     refreshAfterDocumentRestore: function () {
-      if (nativePointerIntent) nativePointerIntent.cancel();
+      cancelNativeSelection();
       // Undo/redo rebuilds every Paper item: gesture-local object references point at removed geometry after the restore.
       mode = null;
       draggingArc = null;
@@ -3598,7 +3582,7 @@
     // already handles committing what THEY changed; this isn't a general
     // abandon-any-gesture hook).
     cancelMarquee: function () {
-      if (nativePointerIntent) nativePointerIntent.cancel();
+      cancelNativeSelection();
       if (mode !== 'marquee') return;
       if (_marquee.rect) { _marquee.rect.remove(); _marquee.rect = null; }
       _marquee.active = false;
@@ -3615,7 +3599,7 @@
     target.addEventListener('pointerup', function (e) { if (!nativePointerEvent('up', e)) onUp(e); }, { capture: true });
     target.addEventListener('pointercancel', function (e) { if (!nativePointerEvent('cancelEvent', e)) onUp(e); }, { capture: true });
     target.addEventListener('lostpointercapture', function (e) { nativePointerEvent('cancelEvent', e); }, { capture: true });
-    window.addEventListener('blur', function () { if (nativePointerIntent) nativePointerIntent.cancel(); });
+    window.addEventListener('blur', cancelNativeSelection);
     target.addEventListener('contextmenu', function (e) { if (!nativePointerEvent('cancelEvent', e)) { onContext(e); return; } if (shouldIntercept() && window.NemoNativeSelectMenu) window.NemoNativeSelectMenu.open(window, e); /* #2372: a native project's Select menu */ }, { capture: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

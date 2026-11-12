@@ -356,8 +356,8 @@
         requireCurrent(o);entry.items=items.map(i=>Object.assign({},i));entry.pose=pose;
       }
       const geometryOf=async(item,center)=>{
-        const k=stable(item.stableTarget)+(center?'|c':''),hit=entry.geometry.get(k);if(hit)return hit;
-        const g=await subselectGeometry(o,item.stableTarget,undefined,false,true,center,center?undefined:selector.frame);requireCurrent(o);entry.geometry.set(k,g);return g;
+        const k=stable(item.stableTarget)+(center?(centres==='motion'?'|c-motion':'|c'):''),hit=entry.geometry.get(k);if(hit)return hit;
+        const g=await subselectGeometry(o,item.stableTarget,undefined,false,true,center,center&&centres!=='motion'?undefined:selector.frame);requireCurrent(o);entry.geometry.set(k,g);return g;
       };
       for(const item of items){
         // #2372: a raster image or text block has no outline to page; a kept one is hit as its painted rect/glyph box.

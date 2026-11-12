@@ -62,8 +62,9 @@ pub(crate) struct SubselectReadItem {
     /// the name absent for a group never renamed. Absent for a loose record. The Elements panel builds its group tree from it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) group_path: Option<Vec<serde_json::Value>>,
-    /// Legacy point-offset metadata. Evaluated hit pages now carry complete
-    /// contours (including changed handles/counts), so current listings omit it.
+    /// Legacy dense point offsets, only when source+offsets exactly represents
+    /// the evaluated contour (same count, closure, handles). Frame-aware readers
+    /// ignore these and consume the evaluated geometry page without a second offset.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) vertex_offsets: Option<Vec<[f64; 2]>>,
 }

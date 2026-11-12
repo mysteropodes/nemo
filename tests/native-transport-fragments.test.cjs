@@ -38,7 +38,7 @@ test('small fixture preserves explicit order and deterministically appends unord
     fs.mkdirSync(path.join(root, dir));
   }
   const common = { type: 'object' };
-  const branch = (operation) => ({ allOf: [{ $ref: '#/$defs/Common' }, { properties: { operation: { const: operation } } }] });
+  const branch = (operation) => ({ allOf: [{ $ref: '#/$defs/Common' }, { properties: { operation: { const: operation }, payload: { type: 'object' } } }] });
   const zulu = branch('query.zulu'), alpha = branch('query.alpha'), extra = branch('query.extra');
   write(root, `${transport.INPUT}/shared.json`, {
     schema: { title: 'fixture' },
@@ -103,10 +103,11 @@ test('missing or duplicate variants, duplicate definitions, broken refs and orph
     ['missing variant', (r) => mutate(r, fragment, (d) => d.requests.shift()), /missing request variant/],
     ['duplicate variant', (r) => mutate(r, fragment, (d) => d.requests.push(d.requests[0])), /duplicate request operation/],
     ['duplicate definition', (r) => mutate(r, fragment, (d) => { d.definitions.Identifier = { schema: {} }; }), /duplicate definition Identifier/],
-    ['inherited local ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[0].$ref = '#/$defs/constructor'; }), /unresolved ref/],
-    ['inherited external ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[0].$ref = 'native-object-v1.schema.json#/$defs/toString'; }), /unresolved ref/],
-    ['broken local ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[0].$ref = '#/$defs/Absent'; }), /unresolved ref/],
-    ['missing external ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[0].$ref = 'native-object-v1.schema.json#/$defs/Absent'; }), /unresolved ref/],
+    ['inherited local ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[1].properties.payload.$ref = '#/$defs/constructor'; }), /unresolved ref/],
+    ['inherited external ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[1].properties.payload.$ref = 'native-object-v1.schema.json#/$defs/toString'; }), /unresolved ref/],
+    ['broken local ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[1].properties.payload.$ref = '#/$defs/Absent'; }), /unresolved ref/],
+    ['missing external ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[1].properties.payload.$ref = 'native-object-v1.schema.json#/$defs/Absent'; }), /unresolved ref/],
+    ['unsupported branch condition', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[1].if = { properties: { payload: { const: {} } } }; }), /projection changes need explicit support/],
     ['wrong owner', (r) => mutate(r, fragment, (d) => { d.capability = 'wrong'; }), /does not match/],
     ['orphan fragment', (r) => write(r, `${transport.INPUT}/orphan.json`, {}), /without descriptor/],
     ['missing fragment', (r) => fs.rmSync(path.join(r, fragment)), /ENOENT/],
@@ -130,18 +131,19 @@ test('a new capability adds its own descriptor and fragment without a central re
   write(root, `${APP}/capabilities-v2/native-fixture.json`, descriptor);
   write(root, `${transport.INPUT}/native-fixture.json`, {
     capability: descriptor.id,
-    definitions: { FixturePayload: { schema: { type: 'object', additionalProperties: false } } },
+    definitions: { FixturePayload: { schema: { $ref: 'fixture-capability.schema.json#/$defs/Payload' } } },
     requests: [{ schema: { allOf: [{ $ref: '#/$defs/RequestBase' }, { properties: {
       operation: { const: 'query.fixture' }, payload: { $ref: '#/$defs/FixturePayload' },
     } }] } }],
   });
+  write(root, `${APP}/fixture-capability.schema.json`, { $defs: { Payload: { type: 'object', additionalProperties: false } } });
   assert.match(transport.check(root).problems.join('; '), /is stale/);
   assert.equal(cli(root, '--write').status, 0);
   assert.equal(cli(root, '--check').status, 0);
   const after = read(root, transport.OUTPUT);
   assert.deepEqual(after.$defs.Request.oneOf.slice(0, -1), before.$defs.Request.oneOf);
   assert.equal(after.$defs.Request.oneOf.at(-1).allOf[1].properties.operation.const, 'query.fixture');
-  assert.deepEqual(after.$defs.FixturePayload, { type: 'object', additionalProperties: false });
+  assert.deepEqual(after.$defs.FixturePayload, { $ref: 'fixture-capability.schema.json#/$defs/Payload' });
 });
 
 test('normal packaged build checks the same aggregate before compiling the sidecar', () => {

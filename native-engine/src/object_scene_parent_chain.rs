@@ -333,7 +333,7 @@ impl SceneParentChains {
         for (source, layer, record) in records {
             let admitted = (|| -> Result<(), ChainUnavailable> {
                 let path = self.record_path(source, &record)?;
-                self.add(layer, path.bounding_box())?;
+                if !path.elements().is_empty() { self.add(layer, path.bounding_box())?; }
                 Ok(())
             })();
             admitted.map_err(|kind| (layer, kind))?;
