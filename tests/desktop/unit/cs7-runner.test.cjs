@@ -85,6 +85,16 @@ test('candidate drift before or after any row prevents a passing receipt', async
     assert.equal(state.calls.at(-1), 'cleanup');
   }
 });
+test('owner drift after a passing scenario prevents coverage credit for that batch', async () => {
+  const state = setup(1); let identities = 0;
+  state.session.identity = async () => (++identities === 2 ? { ...identity, pid: 456 } : identity);
+  const result = await runInstalledRows(state);
+  assert.equal(result.installed.rows[0].status, 'pass');
+  assert.equal(result.installed.terminalCode, 'installed-precondition-failed');
+  assert.deepEqual(result.installed.rows[0].expected.tasks, ['F03']);
+  assert.deepEqual(result.installed.rows[0].tasks, []);
+  assert.deepEqual(result.tasks, []);
+});
 test('partial startup, invalid assertions and failed cleanup cannot pass', async () => {
   for (const mutate of [s => { s.session.start = async () => { throw Error('partial start'); }; },
     s => { s.session.cleanup = async () => { throw Error('still alive'); }; },
@@ -177,6 +187,19 @@ test('an unsafe shared result stops subsequent input even if its consumer permit
   assert.deepEqual(state.calls, ['start', 'cleanup']);
   assert.equal(result.installed.operatorInputFailures, 0);
   assert.equal(result.installed.terminalCode, 'scenario-stopped');
+});
+test('malformed shared results cannot credit their unconfirmed batch or erase earlier confirmed work', async () => {
+  const state = setup(3);
+  state.scenarios['case-1'].run = async () => ({ checks: [{ id: 'workflow', status: 'pass' }], safeToContinue: true,
+    sharedResults: [
+      { rowId: 'row-2', result: { checks: [{ id: 'workflow', status: 'pass' }], safeToContinue: true } },
+      { rowId: 'row-0', result: { checks: [{ id: 'workflow', status: 'pass' }], safeToContinue: true } },
+    ] });
+  const result = await runInstalledRows(state);
+  assert.equal(result.installed.terminalCode, 'installed-precondition-failed');
+  assert.deepEqual(result.installed.rows.map(r => r.status), ['pass', 'pass', 'pass']);
+  assert.deepEqual(result.installed.rows.map(r => r.tasks), [['F03'], [], []]);
+  assert.deepEqual(result.tasks, ['F03']);
 });
 test('finalization cannot erase an observed failure or omit a declared clause', async () => {
   for (const finalChecks of [[], [{ id: 'workflow', status: 'pass' }]]) {

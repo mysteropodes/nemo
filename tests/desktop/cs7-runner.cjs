@@ -181,7 +181,7 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
   const selected = selection ? { scope: selection.omittedReady.length ? 'subset' : 'all-ready',
     selected: rows.map(r => r.id), omittedReady: [...selection.omittedReady] } : null;
   const results = rows.map(row => rowResult(row, [], 'unrun'));
-  const finalizers = [], recorded = new Set(), safeRows = new Map();
+  const finalizers = [], recorded = new Set(), safeRows = new Map(), confirmedRows = new Set();
   let identity, operatorInputFailures = 0, evidenceFailures = 0, cleanup = 'unrun', terminalCode = null, activeRow = null, failure = null;
   function record(i, observed) {
     check(!recorded.has(i), 'installed row already recorded');
@@ -216,13 +216,18 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
       const shared = observed.sharedResults || [];
       check(Array.isArray(shared) && shared.length < rows.length, 'invalid shared installed results');
       let safeToContinue = observed.safeToContinue;
+      const batchIndices = [i];
       for (const item of shared) {
         const index = rows.findIndex(r => r.id === item.rowId);
         check(index > i && !item.result?.sharedResults, 'shared installed result must name a later declared row');
         record(index, item.result);
+        batchIndices.push(index);
         safeToContinue = safeToContinue && item.result.safeToContinue;
       }
       check(isDeepStrictEqual(verifiedIdentity(await session.identity()), identity), 'installed candidate changed');
+      // A row (and any shared workflow results) is attributable to this owner only after
+      // the complete batch shape is valid and the post-run owner handshake still matches.
+      for (const index of batchIndices) confirmedRows.add(index);
       await save({ identity, ...(selected ? { selection: selected } : {}), rows: results, cleanup, complete: false });
       if (!safeToContinue) { terminalCode = 'scenario-stopped'; break; }
     }
@@ -258,7 +263,7 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
   // Publish actual coverage only for fully validated rows after the owner is stopped and
   // deferred evidence has been finalized. Failed, blocked, unrun and unsafe rows remain zero.
   if (cleanup === 'complete') results.forEach((result, i) => {
-    if (result.status !== 'pass' || safeRows.get(i) !== true) return;
+    if (!confirmedRows.has(i) || result.status !== 'pass' || safeRows.get(i) !== true) return;
     const row = rows[i];
     result.tasks = [...row.tasks];
     result.partialTasks = structuredClone(row.partialTasks || {});

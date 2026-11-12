@@ -320,21 +320,19 @@ function createWorkflow({ reportDirectory, fixtureDirectory = FIXTURES }) {
         if (step.type === 'save-again') {
           if (ev.nameDialogOpened === true) failure = 'save-asked-for-a-name-again';
           else if (typeof ev.nameDialogOpened !== 'boolean' || ev.savedFile !== SAVED) throw malformed(ROW, step.id);
-          else if (!afterNodes) {
-            const reason = 'the accessibility read was unavailable, so a repeat name dialog was not observed';
-            hold(step.check, reason);
-            return finish(true, step.id + ': ' + reason);
-          }
         }
-        if (!failure && (!f || !plain(json) || !firstSave)) throw malformed(ROW, step.id);
+        if (!failure && !firstSave) throw malformed(ROW, step.id);
         if (!failure && step.type === 'save-again') {
-          if (afterNodes && nameDialog(afterNodes)) failure = 'save-asked-for-a-name-again';
+          if (!f || !plain(json)) failure = 'save-did-not-write-the-edit';
           else if (f.sha256 === firstSave.hash || f.mtimeMs <= firstSave.mtimeMs || f.mtimeMs < requestedAt - 2000) failure = 'save-did-not-write-the-edit';
           else if (!unedited(doc, next)) failure = 'saving-changed-the-document';
           else failure = savedAgrees(json, next);
+          if (!failure && afterNodes && nameDialog(afterNodes)) failure = 'save-asked-for-a-name-again';
+          if (!failure && !afterNodes) hold(step.check, 'the accessibility read was unavailable, so a repeat name dialog was not observed');
           if (!failure) secondSave = { hash: f.sha256, mtimeMs: f.mtimeMs, summary: next };
           if (!failure) kit.privateEvidence(dir, 'file-' + step.id, { schema: 'nemo.legacy-import-private/1', sha256: f.sha256, size: f.size, mtimeMs: f.mtimeMs, requestedAt });
         } else if (!failure && step.type === 'reopen') {
+          if (!f || !plain(json)) throw malformed(ROW, step.id);
           if (!secondSave) throw malformed(ROW, step.id);
           else if (f.sha256 !== secondSave.hash || f.mtimeMs !== secondSave.mtimeMs) failure = 'saved-file-changed-by-opening';
           else if (sameDocument(secondSave.summary, next)) failure = 'reopen-did-not-create-a-new-document';
