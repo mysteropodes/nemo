@@ -5,7 +5,7 @@
     "regions",
     "functions"
   ],
-  "branchesExcluded": "branch coverage is not instrumented by the stable Rust toolchain (needs nightly -Z coverage-options=branch); every branch count is 0, so a branch floor would be a gate that cannot fail. Excluded on purpose \u2014 see T04/#1053.",
+  "branchesExcluded": "branch coverage is not instrumented by the stable Rust toolchain (needs nightly -Z coverage-options=branch); every branch count is 0, so a branch floor would be a gate that cannot fail. Excluded on purpose — see T04/#1053.",
   "crate": "nemo-mcp",
   "manifestPath": "nemo-mcp/Cargo.toml",
   "recorded": {
@@ -923,6 +923,17 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "G44/#2357: stored-camera read contract measured with cargo-llvm-cov 0.9.1 on the clean #2357 candidate (nemo-mcp suite 512 tests, 0 failed). Only the two new entries are added; every pre-existing file/aggregate floor, exclusion, tool and recorded provenance is unchanged."
+    },
+    "nemo-mcp/src/native_request_schema.rs": {
+      "lines": 95.77,
+      "regions": 94.23,
+      "functions": 80,
+      "note": "#2363/#2828: measured with cargo-llvm-cov 0.9.1 on the scoped semantic-order and ingress-control correction. Added only these two rows; all existing floors, totals, exclusions, tool and recorded provenance remain unchanged."
+    },
+    "nemo-mcp/src/native_request_schema_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#2363/#2828: measured with cargo-llvm-cov 0.9.1 on the scoped semantic-order and ingress-control correction. Added only these two rows; all existing floors, totals, exclusions, tool and recorded provenance remain unchanged."
     }
   }
 }

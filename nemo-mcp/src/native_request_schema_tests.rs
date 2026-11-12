@@ -240,3 +240,113 @@ fn projected_payload_and_envelope_agree_with_the_complete_request_schema() {
         }
     }
 }
+
+#[test]
+fn unknown_operations_have_no_projected_validator_and_still_use_registration_diagnostics() {
+    let operation = "query.not_registered";
+    assert!(validator(operation, false).unwrap().is_none());
+    assert!(!declares(operation));
+    let request: NativeApplicationRequest = serde_json::from_value(json!({"apiVersion":2,"requestId":"unknown","instanceId":"instance","documentId":"document","operation":operation,"payload":{}})).unwrap();
+    assert_eq!(envelope(&request), None);
+    let error = request.validate_input().unwrap_err();
+    assert_eq!(error.code(), "invalid_request");
+    assert!(error
+        .message()
+        .contains("is not declared by a registered native capability"));
+}
+
+#[test]
+fn malformed_embedded_contracts_refuse_setup_or_compilation_without_panicking() {
+    let base = json!({"$id":"https://nemo.test/contracts/native-transport-v2.schema.json", "$defs":{
+      "Envelope":{"type":"object"}, "Request":{"oneOf":[{"allOf":[{"$ref":"#/$defs/Envelope"},
+        {"properties":{"operation":{"const":"query.fixture"},"payload":{"type":"object"}}}]}]}}});
+    let mut cases = Vec::new();
+    let mut missing_id = base.clone();
+    missing_id.as_object_mut().unwrap().remove("$id");
+    cases.push((missing_id, "missing transport id"));
+    let mut invalid_id = base.clone();
+    invalid_id["$id"] = json!("no-slash");
+    cases.push((invalid_id, "invalid transport id"));
+    let mut missing_allof = base.clone();
+    missing_allof["$defs"]["Request"]["oneOf"][0] = json!({});
+    cases.push((missing_allof, "missing request allOf"));
+    let mut short = base.clone();
+    short["$defs"]["Request"]["oneOf"][0]["allOf"] = json!([]);
+    cases.push((short, "unsupported request branch"));
+    let mut shape = base.clone();
+    shape["$defs"]["Request"]["oneOf"][0]["allOf"][1] = Value::Null;
+    cases.push((shape, "missing request shape"));
+    let mut properties = base.clone();
+    properties["$defs"]["Request"]["oneOf"][0]["allOf"][1] = json!({});
+    cases.push((properties, "missing request properties"));
+    let mut condition = base.clone();
+    condition["$defs"]["Request"]["oneOf"][0]["allOf"][1]["if"] = json!({});
+    cases.push((condition, "unsupported request property projection"));
+    let mut ref_missing = base.clone();
+    ref_missing["$defs"]["Request"]["oneOf"][0]["allOf"][0] = json!({});
+    cases.push((ref_missing, "missing request envelope ref"));
+    let mut ref_external = base.clone();
+    ref_external["$defs"]["Request"]["oneOf"][0]["allOf"][0]["$ref"] = json!("other.json");
+    cases.push((ref_external, "nonlocal request envelope"));
+    let mut no_operation = base.clone();
+    no_operation["$defs"]["Request"]["oneOf"][0]["allOf"][1]["properties"]["operation"] = json!({});
+    cases.push((no_operation, "missing operation const/enum"));
+    let mut wrong_name = base.clone();
+    wrong_name["$defs"]["Request"]["oneOf"][0]["allOf"][1]["properties"]["operation"] =
+        json!({"const":7});
+    cases.push((wrong_name, "non-string operation"));
+    let mut duplicate = base.clone();
+    let branch = duplicate["$defs"]["Request"]["oneOf"][0].clone();
+    duplicate["$defs"]["Request"]["oneOf"]
+        .as_array_mut()
+        .unwrap()
+        .push(branch);
+    cases.push((duplicate, "duplicate operation"));
+    for properties in [
+        json!({"operation":{"const":"query.fixture"},"unrelated":{}}),
+        json!({"payload":{},"unrelated":{}}),
+    ] {
+        let mut missing_projection_member = base.clone();
+        missing_projection_member["$defs"]["Request"]["oneOf"][0]["allOf"][1]["properties"] =
+            properties;
+        cases.push((
+            missing_projection_member,
+            "unsupported request property projection",
+        ));
+    }
+    let mut invalid_uri = base.clone();
+    invalid_uri["$id"] = json!("https://[invalid/schema.json");
+    assert!(build_catalog_from(invalid_uri, &[]).is_err());
+    assert!(build_catalog_from(
+        base.clone(),
+        &[(
+            "invalid-id.schema.json",
+            r#"{"$id":"https://[invalid/schema.json"}"#
+        )]
+    )
+    .is_err());
+    for (source, expected) in cases {
+        let result = std::panic::catch_unwind(|| build_catalog_from(source, &[]));
+        assert!(
+            result.is_ok(),
+            "setup must refuse rather than panic: {expected}"
+        );
+        assert!(result.unwrap().err().unwrap().contains(expected));
+    }
+    assert!(
+        build_catalog_from(base.clone(), &[("bad.schema.json", "{broken")])
+            .err()
+            .unwrap()
+            .contains("bad.schema.json")
+    );
+    let mut unsupported_keyword = base;
+    unsupported_keyword["$defs"]["Request"]["oneOf"][0]["allOf"][1]["properties"]["payload"] =
+        json!({"type":"not-a-json-type"});
+    let catalog = build_catalog_from(unsupported_keyword, &[]).unwrap();
+    assert!(compile(
+        &catalog,
+        catalog.operations.get("query.fixture").unwrap(),
+        false
+    )
+    .is_err());
+}

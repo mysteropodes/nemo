@@ -476,3 +476,46 @@ fn public_object_history_success_is_exact_and_correlated_to_its_request() {
         ));
     }
 }
+
+#[test]
+fn formerly_forwarded_envelopes_enforce_schema_revision_policy_at_the_original_byte_boundary() {
+    for (operation, revision, payload) in [
+        ("command.document.apply", None, json!({"command":"layer.opacity.set","stableTarget":{"layerUid":"layer"},"value":25})),
+        ("query.document.revision", Some(0), json!({})),
+    ] {
+        let request = NativeApplicationRequest {
+            api_version: 2, request_id: "schema-envelope".into(), instance_id: "instance".into(), document_id: "document".into(),
+            expected_revision: revision, operation: operation.into(), payload, cancelled_before_dispatch: false,
+        };
+        same_failure(&request, "invalid_request", "native request envelope does not match its declared contract");
+        let bytes = serde_json::to_vec(&request).unwrap();
+        assert!(crate::wire::decode_native_request(&bytes).unwrap_err().to_string()
+            .contains("native request envelope does not match its declared contract"));
+    }
+}
+
+#[test]
+fn malformed_metadata_and_font_inputs_refuse_at_the_actual_public_byte_boundary() {
+    for (operation, revision, payload, message) in [
+        (crate::native_contract::comments::EDIT, Some(7), Value::Null,
+            "native object team comment metadata command does not match its declared contract"),
+        (crate::native_contract::custom_brush::EDIT, Some(7), json!({}),
+            "native object custom brush catalog metadata command does not match its declared contract"),
+        (crate::native_contract::font::QUERY, None, json!({}),
+            "native pinned-read payload does not match its declared contract"),
+    ] {
+        let request = NativeApplicationRequest {
+            api_version: 2, request_id: "invalid-metadata".into(), instance_id: "instance".into(), document_id: "document".into(),
+            expected_revision: revision, operation: operation.into(), payload, cancelled_before_dispatch: false,
+        };
+        let code = if revision.is_some() { "invalid_request" } else { "malformed_payload" };
+        same_failure(&request,code,message);
+        assert!(crate::wire::decode_native_request(&serde_json::to_vec(&request).unwrap()).unwrap_err().to_string().contains(message));
+    }
+    let request = NativeApplicationRequest {
+        api_version: 2, request_id: "invalid-schema-shape".into(), instance_id: "instance".into(), document_id: "document".into(),
+        expected_revision: None, operation: "query.document.opacity".into(), payload: json!({}), cancelled_before_dispatch: false,
+    };
+    same_failure(&request,"malformed_payload","native pinned-read payload does not match its declared contract");
+    assert!(crate::wire::decode_native_request(&serde_json::to_vec(&request).unwrap()).is_err());
+}

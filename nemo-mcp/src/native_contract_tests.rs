@@ -343,3 +343,22 @@ fn native_catalog_sources_are_discovered_from_the_declaration_directory() {
         crate::capabilities::native_catalog().descriptors().len()
     );
 }
+
+#[test]
+fn migrated_request_shapes_remain_closed_in_the_public_response_correlation_gate() {
+    let cases = [
+        ("command.document.object.layer.visibility.set", json!({"command":"object.layer.visibility.set","layerUid":"layer","visible":true}), json!({"applied":true,"historyEntriesAdded":1})),
+        ("command.document.object.undo", json!({"command":"object.undo"}), json!({"applied":true,"historyEntriesAdded":0})),
+        (layer_policy::OP, json!({"command":"object.layer.policy.edit","layerUid":"layer","flag":"locked","value":true}), json!({"applied":true,"historyEntriesAdded":1})),
+        ("query.document.serialize", json!({"atRevision":0}), serialized(document())),
+        ("query.document.evaluate", json!({"atRevision":0,"contextId":"scene-root","frame":0}), json!({"documentSnapshotId":"snapshot","documentId":"doc","contentRevision":0,"contextId":"scene-root","frame":0,"layers":[]})),
+        ("query.diagnostics.recent", json!({}), json!({"records":[],"truncated":false})),
+    ];
+    for (operation,payload,result) in cases {
+        assert!(validate_result(operation,"doc",&payload,&result),"valid {operation}");
+        let mut extra=payload.clone(); extra["extra"]=json!(true);
+        for malformed in [Value::Null,json!([]),json!("encoded"),extra] {
+            assert!(!validate_result(operation,"doc",&malformed,&result),"{operation}: {malformed}");
+        }
+    }
+}

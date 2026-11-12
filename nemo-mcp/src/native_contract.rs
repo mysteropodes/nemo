@@ -151,13 +151,17 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     )
 }
 
-/// Schema shapes precede retained semantic protections. Unknown operations are
+/// Retained semantic protections precede schema shapes. Unknown operations are
 /// left to the existing registration diagnostic; a declared operation without a
 /// schema branch fails closed rather than silently reaching its native owner.
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
+    // Preserve semantic refusals and their independent negative tables before
+    // applying generated shape constraints. Neither gate may bypass the other.
+    if !retained_request_constraints(operation, payload) {
+        return false;
+    }
     match request_schema::payload(operation, payload) {
-        Some(false) => false,
-        Some(true) => retained_request_constraints(operation, payload),
+        Some(valid) => valid,
         None => crate::capabilities::native_catalog().capability_for_operation(operation).is_none(),
     }
 }
@@ -213,15 +217,15 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
         "command.document.object.layer.create" => object::create_request(payload),
         import::OP => import::request(payload),
         operation if export::owns(operation) => export::request(operation, payload),
-        "query.diagnostics.recent" => true,
+        "query.diagnostics.recent" => request_schema::payload(operation, payload) == Some(true),
         "command.reproduction.opt_in"
         | "query.reproduction.status"
-        | "query.reproduction.export" => true,
+        | "query.reproduction.export" => request_schema::payload(operation, payload) == Some(true),
         "query.reproduction.replay" => exact(payload, &["bundle"], &[])
             .is_some_and(|value| value.get("bundle").is_some_and(reproduction::bundle)),
         "query.reproduction.report" => reproduction::report_request(payload),
         // Closed keys, types, IDs and bounds come from the request schema.
-        "query.document.serialize" | "query.document.evaluate" => true,
+        "query.document.serialize" | "query.document.evaluate" => request_schema::payload(operation, payload) == Some(true),
         _ => return import::video_link::request_check(operation, payload),
     })
 }
@@ -299,7 +303,7 @@ fn opacity_document(value: &Value) -> bool {
         }
         if let Some(motion) = layer.get("motion") {
             let Some(motion) = exact(motion, &["opacity"], &[])
-                .and_then(|motion| exact(motion.get("opacity")?, &["keys"], &[]))
+                .and_then(|motion| exact(&motion["opacity"], &["keys"], &[]))
             else {
                 return false;
             };
@@ -345,7 +349,10 @@ pub(crate) fn validate_result(
     if operation == history_read::OP {
         return history_read::result(payload, result);
     }
-    if !validate_request(operation, payload) {
+    // Request schemas are admitted at the actual original-byte ingress. Keep
+    // this response-correlation gate's established semantic behavior instead
+    // of reinterpreting standalone response checks with new request rules.
+    if !retained_request_constraints(operation, payload) {
         return false;
     }
     match result_validator(operation) {
@@ -383,13 +390,11 @@ pub(crate) const MCP_RESULT_UNCHECKED: &[&str] = &[
 
 #[cfg(test)]
 pub(crate) fn has_result_validator(operation: &str) -> bool {
-    result_validator(operation).is_some()
+    operation == history_read::OP || result_validator(operation).is_some()
 }
 
 fn result_validator(operation: &str) -> Option<ResultValidator> {
     Some(match operation {
-        // Routed before request validation in validate_result; listed for routing.
-        history_read::OP => |_, _, p, r| history_read::result(p, r),
         font::IMPORT | font::QUERY => |o, _, p, r| font::result(o, p, r),
         property_read::OP => |_, d, p, r| property_read::result(d, p, r),
         composition::READ | composition::EDIT => |o, d, p, r| composition::result(o, d, p, r),
