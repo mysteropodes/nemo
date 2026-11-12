@@ -58,8 +58,14 @@ function createContext({ wire, work, rowId }) {
 }
 
 // ---- observations -------------------------------------------------------------------------------------------------
+// The pin of the current revision. An object project answers `query.document.snapshot.acquire` with "Unsupported object read
+// operation" (that op, query.document.serialize and query.document.evaluate belong to the opacity document, authority
+// native-engine::history::NativeOpacityHistory in engineering/application/capabilities-v2/native-opacity.json); the public pin of an
+// object project is the {atRevision, documentSnapshotId} the object query's presentation view returns
+// (tests/desktop/native-image-mesh.test.cjs presentation bootstrap; native-engine/src/object_snapshot.rs presentation read).
 async function pinNow(ctx) {
-  const pin = await ctx.wire.query(P.snapshotAcquire().operation, P.snapshotAcquire().payload);
+  const at = await ctx.wire.discover();
+  const b = P.presentationRead(at.contentRevision), pin = await ctx.wire.query(b.operation, b.payload);
   ctx.book.ok('reply', 'snapshot pin acquired', pin.ok && typeof pin.result.documentSnapshotId === 'string', pin.ok ? { atRevision: pin.result.atRevision } : pin.error);
   return { revision: pin.result.atRevision, pin: pin.result.documentSnapshotId };
 }
