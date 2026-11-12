@@ -158,3 +158,26 @@ fn the_animator_view_may_name_a_component_context_and_its_chunk_echoes_it() {
     assert!(!result("document", &plain, &chunk(json!({"contextId":"comp-a"}))), "and must not invent one");
     assert!(result("document", &plain, &chunk(json!({}))));
 }
+
+#[test]
+fn text_wire_pages_require_dense_progress_and_complete_declared_types() {
+    let wrap=|p: Value| -> crate::contract::NativeApplicationRequest { serde_json::from_value(json!({"apiVersion":2,"requestId":"text-page","instanceId":"instance","documentId":"document","operation":OP,"payload":p})).unwrap() };
+    let wire=|q: &crate::contract::NativeApplicationRequest,body: Value| {
+        let r=serde_json::from_value(json!({"apiVersion":2,"requestId":q.request_id,"instanceId":"instance","documentId":"document","contentRevision":7,"ok":true,"result":body})).unwrap();
+        crate::wire::validate_native_response(&r,q).is_ok()
+    };
+    let q=wrap(payload(json!({"kind":"text","target":target(),"offset":0,"limit":2})));
+    let mut page=header("text");
+    for (key,value) in [("target",target()),("offset",json!(0)),("textBytes",json!(4)),("text",json!("ab")),("nextOffset",json!(2))] {page[key]=value;}
+    assert!(wire(&q,page.clone()));
+    for (key,value) in [("text",Value::Null),("textBytes",json!(-1)),("offset",json!(1)),("nextOffset",json!(1)),("text",json!("")),("text",json!("abc"))] {
+        let mut bad=page.clone();bad[key]=value;assert!(!wire(&q,bad));
+    }
+    let q=wrap(payload(json!({"kind":"targets","scope":scope(),"offset":0,"limit":1})));
+    let mut page=header("targets");
+    for (key,value) in [("scope",scope()),("offset",json!(0)),("total",json!(2)),("items",json!([{"target":target()}])),("nextOffset",json!(1))] {page[key]=value;}
+    assert!(wire(&q,page.clone()));
+    for (key,value) in [("items",Value::Null),("total",json!(-1)),("items",json!([])),("items",json!([{"target":target()},{"target":target()}])),("nextOffset",json!(0))] {
+        let mut bad=page.clone();bad[key]=value;assert!(!wire(&q,bad));
+    }
+}

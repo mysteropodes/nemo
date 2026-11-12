@@ -514,3 +514,15 @@ fn a_vector_family_record_is_judged_by_the_vector_validator_and_keeps_the_read_t
     mixed["vector"] = vector["vector"].clone();
     assert!(!record(&mixed));
 }
+
+#[test]
+fn public_layer_creation_keeps_the_entered_component_context_closed_and_nonempty() {
+    let admitted=|context: Value| {
+        let request=json!({"apiVersion":2,"requestId":"create-context","instanceId":"instance","documentId":"document",
+            "expectedRevision":7,"operation":"command.document.object.layer.create",
+            "payload":{"command":"object.layer.create","name":"component layer","contextId":context}});
+        crate::wire::decode_native_request(&serde_json::to_vec(&request).unwrap()).is_ok()
+    };
+    assert!(admitted(json!("comp-a")));
+    for invalid in [Value::Null,json!(""),json!(7),json!([])] { assert!(!admitted(invalid)); }
+}

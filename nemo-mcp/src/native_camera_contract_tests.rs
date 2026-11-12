@@ -116,3 +116,12 @@ fn the_shared_settings_arm_routes_camera_and_symmetry_to_their_own_validators() 
         &json!({"ordinal":1,"frame":0,"x":0,"y":0,"w":1,"hOut":[1,2],"hIn":[0,0]})
     ));
 }
+
+#[test]
+fn camera_page_wire_rejects_nonarray_items_and_more_keys_than_requested() {
+    let q=query(json!({"kind":"keyPage","cursor":0,"limit":2}));
+    let body=|items: Value| json!({"kind":"cameraKeyPage","keysPresent":true,"keyCount":3,"cursor":0,"items":items,"nextCursor":2});
+    assert!(wire(&q,&response(&q,body(json!([key(1),key(2)])))));
+    assert!(!wire(&q,&response(&q,body(Value::Null))));
+    assert!(!wire(&q,&response(&q,body(json!([key(1),key(2),key(3)])))));
+}

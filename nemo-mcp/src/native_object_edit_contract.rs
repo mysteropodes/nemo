@@ -43,103 +43,238 @@ enum K {
     Fill(fill::Field),
 }
 
-/// (operation suffix, command, "member:kind ..." in wire order). Every operation is a revisioned command; only a
+/// Operation suffix, command and typed fields in wire order (the bool marks optional fields).
+/// Every operation is a revisioned command; only a
 /// duplicate names its minted identity; copy/cut carry a bounded clipboard; other receipts are compact.
-static SPECS: [(&str, &str, &str); 21] = [
-    // `contextId:uid?` (#2256): the declared component whose layers the edit works on; absent is the scene root.
+type Member = (&'static str, K, bool);
+static SPECS: [(&str, &str, &[Member]); 21] = [
     (
         "layer.delete",
         "object.layer.delete",
-        "selection:selection contextId:uid?",
+        &[
+            ("selection", K::Selection, false),
+            ("contextId", K::Uid, true),
+        ],
     ),
     (
         "layer.duplicate",
         "object.layer.duplicate",
-        "layerUid:opaque contextId:uid?",
+        &[
+            ("layerUid", K::Opaque, false),
+            ("contextId", K::Uid, true),
+        ],
     ),
     (
         "layer.rename",
         "object.layer.rename",
-        "layerUid:opaque name:name",
+        &[
+            ("layerUid", K::Opaque, false),
+            ("name", K::Name, false),
+        ],
     ),
     (
         "layer.reorder",
         "object.layer.reorder",
-        "layerUids:opaques gap:gap selection:selection contextId:uid?",
+        &[
+            ("layerUids", K::Opaques, false),
+            ("gap", K::Gap, false),
+            ("selection", K::Selection, false),
+            ("contextId", K::Uid, true),
+        ],
     ),
     (
         "group.create",
         "object.group.create",
-        "layerUid:uid contextId:uid groupId:uid name:groupName strokeIds:strokes1",
+        &[
+            ("layerUid", K::Uid, false),
+            ("contextId", K::Uid, false),
+            ("groupId", K::Uid, false),
+            ("name", K::GroupName, false),
+            ("strokeIds", K::Strokes(1), false),
+        ],
     ),
     (
         "group.ungroup",
         "object.group.ungroup",
-        "layerUid:uid contextId:uid strokeIds:strokes1",
+        &[
+            ("layerUid", K::Uid, false),
+            ("contextId", K::Uid, false),
+            ("strokeIds", K::Strokes(1), false),
+        ],
     ),
     (
         "group.combine",
         "object.group.combine",
-        "layerUid:uid contextId:uid groupId:uid mode:combine strokeIds:strokes1",
+        &[
+            ("layerUid", K::Uid, false),
+            ("contextId", K::Uid, false),
+            ("groupId", K::Uid, false),
+            ("mode", K::Combine, false),
+            ("strokeIds", K::Strokes(1), false),
+        ],
     ),
     (
         "group.mode.set",
         "object.group.mode.set",
-        "layerUid:uid contextId:uid groupId:uid mode:combine",
+        &[
+            ("layerUid", K::Uid, false),
+            ("contextId", K::Uid, false),
+            ("groupId", K::Uid, false),
+            ("mode", K::Combine, false),
+        ],
     ),
     (
         "group.rename",
         "object.group.rename",
-        "layerUid:uid contextId:uid groupId:uid name:groupName",
+        &[
+            ("layerUid", K::Uid, false),
+            ("contextId", K::Uid, false),
+            ("groupId", K::Uid, false),
+            ("name", K::GroupName, false),
+        ],
     ),
     (
         "group.member.remove",
         "object.group.member.remove",
-        "layerUid:uid contextId:uid strokeId:uid",
+        &[
+            ("layerUid", K::Uid, false),
+            ("contextId", K::Uid, false),
+            ("strokeId", K::Uid, false),
+        ],
     ),
     (
         "selection.delete",
         "object.selection.delete",
-        "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0",
+        &[
+            ("contextId", K::Uid, false),
+            ("layerUid", K::Uid, false),
+            ("frame", K::Frame, false),
+            ("mode", K::EditMode, false),
+            ("strokeIds", K::Strokes(0), false),
+        ],
     ),
     (
         "selection.duplicate",
         "object.selection.duplicate",
-        "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0 offset:offset? others:others?",
+        &[
+            ("contextId", K::Uid, false),
+            ("layerUid", K::Uid, false),
+            ("frame", K::Frame, false),
+            ("mode", K::EditMode, false),
+            ("strokeIds", K::Strokes(0), false),
+            ("offset", K::Offset, true),
+            ("others", K::Others, true),
+        ],
     ),
     (
         "layer.split",
         "object.layer.split",
-        "contextId:uid layerUid:uid frame:frame labels:labels",
+        &[
+            ("contextId", K::Uid, false),
+            ("layerUid", K::Uid, false),
+            ("frame", K::Frame, false),
+            ("labels", K::Labels, false),
+        ],
     ),
     (
         "clipboard.paste",
         "object.clipboard.paste",
-        "contextId:uid layerUid:uid frame:frame mode:editMode clip:clip",
+        &[
+            ("contextId", K::Uid, false),
+            ("layerUid", K::Uid, false),
+            ("frame", K::Frame, false),
+            ("mode", K::EditMode, false),
+            ("clip", K::Clip, false),
+        ],
     ),
     (
         "boolean.apply",
         "object.boolean.apply",
-        "mode:boolean layerUid:uid contextId:uid frame:frame strokeIds:strokes2",
+        &[
+            ("mode", K::Boolean, false),
+            ("layerUid", K::Uid, false),
+            ("contextId", K::Uid, false),
+            ("frame", K::Frame, false),
+            ("strokeIds", K::Strokes(2), false),
+        ],
     ),
     (
         "boolean.erase",
         "object.boolean.erase",
-        "layerUid:uid contextId:uid frame:frame strokeId:uid footprint:footprint joinHistory:flag?",
+        &[
+            ("layerUid", K::Uid, false),
+            ("contextId", K::Uid, false),
+            ("frame", K::Frame, false),
+            ("strokeId", K::Uid, false),
+            ("footprint", K::Footprint, false),
+            ("joinHistory", K::Fill(fill::Field::Flag), true),
+        ],
     ),
     (
         "boolean.flatten",
         "object.boolean.flatten",
-        "layerUid:uid contextId:uid frame:frame groupId:uid",
+        &[
+            ("layerUid", K::Uid, false),
+            ("contextId", K::Uid, false),
+            ("frame", K::Frame, false),
+            ("groupId", K::Uid, false),
+        ],
     ),
-    ("fill.trace","object.fill.trace","layerUid:uid contextId:uid frame:frame point:point color:color opacity:opacity remove:flag"),
-    ("fill.brush","object.fill.brush","layerUid:uid contextId:uid frame:frame outline:outline color:color opacity:opacity placement:placement mask:mask copies:copies stamps:stamps"),
-    ("clipboard.copy", "object.clipboard.copy", "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0"),
-    ("clipboard.cut", "object.clipboard.cut", "contextId:uid layerUid:uid frame:frame mode:editMode strokeIds:strokes0"),
+    (
+        "fill.trace",
+        "object.fill.trace",
+        &[
+            ("layerUid", K::Uid, false),
+            ("contextId", K::Uid, false),
+            ("frame", K::Frame, false),
+            ("point", K::Fill(fill::Field::Point), false),
+            ("color", K::Fill(fill::Field::Color), false),
+            ("opacity", K::Fill(fill::Field::Opacity), false),
+            ("remove", K::Fill(fill::Field::Flag), false),
+        ],
+    ),
+    (
+        "fill.brush",
+        "object.fill.brush",
+        &[
+            ("layerUid", K::Uid, false),
+            ("contextId", K::Uid, false),
+            ("frame", K::Frame, false),
+            ("outline", K::Fill(fill::Field::Outline), false),
+            ("color", K::Fill(fill::Field::Color), false),
+            ("opacity", K::Fill(fill::Field::Opacity), false),
+            ("placement", K::Fill(fill::Field::Placement), false),
+            ("mask", K::Fill(fill::Field::Mask), false),
+            ("copies", K::Fill(fill::Field::Copies), false),
+            ("stamps", K::Fill(fill::Field::Stamps), false),
+        ],
+    ),
+    (
+        "clipboard.copy",
+        "object.clipboard.copy",
+        &[
+            ("contextId", K::Uid, false),
+            ("layerUid", K::Uid, false),
+            ("frame", K::Frame, false),
+            ("mode", K::EditMode, false),
+            ("strokeIds", K::Strokes(0), false),
+        ],
+    ),
+    (
+        "clipboard.cut",
+        "object.clipboard.cut",
+        &[
+            ("contextId", K::Uid, false),
+            ("layerUid", K::Uid, false),
+            ("frame", K::Frame, false),
+            ("mode", K::EditMode, false),
+            ("strokeIds", K::Strokes(0), false),
+        ],
+    ),
 ];
 const PREFIX: &str = "command.document.object.";
 
-fn spec(operation: &str) -> Option<(&'static str, &'static str)> {
+fn spec(operation: &str) -> Option<(&'static str, &'static [Member])> {
     let suffix = operation.strip_prefix(PREFIX)?;
     SPECS
         .iter()
@@ -226,31 +361,6 @@ fn offset(value: &Value) -> bool {
     })
 }
 
-fn kind(token: &str) -> Option<K> {
-    Some(match token {
-        "uid" => K::Uid,
-        "opaque" => K::Opaque,
-        "opaques" => K::Opaques,
-        "gap" => K::Gap,
-        "selection" => K::Selection,
-        "name" => K::Name,
-        "groupName" => K::GroupName,
-        "frame" => K::Frame,
-        "strokes0" => K::Strokes(0),
-        "strokes1" => K::Strokes(1),
-        "strokes2" => K::Strokes(2),
-        "combine" => K::Combine,
-        "boolean" => K::Boolean,
-        "editMode" => K::EditMode,
-        "labels" => K::Labels,
-        "clip" => K::Clip,
-        "footprint" => K::Footprint,
-        "offset" => K::Offset,
-        "others" => K::Others,
-        _ => K::Fill(fill::kind(token)?),
-    })
-}
-
 fn check(kind: K, value: &Value) -> bool {
     match kind {
         K::Uid => uid(value),
@@ -294,24 +404,17 @@ pub(super) fn request(operation: &str, payload: &Value) -> bool {
     let Some((command, members)) = spec(operation) else {
         return false;
     };
-    let members: Vec<(&str, &str)> = members
-        .split(' ')
-        .filter_map(|member| member.split_once(':'))
-        .collect();
-    // A token ending in `?` names an optional member: absent is valid, present must pass its check.
-    let optional = |token: &str| token.ends_with('?');
+    // The field kinds are compiler-checked constants. Missing required keys and
+    // unknown keys are rejected before member checks; only declared optional
+    // keys may be absent. No request can introduce an unknown field-kind token.
     let mut required = vec!["command"];
-    required.extend(members.iter().filter(|member| !optional(member.1)).map(|member| member.0));
-    let allowed: Vec<&str> = members.iter().filter(|member| optional(member.1)).map(|member| member.0).collect();
+    required.extend(members.iter().filter(|member| !member.2).map(|member| member.0));
+    let allowed: Vec<_> = members.iter().filter(|member| member.2).map(|member| member.0).collect();
     exact(payload, &required, &allowed).is_some_and(|object| {
         object.get("command").and_then(Value::as_str) == Some(command)
-            && members.iter().all(|(name, token)| {
-                let token = token.trim_end_matches('?');
-                match (object.get(*name), kind(token)) {
-                    (Some(value), Some(k)) => check(k, value),
-                    (None, Some(_)) => members.iter().any(|m| m.0 == *name && optional(m.1)),
-                    _ => false,
-                }
+            && members.iter().all(|(name, kind, optional)| match object.get(*name) {
+                Some(value) => check(*kind, value),
+                None => *optional,
             })
     })
 }

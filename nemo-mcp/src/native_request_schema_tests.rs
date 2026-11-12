@@ -130,8 +130,9 @@ fn ordinary_gui_project_read_requests_cross_the_real_original_byte_boundary() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let requests: Vec<Value> = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(requests.len(), 5);
+    let fixture: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let requests = fixture["requests"].as_array().unwrap();
+    assert_eq!(requests.len(), 12);
     assert!(requests
         .iter()
         .any(|r| r["payload"]["view"]["hitTest"] == true));
@@ -141,12 +142,40 @@ fn ordinary_gui_project_read_requests_cross_the_real_original_byte_boundary() {
     assert!(requests
         .iter()
         .any(|r| r["payload"]["view"]["contextId"] == "comp-a"));
-    for request in requests {
+    assert!(requests
+        .iter()
+        .any(|r| r["payload"]["subselect"]["center"] == true
+            && r["payload"]["subselect"]["atFrame"] == 10));
+    for (index, request) in requests.iter().enumerate() {
         let bytes = serde_json::to_vec(&request).unwrap();
         assert!(
             crate::wire::decode_native_request(&bytes).is_ok(),
             "{request}"
         );
+        let typed = crate::wire::decode_native_request(&bytes).unwrap();
+        let response: crate::contract::NativeApplicationResponse =
+            serde_json::from_value(fixture["responses"][index].clone()).unwrap();
+        let admitted_response = crate::wire::validate_native_response(&response, &typed);
+        assert!(
+            admitted_response.is_ok(),
+            "{request}: {admitted_response:?}"
+        );
+        if request["payload"]["view"]["hitTest"] == true {
+            for bad in [
+                json!([[0, 0]]),
+                json!([[0, 0], [0, 0], [1, "bad"]]),
+                Value::Null,
+            ] {
+                let mut invalid = response.clone();
+                invalid.result.as_mut().unwrap()["items"][0]["vertexOffsets"] = bad;
+                assert!(crate::wire::validate_native_response(&invalid, &typed).is_err());
+            }
+        }
+        if request["payload"]["subselect"].get("atFrame").is_some() {
+            let mut mismatch = response;
+            mismatch.result.as_mut().unwrap()["subselect"]["atFrame"] = json!(9);
+            assert!(crate::wire::validate_native_response(&mismatch, &typed).is_err());
+        }
     }
 }
 

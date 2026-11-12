@@ -934,6 +934,11 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "#2363/#2828: measured with cargo-llvm-cov 0.9.1 on the scoped semantic-order and ingress-control correction. Added only these two rows; all existing floors, totals, exclusions, tool and recorded provenance remain unchanged."
+    },
+    "nemo-mcp/src/native_layer_policy_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#2368: unchanged layer-policy tests moved to the repository sibling-test convention; measured with pinned cargo-llvm-cov 0.9.1. Both test names and all assertions preserved; all existing production floors and aggregate floors remain unchanged."
     }
   }
 }
