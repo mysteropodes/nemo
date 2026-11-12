@@ -1,0 +1,120 @@
+'use strict';
+// The two agent clients, run headless for #1049: `codex exec` and `claude -p`, each with a per-invocation MCP configuration that
+// points at the candidate package's own nemo-mcp and the isolated session's registry. Nothing here edits a user or project
+// client configuration, and no keyboard or mouse input exists on this route.
+//
+// What this module can say: which client binary and version ran, the exact command line, how it ended, and (informationally) the
+// tool calls its own event stream shows. It never says whether the workflow succeeded; the judge reads the application for that.
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { spawn, spawnSync } = require('node:child_process');
+
+const NAMES = Object.freeze(['codex', 'claude']);
+const LIMIT = 8 * 1024 * 1024;
+const digest = value => crypto.createHash('sha256').update(value).digest('hex');
+const scrubbedEnv = (env = process.env) => Object.fromEntries(Object.entries(env).filter(([k, v]) => !/^NEMO_/.test(k) && typeof v === 'string'));
+
+function onPath(command, env = process.env) {
+  for (const dir of String(env.PATH || '').split(path.delimiter).filter(Boolean)) {
+    const file = path.join(dir, command);
+    try { if (fs.statSync(file).isFile()) { fs.accessSync(file, fs.constants.X_OK); return file; } } catch { /* next entry */ }
+  }
+  return null;
+}
+
+// Name, version and bytes of the client that would run. `run` is injectable for tests.
+function probeClient(name, { env = process.env, run = spawnSync } = {}) {
+  if (!NAMES.includes(name)) throw new Error('unknown client');
+  const found = onPath(name, env);
+  if (!found) return { name, available: false, reason: name + ' is not installed (not on PATH)' };
+  const out = run(found, ['--version'], { env: scrubbedEnv(env), encoding: 'utf8', timeout: 30000 });
+  const text = String((out && out.stdout) || '').trim().split('\n')[0] || '';
+  const version = (text.match(/\d+\.\d+\.\d+[\w.-]*/) || [])[0];
+  if (!out || out.error || out.status !== 0 || !version) return { name, available: false, reason: name + ' did not report a version', path: found };
+  let real = found, bytes = null;
+  try { real = fs.realpathSync(found); bytes = digest(fs.readFileSync(real)); } catch { /* version and path still identify it */ }
+  return { name, available: true, version, versionText: text.slice(0, 120), path: found, realPath: real, sha256: bytes };
+}
+
+// The command line, the standard input (the exact prompt) and the private files for one invocation. Pure.
+function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, reportDir, maxTurns = 80 }) {
+  if (name === 'codex') {
+    const lastMessage = path.join(reportDir, 'codex.last-message.txt');
+    const set = (key, value) => ['-c', key + '=' + value];
+    return { command, input: prompt, cwd, lastMessage, files: {}, args: ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--cd', cwd,
+      ...set('approval_policy', '"never"'),
+      ...set('mcp_servers.nemo.command', JSON.stringify(mcpCommand)), ...set('mcp_servers.nemo.args', '[]'),
+      ...set('mcp_servers.nemo.env.NEMO_MCP_REGISTRY', JSON.stringify(mcpRegistry)),
+      ...set('mcp_servers.nemo.startup_timeout_sec', '60'), ...set('mcp_servers.nemo.tool_timeout_sec', '300'),
+      '--output-last-message', lastMessage, '-'] };
+  }
+  const config = path.join(reportDir, 'claude.mcp-config.json');
+  return { command, input: prompt, cwd, lastMessage: null,
+    files: { [config]: JSON.stringify({ mcpServers: { nemo: { command: mcpCommand, args: [], env: { NEMO_MCP_REGISTRY: mcpRegistry } } } }, null, 2) + '\n' },
+    args: ['-p', '--mcp-config', config, '--strict-mcp-config', '--tools', '', '--allowedTools', 'mcp__nemo__nemo_discover', 'mcp__nemo__nemo_command',
+      '--output-format', 'stream-json', '--verbose', '--max-turns', String(maxTurns), '--no-session-persistence'] };
+}
+
+// Run it. Resolves with how it ended; rejects never. `spawnImpl` is injectable for tests.
+function runClient(spec, { timeoutMs = 20 * 60 * 1000, env = process.env, spawnImpl = spawn } = {}) {
+  for (const [file, text] of Object.entries(spec.files || {})) fs.writeFileSync(file, text, { flag: 'wx', mode: 0o600 });
+  return new Promise(resolve => {
+    const started = Date.now();
+    const out = { stdout: [], stderr: [], size: 0, truncated: false };
+    let child, timedOut = false, settled = false;
+    const finish = result => { if (settled) return; settled = true; clearTimeout(timer); resolve({ ms: Date.now() - started, timedOut, truncated: out.truncated,
+      stdout: Buffer.concat(out.stdout).toString('utf8'), stderr: Buffer.concat(out.stderr).toString('utf8'), ...result }); };
+    const keep = which => chunk => { if (out.size + chunk.length > LIMIT) { out.truncated = true; return; } out.size += chunk.length; out[which].push(chunk); };
+    try { child = spawnImpl(spec.command, spec.args, { cwd: spec.cwd, env: scrubbedEnv(env), stdio: ['pipe', 'pipe', 'pipe'] }); }
+    catch (error) { return resolve({ ms: 0, spawnError: String(error.code || error.name), stdout: '', stderr: '', timedOut: false, truncated: false }); }
+    const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* gone */ } }, 5000).unref(); }, timeoutMs);
+    child.stdout.on('data', keep('stdout')); child.stderr.on('data', keep('stderr'));
+    child.on('error', error => finish({ spawnError: String(error.code || error.name) }));
+    child.on('close', (exitCode, signal) => finish({ exitCode, signal }));
+    child.stdin.on('error', () => {}); child.stdin.end(spec.input);
+  });
+}
+
+// Never a pass on its own: `unavailable` makes the half unrun; anything else is judged from the application's state.
+const AUTH = /not logged in|log ?in required|please (run )?\S*\s*(log ?in|auth)|unauthori[sz]ed|authentication|invalid (api )?key|api key|credentials|\b401\b|sign in/i;
+const QUOTA = /quota|rate.?limit|usage limit|limit reached|too many requests|\b429\b|insufficient|credit balance|billing|exceeded/i;
+const FLAGS = /unknown (option|argument|flag)|unexpected argument|unrecognized (option|argument)|invalid value for|no such option/i;
+function classify(result) {
+  if (result.spawnError) return { kind: 'unavailable', reason: 'the client could not be started (' + result.spawnError + ')' };
+  const text = (result.stderr + '\n' + result.stdout.slice(-20000));
+  if (result.exitCode !== 0 && !result.timedOut) {
+    if (AUTH.test(text)) return { kind: 'unavailable', reason: 'the client is not authenticated' };
+    if (QUOTA.test(text)) return { kind: 'unavailable', reason: 'the client is over its quota or rate limit' };
+    if (FLAGS.test(text)) return { kind: 'unavailable', reason: 'the client rejected the harness command line (flag mismatch with this client version)' };
+    return { kind: 'failed', reason: 'the client exited with status ' + result.exitCode };
+  }
+  return result.timedOut ? { kind: 'timeout', reason: 'the client did not finish within the time limit' } : { kind: 'ok', reason: null };
+}
+
+// Informational only: tool calls and application error codes the client's own event stream shows, and its last message.
+const CODES = ['stale_revision', 'wrong_document', 'wrong_instance', 'invalid_request', 'unavailable', 'unsupported_capability'];
+function trace(result, lastMessageFile) {
+  const calls = {}, codes = {};
+  let last = null;
+  const walk = value => {
+    if (Array.isArray(value)) return value.forEach(walk);
+    if (!value || typeof value !== 'object') return;
+    for (const key of ['name', 'tool']) {
+      const hit = typeof value[key] === 'string' ? value[key].match(/(nemo_(?:discover|command))$/) : null;
+      if (hit) calls[hit[1]] = (calls[hit[1]] || 0) + 1;
+    }
+    if (value.type === 'result' && typeof value.result === 'string') last = value.result;
+    Object.values(value).forEach(walk);
+  };
+  for (const line of result.stdout.split('\n')) {
+    if (!line.startsWith('{')) continue;
+    let event; try { event = JSON.parse(line); } catch { continue; }
+    walk(event);
+    for (const code of CODES) { const n = (line.match(new RegExp('\\\\?"code\\\\?":\\\\?"' + code + '\\\\?"', 'g')) || []).length; if (n) codes[code] = (codes[code] || 0) + n; }
+  }
+  if (lastMessageFile) { try { last = fs.readFileSync(lastMessageFile, 'utf8'); } catch { /* none written */ } }
+  return { informational: true, toolCalls: calls, errorCodesSeen: codes, lastMessage: last === null ? null : String(last).slice(0, 4000) };
+}
+
+module.exports = { NAMES, scrubbedEnv, onPath, probeClient, invocation, runClient, classify, trace, digest };

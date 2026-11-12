@@ -79,6 +79,43 @@ Most unit tests call the application API directly. MCP has protocol and parity s
 not the route for every test. UI wiring has independent interaction tests even when command
 handlers pass.
 
+## The installed candidate and the clients that test it
+
+"The installed Nemo" is never a name, a path, an app found in `/Applications`, or the newest package on disk. It is **one
+package**, identified by the items below, recorded together. An installed-app or MCP-client result that does not carry all of them
+does not count as installed or client evidence, and a package whose proof names another source head is evidence for that head only.
+
+| Item | What it is | Where it comes from |
+| --- | --- | --- |
+| Source head and tree | 40-hex commit and tree of the clean committed checkout under acceptance | `git rev-parse HEAD`, `HEAD^{tree}`; must equal `details.source.head` of the package proof, with `dirty: false` |
+| Build id | `<app version>:<source head>`, the whole string, no `-dirty` | the registry record of the running app and `buildId` in `nemo_discover` |
+| Executable SHA-256 | `Contents/MacOS/nemo` (the app) and `Contents/MacOS/nemo-mcp` (the bundled MCP) | `shasum -a 256` of the files that will run, equal to the `artifacts[]` entries of `build-proof.json` |
+| Client versions | per agent client: name, `--version` output, resolved path and SHA-256 of the binary, the exact prompt and command line | `codex --version`, `claude --version`; recorded by the harness |
+
+**How a fresh session finds the candidate.** It is the package built from the head being accepted: the clean checkout's head is
+named by the task or issue, and `npm run build:desktop` (run under `lockf -k /tmp/nemo-heavy-job.lock`, one build at a time)
+prints a report directory holding `Nemo.app` and its `build-proof.json` side by side. Do not rebuild to refresh a package, do not
+adopt a retained older package for a newer head, and do not infer anything from an app that merely launches. If no package with a
+passing proof for the head exists, say the candidate is unbound and stop; the orchestrator builds it.
+
+**Binding at run time.** The harness starts the package once in a fresh isolated session (`scripts/nemo/native.cjs`, data removed on
+stop) and refuses unless: the proof lists the app and the bundled `nemo-mcp` by those SHA-256 values and they match the files about
+to run; the registered build id is the one above; exactly one application is discovered and it is the registered instance; the OS
+listener on the registered port is the process the harness started; and, before and after every row, the head, the executable
+bytes and the pid are unchanged (`tests/desktop/installed-evidence/candidate.cjs`, shared by every runner of that folder).
+
+**Client routes.** A client reaches the candidate only through a configuration that exists for one invocation and names the
+package's own `nemo-mcp` and the isolated session's registry: Codex through `-c mcp_servers.nemo.command=...` and
+`-c mcp_servers.nemo.env.NEMO_MCP_REGISTRY=...`, Claude Code through `--mcp-config <file> --strict-mcp-config`. User, project and
+repository client configuration is never read or edited for this evidence, and a client cannot be pointed at a Nemo it was not
+given. The route sends no keyboard or mouse input.
+
+**What counts as a result.** The verdict comes from the harness's own reads of the application and from files the application wrote,
+taken after the client has exited; what the client says it did, and its tool trace, are recorded as information only. A client that
+is missing, unauthenticated or over quota makes its run **unrun**, with the reason, never a pass. The original opacity workflow
+(#1049) is run this way by `tests/desktop/installed-evidence/f03-clients.cjs`; its receipt records the identity above, per client
+name, version, binary SHA-256 and prompt, every assertion with observed and expected values, and what it cannot show.
+
 ## Fixture and regression rules
 
 - Every reproduced bug gains the smallest useful failing fixture before the fix when practical.

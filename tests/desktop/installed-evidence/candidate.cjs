@@ -120,6 +120,8 @@ async function openCandidate(config, deps = {}) {
     const work = fs.realpathSync(snapshot.runtime.roots.temp);
     return {
       client, work, bound, bind, cleanup,
+      // How another process (an agent client) reaches the very same endpoint: the bundled nemo-mcp and the isolated registry it reads.
+      mcpCommand: mcpBinary, mcpRegistry: fs.realpathSync(registry),
       // Same process, same checkout, same bytes, same registration: refused when anything differs from the start.
       async recheck() {
         check(identityLib.sourceIdentity().head === source.head && !identityLib.sourceIdentity().dirty, 'source changed during the run');

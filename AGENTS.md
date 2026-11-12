@@ -113,6 +113,8 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   are navigation aids.
 - For a persistent field or item type, verify every applicable consumer: save, load,
   undo/redo, selection, animation, render, export, and native bridges.
+- To identify the installed candidate (source head, build id, executable and bundled `nemo-mcp` SHA-256, client versions)
+  and how agent clients may reach it, follow [the installed-candidate rule](engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md#the-installed-candidate-and-the-clients-that-test-it).
 - Validate Tauri behavior for the current desktop milestone and browser behavior
   when its separately admitted R24 work begins. Compile success or a
   screenshot does not establish save/reload, timing, export, or packaged desktop behavior.
