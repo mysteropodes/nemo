@@ -13,6 +13,7 @@ const fs = require('node:fs'), path = require('node:path'), vm = require('node:v
 const Intent = require('../src/js/adapters/select-canvas-intent.js');
 const Overlay = require('../src/js/adapters/native-select-overlay.js');
 const Gesture = require('../src/js/adapters/native-select-gesture.js');
+const Pivot = require('../src/js/adapters/native-select-pivot.js');
 const Paper = require('./helpers/native-import-paper.cjs');
 
 const src = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
@@ -56,7 +57,7 @@ function harness(items) {
       pin = { ...pin, contentRevision: pin.contentRevision + 1, documentSnapshotId: 's' + (pin.contentRevision + 1) };
       return { status: 'applied' };
     } }) },
-    NemoSelectCanvasIntent: Intent, NemoNativeSelectOverlay: Overlay };
+    NemoSelectCanvasIntent: Intent, NemoNativeSelectOverlay: Overlay, NemoNativeSelectPivot: Pivot };
   root.NemoNativeSelectGesture = Gesture.bind(root);
   const intent = Intent.create({
     context: () => JSON.stringify([root.state.tool, root.state.activeLayerIdx, (root.selectedPaths || []).map((p) => p.data.strokeId)]),
@@ -127,6 +128,15 @@ test('commit: exactly ONE batch of one step (one revision, one undo entry) with 
   const g = harness([BIG]); await g.select(35, 35);
   g.press(...RING); g.drag(70, 40); await settle(); await g.release(70, 40); await settle();
   assert.deepEqual(M(g.batches[0].steps[0]), [0, -1, 1, 0, 0, 140], 'a quarter turn counter-clockwise (up) is R(-90deg)');
+});
+
+test('commit: a persisted custom pivot controls the rotate ring and its one matrix', async () => {
+  const h = harness([BIG]); await h.select(35, 35);
+  h.root.state.xformAnchorCustom = [30, 30];
+  h.press(60, 30); h.drag(30, 60); await settle(); await h.release(30, 60); await settle();
+  assert.equal(h.batches.length, 1);
+  assert.deepEqual(M(h.batches[0].steps[0]), [0, 1, -1, 0, 60, 0], 'R(90deg) about the custom point (30,30)');
+  assert.deepEqual(h.batches[0].steps.map((s) => s.reshape.stableTarget.strokeId), ['A']);
 });
 
 test('commit: a multi-item selection turns about the shared box centre and is still ONE batch', async () => {
@@ -264,11 +274,40 @@ test('the duplicate select-bridge rotate writer is retired while scale, skew, la
   assert.match(bridge, /mode = 'layer-multi-' \+ mlHit\.type/);
   assert.match(bridge, /mode = 'nv-rotate'/);
   assert.match(bridge, /NemoNativeSelectGesture\.bind\(window\)/, 'native Select remains the engine-on rotation owner');
+  assert.match(bridge, /nativePaperToolGesturePending = true/, 'engine-off presses are delegated to the Paper Tool event route');
+  assert.match(bridge, /NemoNativeSelectGesture\.paperTool\(window, 'cancel'\)/, 'capture loss cancels the delegated controller');
+  assert.match(bridge, /nativePaperRotateRingPress\(e\)/, 'only an actual native rotate ring is delegated to Paper Tool');
   assert.match(bridge, /Selection rotation requires the native gesture owner; this fallback cannot rotate selections\./, 'the legacy ring press has an explicit unavailable-authority notice');
-  assert.doesNotMatch(bridge.slice(bridge.indexOf('function nativePointerEvent'), bridge.indexOf('// Same handle-position math')), /hitTestHandles|screenToWorld|selectedPaths/, 'native owner handling never probes Paper selection state');
+  assert.doesNotMatch(bridge.slice(bridge.indexOf('function nativePointerEvent'), bridge.indexOf('// The engine-off Paper Tool entry')), /hitTestHandles|screenToWorld|selectedPaths/, 'native pointer handling itself never probes selection geometry');
+  assert.match(bridge, /O\.selectionContext\(window\) !== I\.pickContext\(window\)/, 'the Paper ring classifier checks the current selection context');
+  assert.match(bridge, /var paths = \(selectedPaths \|\| \[\]\)\.filter\(function \(p\) \{ return p && p\.data && p\.data\.nativeStableTarget; \}\)/, 'it only classifies native stable targets');
   assert.match(bridge, /if \(mode && !allowLegacySelectionEdit\(e, 'select'\)\) return;/);
   assert.match(bridge, /if \(\(mode \|\| draggingArc \|\| motionGesture\) && !allowLegacySelectionEdit\(e, 'select'\)\) return;/);
   assert.match(bridge, /if \(shouldIntercept\(\) && !allowLegacySelectionEdit\(e, 'select'\)\) return;/);
+  const tools = src('src/js/tools.js');
+  assert.doesNotMatch(tools, /_xform\.type\s*===\s*['"]rotate['"]|_xform\.startAngle|_xform\.lastAngle/, 'the Paper Tool rotate writer and its exclusive state are gone');
+  const toolDown = tools.slice(tools.indexOf('function onMouseDown'), tools.indexOf('function onMouseDrag'));
+  const refusal = toolDown.indexOf("showToast('Native Select rotation is unavailable right now.')");
+  assert.ok(refusal >= 0 && toolDown.indexOf('pushUndo();', refusal) > refusal, 'unavailable Paper fallback exits before the handle undo');
+  assert.match(tools, /G\.paperTool\(window,'down',event\.event/);
+  assert.match(tools, /paperTool\(window,'move',event\.event\)/);
+  assert.match(tools, /paperTool\(window,'up',event\.event\)/);
+});
+
+test('runtime: the real Paper Tool entry starts the shared adapter with its root, while click and non-rotate remain on the existing intent', async () => {
+  const h = harness([BIG]); await h.select(35, 35);
+  assert.deepEqual(h.ids(), ['A']);
+  assert.deepEqual(h.batches, [], 'the ordinary click uses the existing native intent and does not create a transform');
+  const e = (x, y) => ({ clientX: x, clientY: y, shiftKey: false, altKey: false });
+  assert.equal(Gesture.paperTool(h.root, 'down', e(...RING)), true);
+  Gesture.paperTool(h.root, 'move', e(...QUARTER)); await settle();
+  Gesture.paperTool(h.root, 'up', e(...QUARTER)); await settle();
+  assert.equal(h.batches.length, 1, 'Paper Tool and pointer intent use the same native one-batch lifecycle');
+  assert.deepEqual(M(h.batches[0].steps[0]), [0, 1, -1, 0, 140, 0]);
+  const bridge = src('src/js/select-bridge.js'), tools = src('src/js/tools.js');
+  assert.match(bridge, /function nativePaperRotateRingPress\(e\)[\s\S]*?hit\.type === 'rotate'/);
+  assert.match(bridge, /nativePointer\(\)\[method\]\(e\)/, 'non-rotate clicks and handles keep the native pointer intent route');
+  assert.match(tools, /G\.paperTool\(window,'down',event\.event,function\(\)\{return !nativePaperSelectOwner\(\);\}\)/, 'the actual Tool forwards root before event, preventing the old begin(root,e,abort) arity regression');
 });
 
 function bootSelect(cutover, opts = {}) {
@@ -280,7 +319,7 @@ function bootSelect(cutover, opts = {}) {
   context.multiLayerSelectionBox = () => null; context.multiLayerHit = () => null;
   context.paramShapeSelectionSingle = () => null; context.hitTestArc = () => opts.arc ? {} : null;
   context.showToast = (message) => calls.notices.push(message);
-  context.SMEngineBridge = { isEnabled: () => true, screenToWorld: () => { calls.world++; return [0, 0]; }, suspend() { calls.suspend++; } };
+  context.SMEngineBridge = { isEnabled: () => opts.engineEnabled !== false, screenToWorld: () => { calls.world++; return [0, 0]; }, suspend() { calls.suspend++; } };
   context.pushUndo = () => { calls.undo++; };
   context.ensureKeyframe = () => { calls.key++; };
   if (cutover !== undefined) context.NemoNativeOpacityCutover = cutover;

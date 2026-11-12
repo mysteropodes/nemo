@@ -473,7 +473,7 @@
 
   function allowLegacySelectionEdit(e,k){var c=window.NemoNativeOpacityCutover,b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{if(c!==undefined&&(!c||typeof c.blocksLegacy!=='function'||c.blocksLegacy()!==false)){if(e){e.stopImmediatePropagation();e.preventDefault();}return false;}a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){a=false;}if(!a&&e){e.stopImmediatePropagation();e.preventDefault();}return a;}
   function guardMenuItems(a){return a.map(function(i){if(i.action){var f=i.action;i.action=function(){if(allowLegacySelectionEdit(null,'select'))return f.apply(this,arguments);};}return i;});}
-  var nativePointerIntent = null, nativeLayersRef = null, nativeLayersEpoch = 0;
+  var nativePointerIntent = null, nativeLayersRef = null, nativeLayersEpoch = 0, nativePaperToolGesturePending = false;
   function nativePointer() {
     if (nativePointerIntent) return nativePointerIntent;
     nativePointerIntent = window.NemoSelectCanvasIntent.create({
@@ -533,6 +533,10 @@
     return nativePointerIntent;
   }
   function nativePointerEvent(method, e) {
+    if (nativePaperToolGesturePending) {
+      if (method === 'cancelEvent') { nativePaperToolGesturePending = false; if (window.NemoNativeSelectGesture) window.NemoNativeSelectGesture.paperTool(window, 'cancel'); return true; }
+      if (method === 'down' || method === 'move' || method === 'up') return false;
+    }
     if(window.NemoNativeCommentsUI&&NemoNativeCommentsUI.handle(window,method,e,nativePointerIntent&&nativePointerIntent.cancel))return true;
     if(window.NemoNativeTextToolDesktop&&window.NemoNativeTextToolDesktop.handle(window,method,e,nativePointerIntent&&nativePointerIntent.cancel))return true;
     if (nativePointerIntent && nativePointerIntent.snapshot()) {
@@ -545,12 +549,31 @@
       var c = window.NemoNativeOpacityCutover;
       if (c && typeof c.blocksLegacy === 'function' && c.blocksLegacy() === false) return false;
       if (state.tool === 'subselect') return true; // Direct Select owns its native controller (subselect-bridge, document capture): never consume its gesture
+      if (state.tool === 'select' && method === 'down' && !(window.SMEngineBridge && window.SMEngineBridge.isEnabled()) && nativePaperRotateRingPress(e)) { nativePaperToolGesturePending = true; return false; }
       nativePointer()[method](e);
     } catch (_) {
       if (method === 'down' && window.showToast) showToast('Native Select gestures are unavailable.');
       e.stopImmediatePropagation(); e.preventDefault();
     }
     return true;
+  }
+
+  // The engine-off Paper Tool entry is reserved only for a native rotate ring press. Selection, click and all other handles
+  // stay on the existing pointer intent, which owns picking and movement arbitration.
+  function nativePaperRotateRingPress(e) {
+    var I = window.NemoSelectCanvasIntent, O = window.NemoNativeSelectOverlay, G = window.NemoNativeSelectGesture, P = window.NemoNativeSelectPivot;
+    try {
+      if (e.button !== 0 || state.spaceDown || state.appMode === 'motion' || !I || !O || !G || !P || !I.objectProject(window) || O.selectionContext(window) !== I.pickContext(window)) return false;
+      var paths = (selectedPaths || []).filter(function (p) { return p && p.data && p.data.nativeStableTarget; });
+      if (!paths.length || paths.length !== selectedPaths.length) return false;
+      var shown = I.presentedState(window), box = O.boxOf(window, paths);
+      if (!shown || !box) return false;
+      var at = I.worldPoint(window, e.clientX, e.clientY, shown.pin, shown.presentation), next = I.worldPoint(window, e.clientX + 1, e.clientY, shown.pin, shown.presentation);
+      var wpp = Math.hypot(next.x - at.x, next.y - at.y) || at.perPixel, pivot = P.pointOf(window, box);
+      if (e.altKey && P.grabs(window, box, at, wpp)) return false;
+      var hit = G.hitHandle(box, at, wpp, pivot);
+      return !!hit && hit.type === 'rotate';
+    } catch (_) { return false; }
   }
 
   // Same handle-position math as buildTransformBoxItems() in
@@ -773,6 +796,7 @@
 
   var lastPt = null, motionGesture = false;
   function onDown(e) {
+    if (nativePaperToolGesturePending) return;
     // Right/middle-click never drives select/marquee/move/Motion-drag — a
     // pre-existing gap (no button check at all) that used to go unnoticed
     // since a right-click did nothing visible either way; surfaced once
@@ -1772,6 +1796,7 @@
   }
 
   function onMove(e) {
+    if (nativePaperToolGesturePending) return;
     if (state.appMode === 'motion' && window.SMMotion) {
       var w1 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
       // shiftKey travels with the point (2026-09, #802): Motion's own drags
@@ -2438,6 +2463,7 @@
   }
 
   function onUp(e) {
+    if (nativePaperToolGesturePending) { nativePaperToolGesturePending = false; return; }
     if ((mode || draggingArc || motionGesture) && !allowLegacySelectionEdit(e, 'select')) return;
     // See onDown's comment — clears _motionDrag if a motion handle/dot/
     // anchor drag was in progress; no-ops otherwise. Must run even though

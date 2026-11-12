@@ -425,6 +425,27 @@ mod select_transform {
     }
 
     #[test]
+    fn a_turn_maps_plain_stroke_and_ribbon_linked_fill_gradients_with_the_same_matrix() {
+        let turn = [0., 1., -1., 0., 100., 0.]; // clockwise quarter turn about (50,50)
+        let gradient = json!({"kind":"linear","from":[0,0],"to":[100,0],"stops":[{"offset":0,"color":"#ff0000ff"},{"offset":1,"color":"#0000ffff"}]});
+        let ext = json!({"fillGradient":gradient});
+        let mut plain = owner_of(&document(1, vec![closed(record_at("A", "L1", 0, ""), "s-a", SQUARE, ext)], None));
+        let response = send(&mut plain, "turn", batch(vec![reshape("s-a", turn)]));
+        assert_eq!(response["ok"], true, "{response}");
+        let stroke = at(&plain, "s-a");
+        assert_eq!((stroke["vectorExt"]["fillGradient"]["from"].clone(), stroke["vectorExt"]["fillGradient"]["to"].clone()),
+            (json!([100., 0.]), json!([100., 100.])), "the plain stroke gradient takes the rotation matrix");
+
+        let mut ribbon = ribbon_with_fill(json!({"linkedFillId":"lf","isLinkedFillCompanion":true,"fillGradient":gradient}));
+        let response = send(&mut ribbon, "turn", batch(vec![reshape("native-stroke:1:1", turn)]));
+        assert_eq!(response["ok"], true, "{response}");
+        let fill = at(&ribbon, "native-stroke:1:0");
+        assert_eq!((fill["vectorExt"]["fillGradient"]["from"].clone(), fill["vectorExt"]["fillGradient"]["to"].clone()),
+            (json!([100., 0.]), json!([100., 100.])), "the rebuilt linked fill gradient takes the same matrix");
+        assert_eq!(ribbon.history_depths(), (2, 0), "createMany plus one native batch is two history entries");
+    }
+
+    #[test]
     fn a_copy_step_after_a_transform_copies_the_step_it_named_not_one_the_expansion_shifted_onto_it() {
         let by_copy_doc = ribbon_with_fill(json!({"linkedFillId":"lf","isLinkedFillCompanion":true}));
         let by_record_doc = ribbon_with_fill(json!({"linkedFillId":"lf","isLinkedFillCompanion":true}));
