@@ -1,6 +1,6 @@
 //! Strict raw-client negatives and actual owner/lifecycle availability fences.
 use crate::application_mcp::{
-    object_client::{client_status, dispatch_raw, OPERATIONS},
+    object_client::{client_status, dispatch_raw, operations},
     object_client_tests::*,
 };
 use crate::{
@@ -216,19 +216,8 @@ fn actual_release_reinstall_changes_incarnation_and_never_replays_into_new_owner
     let receipt = install(&state);
     let status = client_status(&state).unwrap();
     assert_eq!(status["available"], true);
-    let operations = json!([
-        "query.document.object",
-        "command.document.object.fill.set",
-        "command.document.object.undo",
-        "command.document.object.redo",
-        "query.document.object.serialize",
-        "command.document.object.layer.visibility.set",
-        "command.document.object.project.settings.edit",
-        "command.document.object.layer.policy.edit",
-        "command.document.object.project.placement.edit",
-        "command.document.object.audio.track.edit",
-        "command.document.object.layer.cut"
-    ]);
+    // The generated allowlist, listed in sorted order, equals the flagged set.
+    let operations = json!(raw_client_flags(&declarations()).unwrap().keys().collect::<Vec<_>>());
     assert_eq!(status["operations"], operations);
     for flag in ["publicCapabilityAvailable", "mcpAvailable"] {
         assert_eq!(status[flag], true);
@@ -326,10 +315,10 @@ fn declarations() -> Vec<Value> {
 }
 fn raw_client_allowlist_drift(descriptors: &[Value]) -> Result<(), String> {
     let flags = raw_client_flags(descriptors)?;
-    let listed: std::collections::BTreeSet<_> = OPERATIONS.iter().copied().collect();
+    let listed: std::collections::BTreeSet<_> = operations().iter().copied().collect();
     let flagged: std::collections::BTreeSet<_> = flags.keys().map(String::as_str).collect();
-    if listed.len() != OPERATIONS.len() || listed != flagged {
-        return Err(format!("OPERATIONS {listed:?} != flagged {flagged:?}"));
+    if listed.len() != operations().len() || listed != flagged {
+        return Err(format!("generated allowlist {listed:?} != flagged {flagged:?}"));
     }
     Ok(())
 }
@@ -338,7 +327,7 @@ fn raw_client_allowlist_equals_the_capability_declared_rawclient_set() {
     let descriptors = declarations();
     raw_client_allowlist_drift(&descriptors).unwrap();
     let flags = raw_client_flags(&descriptors).unwrap();
-    for operation in OPERATIONS {
+    for &operation in operations() {
         let delta = flags[operation];
         // Reads never advance the revision; every command is one transaction.
         assert_eq!(delta, u64::from(operation.starts_with("command.")), "{operation}");
@@ -356,7 +345,7 @@ fn raw_client_host_operations_stay_out_of_the_public_registration() {
         for operation in descriptor["hostOperations"].as_array().into_iter().flatten() {
             host += 1;
             assert!(!registered.contains(&operation), "{operation}");
-            assert!(OPERATIONS.contains(&operation.as_str().unwrap()), "{operation}");
+            assert!(operations().contains(&operation.as_str().unwrap()), "{operation}");
         }
     }
     assert_eq!(host, 2);
@@ -364,8 +353,8 @@ fn raw_client_host_operations_stay_out_of_the_public_registration() {
 #[test]
 fn raw_client_allowlist_drift_is_caught_in_both_directions() {
     let real = declarations();
-    // Unflag one operation: OPERATIONS now lists an operation nothing declares.
-    for operation in OPERATIONS {
+    // Unflag one operation: the allowlist now lists an operation nothing declares.
+    for &operation in operations() {
         let mut unflagged = real.clone();
         for descriptor in &mut unflagged {
             if let Some(raw) = descriptor.get_mut("rawClient").and_then(Value::as_object_mut) {

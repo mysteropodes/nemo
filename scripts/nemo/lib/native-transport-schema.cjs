@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { ROOT } = require('./util.cjs');
+const rawClient = require('./capability-raw-client.cjs');
 
 const APP = 'engineering/application';
 const OUTPUT = `${APP}/native-transport-v2.schema.json`;
@@ -111,18 +112,23 @@ function assemble(root = ROOT) {
   return schema;
 }
 
+// Every generated output: the public aggregate and the Tauri raw-client allowlist
+// (#2363 CS1b), both derived from the capability-owned declarations/fragments.
+function outputs(root) {
+  return [[OUTPUT, json(assemble(root))], [rawClient.ARTIFACT, rawClient.generate(root)]];
+}
+
 function check(root = ROOT) {
   try {
-    const output = json(assemble(root));
-    demand(fs.readFileSync(path.join(root, OUTPUT), 'utf8') === output,
-      `${OUTPUT} is stale; run node scripts/nemo/lib/native-transport-schema.cjs --write`);
-    return { problems: [], summary: 'native v2 transport aggregate matches capability-owned fragments' };
+    for (const [name, output] of outputs(root)) {
+      demand(fs.readFileSync(path.join(root, name), 'utf8') === output,
+        `${name} is stale; run node scripts/nemo/lib/native-transport-schema.cjs --write`);
+    }
+    return { problems: [], summary: 'native v2 transport aggregate and raw-client allowlist match capability-owned inputs' };
   } catch (error) { return { problems: [error.message] }; }
 }
 
-function write(root = ROOT) {
-  const output = json(assemble(root)); // Validate everything before touching output.
-  const destination = path.join(root, OUTPUT);
+function publish(destination, output) {
   const temporary = `${destination}.${randomUUID()}.tmp`;
   let fd;
   let created = false;
@@ -137,6 +143,11 @@ function write(root = ROOT) {
     if (fd !== undefined) fs.closeSync(fd);
     if (created) fs.rmSync(temporary, { force: true });
   }
+}
+
+function write(root = ROOT) {
+  const generated = outputs(root); // Validate everything before touching any output.
+  for (const [name, output] of generated) publish(path.join(root, name), output);
 }
 
 if (require.main === module) {
