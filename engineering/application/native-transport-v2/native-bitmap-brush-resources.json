@@ -1,0 +1,46 @@
+{
+  "capability": "native.object.brush-resources",
+  "definitions": {},
+  "requests": [
+    {
+      "order": 104,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.brush.bitmap.publish"
+              },
+              "payload": {
+                "$ref": "native-bitmap-brush-resources-v1.schema.json#/$defs/Publish"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 105,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.brush.bitmap"
+              },
+              "payload": {
+                "$ref": "native-bitmap-brush-resources-v1.schema.json#/$defs/Query"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

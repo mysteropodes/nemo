@@ -1,0 +1,1001 @@
+{
+  "capability": "native.object.vector",
+  "definitions": {
+    "ObjectContextTarget": {
+      "order": 14,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contextId",
+          "frameScope",
+          "layerUid",
+          "strokeId"
+        ],
+        "properties": {
+          "contextId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+            "description": "#2256: the scene root or the id of a component context the document declares; the native owner refuses any other."
+          },
+          "frameScope": {
+            "$ref": "#/$defs/ObjectFrameScope"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "strokeId": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          }
+        }
+      }
+    },
+    "ObjectParamShapeSet": {
+      "order": 30,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "rect"
+              },
+              "tl": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              "tr": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              "br": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              "bl": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "ellipse"
+              },
+              "startAngle": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              "sweep": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              "innerRadius": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "star"
+              },
+              "pointCount": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              "innerRatio": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              "cornerRadius": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              }
+            }
+          }
+        ],
+        "description": "The declared parameters of a parameter set: the same kind the record holds, no box."
+      }
+    },
+    "ObjectVectorExt": {
+      "order": 31,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {
+          "pressure": {
+            "$ref": "#/$defs/ObjectVectorPressure"
+          },
+          "paramShape": {
+            "$ref": "#/$defs/ObjectParamShape"
+          },
+          "boxAngle": {
+            "$ref": "#/$defs/ObjectFiniteNumber"
+          },
+          "fillGradient": {
+            "$ref": "#/$defs/ObjectVectorFillGradient"
+          },
+          "fillTrace": {
+            "$ref": "#/$defs/ObjectFillTrace"
+          },
+          "isMask": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "maskMode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maskFeather": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "linkedFillId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "isLinkedFillCompanion": {
+            "type": "boolean"
+          },
+          "brushTexture": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "brushGroupId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "isBrushTextureCopy": {
+                "const": true
+              },
+              "brushTexturePreset": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "preTextureOpacity": {
+                "type": "number"
+              },
+              "preTextureStroke": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                  }
+                ]
+              },
+              "strokeSeed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295,
+                "description": "G16 option C: the anchor's stamping seed; native produces its dabs from it."
+              }
+            },
+            "not": {
+              "required": [
+                "isBrushTextureCopy",
+                "brushTexturePreset"
+              ]
+            },
+            "description": "G16: the baseline serP brush-texture members of an anchor (preset, group, hidden paint) or a dab (copy flag, group)."
+          },
+          "shadow": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "channelTag"
+            ],
+            "properties": {
+              "channelTag": {
+                "const": "shadow"
+              },
+              "shadowSwatchId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            }
+          },
+          "isFillShape": {
+            "const": true
+          },
+          "pointTypes": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 256,
+            "items": {
+              "enum": [
+                "corner",
+                "smooth",
+                "symmetric"
+              ]
+            },
+            "description": "Optional per-vertex point-type hint aligned with geometry.segments; absent means inferred from the handles. Never on a pressure ribbon."
+          },
+          "xformAnchorKey": {
+            "enum": [
+              "tl",
+              "tc",
+              "tr",
+              "ml",
+              "mc",
+              "mr",
+              "bl",
+              "bc",
+              "br"
+            ],
+            "description": "The Select rotate/scale pivot preset the artist last chose for this stroke; a stored xformAnchorCustom wins over it."
+          },
+          "xformAnchorCustom": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "description": "The Select rotate/scale pivot as a custom world point [x, y]."
+          }
+        },
+        "minProperties": 1,
+        "description": "Omitted when empty.",
+        "not": {
+          "required": [
+            "pressure",
+            "fillGradient"
+          ]
+        }
+      }
+    },
+    "ObjectVectorRecord": {
+      "order": 32,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "family",
+          "target",
+          "geometry",
+          "fill",
+          "vector"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "const": 1
+          },
+          "family": {
+            "const": "editable-vector-path"
+          },
+          "target": {
+            "$ref": "#/$defs/ObjectContextTarget"
+          },
+          "geometry": {
+            "$ref": "#/$defs/ObjectVectorGeometry"
+          },
+          "fill": {
+            "$ref": "#/$defs/ObjectVectorFill"
+          },
+          "vector": {
+            "$ref": "#/$defs/ObjectVectorBody"
+          },
+          "vectorExt": {
+            "$ref": "#/$defs/ObjectVectorExt"
+          }
+        },
+        "description": "An editable open or closed vector path as the object read returns it."
+      }
+    },
+    "ObjectVectorCreateTarget": {
+      "order": 33,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contextId",
+          "frameScope",
+          "layerUid",
+          "strokeId"
+        ],
+        "properties": {
+          "contextId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+            "description": "#2256: the scene root or the id of a component context the document declares; the native owner refuses any other."
+          },
+          "frameScope": {
+            "$ref": "#/$defs/ObjectFrameScope"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "strokeId": {
+            "const": ""
+          }
+        },
+        "description": "A created record names no stroke id: the owner allocates native-stroke:{revision}:{n}."
+      }
+    },
+    "ObjectVectorCreateRecord": {
+      "order": 34,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "family",
+          "target",
+          "geometry",
+          "fill",
+          "vector"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "const": 1
+          },
+          "family": {
+            "const": "editable-vector-path"
+          },
+          "target": {
+            "$ref": "#/$defs/ObjectVectorCreateTarget"
+          },
+          "geometry": {
+            "$ref": "#/$defs/ObjectVectorGeometry"
+          },
+          "fill": {
+            "$ref": "#/$defs/ObjectVectorFill"
+          },
+          "vector": {
+            "$ref": "#/$defs/ObjectVectorBody"
+          },
+          "vectorExt": {
+            "$ref": "#/$defs/ObjectVectorExt"
+          }
+        },
+        "description": "The record of a vector create."
+      }
+    },
+    "ObjectVectorTrimClip": {
+      "order": 35,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "axis",
+          "mirrors"
+        ],
+        "properties": {
+          "axis": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "number"
+            },
+            "description": "The mirror axis [x1, y1, x2, y2] in document pixels."
+          },
+          "mirrors": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "description": "[drawn, mirror] pairs of indices into the create's records (or a batch's create steps), each index used once."
+          }
+        },
+        "description": "#2361: the stop-at-axis clip a mirror takes AFTER Trim Stroke Ends (baseline clipPathAtAxis after trimStrokeEnds): the cut is measured on the whole stroke, then the drawn path is clipped at its first anchor on the far side of the axis, and the mirror copy to the same anchors; a pressure-ribbon copy with a linked fill is rebuilt from its whole centreline and kept whole. Valid only beside trimEnds. A stroke left with fewer than two anchors refuses the create."
+      }
+    },
+    "ObjectVectorCreatePayload": {
+      "order": 36,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "record"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.vector.create"
+          },
+          "record": {
+            "$ref": "#/$defs/ObjectVectorCreateRecord"
+          },
+          "placement": {
+            "enum": [
+              "front",
+              "behind"
+            ],
+            "description": "Optional (absent = front). G15: behind enters under the layer's existing artwork of the frame (baseline drawMode 'behind')."
+          },
+          "trimEnds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Optional (absent = no trim). Baseline trimStrokeEndsMax: cut the new open stroke's head/tail back to its first/last crossing with the layer's paths in the frame when the overshoot is at most this; symmetry copies share the cuts."
+          },
+          "trimClip": {
+            "$ref": "#/$defs/ObjectVectorTrimClip"
+          },
+          "keyframe": {
+            "const": "copy",
+            "description": "Optional (absent = the Draw/Pen/shape empty key). A held or unexposed target cell becomes a key holding a copy of what it showed (the Labs creators' ensureKeyframe())."
+          }
+        }
+      }
+    },
+    "ObjectVectorCreateManyPayload": {
+      "order": 37,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "records"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.vector.createMany"
+          },
+          "records": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/$defs/ObjectVectorCreateRecord"
+            }
+          },
+          "placement": {
+            "enum": [
+              "front",
+              "behind"
+            ],
+            "description": "Optional (absent = front). G15: behind enters under the layer's existing artwork of the frame (baseline drawMode 'behind')."
+          },
+          "trimEnds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Optional (absent = no trim). Baseline trimStrokeEndsMax: cut the new open stroke's head/tail back to its first/last crossing with the layer's paths in the frame when the overshoot is at most this; symmetry copies share the cuts."
+          },
+          "trimClip": {
+            "$ref": "#/$defs/ObjectVectorTrimClip"
+          },
+          "keyframe": {
+            "const": "copy",
+            "description": "Optional (absent = the Draw/Pen/shape empty key). A held or unexposed target cell becomes a key holding a copy of what it showed (the Labs creators' ensureKeyframe())."
+          }
+        },
+        "description": "G23: 2 to 32 creates on one layer and frame as one revision and one undo entry (symmetry copies); owner-allocated ids in order."
+      }
+    },
+    "ObjectVectorReplacePayload": {
+      "order": 38,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "record"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.vector.replace"
+          },
+          "record": {
+            "$ref": "#/$defs/ObjectVectorRecord"
+          }
+        },
+        "description": "Replaces the record with the same full target in place; an authored frame only."
+      }
+    },
+    "ObjectVectorDeletePayload": {
+      "order": 39,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "stableTarget"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.vector.delete"
+          },
+          "stableTarget": {
+            "$ref": "#/$defs/ObjectContextTarget"
+          }
+        }
+      }
+    },
+    "ObjectVectorMaskEdit": {
+      "order": 40,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "mode"
+            ],
+            "properties": {
+              "kind": {
+                "const": "mode"
+              },
+              "mode": {
+                "enum": [
+                  "add",
+                  "subtract",
+                  "intersect"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "value"
+            ],
+            "properties": {
+              "kind": {
+                "const": "feather"
+              },
+              "value": {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "unset"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectVectorMaskPayload": {
+      "order": 41,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "stableTarget",
+          "maskEdit"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.vector.mask.edit"
+          },
+          "stableTarget": {
+            "$ref": "#/$defs/ObjectContextTarget"
+          },
+          "maskEdit": {
+            "$ref": "#/$defs/ObjectVectorMaskEdit"
+          }
+        },
+        "description": "Original Path mask metadata: selected mode/unset or same-frame layer-shared feather; authored geometry and paint remain unchanged."
+      }
+    },
+    "ObjectVectorBatchPayload": {
+      "order": 42,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "ops"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.vector.batch"
+          },
+          "ops": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "record"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "create"
+                    },
+                    "record": {
+                      "$ref": "#/$defs/ObjectVectorCreateRecord"
+                    },
+                    "placement": {
+                      "enum": [
+                        "front",
+                        "behind"
+                      ]
+                    },
+                    "keyframe": {
+                      "const": "copy"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "record"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "replace"
+                    },
+                    "record": {
+                      "$ref": "#/$defs/ObjectVectorRecord"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "stableTarget"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "delete"
+                    },
+                    "stableTarget": {
+                      "$ref": "#/$defs/ObjectContextTarget"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "op",
+                    "stableTarget",
+                    "placement"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "order"
+                    },
+                    "stableTarget": {
+                      "$ref": "#/$defs/ObjectContextTarget"
+                    },
+                    "placement": {
+                      "enum": [
+                        "front",
+                        "back"
+                      ],
+                      "description": "#2372 Bring to front / Send to back: the named record or stored item goes to this end of its layer's stack in its cell, with a ribbon's linked fill and a texture anchor's dabs."
+                    },
+                    "frame": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The cell the step edits (the held cell a copy key has just made); absent: the target's own frame."
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "keyframe": {
+            "const": "copy"
+          },
+          "trimEnds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Optional, create steps only. Baseline trimStrokeEndsMax: the first create is cut against its own cell and every other create (symmetry copies, Labs multi-frame stamps) takes the same cut."
+          },
+          "trimClip": {
+            "$ref": "#/$defs/ObjectVectorTrimClip"
+          },
+          "skipUnavailable": {
+            "type": "boolean",
+            "description": "Optional (absent or false = atomic: any step the engine refuses refuses the whole batch with nothing written). true lets restyle steps the engine cannot do (a texture anchor the edit would unhide) be skipped while the rest apply; the receipt then reports skippedSteps. A batch whose every step is skipped is still refused."
+          }
+        },
+        "description": "#2361/#2362: 1..64 ordered create/replace/delete/order steps on the layers of ONE context, the scene root or a declared component (one or, for a Select spanning layers, several; a trimEnds batch is one layer) as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
+      }
+    },
+    "ObjectVectorEditPayload": {
+      "order": 43,
+      "schema": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/ObjectVectorCreatePayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectVectorCreateManyPayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectVectorReplacePayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectVectorDeletePayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectVectorMaskPayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectVectorBatchPayload"
+          }
+        ],
+        "description": "Vector create, replace, delete or original Path mask metadata edit. The complete original UTF-8 request envelope is bounded at 65536 bytes, never split or truncated. Other operations and all replies retain their 4096-byte bounds."
+      }
+    },
+    "ObjectParametricSetPayload": {
+      "order": 44,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "stableTarget",
+          "paramShape"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.parametric.set"
+          },
+          "stableTarget": {
+            "$ref": "#/$defs/ObjectTarget"
+          },
+          "paramShape": {
+            "$ref": "#/$defs/ObjectParamShapeSet"
+          }
+        }
+      }
+    },
+    "ObjectParametricTranslatePayload": {
+      "order": 45,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "stableTarget",
+          "delta"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.parametric.translate"
+          },
+          "stableTarget": {
+            "$ref": "#/$defs/ObjectTarget"
+          },
+          "delta": {
+            "$ref": "#/$defs/ObjectVectorPair"
+          }
+        }
+      }
+    },
+    "ObjectParametricScalePayload": {
+      "order": 46,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "stableTarget",
+          "scale",
+          "anchor"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.parametric.scale"
+          },
+          "stableTarget": {
+            "$ref": "#/$defs/ObjectTarget"
+          },
+          "scale": {
+            "$ref": "#/$defs/ObjectVectorPair"
+          },
+          "anchor": {
+            "$ref": "#/$defs/ObjectVectorPair"
+          }
+        }
+      }
+    },
+    "ObjectParametricPayload": {
+      "order": 47,
+      "schema": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/ObjectParametricSetPayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectParametricTranslatePayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectParametricScalePayload"
+          }
+        ]
+      }
+    },
+    "ObjectPathFxEntry": {
+      "order": 48,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "zigzag",
+              "roughen"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "p1": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "p2": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "p3": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ObjectFiniteNumber"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "description": "enabled is absent, true or false; p1..p3 are absent, null or numbers, all kept as sent."
+      }
+    },
+    "ObjectPathEffectsPayload": {
+      "order": 49,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "stack"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.path.effects.set"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "stack": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ObjectPathFxEntry"
+            }
+          }
+        },
+        "description": "The COMPLETE new ordered effect stack of one layer. Storage order is evaluation order; an empty stack is an authored empty stack."
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 112,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.vector.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectVectorEditPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 113,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.parametric.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectParametricPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 114,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.path.effects.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectPathEffectsPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

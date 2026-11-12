@@ -1,0 +1,193 @@
+{
+  "capability": "native.object.layer-lifecycle",
+  "definitions": {
+    "ObjectLayerDeletePayload": {
+      "order": 128,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "selection"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.delete"
+          },
+          "selection": {
+            "$ref": "#/$defs/ObjectLayerSelection"
+          }
+        }
+      }
+    },
+    "ObjectLayerDuplicatePayload": {
+      "order": 129,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.duplicate"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          }
+        }
+      }
+    },
+    "ObjectLayerRenamePayload": {
+      "order": 130,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "name"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.layer.rename"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ObjectLayerReorderPayload": {
+      "order": 131,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUids",
+          "gap",
+          "selection"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.reorder"
+          },
+          "layerUids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1024,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/ObjectOpaqueId"
+            }
+          },
+          "gap": {
+            "type": "number"
+          },
+          "selection": {
+            "$ref": "#/$defs/ObjectLayerSelection"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 30,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.delete"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerDeletePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 31,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.duplicate"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerDuplicatePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 32,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.rename"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerRenamePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 33,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.reorder"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerReorderPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

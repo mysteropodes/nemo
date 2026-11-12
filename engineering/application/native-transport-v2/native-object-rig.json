@@ -1,0 +1,642 @@
+{
+  "capability": "native.object.rig",
+  "definitions": {
+    "ObjectRigSegment": {
+      "order": 73,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "point",
+          "handleIn",
+          "handleOut"
+        ],
+        "properties": {
+          "point": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "handleIn": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "handleOut": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
+    },
+    "ObjectRigTarget": {
+      "order": 74,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "strokeId": {
+            "$ref": "#/$defs/ObjectRigId"
+          },
+          "meshId": {
+            "$ref": "#/$defs/ObjectRigId"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "strokeId"
+            ]
+          },
+          {
+            "required": [
+              "meshId"
+            ]
+          }
+        ]
+      }
+    },
+    "ObjectRigRef": {
+      "order": 75,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "boneId",
+          "vi"
+        ],
+        "properties": {
+          "boneId": {
+            "$ref": "#/$defs/ObjectRigId"
+          },
+          "vi": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ObjectRigAction": {
+      "order": 76,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "segments",
+              "closed"
+            ],
+            "properties": {
+              "kind": {
+                "const": "drawBone"
+              },
+              "segments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ObjectRigSegment"
+                },
+                "minItems": 2,
+                "maxItems": 256
+              },
+              "closed": {
+                "type": "boolean"
+              },
+              "boneId": {
+                "$ref": "#/$defs/ObjectRigId"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "boneId",
+              "vi",
+              "part",
+              "to"
+            ],
+            "properties": {
+              "kind": {
+                "const": "moveSegment"
+              },
+              "boneId": {
+                "$ref": "#/$defs/ObjectRigId"
+              },
+              "vi": {
+                "$ref": "#/$defs/ObjectFrame"
+              },
+              "part": {
+                "enum": [
+                  "point",
+                  "handleIn",
+                  "handleOut"
+                ]
+              },
+              "to": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000000,
+                  "maximum": 1000000000
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "breakTangent": {
+                "type": "boolean"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "boneId",
+              "radius"
+            ],
+            "properties": {
+              "kind": {
+                "const": "setBoneRadius"
+              },
+              "boneId": {
+                "$ref": "#/$defs/ObjectRigId"
+              },
+              "radius": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "strokeId",
+              "frame"
+            ],
+            "properties": {
+              "kind": {
+                "const": "bindStroke"
+              },
+              "strokeId": {
+                "$ref": "#/$defs/ObjectRigId"
+              },
+              "frame": {
+                "$ref": "#/$defs/ObjectFrame"
+              },
+              "boneIds": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ObjectRigId"
+                }
+              },
+              "radius": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "rotate": {
+                "type": "boolean"
+              },
+              "softness": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "meshId"
+            ],
+            "properties": {
+              "kind": {
+                "const": "bindMesh"
+              },
+              "meshId": {
+                "$ref": "#/$defs/ObjectRigId"
+              },
+              "frame": {
+                "$ref": "#/$defs/ObjectFrame"
+              },
+              "boneIds": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ObjectRigId"
+                }
+              },
+              "radius": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "rotate": {
+                "type": "boolean"
+              },
+              "softness": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "frame"
+            ],
+            "properties": {
+              "kind": {
+                "const": "autoAssign"
+              },
+              "frame": {
+                "$ref": "#/$defs/ObjectFrame"
+              },
+              "defaultRadius": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "rotate": {
+                "type": "boolean"
+              },
+              "softness": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              },
+              "paths": {
+                "type": "boolean"
+              },
+              "meshes": {
+                "type": "boolean"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "target",
+              "vertex",
+              "entry",
+              "percent"
+            ],
+            "properties": {
+              "kind": {
+                "const": "setWeight"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectRigTarget"
+              },
+              "vertex": {
+                "$ref": "#/$defs/ObjectFrame"
+              },
+              "entry": {
+                "$ref": "#/$defs/ObjectFrame"
+              },
+              "percent": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "target",
+              "vertex",
+              "boneId"
+            ],
+            "properties": {
+              "kind": {
+                "const": "addWeight"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectRigTarget"
+              },
+              "vertex": {
+                "$ref": "#/$defs/ObjectFrame"
+              },
+              "boneId": {
+                "$ref": "#/$defs/ObjectRigId"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "target",
+              "vertex",
+              "entry"
+            ],
+            "properties": {
+              "kind": {
+                "const": "removeWeight"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectRigTarget"
+              },
+              "vertex": {
+                "$ref": "#/$defs/ObjectFrame"
+              },
+              "entry": {
+                "$ref": "#/$defs/ObjectFrame"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "target",
+              "vertex"
+            ],
+            "properties": {
+              "kind": {
+                "const": "resetWeights"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectRigTarget"
+              },
+              "vertex": {
+                "$ref": "#/$defs/ObjectFrame"
+              },
+              "radius": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "softness": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "root",
+              "joint",
+              "end"
+            ],
+            "properties": {
+              "kind": {
+                "const": "setIk"
+              },
+              "root": {
+                "$ref": "#/$defs/ObjectRigRef"
+              },
+              "joint": {
+                "$ref": "#/$defs/ObjectRigRef"
+              },
+              "end": {
+                "$ref": "#/$defs/ObjectRigRef"
+              },
+              "flip": {
+                "type": "boolean"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "end",
+              "to"
+            ],
+            "properties": {
+              "kind": {
+                "const": "dragIk"
+              },
+              "end": {
+                "$ref": "#/$defs/ObjectRigRef"
+              },
+              "to": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000000,
+                  "maximum": 1000000000
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "description": "#2255: the Alt-drag of a chain end (baseline rig-bridge.js onDown/onMove). `end` must be the far end of a two-bone chain (invalid_request otherwise): the chain is filed with flip false and the lengths of the live pose, ONE solve toward `to` writes the joint, the end and the coincident near vertex of the end bone. One revision and one history entry."
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "endKey"
+            ],
+            "properties": {
+              "kind": {
+                "const": "removeIk"
+              },
+              "endKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "boneId"
+            ],
+            "properties": {
+              "kind": {
+                "const": "removeBone"
+              },
+              "boneId": {
+                "$ref": "#/$defs/ObjectRigId"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "target"
+            ],
+            "properties": {
+              "kind": {
+                "const": "removeBind"
+              },
+              "target": {
+                "$ref": "#/$defs/ObjectRigTarget"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectRigPoseAction": {
+      "order": 77,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "reset"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "frame"
+            ],
+            "properties": {
+              "kind": {
+                "const": "commit"
+              },
+              "frame": {
+                "$ref": "#/$defs/ObjectFrame"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectRigEditPayload": {
+      "order": 87,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "action"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.rig.edit"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectRigId"
+          },
+          "action": {
+            "$ref": "#/$defs/ObjectRigAction"
+          }
+        }
+      }
+    },
+    "ObjectRigPosePayload": {
+      "order": 88,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "action"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.rig.pose"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectRigId"
+          },
+          "action": {
+            "$ref": "#/$defs/ObjectRigPoseAction"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 55,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.rig.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectRigEditPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 56,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.rig.pose"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectRigPosePayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

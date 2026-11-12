@@ -1,0 +1,268 @@
+{
+  "capability": "native.project-comments",
+  "definitions": {
+    "ObjectProjectCommentDraft": {
+      "order": 330,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "x",
+          "y",
+          "frame",
+          "text",
+          "createdAt",
+          "resolved"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "frame": {
+            "type": "number"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "authorName": {
+            "type": "string"
+          },
+          "authorColor": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "pattern": "[^\\u0009-\\u000d\\u0020\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "resolved": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "ObjectProjectCommentsSelector": {
+      "order": 331,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "settings"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "ordinal"
+            ],
+            "properties": {
+              "kind": {
+                "const": "record"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "commentsPage"
+              },
+              "cursor": {
+                "$ref": "#/$defs/Revision"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectCommentsEditAction": {
+      "order": 332,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "comment"
+            ],
+            "properties": {
+              "kind": {
+                "const": "append"
+              },
+              "comment": {
+                "$ref": "#/$defs/ObjectProjectCommentDraft"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "ordinal",
+              "text",
+              "resolved"
+            ],
+            "properties": {
+              "kind": {
+                "const": "update"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "text": {
+                "type": "string"
+              },
+              "resolved": {
+                "type": "boolean"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "ordinal"
+            ],
+            "properties": {
+              "kind": {
+                "const": "delete"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        ]
+      }
+    },
+    "ObjectProjectCommentsEditPayload": {
+      "order": 333,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "action"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.project.comments.edit"
+          },
+          "action": {
+            "$ref": "#/$defs/ObjectProjectCommentsEditAction"
+          }
+        }
+      }
+    },
+    "ObjectProjectCommentsReadPayload": {
+      "order": 334,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "contextId",
+          "selector"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "contextId": {
+            "const": "scene-root"
+          },
+          "selector": {
+            "$ref": "#/$defs/ObjectProjectCommentsSelector"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 143,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.project.comments.read"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectCommentsReadPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 144,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.project.comments.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectCommentsEditPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

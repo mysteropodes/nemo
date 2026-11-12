@@ -1,0 +1,192 @@
+{
+  "capability": "native.object.boolean",
+  "definitions": {
+    "ObjectBooleanApplyPayload": {
+      "order": 142,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "mode",
+          "layerUid",
+          "contextId",
+          "frame",
+          "strokeIds"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.boolean.apply"
+          },
+          "mode": {
+            "enum": [
+              "unite",
+              "subtract",
+              "intersect",
+              "exclude"
+            ]
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "frame": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "strokeIds": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 1024,
+            "items": {
+              "$ref": "#/$defs/ObjectEditId"
+            }
+          }
+        }
+      }
+    },
+    "ObjectBooleanErasePayload": {
+      "order": 143,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "contextId",
+          "frame",
+          "strokeId",
+          "footprint"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.boolean.erase"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "frame": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "strokeId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "footprint": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 1024,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "joinHistory": {
+            "type": "boolean",
+            "description": "A bite after the first of one eraser drag: the revision advances but the undo entry the drag began grows to end at it (historyEntriesAdded 0). Refused unavailable when no such entry is on top of the undo stack."
+          }
+        }
+      }
+    },
+    "ObjectBooleanFlattenPayload": {
+      "order": 144,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "contextId",
+          "frame",
+          "groupId"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.boolean.flatten"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectEditId"
+          },
+          "frame": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "groupId": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 44,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.boolean.apply"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectBooleanApplyPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 45,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.boolean.erase"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectBooleanErasePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 46,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.boolean.flatten"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectBooleanFlattenPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

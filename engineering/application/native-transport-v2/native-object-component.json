@@ -1,0 +1,378 @@
+{
+  "capability": "native.object.component",
+  "definitions": {
+    "ObjectComponentConvertPayload": {
+      "order": 115,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "contextId",
+          "layerUids"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.component.convert"
+          },
+          "contextId": {
+            "type": "string"
+          },
+          "layerUids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "items": {
+              "$ref": "#/$defs/ObjectComponentId"
+            }
+          }
+        }
+      }
+    },
+    "ObjectComponentBreakApartPayload": {
+      "order": 116,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "contextId",
+          "layerUid"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.component.breakApart"
+          },
+          "contextId": {
+            "type": "string"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectComponentId"
+          }
+        }
+      }
+    },
+    "ObjectComponentStateEditPayload": {
+      "order": 117,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "contextId",
+          "kind"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.component.state.edit"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectComponentId"
+          },
+          "kind": {
+            "enum": [
+              "setCameraKey",
+              "removeCameraKey",
+              "setCameraEase",
+              "clearCamera",
+              "addMarker",
+              "updateMarker",
+              "removeMarker",
+              "clearMarkers"
+            ]
+          },
+          "frame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "w": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "rot": {
+            "type": "number"
+          },
+          "hOut": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "hIn": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "ease": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 4,
+            "maxItems": 4,
+            "description": "Cubic-bezier handles x1,y1,x2,y2 of the segment leaving the key; x1 and x2 lie in 0..1."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "color": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "newFrame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        },
+        "description": "One closed edit of the camera keys or the markers a declared component stores (contextId is the component symbol id, never scene-root). setCameraKey needs frame and, for a new key, x, y and w; removeCameraKey, removeMarker need frame; setCameraEase needs frame and ease; addMarker needs frame (name and color optional); updateMarker needs frame and any of newFrame, name, color; clearCamera and clearMarkers take no other member."
+      }
+    },
+    "ObjectComponentExposePayload": {
+      "order": 118,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "symbolId",
+          "key",
+          "targetStrokeId",
+          "targetField",
+          "label"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.component.expose"
+          },
+          "symbolId": {
+            "$ref": "#/$defs/ObjectComponentId"
+          },
+          "key": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 128,
+            "pattern": "^ep_"
+          },
+          "targetStrokeId": {
+            "$ref": "#/$defs/ObjectComponentId"
+          },
+          "targetField": {
+            "$ref": "#/$defs/ObjectComponentId"
+          },
+          "label": {
+            "type": "string"
+          },
+          "default": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "ObjectComponentPlacePayload": {
+      "order": 119,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "symbolId",
+          "name"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.component.place"
+          },
+          "symbolId": {
+            "$ref": "#/$defs/ObjectComponentId"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ObjectComponentInstanceSetPayload": {
+      "order": 120,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.component.instance.set"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectComponentId"
+          },
+          "mode": {
+            "enum": [
+              "loop",
+              "once",
+              "pingpong",
+              "single"
+            ]
+          },
+          "singleFrame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "placedAt": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "speed": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "atFrame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 20,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.component.convert"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectComponentConvertPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 21,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.component.expose"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectComponentExposePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 22,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.component.place"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectComponentPlacePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 23,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.component.instance.set"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectComponentInstanceSetPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 24,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.component.breakApart"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectComponentBreakApartPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 25,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.component.state.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectComponentStateEditPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,196 @@
+{
+  "capability": "native.project-workspace",
+  "definitions": {
+    "ObjectProjectWorkspaceCaptureValue": {
+      "order": 316,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "layerPanelWidth",
+          "toolsPanelWidth",
+          "propsPanelWidth",
+          "propsPanelCollapsed",
+          "timelineHeight",
+          "panelOrder"
+        ],
+        "properties": {
+          "layerPanelWidth": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "toolsPanelWidth": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "propsPanelWidth": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timelineHeight": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "motionColumns": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "toolsDock": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "propsPanelCollapsed": {
+            "type": "boolean"
+          },
+          "panelOrder": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ObjectProjectWorkspaceEditAction": {
+      "order": 317,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "workspace"
+        ],
+        "properties": {
+          "kind": {
+            "const": "capture"
+          },
+          "workspace": {
+            "$ref": "#/$defs/ObjectProjectWorkspaceCaptureValue"
+          }
+        }
+      }
+    },
+    "ObjectProjectWorkspaceSelector": {
+      "order": 318,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "const": "record"
+          }
+        }
+      }
+    },
+    "ObjectProjectWorkspaceEditPayload": {
+      "order": 319,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "action"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.project.workspace.edit"
+          },
+          "action": {
+            "$ref": "#/$defs/ObjectProjectWorkspaceEditAction"
+          }
+        }
+      }
+    },
+    "ObjectProjectWorkspaceReadPayload": {
+      "order": 320,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "contextId",
+          "selector"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "contextId": {
+            "const": "scene-root"
+          },
+          "selector": {
+            "$ref": "#/$defs/ObjectProjectWorkspaceSelector"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 139,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object.project.workspace.read"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectWorkspaceReadPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 140,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.project.workspace.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectProjectWorkspaceEditPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

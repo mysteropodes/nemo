@@ -33,6 +33,7 @@ const crypto = require('node:crypto');
 const { ROOT, exists } = require('./util.cjs');
 const { validate, eachSchemaExample, collectDefs, deepDiff } = require('./capability-schema.cjs');
 const raw = require('./capability-raw-client.cjs');
+const transportSchema = require('./native-transport-schema.cjs');
 const { STATUS } = require('./receipt.cjs');
 
 // Every schema whose embedded examples must hold. value-contract-v1 carries
@@ -324,7 +325,7 @@ function checkNativeCatalog(root) {
   const p = paths(root);
   const files = nativeDescriptorFiles(root);
   if (!files.length) return fail(`no native declarations in ${rel(p.nativeCaps, root)}`);
-  const problems = [], ids = new Map(), ops = new Map();
+  const problems = transportSchema.check(root).problems, ids = new Map(), ops = new Map();
   for (const f of files) {
     const name = rel(f, root);
     let d;
