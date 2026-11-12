@@ -291,6 +291,7 @@ function legacySession({ world, directory = world.dir, reader = stubReader({ dir
     requestEvidence: async request => world.operator(request),
     input: async command => {
       if (command !== 'observe') throw new Error('unexpected helper command ' + command);
+      if (world.faults.observeUnavailableAt === world.phase) throw new Error('accessibility read unavailable');
       if (world.faults.toastHidden) return { status: 'ok', nodes: [] };
       const nodes = [{ role: 'AXStaticText', labels: [], value: world.toast }];
       if (world.dialog && !world.faults.dialogHidden) nodes.push({ role: 'AXSheet', labels: [], identifiers: { resolved: '' } }, { role: 'AXButton', labels: ['Cancel'] }, { role: 'AXButton', labels: ['Save'] });

@@ -79,6 +79,29 @@ test('a changed baseline file fails original-untouched and the clause being judg
   assert.equal(result.safeToContinue, false);
 });
 
+test('Save-again holds only the dialog assertion when accessibility is unavailable and safe workflow can continue', async t => {
+  const { session, workflow, directory } = setup(t, { observeUnavailableAt: 'save-again' });
+  const result = await workflow.run({ session, row: row() });
+  const s = statuses(result);
+  assert.equal(s['first-save-save-as'], 'pass');
+  assert.equal(s['save-reopen'], 'unrun');
+  assert.equal(s['media-text-open'], 'pass');
+  assert.equal(s['refused-field-path'], 'pass');
+  assert.equal(result.safeToContinue, true);
+  const outcome = JSON.parse(fs.readFileSync(path.join(directory, 'legacy-import/outcome.json'), 'utf8'));
+  assert.equal(outcome.reason, null);
+  assert.match(outcome.reasons['save-reopen'], /accessibility read was unavailable/);
+});
+
+test('a proven bad Save-again file still fails even when its accessibility read is unavailable', async t => {
+  const { session, workflow, directory } = setup(t, { saveNoEdit: true, observeUnavailableAt: 'save-again' });
+  const result = await workflow.run({ session, row: row() });
+  assert.equal(statuses(result)['save-reopen'], 'fail');
+  assert.equal(result.safeToContinue, false);
+  const outcome = JSON.parse(fs.readFileSync(path.join(directory, 'legacy-import/outcome.json'), 'utf8'));
+  assert.match(outcome.reason, /save-did-not-write-the-edit|saved-total-frames-differ-from-the-document/);
+});
+
 test('toast text that cannot be read leaves the clauses that need it unrun, with the reason, and never passes them', async t => {
   const { session, workflow, directory } = setup(t, { toastHidden: true });
   const result = await workflow.run({ session, row: row() });
