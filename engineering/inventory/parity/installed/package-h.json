@@ -399,6 +399,9 @@
         "dom:#btn-open",
         "dom:#btn-saveas"
       ],
+      "operatorAttestedRoutes": [
+        "keyboard:Cmd+S"
+      ],
       "dependsOn": [],
       "scenario": "legacy-import",
       "acceptanceReference": "https://github.com/mysteropodes/nemo/issues/2355",
@@ -460,7 +463,7 @@
           ]
         }
       ],
-      "taskEvidence": "Both surfaces are operator-attested (operatorAttestedSurfaces): the native picker, Cmd+S and F5 are performed by a person and only their effects are observed. The row opens two repository fixtures (tests/fixtures/legacy-import/animation.json and media.json) copied into the private report directory, and two files derived from single-frame.json that add exprGlobals or trackRoles. It judges what the document contains (frame counts, layer names, component frames) and the file, history and toast facts; it does not judge that Motion keys, expression values or pictures render or play as in the old app, nor that audio plays, nor MP3 or JPEG conversion, which stay with the importer tests and the hands-on steps. The matching matrix task F03 lists owners 1049, 1584 and 1587, so this row names issue 2355 explicitly and leaves owners.json untouched.",
+      "taskEvidence": "The native picker and F5 are operator-attested surfaces; Cmd+S is recorded separately as the operator-attested keyboard route because no matching inventory surface ID exists. The row opens two repository fixtures (tests/fixtures/legacy-import/animation.json and media.json) copied into the private report directory, and two files derived from single-frame.json that add exprGlobals or trackRoles. It judges what the document contains (frame counts, layer names, component frames) and the file, history and toast facts; it does not judge that Motion keys, expression values or pictures render or play as in the old app, nor that audio plays, nor MP3 or JPEG conversion, which stay with the importer tests and the hands-on steps. The matching matrix task F03 lists owners 1049, 1584 and 1587, so this row names issue 2355 explicitly and leaves owners.json untouched.",
       "runtimePrerequisites": "Foreground operator with the real keyboard and mouse for the native file picker (Open and Save As), Cmd+S, F5 and Cmd+Z; the owned Nemo window placed at the top of display 2 (2880,-270, 1620x1420); a Start screen with no unsaved document at launch; the nemo-mcp process bundled in the package under test, reachable through the candidate's own isolated registry (the runner itself makes every read-only query.* document read and binds it to the candidate; the operator attaches no document state) (history and component read); the UI32 helper only for the read-only accessibility observation of the toast; a disposable report directory, into which the scenario copies the fixtures it asks the operator to open.",
       "evidence": "Reader, host route and JS routes: https://github.com/mysteropodes/nemo/pull/2772 merged at 542bad73f8cf2874c7ad1a68eb995a480583473f. Motion, rig and component families: https://github.com/mysteropodes/nemo/pull/2774 merged at a1c7fb910571557198ae96f3e7526fbccfd468fa. Media, text and remaining fields: https://github.com/mysteropodes/nemo/pull/2777 merged at d9036dc2ab7d9bd1b9a446f60f1167629467edb9. No installed run has happened for this row."
     }
