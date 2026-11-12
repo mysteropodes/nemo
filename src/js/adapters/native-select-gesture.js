@@ -363,6 +363,24 @@
         if (g.kind === 'pivot' && !g.cancelled && !g.active) { end(ev); return true; } // an Alt+click that placed the pivot writes it onto the picked records
         if (g.cancelled || !g.dup || g.kind !== 'move' || g.active) return false; end(ev); return true; } };
   }
+  // The engine-off Paper Tool is a second entry into this same native gesture. Keep its event bridge here so the old monolith forwards Tool
+  // callbacks without creating a parallel pointer-intent controller.
+  function paperTool(root, phase, e, abort) {
+    var g = root._nativePaperSelectGesture;
+    if (phase === 'down') {
+      if (!root.state || root.state.tool !== 'select') return false;
+      try { g = begin(root, e, abort); } catch (_) { g = null; }
+      root._nativePaperSelectGesture = g;
+      if (!g) notice(root, 'Native Select gestures are unavailable.');
+      return true;
+    }
+    if (!g) return false;
+    if (phase === 'move') { try { g.move(e); } catch (_) {} return true; }
+    root._nativePaperSelectGesture = null;
+    if (phase === 'cancel') { try { g.cancel(); } catch (_) {} return true; }
+    if (phase === 'up') { try { g.end(e); } catch (_) {} return true; }
+    return false;
+  }
   // Cmd/Ctrl+A (baseline 1065e9d8 timeline.js onKeyDown): every selectable item of the ACTIVE layer, Select and Direct Select only. A native object
   // project builds no Paper children, so the items come from the same presented listing the marquee reads (a texture dab and a linked fill companion
   // follow their anchor and are never their own selection) and commit through the marquee's path: the pick context is checked before and after the
@@ -391,5 +409,5 @@
     }());
   }
   function bind(root) { return Object.freeze({ begin: function (e, abort) { return begin(root, e, abort); }, selectAll: function () { return selectAll(root); }, hitHandle: hitHandle }); }
-  return Object.freeze({ bind: bind, begin: begin, selectAll: selectAll, hitHandle: hitHandle, matrixOf: matrixOf, commitMatrix: commitMatrix, unsupported: unsupported, unstorable: unstorable });
+  return Object.freeze({ bind: bind, begin: begin, paperTool: paperTool, selectAll: selectAll, hitHandle: hitHandle, matrixOf: matrixOf, commitMatrix: commitMatrix, unsupported: unsupported, unstorable: unstorable });
 }));
