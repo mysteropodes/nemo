@@ -275,11 +275,7 @@ fn only_committed_advances_notify_including_transaction_commit_and_history() {
         assert!(delivery.notification.is_none());
         assert_eq!(delivery.response.content_revision, 0);
     }
-    // The MCP request boundary refuses an out-of-range value before dispatch (#2363).
-    assert!(state
-        .revisions
-        .dispatch(state.instance_id(), &state.native, set(&binding, "invalid", 0, 101), true)
-        .is_err());
+    assert!(state.revisions.dispatch(state.instance_id(), &state.native, set(&binding, "invalid", 0, 101), true).is_err()); // MCP boundary (#2363)
     let mut begin = stage(
         &binding,
         "begin",
