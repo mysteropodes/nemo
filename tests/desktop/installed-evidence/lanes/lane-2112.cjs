@@ -34,8 +34,9 @@ const rows = [
       ctx.eq('file', 'the catalog holds one asset for two placements', [Array.isArray(saved.document.assets) ? saved.document.assets.length : null, items.length], [1, 2]);
       // Negative controls: no revision, no history, no partial publication. Each is a typed refusal by the native owner.
       await attach(ctx, 'attach a corrupt PNG', K.stage(ctx, 'corrupt.png', K.corruptPng()), 'corrupt', { refused: true });
-      // A VALID PNG one pixel wider than the admitted 8192: only a size cap refuses it (it is not a decode failure).
-      await attach(ctx, 'attach a decodable PNG wider than the admitted dimension', K.stage(ctx, 'oversize.png', K.oversizePng()), 'oversize', { refused: true });
+      // A VALID PNG one pixel wider than the admitted 8192: only a size cap refuses it (it is not a decode failure). The owner answers
+      // `unavailable` for it (native-engine/src/object_raster_asset_prepare.rs:86, Refusal::ImageTooLarge); a corrupt PNG is `invalid_request` (:84).
+      await attach(ctx, 'attach a decodable PNG wider than the admitted dimension', K.stage(ctx, 'oversize.png', K.oversizePng()), 'oversize', { refused: true, codes: ['unavailable'] });
       // A missing source is the host's typed "source unavailable", not dispatched: the attach operation itself answered above.
       await attach(ctx, 'attach a missing file', ctx.work + '/does-not-exist.png', 'missing', { refused: true, codes: ['unavailable'],
         details: error => !!error.details && error.details.disposition === 'notDispatched' && error.details.committed === false && /image source/.test(String(error.message)) });
@@ -58,7 +59,7 @@ const rows = [
       ctx.eq('file', 'the catalog holds the asset', (await catalog('held')).length, 1);
       await removeIt('remove the asset while a placement uses it', { refused: true });
       ctx.eq('file', 'a refused removal left the asset in the catalog', (await catalog('in-use')).length, 1);
-      await K.apply(ctx, 'delete the layer that holds the placement', P.layerDelete(layer));
+      await K.apply(ctx, 'delete the placement', P.selectionDelete(layer, [made.result.target.strokeId]));
       ctx.eq('pixel', 'the deleted placement leaves no ink', probe.inkBounds((await K.exportPng(ctx, 'no-placement')).image), null);
       await removeIt('remove the now unreferenced asset');
       ctx.eq('file', 'the removed asset is gone from the catalog', (await catalog('removed')).length, 0);
@@ -67,11 +68,27 @@ const rows = [
       await K.step(ctx, 'redo the removal', 'redo');
       ctx.eq('file', 'redo removes it again', (await catalog('removed-again')).length, 0);
       await K.step(ctx, 'undo the removal again', 'undo');
-      await K.step(ctx, 'undo the layer delete', 'undo');
+      await K.step(ctx, 'undo the placement delete', 'undo');
       ctx.eq('pixel', 'the restored placement paints the original export', (await K.exportPng(ctx, 'restored')).digest, e0.digest);
       await removeIt('remove the asset while the restored placement uses it', { refused: true });
       await K.apply(ctx, 'remove an asset id the catalog never held', () => K.pinned(ctx, ({ pin }) => P.assetRemove(pin, 'asset-never-held')), { noop: true });
       await K.roundTrip(ctx, 'lifetime', e0);
+    } },
+
+  // The layer that holds a raster placement. Split out of the lifetime row because the installed owner refuses it: layer.delete answers
+  // invalid_request "Layer lifecycle payload is invalid or target is absent." for a layer holding a raster item, while a vector layer deletes.
+  { id: '2112-raster-layer-delete', title: 'deleting the layer that holds a raster placement removes the placement and one undo restores it', tasks: ['G02'],
+    async run(ctx) {
+      await K.fresh(ctx);
+      const file = K.stage(ctx, 'teal.png', K.solidPng(160, 100, [...TEAL, 255]));
+      const made = await attach(ctx, 'attach a PNG as a new layer', file, 'evidence-image');
+      const layer = made.result.target.layerUid;
+      const e0 = await K.exportPng(ctx, 'with-placement');
+      ctx.ok('pixel', 'the placement is on the canvas', probe.inkBounds(e0.image) !== null, probe.inkBounds(e0.image));
+      await K.apply(ctx, 'delete the layer that holds the placement', P.layerDelete(layer));
+      ctx.eq('pixel', 'the deleted layer leaves no ink', probe.inkBounds((await K.exportPng(ctx, 'no-layer')).image), null);
+      await K.step(ctx, 'undo the layer delete', 'undo');
+      ctx.eq('pixel', 'undo restores the placement export', (await K.exportPng(ctx, 'restored')).digest, e0.digest);
     } },
 
   { id: '2112-raster-edit-save-reopen', title: 'raster move, resize, rotate, opacity measured in pixels; asset bytes survive save and reopen without the staging file', tasks: ['G02'],
@@ -84,9 +101,9 @@ const rows = [
       const { items } = await savedRaster(ctx, 'r0');
       const item = items[0].item;
       ctx.ok('file', 'the saved raster item carries its placement', ['x', 'y', 'width', 'height'].every(key => typeof item[key] === 'number'), item);
-      await K.apply(ctx, 'move by (50, 40)', P.rasterMove(tgt, item.x + 50, item.y + 40));
+      await K.apply(ctx, 'move by (50, -10)', P.rasterMove(tgt, item.x + 50, item.y - 10));
       const e1 = await K.exportPng(ctx, 'r1'), b1 = probe.inkBounds(e1.image);
-      ctx.near('pixel', 'the ink moved by the same amount', [b1.box[0] - b0.box[0], b1.box[1] - b0.box[1]], [50, 40], 2);
+      ctx.near('pixel', 'the ink moved by the same amount', [b1.box[0] - b0.box[0], b1.box[1] - b0.box[1]], [50, -10], 2);
       ctx.near('pixel', 'its size did not change', [width(b1), height(b1)], [width(b0), height(b0)], 1);
       await K.apply(ctx, 'resize to twice the width', P.rasterResize(tgt, item.width * 2, item.height));
       const e2 = await K.exportPng(ctx, 'r2'), b2 = probe.inkBounds(e2.image);
@@ -148,8 +165,10 @@ const rows = [
       const relisted = await ctx.wire.query(P.textTargets(pin2.revision, pin2.pin, layerUid).operation, P.textTargets(pin2.revision, pin2.pin, layerUid).payload);
       ctx.ok('read', 'the text target is listed after reopen', relisted.ok && relisted.result.total === 1, relisted.ok ? relisted.result.total : relisted.error, { revisionAfterOpen: again.contentRevision });
       ctx.ok('file', 'the saved project holds the text', JSON.stringify(trip.first.document).includes('HELLO'), 'text present');
-      // Absent font: refused, nothing written, nothing falls back.
-      await K.apply(ctx, 'create text with an absent asset font', P.textCreate(layerUid, P.textBlock('X', { font: { kind: 'asset', assetId: 'font-that-is-not-in-the-project' } })), { refused: true });
+      // Absent font: refused, nothing written, nothing falls back. This project holds no asset catalog, and the owner answers `unavailable`
+      // for that (native-engine/src/object_raster_asset_record.rs:151-152 NoInventory, mapped in object_raster_asset_commands.rs:189);
+      // `not_found` (MissingFont, :190) is only the answer when a catalog exists and lacks the font.
+      await K.apply(ctx, 'create text with an absent asset font', P.textCreate(layerUid, P.textBlock('X', { font: { kind: 'asset', assetId: 'font-that-is-not-in-the-project' } })), { refused: true, codes: ['unavailable'] });
       await K.apply(ctx, 'delete the text', P.textDelete(P.target(layerUid, relisted.result.items[0].target.strokeId)));
       ctx.eq('pixel', 'deleting the text leaves no ink', probe.inkBounds((await K.exportPng(ctx, 't3')).image), null);
       await K.step(ctx, 'undo the delete', 'undo');

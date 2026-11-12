@@ -147,7 +147,7 @@ test('an oversize control is a valid PNG past the size cap (a header with no pix
   const ctx = K.createContext({ wire, work, rowId: 'x' });
   await K.fresh(ctx);
   const attach = (file, opts) => K.apply(ctx, 'attach', () => K.pinned(ctx, ({ pin, lifecycleGeneration }) => P.assetAttach({ pin, name: 'n', path: file, lifecycleGeneration })), opts);
-  await attach(K.stage(ctx, 'big.png', K.oversizePng()), { refused: true });
+  await attach(K.stage(ctx, 'big.png', K.oversizePng()), { refused: true, codes: ['unavailable'] });
   await attach(K.stage(ctx, 'ok.png', K.solidPng(8192, 1, [1, 2, 3, 255])));
   await attach(path.join(work, 'missing.png'), { refused: true, codes: ['unavailable'], details: e => e.details.disposition === 'notDispatched' && /image source/.test(e.message) });
   await assert.rejects(attach(path.join(work, 'missing.png'), { refused: true }), /typed owner refusal/, 'the default owner codes do not accept an unavailable source');

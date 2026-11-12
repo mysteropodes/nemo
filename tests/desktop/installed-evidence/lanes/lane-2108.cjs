@@ -210,7 +210,8 @@ const rows = [
       await K.step(ctx, 'undo the cut', 'undo');
       ctx.eq('file', 'undo restores the cut stroke', K.objectStrokeIds((await K.saveAs(ctx, 'uncut')).document).includes(a), true);
       await K.apply(ctx, 'lock layer 1', P.layerPolicy(l1, 'locked', true));
-      await K.apply(ctx, 'delete a selection on a locked layer', P.selectionDelete(l1, [a]), { refused: true });
+      // A locked layer is `unavailable` by contract: native-engine/src/object_selection_edit_payload.rs:201-206 (SelectionError::Locked).
+      await K.apply(ctx, 'delete a selection on a locked layer', P.selectionDelete(l1, [a]), { refused: true, codes: ['unavailable'] });
       await K.apply(ctx, 'paste a stale clip target layer', P.clipboardPaste('layer-missing', clip), { refused: true });
     } },
 ];

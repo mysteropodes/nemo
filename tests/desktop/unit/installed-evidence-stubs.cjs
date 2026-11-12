@@ -105,11 +105,11 @@ function createStubApp(options = {}) {
     assets: doc.assets, meshes: doc.meshes });
 
   function decodePng(bytes) {
+    // Corrupt bytes are a decode failure whatever their header says; only a PNG that decodes can be too large.
     try {
-      const header = bytes.length >= 24 && bytes.subarray(1, 4).toString('latin1') === 'PNG' ? { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) } : null;
-      if (!header) return { error: 'corrupt' };
-      if (header.width > MAX_DIMENSION || header.height > MAX_DIMENSION) return { error: 'too large', ...header };
       const image = png.decode(bytes);
+      const header = { width: image.width, height: image.height };
+      if (header.width > MAX_DIMENSION || header.height > MAX_DIMENSION) return { error: 'too large', ...header };
       const at = (u, v) => png.pixelAt(image, Math.floor(image.width * u), Math.floor(image.height * v));
       return { ...header, colors: [at(0.25, 0.25), at(0.75, 0.25), at(0.25, 0.75), at(0.75, 0.75)] };
     } catch { return { error: 'corrupt' }; }
@@ -198,6 +198,12 @@ function createStubApp(options = {}) {
         commit(doc, 'layer delete', () => { doc.layers = doc.layers.filter(l => l.layerUid !== uid); doc.rasters = doc.rasters.filter(r => r.layerUid !== uid); doc.strokes = doc.strokes.filter(s => s.layerUid !== uid); });
         return ok(2, request, receipt());
       }
+      case 'command.document.object.selection.delete': {
+        const ids = p.strokeIds, known = id => doc.strokes.some(s => s.id === id) || doc.rasters.some(r => r.id === id);
+        if (!ids.every(known)) return ownerRefusal(request, 'not_found', 'unknown stroke');
+        commit(doc, 'selection delete', () => { doc.strokes = doc.strokes.filter(s => !ids.includes(s.id)); doc.rasters = doc.rasters.filter(r => !ids.includes(r.id)); });
+        return ok(2, request, receipt());
+      }
       case 'command.document.object.asset.attach': return assetAttach(request, doc, p);
       case 'command.document.object.asset.remove': {
         const asset = doc.assets.find(a => a.id === p.assetId);
@@ -261,7 +267,8 @@ function createStubApp(options = {}) {
       return refuse(2, request, 'unavailable', 'native image source unavailable', { disposition: 'notDispatched', committed: false, retryExecution: true });
     }
     const decoded = decodePng(bytes);
-    if (decoded.error) return ownerRefusal(request, 'invalid_request', 'image refused: ' + decoded.error);
+    // Observed on the installed app: a corrupt PNG is invalid_request, a decodable PNG past the size cap is unavailable (image_too_large).
+    if (decoded.error) return ownerRefusal(request, decoded.error === 'too large' ? 'unavailable' : 'invalid_request', 'Native image import refused.');
     const sha = require('node:crypto').createHash('sha256').update(bytes).digest('hex');
     let asset = doc.assets.find(a => a.sha === sha);
     let result;
