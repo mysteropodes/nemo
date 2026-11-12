@@ -28,12 +28,13 @@ Ce document est le plan opérationnel unique de la remédiation en cours. Il rem
 Cet amendement change la façon de dimensionner, de prouver et de rapporter le travail. **Il n’assouplit aucun critère d’acceptation, ni l’obligation de parité de référence à 100 % pour le bureau, ni la règle d’autorité unique, la revue indépendante ou la protection de branche.**
 
 1. **Référence de départ figée.**
-   - La référence fonctionnelle de la parité est la source opérationnelle préservée lors de la séparation native, `1065e9d8d9c48e66d9b44bb4de446e8f4e887040` (§0).
-   - L’inventaire des surfaces y est régénéré une seule fois, avec des identifiants stables (et non des numéros de ligne de source), puis figé dans `engineering/inventory/baseline-surfaces.json`.
-   - Les 228 identifiants de tâches d’origine et chaque surface figée sont joints dans un fichier généré `engineering/inventory/parity-matrix.json`, doté d’un contrôle `--check`. Cette matrice, et non le nombre fixe de 50 issues, constitue le dénominateur de parité du §9.
+   - Pour le calcul de la parité du §9, cette proposition modifie le §0 : la référence fonctionnelle est la source au moment de la séparation native, `1065e9d8d9c48e66d9b44bb4de446e8f4e887040`. La source/le build opérationnel préservé pour la reprise reste une référence distincte ; cette proposition ne le confond ni avec la référence fonctionnelle convenue à l’origine, ni avec la source de remédiation acceptée.
+   - Les défauts présents dans `1065e9d8` reçoivent des décisions explicites. Les 453 lignes de correspondance de priorité moyenne ou faible restent en attente jusqu’à leur examen par une personne.
+   - L’inventaire des surfaces y est régénéré une seule fois, avec des identifiants stables (et non des numéros de ligne de source), puis figé dans `engineering/inventory/parity/baseline-surfaces.json`.
+   - Les 228 identifiants de tâches d’origine et chaque surface figée sont joints dans le fichier généré `engineering/inventory/parity/matrix.json`, doté d’un contrôle `--check`. Cette matrice, et non le dénominateur fixe des workflows de référence, constitue le dénominateur de parité du §9.
 2. **Résultats au niveau de la chaîne (remplace le dimensionnement de 30 à 90 minutes du §3).**
-   - Un propriétaire reste responsable d’une chaîne de dépendances jusqu’à l’acceptation de ses lignes de matrice : composants et storyboard, scène et peinture, maillage et rig, texte, médias et import, frames.
-   - Les tâches élémentaires restent réservées au travail réellement indépendant.
+   - Un propriétaire reste responsable d’une chaîne de dépendances jusqu’à l’acceptation de ses lignes de matrice : composants et storyboard, scène et peinture, maillage et rig, texte, médias et import, frames, expressions/parentage (R18.2) et Motion.
+   - Le travail qui ne figure pas dans une chaîne reste découpé en tâches élémentaires ; celles-ci restent également adaptées au travail réellement indépendant.
    - Une issue nomme les lignes de matrice qu’elle fait passer au vert, sa source d’entrée, une commande d’acceptation et les fichiers hérités qu’elle supprime.
 3. **Preuve par commande, acceptation installée regroupée par candidat.**
    - L’acceptation au niveau source d’une ligne est la commande d’acceptation native sans interface de la famille, sur une source identifiée (fournisseurs réels, oracles indépendants, annulation/rétablissement, sauvegarde/réouverture, rendu vers pixels).
@@ -41,19 +42,19 @@ Cet amendement change la façon de dimensionner, de prouver et de rapporter le t
    - Le candidat final unique du §9, ses preuves de clone propre, d’installation, de client et de ressources, ainsi que l’acceptation humaine, sont inchangés.
    - Une réparation crée toujours un nouveau candidat.
 4. **Coût de vérification.**
-   - Lorsqu’un compilateur et des tests peuvent vérifier un changement, utiliser compilation, tests et une revue technique composée par lot d’intégration, à la place d’une revue de source distincte pour chaque tâche élémentaire.
+   - Lorsqu’un compilateur et des tests peuvent vérifier un changement, utiliser compilation, tests et une revue technique composée par lot d’intégration, menée par une personne distincte de l’auteur de chacune des tâches élémentaires du lot, à la place d’une revue de source distincte pour chaque tâche élémentaire.
    - La revue de PR du §7, les demandes de modifications et la protection de fusion sont inchangées.
 5. **Comptes rendus.**
-   - Un état généré à partir de la matrice de parité remplace les messages horaires de l’orchestrateur dans #1062, qui a atteint la limite de 2 500 commentaires de GitHub.
+   - Un état généré à partir de la matrice de parité remplace les messages horaires de l’orchestrateur dans #2804.
    - Les commentaires d’issue se limitent à la prise en charge, au blocage, à la PR et à l’acceptation, selon les gabarits courts du §3.
    - Les commentaires ne ressassent pas l’historique conservé ; ils y renvoient par lien.
 6. **Tableau.**
    - Un script du dépôt renseigne et relit les champs du Project #2 à partir de l’état des issues et de la matrice.
    - Les modifications manuelles multi-champs restent permises mais ne sont plus exigées à chaque transition.
 7. **Gel des monolithes.**
-   - `src/js/motion.js`, `timeline.js`, `tools.js`, `app.js` et `tweens.js` n’acceptent que des suppressions et des redirections minimales de sites d’appel.
+   - `src/js/motion.js`, `timeline.js`, `tools.js`, `app.js` et `tweens.js` n’acceptent que des suppressions et des redirections minimales de sites d’appel. Un défaut produit découvert dans un monolithe gelé se corrige soit par la migration native de sa famille, soit par une correction opérationnelle sur `main` selon le §0.
    - Tout nouveau comportement d’interface est un présentateur au-dessus de modèles de lecture natifs, monté via la jonction de présentateur ([CS5 #2347](https://github.com/mysteropodes/nemo/issues/2347)).
-8. **Fichiers partagés et postes.**
+8. **Fichiers partagés et créneaux.**
    - L’enregistrement des capacités, l’appartenance à la couverture et aux profils, l’inventaire et le chargement des adaptateurs deviennent générés, sous CS1 #2341 et CS3 #2342.
    - Une fois qu’ils le sont, la règle d’un seul rédacteur par fichier entier (§3) ne s’applique plus qu’aux fichiers restés entretenus à la main.
    - Les plafonds de worktrees et de rédacteurs du §2 sont alors réexaminés au regard de la contention mesurée.

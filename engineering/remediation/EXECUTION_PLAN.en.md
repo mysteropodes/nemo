@@ -22,12 +22,13 @@ This is the single operating plan for the current remediation. It supersedes the
 This amendment changes how work is sized, evidenced and reported. **It does not relax any acceptance criterion, the 100% desktop baseline-parity obligation, the single-authority rule, independent review or branch protection.**
 
 1. **Frozen commencement baseline.**
-   - The functional baseline for parity is the operational source preserved at the native-only separation, `1065e9d8d9c48e66d9b44bb4de446e8f4e887040` (§0).
-   - The surface inventory is regenerated there once, with stable identifiers (not source line numbers), and frozen as `engineering/inventory/baseline-surfaces.json`.
-   - The 228 original task IDs and every frozen surface are joined in a generated `engineering/inventory/parity-matrix.json` with a `--check` gate. This matrix, not the fixed-50 issue count, is the parity denominator of §9.
+   - For §9 parity accounting, this proposal changes §0: the functional baseline is the source at the native-only separation, `1065e9d8d9c48e66d9b44bb4de446e8f4e887040`. The operational source/build preserved for recovery remains a distinct reference; this proposal does not conflate it with the original agreed baseline or the accepted remediation source.
+   - Defects present at `1065e9d8` receive explicit dispositions. The 453 medium/low mapping rows remain pending until a human has reviewed them.
+   - The surface inventory is regenerated there once, with stable identifiers (not source line numbers), and frozen at `engineering/inventory/parity/baseline-surfaces.json`.
+   - The 228 original task IDs and every frozen surface are joined in generated `engineering/inventory/parity/matrix.json` with a `--check` gate. This matrix, not the fixed baseline-workflow denominator, is the parity denominator of §9.
 2. **Chain-level outcomes (supersedes the 30–90-minute sizing in §3).**
-   - One owner stays accountable for a dependency chain until its matrix rows are accepted: components and storyboard, scene and paint, mesh and rig, text, media and import, frames.
-   - Leaves remain for genuinely independent work.
+   - One owner stays accountable for a dependency chain until its matrix rows are accepted: components and storyboard, scene and paint, mesh and rig, text, media and import, frames, expressions/parenting (R18.2), and Motion.
+   - Work not listed in a chain remains in leaves; leaves also remain for genuinely independent work.
    - An issue names the matrix rows it turns green, its entry source, one acceptance command and the legacy files it deletes.
 3. **Evidence by command, installed acceptance batched per candidate.**
    - Source-level acceptance of a row is the family's headless native acceptance command at an identified source (real providers, independent oracles, undo/redo, save/reopen, render-to-pixels).
@@ -35,17 +36,17 @@ This amendment changes how work is sized, evidenced and reported. **It does not 
    - §9's single final candidate, its clean-clone, installed, client and resource evidence, and human acceptance are unchanged.
    - A repair still creates a new candidate.
 4. **Verification spend.**
-   - Where a compiler and tests can verify a change, use compile plus tests plus one composed technical review per integration batch, in place of separate per-leaf source review.
+   - Where a compiler and tests can verify a change, use compile plus tests plus one composed technical review per integration batch, performed by a reviewer distinct from the author of every leaf in that batch, in place of separate per-leaf source review.
    - §7 PR review, change requests and merge protection are unchanged.
 5. **Reporting.**
-   - A status generated from the parity matrix replaces the hourly orchestrator posts in #1062, which has reached GitHub's 2,500-comment limit.
+   - A status generated from the parity matrix replaces the hourly orchestrator posts in #2804.
    - Issue comments are limited to claim, blocker, PR and acceptance, using the short templates in §3.
    - Comments do not restate preserved history; they link to it.
 6. **Board.**
    - A repository script sets and reads back the Project #2 fields from issue and matrix state.
    - Manual multi-field edits remain allowed but are no longer required at each transition.
 7. **Monolith freeze.**
-   - `src/js/motion.js`, `timeline.js`, `tools.js`, `app.js` and `tweens.js` accept deletions and minimal call-site redirections only.
+   - `src/js/motion.js`, `timeline.js`, `tools.js`, `app.js` and `tweens.js` accept deletions and minimal call-site redirections only. A product bug found in a frozen monolith is fixed either through the native migration of its family or as an operational fix on `main` under §0.
    - New UI behaviour is a presenter over native read models, mounted through the presenter seam ([CS5 #2347](https://github.com/mysteropodes/nemo/issues/2347)).
 8. **Shared files and slots.**
    - Capability registration, coverage and profile membership, inventory and adapter loading become generated, under CS1 #2341 and CS3 #2342.
