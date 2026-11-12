@@ -27,7 +27,7 @@ fn public_object_history_requires_registered_strict_revision_pinned_commands() {
         same_failure(
             &missing,
             "invalid_request",
-            "native object history command requires expectedRevision",
+            "native command requires expectedRevision",
         );
         let mut unsafe_revision = base.clone();
         unsafe_revision.expected_revision = Some(9_007_199_254_740_992);
@@ -54,7 +54,7 @@ fn public_object_history_requires_registered_strict_revision_pinned_commands() {
             same_failure(
                 &invalid,
                 "invalid_request",
-                "native object history command does not match its declared contract",
+                "native command does not match its declared contract",
             );
         }
     }
@@ -132,28 +132,29 @@ fn public_object_history_success_is_exact_and_correlated_to_its_request() {
 
 #[test]
 fn formerly_forwarded_envelopes_enforce_schema_revision_policy_at_the_original_byte_boundary() {
-    for (operation, revision, payload) in [
-        ("command.document.apply", None, json!({"command":"layer.opacity.set","stableTarget":{"layerUid":"layer"},"value":25})),
-        ("query.document.revision", Some(0), json!({})),
+    for (operation, revision, payload, message) in [
+        ("command.document.apply", None, json!({"command":"layer.opacity.set","stableTarget":{"layerUid":"layer"},"value":25}),
+            "native command requires expectedRevision"),
+        ("query.document.revision", Some(0), json!({}), "native pinned reads forbid expectedRevision"),
     ] {
         let request = NativeApplicationRequest {
             api_version: 2, request_id: "schema-envelope".into(), instance_id: "instance".into(), document_id: "document".into(),
             expected_revision: revision, operation: operation.into(), payload, cancelled_before_dispatch: false,
         };
-        same_failure(&request, "invalid_request", "native request envelope does not match its declared contract");
+        same_failure(&request, "invalid_request", message);
         let bytes = serde_json::to_vec(&request).unwrap();
         assert!(crate::wire::decode_native_request(&bytes).unwrap_err().to_string()
-            .contains("native request envelope does not match its declared contract"));
+            .contains(message));
     }
 }
 
 #[test]
 fn malformed_metadata_and_font_inputs_refuse_at_the_actual_public_byte_boundary() {
     for (operation, revision, payload, message) in [
-        (crate::native_contract::comments::EDIT, Some(7), Value::Null,
-            "native object team comment metadata command does not match its declared contract"),
+        (crate::native_contract::comments::EDIT, Some(7), json!({"bogus":1}),
+            "native command does not match its declared contract"),
         (crate::native_contract::custom_brush::EDIT, Some(7), json!({}),
-            "native object custom brush catalog metadata command does not match its declared contract"),
+            "native command does not match its declared contract"),
         (crate::native_contract::font::QUERY, None, json!({}),
             "native pinned-read payload does not match its declared contract"),
     ] {
@@ -171,4 +172,43 @@ fn malformed_metadata_and_font_inputs_refuse_at_the_actual_public_byte_boundary(
     };
     same_failure(&request,"malformed_payload","native pinned-read payload does not match its declared contract");
     assert!(crate::wire::decode_native_request(&serde_json::to_vec(&request).unwrap()).is_err());
+}
+
+/// Add-one-capability, Rust side (#2363): validate_input holds no per-feature
+/// operation list, so every declared operation obeys the revision policy and the
+/// declared-contract gate that its own transport branch states.
+#[test]
+fn declared_operations_obey_their_own_branch_policy_through_the_mcp_input_gate() {
+    let source = include_str!("native_request_input.rs");
+    for central in ["::EDIT", "::OP", "::admitted(", "::declares(", "forbids_expected_revision"] {
+        assert!(!source.contains(central), "validate_input must not list {central}");
+    }
+    let (mut required, mut forbidden) = (0, 0);
+    for descriptor in crate::capabilities::native_catalog().descriptors() {
+        for example in descriptor["examples"].as_array().unwrap() {
+            let request: NativeApplicationRequest =
+                serde_json::from_value(example["request"].clone()).unwrap();
+            let policy = crate::native_contract::request_schema::expected_revision_policy(&request.operation);
+            assert!(request.validate_input().is_ok(), "{}", request.operation);
+            let mut probe = request.clone();
+            match policy {
+                Some(true) => {
+                    required += 1;
+                    probe.expected_revision = None;
+                    same_failure(&probe, "invalid_request", "native command requires expectedRevision");
+                    // A closed-shape violation is refused at the same declared-contract gate.
+                    probe.expected_revision = Some(0);
+                    probe.payload = json!({"command":"undeclared.shape","\u{0}":[]});
+                    same_failure(&probe, "invalid_request", "native command does not match its declared contract");
+                }
+                Some(false) => {
+                    forbidden += 1;
+                    probe.expected_revision = Some(0);
+                    same_failure(&probe, "invalid_request", "native pinned reads forbid expectedRevision");
+                }
+                None => panic!("{} is declared without a revision policy", request.operation),
+            }
+        }
+    }
+    assert!(required > 0 && forbidden > 0, "{required} command and {forbidden} query examples");
 }

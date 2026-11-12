@@ -130,7 +130,7 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
             assert_eq!(rejected.is_error, Some(true));
         }
         for (field, value, code) in [
-            ("payload", json!("{}"), "malformed_payload"),
+            ("payload", json!("{}"), "invalid_request"),
             (
                 "operation",
                 json!("command.not_registered"),

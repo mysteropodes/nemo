@@ -102,7 +102,7 @@ test('the Rust contract and its two test children are members of the MCP transpo
   const nativeCall = wire.slice(nativeCallStart, nativeCallEnd);
   assert.match(nativeCall, /validate_native_response\(&response, &response_contract\)\?;/);
   assert.match(nativeCall, /response\.request_id != request_id\s*\|\| response\.instance_id != endpoint\.instance_id/);
-  assert.match(read('nemo-mcp/src/native_request_input.rs'), /native object rig command requires expectedRevision/);
+  assert.match(read('nemo-mcp/src/native_request_input.rs'), /native command requires expectedRevision/);
 });
 
 test('the JS modules have ordinary, layered, size-bounded profile membership and keep the domain host-free', () => {

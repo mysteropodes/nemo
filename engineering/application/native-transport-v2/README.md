@@ -93,6 +93,15 @@ descriptor example and metadata/payload mutations. Another compiles both validat
 for every declared operation, including operations without examples. Existing raw
 member, byte, typed input, diagnostic, registration and availability gates remain.
 
+The revision policy and the pre-byte declared-contract check in `validate_input` come
+from each operation's own envelope branch (`RequiredRevisionRequest` or
+`ForbiddenRevisionRequest`, read by `request_schema::expected_revision_policy`), not from
+a per-feature operation list. A new command capability therefore needs no edit to
+`native_request_input.rs`; `declared_operations_obey_their_own_branch_policy_through_the_mcp_input_gate`
+walks every declared example through the real input gate and fails if a list regrows.
+A bad payload on a declared command is one `invalid_request` ("native command does not
+match its declared contract") for every family; the old per-family wording is gone.
+
 Pure request rules for layer policy, visibility, object undo/redo, pinned
 serialize/evaluate and empty diagnostics/reproduction payloads now use the schema.
 Other family predicates remain for semantic protections, including byte lengths,

@@ -109,7 +109,7 @@ test('the Rust contract and its test child are members of the MCP transport modu
   assert.match(contract, /vector::VECTOR \| vector::PARAMETRIC \| vector::EFFECTS => \{\s+vector::request\(operation, payload\)/);
   assert.match(contract, /op if vector::owns\(op\) => \|o, _, p, r\| vector::result\(o, p, r\),/);
   assert.match(read('nemo-mcp/src/wire.rs'), /vector::response_matches\(request, response\)/);
-  assert.match(read('nemo-mcp/src/native_request_input.rs'), /crate::native_contract::vector::VECTOR[\s\S]*crate::native_contract::vector::EFFECTS/);
+  assert.match(read('nemo-mcp/src/native_request_input.rs'), /expected_revision_policy\(&self\.operation\)/);
   assert.match(read('nemo-mcp/src/native_object_contract.rs'), /crate::native_contract::vector::FAMILY/);
   for (const file of ['native_contract.rs', 'wire.rs', 'capabilities.rs', 'native_request_input.rs', 'native_object_contract.rs']) assert.ok(nonblank(read('nemo-mcp/src/' + file)) <= 500, file);
   assert.match(read('engineering/boundaries/profiles/rust.coverage.json'), /"nativeVectorPublicContractRegistration": "L01-J\/#2261/);

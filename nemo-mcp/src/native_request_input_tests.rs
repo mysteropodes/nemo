@@ -52,7 +52,7 @@ fn public_visibility_is_registered_and_strict() {
     same_failure(
         &missing_revision,
         "invalid_request",
-        "native object visibility command requires expectedRevision",
+        "native command requires expectedRevision",
     );
     let mut unsafe_revision = base.clone();
     unsafe_revision.expected_revision = Some(9_007_199_254_740_992);
@@ -74,7 +74,7 @@ fn public_visibility_is_registered_and_strict() {
         same_failure(
             &invalid,
             "invalid_request",
-            "native object visibility command does not match its declared contract",
+            "native command does not match its declared contract",
         );
     }
     for good in [
@@ -332,7 +332,7 @@ fn import_input_requires_a_revision_and_its_declared_payload_before_availability
     same_failure(
         &missing_revision,
         "invalid_request",
-        "native object import command requires expectedRevision",
+        "native command requires expectedRevision",
     );
     let mut open = base.clone();
     open.payload["unexpected"] = json!(true);
@@ -342,7 +342,7 @@ fn import_input_requires_a_revision_and_its_declared_payload_before_availability
         same_failure(
             request,
             "invalid_request",
-            "native object import command does not match its declared contract",
+            "native command does not match its declared contract",
         );
     }
 }
