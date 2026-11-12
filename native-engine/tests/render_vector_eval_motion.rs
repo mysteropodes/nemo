@@ -394,3 +394,113 @@ fn a_dynamic_shapes_element_lists_its_parametric_rows_by_kind() {
         assert!(names(&v, false).iter().all(|n| !rows.contains(&n.as_str())), "{kind}: the layer lists none of them");
     }
 }
+
+/// Frozen baseline order at 1065e9d8: stored 20..40 x 60..80 rectangle,
+/// vtx0 [-10, 10] expands the box to 10..40 x 60..90 BEFORE a 5px TL rebuild.
+/// In particular rebuilt anchor 0 is [15,60], never the old order's [15,70].
+#[test]
+fn vertex_before_parametric_rebuild_reaches_rest_duplicator_and_paged_hit_geometry() {
+    use crate::evaluation::object_vector_kernels::render_vector_eval::{evaluate_vector_rest, duplicator_geometry, painted_record};
+    use crate::object_render_scene::prepare_object_viewport_composition;
+    let mut v = original_initial();
+    v["propertyHolders"] = json!([{
+        "target":{"contextId":"scene-root","layerUid":"r08_curve_layer","strokeId":"r08_curve_rect"},
+        "properties":[{"property":"cornerTL","track":{"keys":[{"frame":0,"v":[5],"curvePoints":[]}]}},
+            {"property":"vtx0","track":{"keys":[{"frame":0,"v":[0,0],"curvePoints":[]},{"frame":10,"v":[-10,10],"curvePoints":[]}]}}]
+    }]);
+    v["objects"][0]["vectorExt"] = json!({"paramShape":{"kind":"rect","tl":0,"tr":0,"br":0,"bl":0}});
+    let s = snap(&v);
+    let before = encode_storage_project(s.document()).unwrap();
+    for (frame, want) in [(10, vec![[15.,60.],[40.,60.],[40.,90.],[10.,90.],[10.,65.]]),
+                          (0, vec![[25.,60.],[40.,60.],[40.,80.],[20.,80.],[20.,65.]]),
+                          (10, vec![[15.,60.],[40.,60.],[40.,90.],[10.,90.],[10.,65.]]) ] {
+        let got = evaluate_vector_rest(&s, 0, frame).unwrap();
+        assert_eq!(got.segments.iter().map(|s|s.point).collect::<Vec<_>>(), want);
+        close(got.segments[0].handle_in[0], -5. * 0.5522847498);
+        close(got.segments[4].handle_out[1], -5. * 0.5522847498);
+        let selector = pins(&s, frame);
+        let packet = prepare_object_exposure_frame(&s, &selector).unwrap();
+        let record = &s.document().objects()[0];
+        assert_eq!(duplicator_geometry(&packet, record, 0).unwrap().0, got.segments);
+        let local = painted_record(&s, record, &s.document().layers()[0], frame).unwrap();
+        assert_eq!(local.geometry.segments.len(),5);
+        assert_eq!(s.document().objects()[0].geometry.segments.len(),4,"paint never becomes editable source");
+        let request = json!({"apiVersion":2,"requestId":"evaluated-hit","instanceId":s.instance_id(),"documentId":s.document_id(),"operation":"query.document.object",
+            "payload":{"atRevision":s.content_revision(),"documentSnapshotId":s.snapshot_id(),"stableTarget":record.target(),"subselect":{"cursor":0,"limit":16,"hitTest":true,"atFrame":frame}}});
+        let response = s.dispatch(serde_json::from_value(request).unwrap()).unwrap();
+        assert!(response.ok,"{response:?}");
+        let result = response.result.unwrap();
+        assert_eq!(result["subselect"]["atFrame"],frame);
+        assert_eq!(result["subselect"]["total"],5);
+        for (anchor, expected) in result["subselect"]["segments"].as_array().unwrap().iter().zip(&want) {
+            assert_eq!(anchor["point"], json!(expected));
+        }
+        let p = plan(&s,frame);
+        let witness = prepare_object_viewport_composition(&p,&selector,None).unwrap();
+        let projection = witness.subselect_read_projection("r08_curve_layer",None,true).unwrap().with_presentation("hit-vertex".into(),1).unwrap();
+        let request = json!({"apiVersion":2,"requestId":"hit-list","instanceId":s.instance_id(),"documentId":s.document_id(),"operation":"query.document.object",
+            "payload":{"atRevision":s.content_revision(),"documentSnapshotId":s.snapshot_id(),"view":{"kind":"subselect","contextId":"scene-root","layerUid":"r08_curve_layer","frame":frame,"workId":"hit-vertex","viewGeneration":1,"cursor":0,"limit":8,"hitTest":true}}});
+        let response=s.dispatch_with_subselect_view(serde_json::from_value(request).unwrap(),Ok(&projection)).unwrap();
+        assert!(response.ok,"{response:?}");
+        let item=&response.result.as_ref().unwrap()["items"][0];
+        assert_eq!(item["count"],5);
+        assert_eq!(item["bounds"],json!([if frame==0 {20.} else {10.},60.,40.,if frame==0 {80.} else {90.}]));
+        assert!(item.get("vertexOffsets").is_none(),"already evaluated, never double-offset");
+    }
+    assert_eq!(encode_storage_project(s.document()).unwrap(),before);
+}
+
+#[test]
+fn vertex_sampling_failure_is_a_hit_projection_refusal_and_brush_indices_never_deform_the_outline() {
+    use crate::evaluation::object_vector_kernels::render_vector_eval::painted_record;
+    let mut v=original_initial();
+    v["propertyHolders"]=json!([{"target":{"contextId":"scene-root","layerUid":"r08_curve_layer","strokeId":"r08_curve_rect"},"properties":[{"property":"vtx0","static":[1,2],"expression":{"enabled":true,"code":"[1,2]"}}]}]);
+    let s=snap(&v);
+    assert_eq!(painted_record(&s,&s.document().objects()[0],&s.document().layers()[0],0),Err(VectorEvalError::ExpressionUnavailable{property:"vtx"}));
+    v["propertyHolders"][0]["properties"][0].as_object_mut().unwrap().remove("expression");
+    v["objects"][0]["vectorExt"]=json!({"pressure":{"centerSegments":[
+        {"point":{"x":20,"y":70},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":4},
+        {"point":{"x":40,"y":70},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":4}]}});
+    let s=snap(&v);
+    assert_eq!(evaluate_vector(&s,0,0),Err(VectorEvalError::BrushVertexUnavailable));
+    v["propertyHolders"]=json!([]);
+    let s=snap(&v);
+    assert!(evaluate_vector(&s,0,0).is_ok(),"unanimated ribbon stays byte-identical");
+}
+
+#[test]
+fn anchor_changing_path_effects_keep_vertex_indices_on_their_rendered_base() {
+    use crate::evaluation::object_vector_kernels::render_vector_eval::painted_record;
+    let mut v=original_initial();
+    v["propertyHolders"]=json!([]);
+    v["layers"][0]["pathFx"]=json!([{"type":"zigzag","p1":4,"p2":6,"p3":0}]);
+    let base=snap(&v);
+    let plain=evaluate_vector(&base,0,0).unwrap();
+    assert!(plain.segments.len()>4,"effect changes source anchor identity/count");
+    v["propertyHolders"]=json!([{"target":{"contextId":"scene-root","layerUid":"r08_curve_layer","strokeId":"r08_curve_rect"},"properties":[{"property":"vtx0","static":[-10,10]}]}]);
+    let s=snap(&v);
+    let got=evaluate_vector(&s,0,0).unwrap();
+    assert_eq!(got.segments.len(),plain.segments.len());
+    assert_eq!(got.segments[0].point,[10.,90.]);
+    assert_eq!(got.segments[0].handle_in,plain.segments[0].handle_in);
+    assert_eq!(&got.segments[1..],&plain.segments[1..]);
+    let painted=painted_record(&s,&s.document().objects()[0],&s.document().layers()[0],0).unwrap();
+    assert_eq!(painted.geometry.segments.len(),got.segments.len());
+    assert_eq!(painted.geometry.segments[0].point.x.as_f64(),Some(10.));
+    assert_eq!(s.document().objects()[0].geometry.segments.len(),4);
+}
+
+#[test]
+fn idle_shapes_do_not_build_replacement_anchor_arrays_or_rebuild_from_static_parameters() {
+    use crate::evaluation::object_vector_kernels::render_vector_eval::run_param_shape_with;
+    for shape in [Value::Null,json!({"paramShape":{"kind":"rect","tl":7,"tr":3,"br":0,"bl":0}})] {
+        let mut v=original_initial();
+        v["propertyHolders"]=json!([]);
+        if !shape.is_null(){v["objects"][0]["vectorExt"]=shape;}
+        let s=snap(&v);
+        assert_eq!(run_param_shape_with(&s,&s.document().objects()[0],0,||panic!("idle shape must not request rebuilt anchors")).unwrap(),None);
+        let plain=evaluate_vector(&s,0,0).unwrap();
+        v["propertyHolders"]=json!([{"target":{"contextId":"scene-root","layerUid":"r08_curve_layer","strokeId":"r08_curve_rect"},"properties":[{"property":"vtx0","static":[0,0]}]}]);
+        assert_eq!(evaluate_vector(&snap(&v),0,0).unwrap(),plain,"zero vertex motion preserves exact idle geometry");
+    }
+}

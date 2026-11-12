@@ -246,13 +246,11 @@ fn element_matrices(
             layer_uid: record.target.layer_uid.clone(),
             stroke_id: Presence::Present(record.target.stroke_id.clone()),
         };
-        // The pivot is the centre of the geometry as painted: with the `vtxN` offsets of its element holder.
-        let posed = crate::evaluation::object_vector_kernels::render_vector_eval::vertex::vertex_posed(
-            packet.snapshot(),
-            record,
-            packet.frame(),
-        );
-        let record = posed.as_ref().map_or(record, |(posed, _)| posed);
+        // Same pre-element geometry as paint, with errors retained as refusal.
+        let posed = crate::evaluation::object_vector_kernels::render_vector_eval::painted_record(
+            packet.snapshot(), record, &packet.source_layers()[source.source_layer_index()], packet.frame(),
+        ).map_err(|e| e.message())?;
+        let record = &posed;
         let mut matrix = outer;
         if let Some(mat) = packet
             .snapshot()

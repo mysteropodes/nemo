@@ -71,8 +71,8 @@ impl ObjectCompositionWitness {
         // from the layer is listed as itself.
         let dabs = if hit_test { dab_bounds(self, index, &matrices) } else { DabBounds::default() };
         // #2372: masks are no paint command (they clip), so the hit-test listing adds each one as a `mask` item in record order,
-        // beside the content it masks. A layer's path effects reshape what its records paint, so those records are left out item
-        // by item (the editable read still refuses the layer).
+        // beside the content it masks. Masks with path effects remain outside the mask geometry reader;
+        // ordinary contours use evaluated paging, while the editable read still refuses path effects.
         let mut masks: std::collections::VecDeque<_> = if hit_test {
             packet.records().filter(|s| s.source_layer_index() == index && s.record().is_mask()).collect()
         } else {
@@ -111,9 +111,6 @@ impl ObjectCompositionWitness {
                 _ => continue,
             };
             let source = command.source();
-            if faded(&source) {
-                continue;
-            }
             let r = edited
                 .as_ref()
                 .filter(|r| r.target == source.record().target)
@@ -123,20 +120,14 @@ impl ObjectCompositionWitness {
             // #2356: the editable listing omits a record that has no editable points (a brush, textured or pressure stroke
             // whose anchors are refused) instead of failing the whole layer, so one such record never blocks vertex editing
             // of its neighbours; its per-item geometry read stays refused.
-            // The record as painted: the `vtxN` offsets of its element holder are in its bounds and matrix (and listed for the points).
+            // Hit geometry is paged at this presentation frame. Editable reads
+            // keep source anchors/indices; rebuilt paint is never exposed as an edit target.
             let posed = if hit_test {
-                crate::evaluation::object_vector_kernels::render_vector_eval::vertex::vertex_posed(
-                    packet.snapshot(),
-                    r,
-                    packet.frame(),
-                )
-            } else {
-                None
-            };
-            let (r, vertex_offsets) = match &posed {
-                Some((posed, dense)) => (posed, Some(dense.clone())),
-                None => (r, None),
-            };
+                Some(crate::evaluation::object_vector_kernels::render_vector_eval::painted_record(
+                    packet.snapshot(), r, &packet.source_layers()[index], packet.frame(),
+                ).map_err(|e| e.message())?)
+            } else { None };
+            let r = posed.as_ref().unwrap_or(r);
             let count = if hit_test {
                 r.geometry.segments.len()
             } else {
@@ -148,6 +139,9 @@ impl ObjectCompositionWitness {
                     }
                 }
             };
+            if hit_test && count > 256 {
+                return Err("Subselect evaluated contour exceeds the geometry paging bound");
+            }
             let matrix = *matrices
                 .get(&source.source_object_index())
                 .ok_or("Subselect transform is absent")?;
@@ -194,7 +188,7 @@ impl ObjectCompositionWitness {
                 style: if hit_test { record::style::listed(r) } else { None },
                 param_shape: if hit_test { record::param_shape(r) } else { None },
                 group_path: None,
-                vertex_offsets,
+                vertex_offsets: None,
             });
         }
         flush(&mut items, usize::MAX);

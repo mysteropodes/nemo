@@ -24,7 +24,8 @@ function fixture(mode){
     }else{
       const page=p.subselect,ribbon=p.stableTarget.strokeId==='ribbon',source=page.center?outline.slice(0,18):ribbon?outline:outline.slice(0,2),total=mode==='count'&&ribbon?19:source.length;
       const end=Math.min(page.cursor+page.limit,total);
-      result={atRevision:rev,documentSnapshotId:state.info.documentSnapshotId,subselect:{stableTarget:p.stableTarget,closed:ribbon&&!page.center,total,cursor:page.cursor,nextCursor:end===total?null:end,preview:false,segments:source.slice(page.cursor,end),hitTest:true}};
+      result={atRevision:rev,documentSnapshotId:state.info.documentSnapshotId,subselect:{stableTarget:p.stableTarget,closed:ribbon&&!page.center,total,cursor:page.cursor,nextCursor:end===total?null:end,preview:false,segments:source.slice(page.cursor,end).map((s,i)=>mode==='offsets'&&!ribbon&&page.cursor+i===0?{...s,point:[5,8]}:s),hitTest:true}};
+      if(page.atFrame!==undefined)result.subselect.atFrame=page.atFrame;
       if(page.center)Object.assign(result.subselect,{center:true,widths:source.slice(page.cursor,end).map((_,i)=>page.cursor+i+0.5)});
     }
     return {apiVersion:2,requestId:q.requestId,instanceId:'i',documentId:'d',contentRevision:rev,ok:true,result};
@@ -87,7 +88,7 @@ test('the layer\'s pose rides the hit-test listing to the reader, whichever page
   assert.deepEqual(again.layerMatrix,[1,0,0,1,7,-3],'a cached listing keeps its pose');
   assert.equal(f.sent.filter(q=>q.payload.view).length,1);
 });
-test('a listed vertexOffsets moves the anchor POINTS of its record only, once per read, and leaves the handles alone (C-motion-canvas-4)',async()=>{
+test('evaluated vertex contours retain point-only offsets once per read and ignore legacy offset metadata',async()=>{
   const f=fixture('offsets');
   for(const again of [false,true]){
     const r=await f.read(item=>item.role==='plain');

@@ -287,10 +287,10 @@
       if (!ok) throw fault('uncorrelated', 'Ghost frames are incomplete', 'ghost_page_incomplete');
       return freeze({ info: copyPins(o.info), presentation: o.presentation, layerUid: selector.layerUid, frames: frames });
     }
-    async function subselectGeometry(o, stableTarget, intent, paint, hitTest, center) {
+    async function subselectGeometry(o, stableTarget, intent, paint, hitTest, center, atFrame) {
       let cursor=0,segments=[],total=null,closed=null,widths=[],pointTypes=[],typed=false;
       for(;;){
-        const page={cursor:cursor,limit:16};if(intent!==undefined)page.preview=intent;if(paint)page.paint=true;if(hitTest)page.hitTest=true;if(center)page.center=true;
+        const page={cursor:cursor,limit:16};if(intent!==undefined)page.preview=intent;if(paint)page.paint=true;if(hitTest)page.hitTest=true;if(center)page.center=true;if(atFrame!==undefined)page.atFrame=atFrame;
         const r=(await queryBody(o,{atRevision:o.info.contentRevision,documentSnapshotId:o.info.documentSnapshotId,stableTarget:stableTarget,subselect:page})).subselect;
         if(total!==null&&(r.total!==total||r.closed!==closed))throw fault('uncorrelated','Subselect geometry changed between pages');
         total=r.total;closed=r.closed;segments=segments.concat(r.segments);if(center)widths=widths.concat(r.widths);if(own(r,'pointTypes')){typed=true;pointTypes=pointTypes.concat(r.pointTypes);}
@@ -357,7 +357,7 @@
       }
       const geometryOf=async(item,center)=>{
         const k=stable(item.stableTarget)+(center?'|c':''),hit=entry.geometry.get(k);if(hit)return hit;
-        const g=await subselectGeometry(o,item.stableTarget,undefined,false,true,center);requireCurrent(o);entry.geometry.set(k,g);return g;
+        const g=await subselectGeometry(o,item.stableTarget,undefined,false,true,center,center?undefined:selector.frame);requireCurrent(o);entry.geometry.set(k,g);return g;
       };
       for(const item of items){
         // #2372: a raster image or text block has no outline to page; a kept one is hit as its painted rect/glyph box.
@@ -365,8 +365,9 @@
         if(typeof wanted==='function'&&!wanted(item))continue;
         const geometry=await geometryOf(item,false);
         if(geometry.closed!==item.closed||geometry.segments.length!==item.count)throw fault('uncorrelated','Presented geometry differs from its listing');
-        // The record as PAINTED: its `vtxN` Motion offsets (listed by the engine) move the anchor points, never the handles.
-        item.segments=Array.isArray(item.vertexOffsets)&&item.vertexOffsets.length===geometry.segments.length?geometry.segments.map((a,i)=>({point:[a.point[0]+item.vertexOffsets[i][0],a.point[1]+item.vertexOffsets[i][1]],handleIn:a.handleIn,handleOut:a.handleOut})):geometry.segments;
+        // Native evaluated contour includes vertex offsets, path effects and the
+        // parametric rebuild at selector.frame. Source edit indices stay separate.
+        item.segments=geometry.segments;
         if(centres&&item.role==='ribbon'){const c=await geometryOf(item,true);
           item.center=c.segments.map((a,i)=>({point:a.point,handleIn:a.handleIn,handleOut:a.handleOut,width:c.widths[i]}));}
       }

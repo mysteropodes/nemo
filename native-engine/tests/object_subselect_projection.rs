@@ -317,3 +317,19 @@ fn pressure_preview_and_commit_use_the_painted_pivot_under_scaled_rotated_parent
     }
     assert_eq!(owner.history_depths(), (1, 0));
 }
+
+#[test]
+fn vertex_expression_failure_cannot_yield_a_rest_hit_transform() {
+    let mut doc=source();
+    doc["propertyHolders"][0]["properties"].as_array_mut().unwrap().push(json!({
+        "property":"vtx0","static":[1,2],"expression":{"enabled":true,"code":"[1,2]"}
+    }));
+    let owner=support::owner_of(&doc);
+    let s=owner.acquire_snapshot(0).unwrap();
+    let selector=ObjectFrameSelector {instance_id:s.instance_id(),document_id:s.document_id(),content_revision:0,
+        document_snapshot_id:s.snapshot_id(),context_id:"scene-root",scope_kind:FrameScopeKind::Authored,frame:0};
+    match prepare_object_frame(&s,&selector) {
+        Ok(packet) => assert!(super::matrices_hit_posed(&packet,0).is_err(),"paint refusal must remain a hit refusal"),
+        Err(error) => assert_eq!(error,crate::object_frame_packet::ObjectFrameError::Unavailable),
+    }
+}
