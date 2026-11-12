@@ -504,3 +504,18 @@ fn a_target_may_name_a_component_context_id_but_never_free_text() {
     let many = json!({"command":"object.vector.createMany","records":[record(mixed.clone()), record(created())]});
     assert!(!request(VECTOR, &many), "createMany stays on one context");
 }
+
+#[test]
+fn stored_vector_pivots_use_the_desktop_presets_and_finite_world_points_at_byte_admission() {
+    let admitted=|payload: Value| crate::wire::decode_native_request(&serde_json::to_vec(&envelope(VECTOR,payload,Some(7))).unwrap()).is_ok();
+    let base=json!({"command":"object.vector.create","record":record(created())});
+    for preset in ["tl","tc","tr","ml","mc","mr","bl","bc","br"] {
+        let mut value=base.clone();value["record"]["vectorExt"]=json!({"xformAnchorKey":preset,"xformAnchorCustom":[-10.25,80]});
+        assert!(admitted(value),"{preset}");
+    }
+    for (key,member) in [("xformAnchorKey",json!("center")),("xformAnchorKey",Value::Null),("xformAnchorKey",json!(1)),
+        ("xformAnchorCustom",json!([1])),("xformAnchorCustom",json!([1,2,3])),("xformAnchorCustom",json!([1,"2"])),
+        ("xformAnchorCustom",json!({"x":1,"y":2}))] {
+        let mut value=base.clone();value["record"]["vectorExt"]=json!({key:member});assert!(!admitted(value),"{key}");
+    }
+}

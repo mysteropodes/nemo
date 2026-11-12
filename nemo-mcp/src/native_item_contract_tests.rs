@@ -512,3 +512,27 @@ fn the_shared_result_check_routes_the_item_operations_through_this_module() {
 
 #[path = "native_item_contract_component_tests.rs"]
 mod component;
+
+#[test]
+fn stored_item_select_pivots_cross_public_bytes_but_text_patches_cannot_reanchor() {
+    let admitted=|payload: Value| crate::wire::decode_native_request(&serde_json::to_vec(&envelope(ITEM,payload,Some(7))).unwrap()).is_ok();
+    for preset in ["tl","tc","tr","ml","mc","mr","bl","bc","br"] {
+        let mut raster=json!({"command":"object.raster.create","target":created(),"item":item()});
+        raster["item"]["xformAnchorKey"]=json!(preset);raster["item"]["xformAnchorCustom"]=json!([-10,4.25]);
+        raster["item"]["skew"]=json!(89.5);assert!(admitted(raster));
+        let mut text=json!({"command":"object.text.create","target":created(),"block":block()});
+        text["block"]["xformAnchorKey"]=json!(preset);text["block"]["xformAnchorCustom"]=json!([5,-7]);assert!(admitted(text));
+    }
+    for (key,value) in [("xformAnchorKey",json!("center")),("xformAnchorKey",json!(1)),
+        ("xformAnchorCustom",Value::Null),("xformAnchorCustom",json!([1])),("xformAnchorCustom",json!([1,"2"])),
+        ("skew",json!(-90)),("skew",json!(90))] {
+        for (command,member,body) in [("object.raster.create","item",item()),("object.text.create","block",block())] {
+            let mut payload=json!({"command":command,"target":created()});payload[member]=body;payload[member][key]=value.clone();
+            assert!(!admitted(payload),"{command}: {key}");
+        }
+    }
+    for (key,value) in [("xformAnchorKey",json!("mc")),("xformAnchorCustom",json!([1,2]))] {
+        let mut payload=json!({"command":"object.text.edit","stableTarget":stable(),"patch":{"text":"content only"}});
+        payload["patch"][key]=value;assert!(!admitted(payload),"a text patch cannot replace {key}");
+    }
+}
