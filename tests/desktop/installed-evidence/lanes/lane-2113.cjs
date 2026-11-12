@@ -177,20 +177,22 @@ const rows = [
       await K.roundTrip(ctx, 'brush', e2);
     } },
 
-  { id: '2113-evaluate-vs-export-pin', title: 'evaluate agrees with the export; an edit after a pin cannot change what the pinned revision reports', tasks: ['D32', 'I16a'],
+  { id: '2113-evaluate-vs-export-pin', title: 'the evaluated layer value agrees with the export; an edit after a pin cannot change what the pinned revision reports', tasks: ['D32', 'I16a'],
+    limitations: ['The document evaluate query is an opacity-document operation (authority NativeOpacityHistory) that the object owner refuses; the evaluated value is the layer opacity sample of the object property read (rawSample view).'],
     async run(ctx) {
       const { layerUid } = await K.fresh(ctx);
       await K.apply(ctx, 'create a rectangle', P.vectorCreate(P.vectorRecord({ layerUid, segments: P.rectSegments(40, 40, 200, 160), fill: RED })));
       const e0 = await K.exportPng(ctx, 'full');
-      const valueAt = async (revision) => {
-        const b = P.evaluate(revision), res = await ctx.wire.query(b.operation, b.payload);
-        return res.ok ? { ok: true, value: (res.result.layers.find(l => l.layerUid === layerUid) || {}).value } : { ok: false, error: res.error, frontDoor: res.frontDoor === true };
+      const valueAt = async (revision, pin) => {
+        const b = P.propertyRead(revision, pin, layerUid, 'opacity'), res = await ctx.wire.query(b.operation, b.payload);
+        return res.ok ? { ok: true, value: res.result.value[0] } : { ok: false, error: res.error, frontDoor: res.frontDoor === true };
       };
-      const now0 = await ctx.wire.discover(), ev0 = await valueAt(now0.contentRevision);
+      const valueNow = async () => { const { revision, pin } = await K.pinNow(ctx); return valueAt(revision, pin); };
+      const ev0 = await valueNow();
       ctx.eq('read', 'evaluate reports full opacity for the layer', [ev0.ok, ev0.value], [true, 100]);
       await K.apply(ctx, 'layer opacity to half', () => opacityBuilder(ctx, layerUid, 0.5));
       const e1 = await K.exportPng(ctx, 'half');
-      const pinned = await ctx.wire.discover(), ev1 = await valueAt(pinned.contentRevision);
+      const ev1 = await valueNow();
       ctx.near('read', 'evaluate reports half opacity', ev1.value, 50, 0.5);
       const ratio = probe.coverageRatio(e0, e1, probe.inkBounds(e0.image).box);
       ctx.near('pixel', 'the export coverage agrees with the evaluated value', ratio, ev1.value / 100, 0.08);
@@ -199,11 +201,11 @@ const rows = [
       const e2 = await K.exportPng(ctx, 'quarter');
       ctx.ok('pixel', 'the later export shows the edit', e2.digest !== e1.digest, [e1.digest, e2.digest]);
       K.exportIntact(ctx, 'the earlier export file is byte-identical on disk after the later edit and export', e1);
-      const old = await valueAt(r1);
+      const old = await valueAt(r1, p1);
       ctx.ok('read', 'the pinned revision never reports the later value (a typed stale refusal, or the old value)', old.ok ? Math.abs(old.value - 50) < 0.5 : !old.frontDoor && STALE.includes(old.error.code), old);
       const stalePin = P.historyRead(r1, p1), staleRead = await ctx.wire.query(stalePin.operation, stalePin.payload);
       ctx.ok('reply', 'a history read with the pre-edit pin is a typed stale refusal from the owner', typed(staleRead, STALE), staleRead.ok ? 'accepted' : { code: staleRead.error.code, frontDoor: staleRead.frontDoor === true }, STALE);
-      const current = await ctx.wire.discover(), ev2 = await valueAt(current.contentRevision);
+      const ev2 = await valueNow();
       ctx.near('read', 'the current revision evaluates to a quarter', ev2.value, 25, 0.5);
       await K.step(ctx, 'undo the edit', 'undo');
       ctx.eq('pixel', 'undo returns the export to the pinned state', (await K.exportPng(ctx, 'back')).digest, e1.digest);

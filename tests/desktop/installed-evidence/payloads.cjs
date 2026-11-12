@@ -99,13 +99,13 @@ const presentationRead = revision => ({ operation: QOBJ, payload: { atRevision: 
 const meshQuery = (revision, pin, { contextId, layerUid, frame, workId, viewGeneration, page }) => ({ operation: QOBJ,
   payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'imageMesh', contextId, layerUid, frame, workId, viewGeneration, page } } });
 const propertyMetadata = (revision, pin, layerUid) => ({ operation: 'query.document.object.property.metadata', payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'properties', target: { contextId: ROOT, layerUid }, offset: 0, limit: 8 } } });
-const snapshotAcquire = () => ({ operation: 'query.document.snapshot.acquire', payload: {} });
 const historyRead = (revision, pin) => ({ operation: QOBJ + '.history', payload: { atRevision: revision, documentSnapshotId: pin } });
-const evaluate = (revision, frame = 0) => ({ operation: 'query.document.evaluate', payload: { atRevision: revision, contextId: ROOT, frame } });
-const serialize = revision => ({ operation: 'query.document.serialize', payload: { atRevision: revision } });
+// The layer's own sample of a property (rawSample view of query.document.object.property.read) at a frame, pinned.
+const propertyRead = (revision, pin, layerUid, property, frame = 0) => ({ operation: 'query.document.object.property.read',
+  payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'rawSample', target: { contextId: ROOT, layerUid }, property, frame } } });
 
 module.exports = { OBJ, ROOT, target, seg, rectSegments, solid, vectorRecord, vectorCreate, vectorReplace, vectorDelete, parametricSet, parametricTranslate, parametricScale,
   pathEffects, layerPolicy, undo, redo, groupCreate, groupUngroup, groupCombine, groupMode, groupRename, groupMemberRemove, booleanApply, booleanErase, booleanFlatten,
   layerCreate, layerDuplicate, layerRename, layerReorder, layerDelete, layerVisibility, layerSplit, selectionDelete, selectionDuplicate, clipboardCopy, clipboardCut, clipboardPaste,
   assetAttach, assetRemove, rasterMove, rasterResize, rasterRotate, rasterOpacity, textBlock, textCreate, textEdit, textDelete, textTargets, textInspect, textBody,
-  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, propertyMetadata, meshAttach, meshSetOffset, presentationRead, meshQuery, snapshotAcquire, historyRead, evaluate, serialize };
+  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, propertyMetadata, meshAttach, meshSetOffset, presentationRead, meshQuery, historyRead, propertyRead };

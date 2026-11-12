@@ -220,12 +220,13 @@ async function readObject(ctx, stableTarget) {
   const res = await ctx.wire.query(b.operation, b.payload);
   return res.ok ? { ok: true, object: res.result.object } : { ok: false, error: res.error };
 }
+// The document's layer order, read from the saved project (drawing.layers is the document order). An object project offers no
+// public serialize query: query.document.serialize is an opacity-document operation and the object owner refuses it.
 async function layerOrder(ctx) {
-  const { revision } = await pinNow(ctx);
-  const b = P.serialize(revision);
-  const res = await ctx.wire.query(b.operation, b.payload);
-  ctx.book.ok('reply', 'serialize read', res.ok && Array.isArray(res.result.document && res.result.document.layers), res.ok ? 'ok' : res.error);
-  return res.result.document.layers.map(layer => layer.layerUid);
+  const saved = await saveAs(ctx, 'order');
+  const layers = saved.document && saved.document.drawing && saved.document.drawing.layers;
+  ctx.book.ok('file', 'layer order read from the saved project', Array.isArray(layers), Array.isArray(layers) ? layers.length : 'no drawing.layers');
+  return layers.map(layer => layer.layerUid);
 }
 
 // The image mesh of the raster on `layerUid`, read through the object query's imageMesh view (the mesh id is never part of a

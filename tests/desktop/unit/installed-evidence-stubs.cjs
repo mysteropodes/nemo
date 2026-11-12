@@ -95,7 +95,7 @@ function createStubApp(options = {}) {
     return png.encodeRGBA(doc.w, doc.h, image.rgba);
   }
   const fileOf = doc => ({ format: 'stub', w: doc.w, h: doc.h, layers: doc.layers,
-    drawing: { objects: doc.strokes.map(s => ({ target: { strokeId: s.id }, layerUid: s.layerUid, ...(s.groupId ? { groupId: s.groupId } : {}), record: s.record })),
+    drawing: { layers: doc.layers.map(l => ({ layerUid: l.layerUid, name: l.name })), objects: doc.strokes.map(s => ({ target: { strokeId: s.id }, layerUid: s.layerUid, ...(s.groupId ? { groupId: s.groupId } : {}), record: s.record })),
       items: { raster: doc.rasters.map(r => ({ target: { strokeId: r.id }, item: { layerUid: r.layerUid, x: r.x, y: r.y, width: r.width, height: r.height, assetId: r.assetId, ...(r.meshId ? { meshId: r.meshId } : {}) } })) } },
     assets: doc.assets, meshes: doc.meshes });
 
@@ -148,11 +148,12 @@ function createStubApp(options = {}) {
     if (!doc || request.documentId !== doc.id) return refuse(2, request, 'wrong_document', 'wrong document');
     if (op.startsWith('command.') && request.expectedRevision !== doc.rev) return refuse(2, request, 'stale_revision', 'stale');
     switch (op) {
-      case 'query.document.snapshot.acquire': return ok(2, request, { atRevision: doc.rev, documentSnapshotId: snapshotId() });
+      // Real reply of the installed object owner (observed on the packaged candidate): the opacity-document queries are refused.
+      case 'query.document.snapshot.acquire': case 'query.document.serialize': case 'query.document.evaluate':
+        return { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId, documentId: doc.id, contentRevision: doc.rev, ok: false, error: { code: 'invalid_request', message: 'Unsupported object read operation.' } };
       case 'query.document.object.history':
         if (p.documentSnapshotId !== snapshotId()) return ownerRefusal(request, 'invalid_request', 'pin-changed');
         return ok(2, request, { atRevision: doc.rev, documentSnapshotId: snapshotId(), undoDepth: doc.undo.length, redoDepth: doc.redo.length, offset: 0, entries: [] });
-      case 'query.document.serialize': return ok(2, request, { atRevision: doc.rev, document: { layers: doc.layers.map(l => ({ layerUid: l.layerUid })) } });
       case 'query.document.object': return objectQuery(request, doc, p);
       case 'command.document.object.vector.edit': return vectorEdit(request, doc, p);
       case 'command.document.object.undo': case 'command.document.object.redo': {

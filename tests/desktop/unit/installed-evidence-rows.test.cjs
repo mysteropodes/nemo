@@ -82,7 +82,7 @@ const samples = [
   P.brushStroke({ pin: 'snap-1', lifecycleGeneration: 1, layerUid: 'L1', groupId: 'bmb_1', path: '/tmp/b.png', companion: { x: 1, y: 2, width: 58, height: 18, opacity: 1 }, segments: [P.seg(1, 1), P.seg(9, 9)] }),
   P.compositingBlend('L1', 'multiply'), P.objectRead(0, T), P.propertyOpacity('L1', [50]), P.propertyMetadata(0, 'snap-1', 'L1'),
   P.meshAttach(T, { outline: [[0, 0], [1, 0], [1, 1]], verts: [[0, 0], [1, 0], [1, 1]], tris: [0, 1, 2], offsets: [[0, 0], [0, 0], [0, 0]], cols: 1, rows: 1 }), P.meshSetOffset('im_1', 2, 0.3, 0.25),
-  P.snapshotAcquire(), P.historyRead(0, 'snap-1'), P.evaluate(0), P.serialize(0),
+  P.historyRead(0, 'snap-1'), P.propertyRead(0, 'snap-1', 'L1', 'opacity'),
   P.vectorCreate(P.vectorRecord({ layerUid: 'L1', closed: false, segments: [P.seg(1, 1), P.seg(5, 5), P.seg(9, 1)], stroke: [0, 0, 1, 1], join: 'miter', cap: 'butt', style: { miterLimit: 3, dashArray: [12, 8], dashOffset: 0, paintOrder: 'strokeFirst' } })),
   P.vectorCreate(P.vectorRecord({ layerUid: 'L1', segments: P.rectSegments(0, 0, 4, 4), fill: [0, 0, 0, 1], ext: { pressure: { centerSegments: [{ point: { x: 0, y: 0 }, handleIn: { x: 0, y: 0 }, handleOut: { x: 0, y: 0 }, width: 6 }],
     widthProfile: [{ t: 0, width: 2 }, { t: 1, width: 12 }], strokeProfile: 'taper-out', profileBase: 3 } } })),

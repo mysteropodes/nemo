@@ -236,3 +236,20 @@ test('flatten is judged on the saved project: members and group id consumed, a r
   assert.match(noop.reason, /flatten consumed the members/);
   assert.ok(noop.assertions.some(a => /flatten the group: exactly one history entry/.test(a.id) && a.verdict === 'pass'), 'the revision and history bump alone looked fine');
 });
+
+// ---- the pin and the layer order on an object project (real reply shapes seen on the packaged candidate) -------------------------
+test('an object project refuses the opacity-document queries: the pin comes from the presentation view and the layer order from the saved project', async t => {
+  const { wire, work, app } = setup(t);
+  const ctx = K.createContext({ wire, work, rowId: 'x' });
+  await K.fresh(ctx);
+  for (const operation of ['query.document.snapshot.acquire', 'query.document.serialize', 'query.document.evaluate']) {
+    const refused = await wire.query(operation, { atRevision: 0 });
+    assert.equal(refused.ok, false);
+    assert.deepEqual([refused.error.code, refused.error.message], ['invalid_request', 'Unsupported object read operation.'], operation);
+  }
+  const { revision, pin } = await K.pinNow(ctx);
+  assert.equal(revision, 0);
+  assert.equal(typeof pin, 'string');
+  assert.deepEqual(await K.layerOrder(ctx), ['L1']);
+  assert.ok(app);
+});
