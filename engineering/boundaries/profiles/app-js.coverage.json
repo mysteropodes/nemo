@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "fef52f033a8194c9fbb5a0db674dde7396a48f54",
-    "sourceRootTree": "9836a3e5295592037a05880062afc94526444051",
+    "candidateCommit": "1766c5378f6ab5f82a85d89f1deb9381f650a8c6",
+    "sourceRootTree": "8e9208e9068f9aeaaaf0695631fdbd1e18adb01c",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "d6c88f643d4ce4e8b2d89b7f72248bfb2247f9a8",
-      "lastChangedCommit": "fef52f033a8194c9fbb5a0db674dde7396a48f54"
+      "gitTree": "79818d663c7235b6469f8c0172f38e2d8bfce5d0",
+      "lastChangedCommit": "1766c5378f6ab5f82a85d89f1deb9381f650a8c6"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,7 +35,7 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "1808d3b38e16a6fd6bb7c7e8908a5873566c9c8a594fe53ef90a13f39070935e"
+      "value": "585e46c9dcebf85bcc4203e91d61638e207637787e534d0ada36296cc0596011"
     },
     "profiles": [
       {
@@ -43,7 +43,7 @@
         "gitBlob": "813ecd4f62712de13091b919b8d15fdfdc6dfb1f",
         "sha256": "33cc562b0f4d8408c9b711345681a27d56b37dbd813a70569ab73ac37009f994",
         "moduleCount": 307,
-        "basedOnCommit": "fef52f033a8194c9fbb5a0db674dde7396a48f54"
+        "basedOnCommit": "1766c5378f6ab5f82a85d89f1deb9381f650a8c6"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -61,8 +61,8 @@
       },
       {
         "path": "THIRD_PARTY_NOTICES.md",
-        "gitBlob": "2fe3f743ad9d79fd82a21dc2593bd7f41e5278ee",
-        "sha256": "da100ec9fb51cfe7a139440c4b05151c56a68ed0e79b23ef5212bcb15d61d337"
+        "gitBlob": "fd434f77befe37b13d81dc5ed009c33e557d6763",
+        "sha256": "6462b93ffe8679c22e7c211bb779983fb9fadaa45036e6c49e9c8abcb506c347"
       },
       {
         "path": "src/wasm/package.json",

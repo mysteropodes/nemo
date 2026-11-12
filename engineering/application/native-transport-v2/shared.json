@@ -5914,7 +5914,8 @@
               "atFrame": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 4294967295
+                "maximum": 4294967295,
+                "description": "Evaluation frame for a painted contour, or with center:true the source centerline after admitted vertex Motion; Trim keeps original centerline identity and ignores vertex/size tracks."
               }
             },
             "allOf": [
@@ -5930,11 +5931,6 @@
                   ],
                   "not": {
                     "anyOf": [
-                      {
-                        "required": [
-                          "center"
-                        ]
-                      },
                       {
                         "required": [
                           "paint"

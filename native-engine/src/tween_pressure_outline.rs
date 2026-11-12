@@ -1,7 +1,17 @@
 //! Pressure outline reconstruction from the interpolated centerline and widths.
 use crate::object_document::pressure_geometry::*;
 pub(crate) fn pressure_outline(center: &[SegOut], widths: &[f64]) -> R<Vec<SegOut>> {
-    if center.len() < 2 || center.len() != widths.len() {
+    let (pts, ws) = sample_centerline(center, widths, None)?;
+    outline_samples(&pts, &ws)
+}
+
+/// Baseline sampleVectorBrushCenterline, shared before animated width scaling.
+pub(crate) fn sample_centerline(
+    center: &[SegOut],
+    widths: &[f64],
+    profile: Option<&[(f64, f64)]>,
+) -> R<(Vec<[f64; 2]>, Vec<f64>)> {
+    if center.len() < 2 || (profile.is_none() && center.len() != widths.len()) {
         return Err(Error::InvalidRequest);
     }
     let sampler = PathSampler::new(&path_of(center, false));
@@ -28,10 +38,15 @@ pub(crate) fn pressure_outline(center: &[SegOut], widths: &[f64]) -> R<Vec<SegOu
             wi += 1;
         }
         let t = ((at - lens[wi]) / (lens[wi + 1] - lens[wi]).max(0.0001)).clamp(0., 1.);
-        ws.push(widths[wi] + (widths[wi + 1] - widths[wi]) * t);
+        ws.push(match profile {
+            Some(profile) => width_at_frac(profile, d / sampler.total.max(0.0001))
+                .ok_or(Error::InvalidRequest)?,
+            None => widths[wi] + (widths[wi + 1] - widths[wi]) * t,
+        });
     }
-    outline_samples(&pts, &ws)
+    Ok((pts, ws))
 }
+
 fn tangent(a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
     let d = [b[0] - a[0], b[1] - a[1]];
     let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
@@ -42,6 +57,9 @@ fn tangent(a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
     }
 }
 pub(crate) fn outline_samples(pts: &[[f64; 2]], widths: &[f64]) -> R<Vec<SegOut>> {
+    cleanup_outline(outline_samples_raw(pts, widths)?)
+}
+pub(crate) fn outline_samples_raw(pts: &[[f64; 2]], widths: &[f64]) -> R<Vec<SegOut>> {
     if pts.len() < 2 || pts.len() != widths.len() {
         return Err(Error::InvalidRequest);
     }
@@ -53,7 +71,7 @@ pub(crate) fn outline_samples(pts: &[[f64; 2]], widths: &[f64]) -> R<Vec<SegOut>
         .sum();
     let gap = (pts[0][0] - pts[n - 1][0]).hypot(pts[0][1] - pts[n - 1][1]);
     if n >= 8 && gap < 6f64.max(avg * 0.6) && travel > avg * 3. {
-        return cleanup_outline(ring_outline(pts, widths, avg)?);
+        return ring_outline(pts, widths, avg);
     }
     let (mut left, mut right, mut tangents) = (vec![], vec![], vec![]);
     for i in 0..n {
@@ -87,7 +105,7 @@ pub(crate) fn outline_samples(pts: &[[f64; 2]], widths: &[f64]) -> R<Vec<SegOut>
     left.extend(end);
     left.extend(right);
     left.extend(start);
-    cleanup_outline(left)
+    Ok(left)
 }
 
 fn ring_outline(pts: &[[f64; 2]], widths: &[f64], avg: f64) -> R<Vec<SegOut>> {
@@ -172,19 +190,6 @@ pub(crate) fn profiled_outline(center: &[SegOut], profile: &[(f64, f64)]) -> R<V
     if center.len() < 2 || profile.is_empty() {
         return Err(Error::InvalidRequest);
     }
-    let sampler = PathSampler::new(&path_of(center, false));
-    let steps = (sampler.total / 6.).round().max(8.) as usize;
-    if steps > 8192 {
-        return Err(Error::Unavailable);
-    }
-    let (mut pts, mut ws) = (vec![], vec![]);
-    for i in 0..=steps {
-        let d = sampler.total * i as f64 / steps as f64;
-        let p = sampler.point_at(d);
-        pts.push([p.x, p.y]);
-        ws.push(
-            width_at_frac(profile, d / sampler.total.max(0.0001)).ok_or(Error::InvalidRequest)?,
-        );
-    }
+    let (pts, ws) = sample_centerline(center, &[], Some(profile))?;
     outline_samples(&pts, &ws)
 }

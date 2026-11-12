@@ -201,7 +201,7 @@
     if (!layer) return null;
     try {
       data = await s.session.readPresentedStrokes({ contextId: heldId(root), layerUid: layer.layerUid, frame: s.presentation.frame }, s.pin,
-        function (item) { return !wanted || wanted(item, worldBounds(item)); }, centres);
+        function (item) { return !wanted || wanted(item, worldBounds(item)); }, centres || (root.state && root.state.appMode === 'motion' ? 'motion' : false));
     } catch (error) {
       if (!error || error.code !== 'stale_revision' || (attempt || 0) >= 3) throw error;
       await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 30); });

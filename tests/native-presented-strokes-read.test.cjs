@@ -22,7 +22,7 @@ function fixture(mode){
       if(mode==='offsets')result.items[0].vertexOffsets=[[5,-2],[0,0]];
       if(mode==='pose'||mode==='bytes-pose')result.layerMatrix=[1,0,0,1,7,-3];
     }else{
-      const page=p.subselect,ribbon=p.stableTarget.strokeId==='ribbon',source=page.center?outline.slice(0,18):ribbon?outline:outline.slice(0,2),total=mode==='count'&&ribbon?19:source.length;
+      const page=p.subselect,ribbon=p.stableTarget.strokeId==='ribbon',source=page.center?outline.slice(0,18).map(s=>mode==='motion-centres'&&page.atFrame!==undefined?{...s,point:[s.point[0]+5,s.point[1]-3]}:s):ribbon?outline:outline.slice(0,2),total=mode==='count'&&ribbon?19:source.length;
       const end=Math.min(page.cursor+page.limit,total);
       result={atRevision:rev,documentSnapshotId:state.info.documentSnapshotId,subselect:{stableTarget:p.stableTarget,closed:ribbon&&!page.center,total,cursor:page.cursor,nextCursor:end===total?null:end,preview:false,segments:source.slice(page.cursor,end).map((s,i)=>mode==='offsets'&&!ribbon&&page.cursor+i===0?{...s,point:[5,8]}:s),hitTest:true}};
       if(page.atFrame!==undefined)result.subselect.atFrame=page.atFrame;
@@ -95,4 +95,14 @@ test('evaluated vertex contours retain point-only offsets once per read and igno
     assert.deepEqual(r.items[0].segments,[{point:[5,8],handleIn:[0,0],handleOut:[0,0]},{point:[1,10],handleIn:[0,0],handleOut:[0,0]}],again?'a cached geometry page is not offset twice':'first read');
   }
   assert.equal(f.outline[0].point[0],0,'the stored geometry is never mutated');
+});
+
+test('Motion centerline pages are frame-correlated and never reuse cached stored sculpt centers',async()=>{
+ const f=fixture('motion-centres');
+ const stored=await f.read(undefined,true);assert.deepEqual(stored.items[1].center[0].point,[0,10]);
+ const motion=await f.read(undefined,'motion');assert.deepEqual(motion.items[1].center[0].point,[5,7]);
+ assert.equal(motion.items[1].center[0].width,stored.items[1].center[0].width);
+ const centers=f.sent.filter(q=>q.payload.subselect&&q.payload.subselect.center).map(q=>q.payload.subselect);
+ assert.deepEqual(centers.map(p=>[p.cursor,p.atFrame]),[[0,undefined],[16,undefined],[0,0],[16,0]]);
+ const n=f.sent.length;await f.read(undefined,'motion');assert.equal(f.sent.length,n,'evaluated centers cache only in their own frame');
 });
