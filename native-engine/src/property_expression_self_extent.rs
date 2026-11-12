@@ -12,19 +12,26 @@
 //! frame count and fps apply. Frames need no project metadata; seconds do, so a bare
 //! drawing refuses them instead of inventing Motion's `|| 24`.
 //!
+//! An evaluation frame at or past the context's `totalFrames` is refused
+//! (`FrameOutOfRange`), and a time link's offsets are sampled at that evaluation frame.
+//!
 //! `contentBox()` is the Paper `bounds` of the holder's live item, else of its whole
-//! layer: tight cubic bounds BEFORE the layer's own Motion. Motion answers the loaded
-//! frame; here the frame is explicit. Motion maps "no layer" and "no geometry" to the
-//! same zero box; this kernel keeps [`ContentBox::Missing`] distinct from a real
-//! zero-size box (a one-anchor path), and [`ContentBox::motion_value`] restores the
-//! Motion mapping. Raster/text items, rigged layers and legacy contours are refused:
-//! their Paper bounds need providers this evaluation-layer kernel does not own.
+//! layer. `loadFrame` builds those items from `getEffectiveStrokesRendered`: the stored
+//! strokes of the held key after the layer's path effects. Element and vertex Motion,
+//! the parametric rebuild and layer Motion are applied only when rendering, so none is
+//! applied here and no property or expression is sampled; the read therefore also
+//! answers inside an element's own expression. Motion answers the loaded frame; here
+//! the frame is explicit. Motion maps "no layer" and "no geometry" to the same zero
+//! box; this kernel keeps [`ContentBox::Missing`] distinct from a real zero-size box,
+//! and [`ContentBox::motion_value`] restores the Motion mapping. Typed refusals: a
+//! component context, a component instance, a duplicator host (its copies are in the
+//! Paper layer), a rig, raster/text items and any non-`editable-vector-path` record.
 
 use crate::evaluation::object_component_kernels::object_context_resolver::{
     ContextSource, ResolvedContext,
 };
 use crate::evaluation::object_vector_kernels::render_vector_eval::{
-    evaluate_record_rest_with_pose, evaluate_vector_rest, is_vector_record,
+    from_path, is_vector_record, load_stored, run_path_fx, EvaluatedVector,
 };
 use crate::evaluation::property_expression_lookup::marker_binding::{
     snapshot_fps, MarkerBindingError,
@@ -33,9 +40,7 @@ use crate::evaluation::property_expression_lookup::LookupRefusal;
 use crate::evaluation::property_expression_views::ExpressionContextView;
 use crate::object_document::{RangeError, RangeEvaluator};
 use crate::object_frame_packet::projection::layer_bounds;
-use crate::object_frame_packet::{
-    prepare_object_rest_geometry_frame, FrameScopeKind, ObjectFrameSelector,
-};
+use crate::object_frame_packet::FrameScopeKind;
 use crate::revision::ObjectSnapshot;
 
 /// Why an extent or a content box cannot be answered.
@@ -225,8 +230,10 @@ pub(crate) fn content_box(
     layer_box(snapshot, context_id, this.layer_uid(), None, frame)
 }
 
-/// Tight rest bounds of the vector records `layer_uid` shows at `frame`, optionally
-/// only the record of `stroke`. Every record comes from the context's own table.
+/// Paper `bounds` of what `loadFrame` builds for `layer_uid` at `frame`: its stored
+/// strokes at the held key after the layer's path effects (`getEffectiveStrokesRendered`),
+/// optionally only the stroke `stroke`. Element/vertex Motion and parametric rebuilds are
+/// render-time stages Paper never sees, so none is applied; nothing is sampled.
 pub(crate) fn layer_box(
     snapshot: &ObjectSnapshot,
     context_id: &str,
@@ -235,36 +242,48 @@ pub(crate) fn layer_box(
     frame: u32,
 ) -> Result<ContentBox, SelfExtentError> {
     use SelfExtentError::Geometry;
+    let source = ContextSource::of_document(snapshot.document());
     let context = resolve(snapshot, context_id)?;
-    let selector = ObjectFrameSelector {
-        instance_id: snapshot.instance_id(),
-        document_id: snapshot.document_id(),
-        content_revision: snapshot.content_revision(),
-        document_snapshot_id: snapshot.snapshot_id(),
-        context_id: context.id(),
-        scope_kind: FrameScopeKind::Authored,
-        frame,
-    };
-    // Rest geometry only: no property, expression or control is evaluated here, which
-    // is what keeps this read free of the expression it answers.
-    let packet = prepare_object_rest_geometry_frame(snapshot, &selector)
-        .map_err(|_| Geometry("the frame packet cannot be prepared"))?;
-    let index = packet
-        .source_layers()
-        .iter()
-        .position(|l| l.layer_uid() == layer_uid)
+    let (_, layer) = context
+        .layer(layer_uid)
         .ok_or(SelfExtentError::UnknownLayer)?;
-    if packet.source_layers()[index].rig().is_some() {
+    if context.id() != "scene-root" {
+        return Err(Geometry(
+            "component strokes need a context-scoped stored loader",
+        ));
+    }
+    if source.instance(layer_uid).is_some() {
+        return Err(Geometry(
+            "a component instance is boxed on its composed geometry",
+        ));
+    }
+    let duplicators = snapshot.document().duplicator_set();
+    if duplicators.is_some_and(|set| set.duplicator(context.id(), layer_uid).is_some()) {
+        return Err(Geometry("a duplicator layer is boxed with its copies"));
+    }
+    if layer.rig().is_some() {
         return Err(Geometry("a rigged layer is boxed on its posed strokes"));
     }
-    // Out of range or blank: the live Paper layer is empty.
-    let Some(held) = packet.source_frame_for_layer(index) else {
+    let ranges = RangeEvaluator::for_document(snapshot.document(), context.id(), frame)
+        .map_err(SelfExtentError::Range)?;
+    let timing = layer
+        .timing
+        .value()
+        .ok_or(SelfExtentError::Range(RangeError::TimingUnavailable))?;
+    // The held key (`timing.exposure`) and the in/out gate of the frame selection.
+    let gated = ranges.gates(layer_uid).map_err(SelfExtentError::Range)?;
+    let shown = !gated
+        || ranges
+            .resolve(layer_uid, true)
+            .map_err(SelfExtentError::Range)?
+            .contains(frame);
+    let Some(held) = timing.exposure(frame).1.filter(|_| shown) else {
         return Ok(ContentBox::Missing);
     };
     let at_held = |t: &crate::object_document::ObjectTarget| {
         t.context_id() == context.id()
             && t.layer_uid() == layer_uid
-            && t.scope_kind() == packet.scope_kind()
+            && t.scope_kind() == &FrameScopeKind::Authored
             && t.frame() == held
             && stroke.map_or(true, |s| t.stroke_id() == s)
     };
@@ -278,17 +297,19 @@ pub(crate) fn layer_box(
             continue;
         }
         if !is_vector_record(record) {
-            return Err(Geometry("a legacy contour record has no evaluated bounds"));
+            return Err(Geometry(
+                "only editable-vector-path records have a stored box here",
+            ));
         }
-        let vector = match packet.records().find(|r| r.source_object_index() == at) {
-            Some(source) => evaluate_record_rest_with_pose(&packet, source, None),
-            None if context.id() != "scene-root" => {
-                return Err(Geometry("a component record is not in its frame packet"));
-            }
-            None => evaluate_vector_rest(snapshot, at, packet.frame()),
-        }
-        .map_err(|_| Geometry("the record geometry cannot be evaluated"))?;
-        vectors.push(vector);
+        let stored =
+            load_stored(snapshot, at).map_err(|_| Geometry("the stored stroke cannot be read"))?;
+        let after = run_path_fx(stored.stack.as_deref(), &stored.stroke, frame)
+            .map_err(|_| Geometry("the layer path effects cannot be applied"))?;
+        vectors.push(EvaluatedVector {
+            source_object_index: at,
+            closed: after.closed,
+            segments: after.segments.iter().flatten().map(from_path).collect(),
+        });
     }
     let bounds = layer_bounds(&vectors).map_err(|_| Geometry("the bounds are not finite"))?;
     Ok(bounds.map_or(ContentBox::Missing, |b| ContentBox::Bounds {

@@ -276,10 +276,6 @@ fn content_box_reads_the_pinned_rest_geometry() {
     let gone = view(&p, "scene-root", "F", Some("f1"));
     assert_eq!(content_box(&gone, &p, 0), Ok(bounds(0., 0., 4., 4.)));
     assert_eq!(content_box(&gone, &p, 6), Ok(bounds(8., 8., 1., 1.)));
-    assert_eq!(
-        content_box(&layer, &p, 3).unwrap().motion_value(),
-        [20., 30., 190., 180.]
-    );
 }
 
 #[test]
@@ -296,4 +292,70 @@ fn a_zero_size_box_is_not_missing_geometry() {
     // Motion maps both absences to zeros; only a real box keeps its position.
     assert_eq!(empty.motion_value(), [0.0; 4]);
     assert_eq!(point.motion_value(), [50., 60., 0., 0.]);
+}
+
+/// [`drawing`] with `property` on the only property holder, element A/a1.
+fn with_element_position(property: Value) -> ObjectSnapshot {
+    let mut d = drawing();
+    d["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"A",
+        "strokeId":"a1"},"properties":[property]}]);
+    pin(&project(d, 24.0))
+}
+
+#[test]
+fn element_motion_is_a_render_stage_the_box_never_sees() {
+    // Paper holds the unposed strokes: a keyed +50 element offset moves nothing.
+    let keyed = json!({"property":"position","track":{"keys":[{"frame":0,"v":[50,0]},
+        {"frame":10,"v":[80,0]}]}});
+    let p = with_element_position(keyed);
+    for (stroke, want) in [
+        (Some("a1"), bounds(20., 30., 100., 60.)),
+        (None, bounds(20., 30., 190., 180.)),
+    ] {
+        assert_eq!(
+            content_box(&view(&p, "scene-root", "A", stroke), &p, 3),
+            Ok(want)
+        );
+    }
+    // Inside the element's own expression nothing is sampled, so the box answers.
+    let driven = json!({"property":"position","static":[20,0],
+        "expression":{"enabled":true,"code":"[20, 0]"}});
+    let p = with_element_position(driven);
+    let own = view(&p, "scene-root", "A", Some("a1"));
+    assert_eq!(content_box(&own, &p, 3), Ok(bounds(20., 30., 100., 60.)));
+    let layer = view(&p, "scene-root", "A", None);
+    assert_eq!(content_box(&layer, &p, 3), Ok(bounds(20., 30., 190., 180.)));
+}
+
+#[test]
+fn duplicator_hosts_and_component_instances_are_refused() {
+    let mut d = drawing();
+    d["componentTables"] = json!({
+        "duplicators":{"format":"nemo.native-duplicator-set","formatVersion":1,
+            "effectorLayers":[],"duplicators":[
+                {"contextId":"scene-root","layerUid":"B","duplicator":{"mode":"path"}}]},
+        "components":{"format":"nemo.native-component-set","formatVersion":1,
+            "components":[{"symbolId":"sym","totalFrames":3,"layers":[{"layerUid":"inside"}],
+                "objects":[]}],
+            "instances":[{"contextId":"scene-root","layerUid":"N","symbolId":"sym",
+                "symSpeed":1,"symPlacedAt":0,"symMatrix":[1,0,0,1,0,0],
+                "frameKeys":[{"frame":0,"componentFrame":0}]}]}});
+    let p = pin(&project(d, 24.0));
+    let refused = |uid: &str| content_box(&view(&p, "scene-root", uid, None), &p, 0);
+    for (uid, why) in [
+        ("B", "a duplicator layer is boxed with its copies"),
+        (
+            "N",
+            "a component instance is boxed on its composed geometry",
+        ),
+    ] {
+        assert_eq!(refused(uid), Err(E::Geometry(why)));
+    }
+    // Neighbouring plain layers still answer from their stored strokes.
+    assert_eq!(refused("C"), Ok(bounds(5., 5., 5., 5.)));
+    // A component context is refused rather than boxed from the scene table.
+    assert!(matches!(
+        content_box(&view(&p, "sym", "inside", None), &p, 0),
+        Err(E::Geometry(_))
+    ));
 }
