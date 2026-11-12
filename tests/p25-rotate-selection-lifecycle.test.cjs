@@ -274,7 +274,7 @@ test('the duplicate select-bridge rotate writer is retired while scale, skew, la
   assert.match(bridge, /mode = 'layer-multi-' \+ mlHit\.type/);
   assert.match(bridge, /mode = 'nv-rotate'/);
   assert.match(bridge, /NemoNativeSelectGesture\.bind\(window\)/, 'native Select remains the engine-on rotation owner');
-  assert.match(bridge, /nativePaperToolGesturePending = true/, 'engine-off presses are delegated to the Paper Tool event route');
+  assert.match(bridge, /nativePaperToolPointer = e\.pointerId/, 'engine-off presses are delegated to the Paper Tool event route');
   assert.match(bridge, /NemoNativeSelectGesture\.paperTool\(window, 'cancel'\)/, 'capture loss cancels the delegated controller');
   assert.match(bridge, /nativePaperRotateRingPress\(e\)/, 'only an actual native rotate ring is delegated to Paper Tool');
   assert.match(bridge, /Selection rotation requires the native gesture owner; this fallback cannot rotate selections\./, 'the legacy ring press has an explicit unavailable-authority notice');
@@ -307,7 +307,7 @@ test('runtime: the real Paper Tool entry starts the shared adapter with its root
   const bridge = src('src/js/select-bridge.js'), tools = src('src/js/tools.js');
   assert.match(bridge, /function nativePaperRotateRingPress\(e\)[\s\S]*?hit\.type === 'rotate'/);
   assert.match(bridge, /nativePointer\(\)\[method\]\(e\)/, 'non-rotate clicks and handles keep the native pointer intent route');
-  assert.match(tools, /G\.paperTool\(window,'down',event\.event,function\(\)\{return !nativePaperSelectOwner\(\);\}\)/, 'the actual Tool forwards root before event, preventing the old begin(root,e,abort) arity regression');
+  assert.match(tools, /G\.paperTool\(window,'down',event\.event,window\.SMSelectBridge && window\.SMSelectBridge\.cancelMarquee\)/, 'the actual Tool forwards root before event, preventing the old begin(root,e,abort) arity regression');
 });
 
 function bootSelect(cutover, opts = {}) {
@@ -315,13 +315,22 @@ function bootSelect(cutover, opts = {}) {
   const context = { console, Object, state: { tool: 'select', playing: false, appMode: 'anim2d', layers: [{ locked: false }], activeLayerIdx: 0, selectedStrokeIndices: [] },
     document: { readyState: 'complete', addEventListener() {}, getElementById: () => target }, Point: function Point(x, y) { this.x = x; this.y = y; }, window: null };
   context.calls = calls;
-  context.window = context; context.addEventListener = () => {}; context.selectedPaths = opts.selected ? [{}] : [];
+  context.window = context; context.addEventListener = (type, fn) => { handlers[type] = fn; }; context.selectedPaths = opts.selected ? [{}] : [];
   context.multiLayerSelectionBox = () => null; context.multiLayerHit = () => null;
   context.paramShapeSelectionSingle = () => null; context.hitTestArc = () => opts.arc ? {} : null;
   context.showToast = (message) => calls.notices.push(message);
   context.SMEngineBridge = { isEnabled: () => opts.engineEnabled !== false, screenToWorld: () => { calls.world++; return [0, 0]; }, suspend() { calls.suspend++; } };
   context.pushUndo = () => { calls.undo++; };
   context.ensureKeyframe = () => { calls.key++; };
+  if (opts.nativeRing) {
+    const center = { x: 70, y: 70 }, box = { center, width: 120, height: 120, handles: [] };
+    context.selectedPaths = [{ data: { nativeStableTarget: { strokeId: 'A' } } }];
+    context.NemoSelectCanvasIntent = { objectProject: () => true, pickContext: () => 'selection',
+      presentedState: () => ({ pin: {}, presentation: {} }), worldPoint: (_root, x, y) => ({ x, y, perPixel: 1 }) };
+    context.NemoNativeSelectOverlay = { selectionContext: () => 'selection', boxOf: () => box };
+    context.NemoNativeSelectPivot = { pointOf: () => center };
+    context.NemoNativeSelectGesture = { hitHandle: Gesture.hitHandle, paperTool: (_root, phase) => calls.notices.push(phase) };
+  }
   if (cutover !== undefined) context.NemoNativeOpacityCutover = cutover;
   let source = src('src/js/select-bridge.js');
   if (opts.rotateHit) source = source.replace('return window.NemoSelectCanvasIntent.hitHandles(computeHandles(), pt, altHeld, view.zoom);', 'calls.handles++; return { type: \'rotate\' };');
@@ -330,6 +339,20 @@ function bootSelect(cutover, opts = {}) {
   return { handlers, calls };
 }
 const pointer = (type) => { const e = { type, button: 0, pointerId: 1, buttons: 1, clientX: 106, clientY: 70, stopped: 0, stopImmediatePropagation() { this.stopped++; }, preventDefault() {} }; return e; };
+
+test('the engine-off rotate ring reserves its own pointer and releases the Paper Tool when the window blurs', () => {
+  const { handlers, calls } = bootSelect({ blocksLegacy: () => true }, { engineEnabled: false, nativeRing: true });
+  const owner = pointer('pointerdown'); handlers.pointerdown(owner);
+  assert.equal(owner.stopped, 0, 'the primary ring press reaches the Paper Tool');
+  const foreign = { ...pointer('pointercancel'), pointerId: 2 }; handlers.pointercancel(foreign);
+  assert.equal(foreign.stopped, 1); assert.deepEqual(calls.notices, [], 'another pointer cannot cancel the drag');
+  handlers.blur(); handlers.blur();
+  assert.deepEqual(calls.notices, ['cancel'], 'blur cancels the delegated pointer exactly once');
+  const next = pointer('pointerdown'); handlers.pointerdown(next);
+  assert.equal(next.stopped, 0);
+  handlers.pointercancel(pointer('pointercancel'));
+  assert.deepEqual(calls.notices, ['cancel', 'cancel'], 'the next drag has its own cancellation');
+});
 
 test('runtime: with the native cutover owning the canvas (or throwing) a Select press / drag / release is consumed and the legacy writer never reads the canvas', () => {
   for (const cutover of [{ blocksLegacy: () => true }, { blocksLegacy() { throw new Error('boom'); } }, null]) {

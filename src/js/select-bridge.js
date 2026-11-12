@@ -473,7 +473,7 @@
 
   function allowLegacySelectionEdit(e,k){var c=window.NemoNativeOpacityCutover,b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{if(c!==undefined&&(!c||typeof c.blocksLegacy!=='function'||c.blocksLegacy()!==false)){if(e){e.stopImmediatePropagation();e.preventDefault();}return false;}a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){a=false;}if(!a&&e){e.stopImmediatePropagation();e.preventDefault();}return a;}
   function guardMenuItems(a){return a.map(function(i){if(i.action){var f=i.action;i.action=function(){if(allowLegacySelectionEdit(null,'select'))return f.apply(this,arguments);};}return i;});}
-  var nativePointerIntent = null, nativeLayersRef = null, nativeLayersEpoch = 0, nativePaperToolGesturePending = false;
+  var nativePointerIntent = null, nativeLayersRef = null, nativeLayersEpoch = 0, nativePaperToolPointer = null;
   function nativePointer() {
     if (nativePointerIntent) return nativePointerIntent;
     nativePointerIntent = window.NemoSelectCanvasIntent.create({
@@ -532,9 +532,21 @@
     });
     return nativePointerIntent;
   }
+  function cancelPaperToolPointer() {
+    if (nativePaperToolPointer === null) return;
+    nativePaperToolPointer = null;
+    window.NemoNativeSelectGesture.paperTool(window, 'cancel');
+  }
+  function cancelNativeSelection() {
+    cancelPaperToolPointer();
+    if (nativePointerIntent) nativePointerIntent.cancel();
+  }
   function nativePointerEvent(method, e) {
-    if (nativePaperToolGesturePending) {
-      if (method === 'cancelEvent') { nativePaperToolGesturePending = false; if (window.NemoNativeSelectGesture) window.NemoNativeSelectGesture.paperTool(window, 'cancel'); return true; }
+    if (nativePaperToolPointer !== null) {
+      if (e.pointerId !== undefined && e.pointerId !== nativePaperToolPointer) {
+        e.stopImmediatePropagation(); e.preventDefault(); return true;
+      }
+      if (method === 'cancelEvent') { cancelPaperToolPointer(); return true; }
       if (method === 'down' || method === 'move' || method === 'up') return false;
     }
     if(window.NemoNativeCommentsUI&&NemoNativeCommentsUI.handle(window,method,e,nativePointerIntent&&nativePointerIntent.cancel))return true;
@@ -547,9 +559,10 @@
     if (!Object.prototype.hasOwnProperty.call(window, 'NemoNativeOpacityCutover')) return false;
     try {
       var c = window.NemoNativeOpacityCutover;
-      if (c && typeof c.blocksLegacy === 'function' && c.blocksLegacy() === false) return false;
+      var owns = c && typeof c.blocksLegacy === 'function' ? c.blocksLegacy() : null;
+      if (owns === false) return false;
       if (state.tool === 'subselect') return true; // Direct Select owns its native controller (subselect-bridge, document capture): never consume its gesture
-      if (state.tool === 'select' && method === 'down' && !(window.SMEngineBridge && window.SMEngineBridge.isEnabled()) && nativePaperRotateRingPress(e)) { nativePaperToolGesturePending = true; return false; }
+      if (owns === true && state.tool === 'select' && method === 'down' && Number.isSafeInteger(e.pointerId) && !(window.SMEngineBridge && typeof window.SMEngineBridge.isEnabled === 'function' && window.SMEngineBridge.isEnabled()) && nativePaperRotateRingPress(e)) { nativePaperToolPointer = e.pointerId; return false; }
       nativePointer()[method](e);
     } catch (_) {
       if (method === 'down' && window.showToast) showToast('Native Select gestures are unavailable.');
@@ -796,7 +809,7 @@
 
   var lastPt = null, motionGesture = false;
   function onDown(e) {
-    if (nativePaperToolGesturePending) return;
+    if (nativePaperToolPointer !== null) return;
     // Right/middle-click never drives select/marquee/move/Motion-drag — a
     // pre-existing gap (no button check at all) that used to go unnoticed
     // since a right-click did nothing visible either way; surfaced once
@@ -1796,7 +1809,7 @@
   }
 
   function onMove(e) {
-    if (nativePaperToolGesturePending) return;
+    if (nativePaperToolPointer !== null) return;
     if (state.appMode === 'motion' && window.SMMotion) {
       var w1 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
       // shiftKey travels with the point (2026-09, #802): Motion's own drags
@@ -2463,7 +2476,7 @@
   }
 
   function onUp(e) {
-    if (nativePaperToolGesturePending) { nativePaperToolGesturePending = false; return; }
+    if (nativePaperToolPointer !== null) { nativePaperToolPointer = null; return; }
     if ((mode || draggingArc || motionGesture) && !allowLegacySelectionEdit(e, 'select')) return;
     // See onDown's comment — clears _motionDrag if a motion handle/dot/
     // anchor drag was in progress; no-ops otherwise. Must run even though
@@ -3531,7 +3544,7 @@
   // pre-distort rectangle while a corner-pin drag is in progress.
   window.SMSelectBridge = {
     refreshAfterDocumentRestore: function () {
-      if (nativePointerIntent) nativePointerIntent.cancel();
+      cancelNativeSelection();
       // Undo/redo rebuilds every Paper item: gesture-local object references point at removed geometry after the restore.
       mode = null;
       draggingArc = null;
@@ -3569,7 +3582,7 @@
     // already handles committing what THEY changed; this isn't a general
     // abandon-any-gesture hook).
     cancelMarquee: function () {
-      if (nativePointerIntent) nativePointerIntent.cancel();
+      cancelNativeSelection();
       if (mode !== 'marquee') return;
       if (_marquee.rect) { _marquee.rect.remove(); _marquee.rect = null; }
       _marquee.active = false;
@@ -3586,7 +3599,7 @@
     target.addEventListener('pointerup', function (e) { if (!nativePointerEvent('up', e)) onUp(e); }, { capture: true });
     target.addEventListener('pointercancel', function (e) { if (!nativePointerEvent('cancelEvent', e)) onUp(e); }, { capture: true });
     target.addEventListener('lostpointercapture', function (e) { nativePointerEvent('cancelEvent', e); }, { capture: true });
-    window.addEventListener('blur', function () { if (nativePointerIntent) nativePointerIntent.cancel(); });
+    window.addEventListener('blur', cancelNativeSelection);
     target.addEventListener('contextmenu', function (e) { if (!nativePointerEvent('cancelEvent', e)) { onContext(e); return; } if (shouldIntercept() && window.NemoNativeSelectMenu) window.NemoNativeSelectMenu.open(window, e); /* #2372: a native project's Select menu */ }, { capture: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

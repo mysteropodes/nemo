@@ -101,6 +101,7 @@ async function fixture(initial, browser = false, wait = false) {
   root.NemoNativeObjectProject={desktop:()=>session};
   root.NemoNativeObjectProjectFile={projectionReadyForUI:(valueRoot,value)=>!running&&ProjectFile.projectionReadyForUI(valueRoot,value)};
   root.NemoNativeTextToolDesktop={handle(_root,method){text++;return root.state.tool==='text';}};
+  root.nativePaperToolPointer=null;
   root.nativePointerIntent={cancel(){},snapshot(){return null;}};
   root.nativePointer=()=>({down(){select++;},move(){select++;},up(){select++;},cancelEvent(){select++;}});
   root.onDown=()=>{throw Error('legacy native pointer');};root.onMove=()=>{};root.onUp=()=>{};root.onContext=()=>{};
@@ -110,7 +111,7 @@ async function fixture(initial, browser = false, wait = false) {
   const avatars=timeline.indexOf('function refreshFbAvatars(){');
   vm.runInContext(timeline.slice(avatars,timeline.indexOf('// ---- GitHub feedback triage dashboard',avatars)),context);
   const bridge=fs.readFileSync(require.resolve('../src/js/select-bridge.js'),'utf8');
-  vm.runInContext(extractFunction(bridge,'nativePointerEvent'),context);
+  vm.runInContext(['nativePointerEvent','nativePaperRotateRingPress','cancelPaperToolPointer'].map(name=>extractFunction(bridge,name)).join('\n'),context);
   root.target=elements.get('canvas-area');
   const listeners=bridge.split('\n').filter(line=>line.includes('target.addEventListener')&&line.includes('nativePointerEvent'));
   vm.runInContext(listeners.join('\n'),context);

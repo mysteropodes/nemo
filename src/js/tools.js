@@ -7101,7 +7101,7 @@ function onMouseDown(event){
   if(state.playing){stopPlay();return;}
   if(state.tool==='hand'||state.spaceDown){_nativeToolNavigation=nativeViewportNavigation('begin-pan',event.event);state.isPanning=true;return;}
   if(state.tool==='zoom'){if(nativeViewportNavigation('zoom',event.event,null,event.event.altKey ? 0.8 : 1.25))return;if(event.event.altKey)view.zoom=Math.max(.05,view.zoom*.8);else view.zoom=Math.min(20,view.zoom*1.25);updZoom();renderArcs();return;}
-  if(nativePaperSelectOwner()){var G=window.NemoNativeSelectGesture;if(G&&G.paperTool)G.paperTool(window,'down',event.event,function(){return !nativePaperSelectOwner();});else showToast('Native Select gestures are unavailable.');return;}
+  if(nativePaperSelectOwner()){var G=window.NemoNativeSelectGesture;if(G&&G.paperTool)G.paperTool(window,'down',event.event,window.SMSelectBridge && window.SMSelectBridge.cancelMarquee);else showToast('Native Select gestures are unavailable.');return;}
   if(nativePaperSelectUnavailable()){showToast('Native Select gestures are unavailable.');return;}
   if((state.tool==='select'||state.tool==='subselect'||state.tool==='fsselect')&&!allowLegacySelectionEdit(event.event,state.tool))return;
   // Motion mode (motion.js) is a persistent app-mode, not a tool value —
