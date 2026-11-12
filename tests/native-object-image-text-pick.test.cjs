@@ -84,7 +84,7 @@ function reader(items) {
     sent.push(q);
     const p = q.payload;
     const result = p.view ? { ...p.view, limit: undefined, atRevision: 0, documentSnapshotId: pin.documentSnapshotId, total: items.length, nextCursor: null, preview: false, items: items.map((i) => ({ ...i })) }
-      : { atRevision: 0, documentSnapshotId: pin.documentSnapshotId, subselect: { stableTarget: p.stableTarget, closed: false, total: 2, cursor: 0, nextCursor: null, preview: false, hitTest: true, segments: [seg(650, 300), seg(900, 300)] } };
+      : { atRevision: 0, documentSnapshotId: pin.documentSnapshotId, subselect: { stableTarget: p.stableTarget, closed: false, total: 2, cursor: 0, nextCursor: null, preview: false, hitTest: true, atFrame:p.subselect.atFrame, segments: [seg(650, 300), seg(900, 300)] } };
     delete result.limit;
     return { apiVersion: 2, requestId: q.requestId, instanceId: 'i', documentId: 'd', contentRevision: 0, ok: true, result };
   } });

@@ -1,0 +1,107 @@
+{
+  "capability": "native.layer-policy",
+  "definitions": {
+    "ObjectLayerPolicyPayload": {
+      "order": 113,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "flag",
+          "value"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.policy.edit"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "flag": {
+            "enum": [
+              "locked",
+              "shy",
+              "threeD",
+              "keyLock"
+            ]
+          },
+          "value": {
+            "description": "Boolean for locked, shy and threeD; null or in/out/layer for keyLock (null clears the layer key-lock mode).",
+            "oneOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "enum": [
+                  "in",
+                  "out",
+                  "layer"
+                ]
+              }
+            ]
+          }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "flag": {
+                "enum": [
+                  "locked",
+                  "shy",
+                  "threeD"
+                ]
+              },
+              "value": {
+                "type": "boolean"
+              }
+            }
+          },
+          {
+            "properties": {
+              "flag": {
+                "const": "keyLock"
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 4,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.policy.edit"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerPolicyPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

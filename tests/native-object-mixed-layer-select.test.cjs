@@ -32,7 +32,7 @@ function reader(mixed = true, listed = 2) {
     } else if (p.stableTarget.strokeId !== 'v') {
       return { apiVersion: 2, requestId: q.requestId, instanceId: 'i', documentId: 'd', contentRevision: 0, ok: false, error: { code: 'unavailable', message: 'Subselect target is absent.' } };
     } else {
-      result = { ...base, subselect: { stableTarget: p.stableTarget, closed: false, total: 2, cursor: 0, nextCursor: null, preview: false, ...(p.subselect.hitTest ? { hitTest: true } : {}), segments: GEOMETRY } };
+      result = { ...base, subselect: { stableTarget: p.stableTarget, closed: false, total: 2, cursor: 0, nextCursor: null, preview: false, ...(p.subselect.hitTest ? { hitTest: true, atFrame:p.subselect.atFrame } : {}), segments: GEOMETRY } };
     }
     return { apiVersion: 2, requestId: q.requestId, instanceId: 'i', documentId: 'd', contentRevision: 0, ok: true, result };
   } });

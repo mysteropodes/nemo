@@ -1,0 +1,414 @@
+{
+  "capability": "native.object.tween",
+  "definitions": {
+    "ObjectTweenCurvePoint": {
+      "order": 97,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y"
+        ],
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y": {
+            "type": "number"
+          },
+          "tx": {
+            "type": "number"
+          },
+          "ty": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "ObjectTweenOptions": {
+      "order": 98,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resamplePoints",
+          "step",
+          "skipManual",
+          "easing"
+        ],
+        "properties": {
+          "resamplePoints": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 256
+          },
+          "step": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 999
+          },
+          "skipManual": {
+            "type": "boolean"
+          },
+          "easing": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ObjectTweenCurvePoint"
+            },
+            "maxItems": 256
+          }
+        }
+      }
+    },
+    "ObjectTweenOverride": {
+      "order": 99,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "bId"
+        ],
+        "properties": {
+          "aId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "aIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "minItems": 1,
+            "maxItems": 128
+          },
+          "bId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "aId"
+            ]
+          },
+          {
+            "required": [
+              "aIds"
+            ]
+          }
+        ]
+      }
+    },
+    "ObjectTweenSpan": {
+      "order": 100,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "to",
+          "overrides"
+        ],
+        "properties": {
+          "from": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "to": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "easing": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ObjectTweenCurvePoint"
+            },
+            "maxItems": 256
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ObjectTweenOverride"
+            },
+            "maxItems": 128
+          },
+          "manualStrokes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "maxItems": 128
+          }
+        }
+      }
+    },
+    "ObjectTweenGeneratePayload": {
+      "order": 101,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.tween.generate"
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "options": {
+            "$ref": "#/$defs/ObjectTweenOptions"
+          },
+          "starts": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "maxItems": 4096
+          },
+          "selection": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "maxItems": 4096
+          }
+        },
+        "not": {
+          "required": [
+            "starts",
+            "selection"
+          ]
+        }
+      }
+    },
+    "ObjectTweenRegeneratePayload": {
+      "order": 102,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.tween.regenerate"
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "options": {
+            "$ref": "#/$defs/ObjectTweenOptions"
+          },
+          "starts": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "maxItems": 4096
+          },
+          "selection": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "maxItems": 4096
+          }
+        },
+        "not": {
+          "required": [
+            "starts",
+            "selection"
+          ]
+        }
+      }
+    },
+    "ObjectTweenSplitPayload": {
+      "order": 107,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "frame"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.tween.split"
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "frame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "options": {
+            "$ref": "#/$defs/ObjectTweenOptions"
+          }
+        }
+      }
+    },
+    "ObjectTweenReassignPayload": {
+      "order": 108,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "span"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.tween.reassign"
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "span": {
+            "$ref": "#/$defs/ObjectTweenSpan"
+          },
+          "options": {
+            "$ref": "#/$defs/ObjectTweenOptions"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 65,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.tween.generate"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectTweenGeneratePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 66,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.tween.regenerate"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectTweenRegeneratePayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 78,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.tween.split"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectTweenSplitPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 79,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.tween.reassign"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectTweenReassignPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

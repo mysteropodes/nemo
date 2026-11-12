@@ -16,12 +16,22 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   var NS = 'http://www.w3.org/2000/svg', PINS = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
-  var VIOLET = 'rgba(189,147,249,0.86)', ORANGE = 'rgb(255,170,40)', MAX_ELEMENTS = 16, MAX_FRAMES = 60, MAX_PAGES = 4, REACH = 8, THRESHOLD = 3;
+  var VIOLET = 'rgba(189,147,249,0.86)', ORANGE = 'rgb(255,170,40)', PAGE_SIZE = 8, MAX_KEY_PAGES = 512, MAX_PROPERTY_READS = 1024, MAX_BATCH_EDITS = 64, REACH = 8, THRESHOLD = 3;
+  // Match the established native script reader's finite per-run bounds; each native page itself is schema-limited to 8 keys.
+  var READ_LIMIT = 'Unified Motion path unavailable: this selection requires more than 1,024 native property reads.';
+  var PAGE_LIMIT = 'Unified Motion path unavailable: an element has more than 4,096 Position keys.';
+  var DRAG_LIMIT = 'Unified Motion path can be drawn, but moving it is limited to 64 keyed elements.';
   var GONE = 'The document changed during the drag — nothing was changed.';
   var round = function (v) { return Math.round(v * 1e6) / 1e6; };
   var states = new WeakMap();
-  function st(win) { if (!states.has(win)) states.set(win, { key: '', data: null, loading: null, drag: null }); return states.get(win); }
+  function st(win) { if (!states.has(win)) states.set(win, { key: '', data: null, loading: null, drag: null, noticeScope: '', noticeKinds: Object.create(null) }); return states.get(win); }
   function notice(win, text) { if (typeof win.showToast === 'function') try { win.showToast(text, 'warn'); } catch (_) { /* presentation only */ } }
+  function noticeOnce(win, scope, kind, text) {
+    var s = st(win);
+    if (s.noticeScope !== scope) { s.noticeScope = scope; s.noticeKinds = Object.create(null); }
+    if (s.noticeKinds[kind]) return;
+    s.noticeKinds[kind] = true; notice(win, text);
+  }
   function redraw(win) { var O = win.NemoNativeSelectOverlay; if (O && typeof O.show === 'function') try { O.show(win); } catch (_) { /* presentation only */ } }
   // The selected elements of ONE layer (two or more), in Motion with the Select tool; otherwise null.
   function selection(win) {
@@ -32,34 +42,66 @@
     return sel;
   }
   function keyOf(win, sel, shown) { return JSON.stringify([PINS.map(function (k) { return shown.pin[k]; }), shown.presentation.frame, sel.map(function (p) { return p.data.nativeStableTarget.strokeId; })]); }
+  function noticeScope(sel, shown) { return JSON.stringify([PINS.map(function (k) { return shown.pin[k]; }), sel.map(function (p) { return p.data.nativeStableTarget.strokeId; })]); }
   var at = function (win) { var I = win.NemoSelectCanvasIntent; return I && typeof I.presentedState === 'function' ? I.presentedState(win) : null; };
   // Every selected element's Position keys and, for each frame any of them is keyed on, its value there; null when fewer than two elements have keys.
-  async function load(win, sel, shown) {
+  // Native read promises cannot be interrupted; recheck the owner after each response and issue no further page/sample reads once it retires.
+  async function load(win, sel, shown, ownerKey) {
     var W = win.NemoNativeObjectWidgetUI, held = win.NemoSelectCanvasIntent.heldId(win), proof = W.proofNow(win, 'readProperty', held === 'scene-root' ? undefined : held);
     if (!proof || !proof.current(true) || PINS.some(function (k) { return proof.info[k] !== shown.pin[k]; })) return null;
+    var reads = 0;
+    var current = function () {
+      try { var currentSelection = selection(win), currentShown = currentSelection && at(win); return !!currentSelection && !!currentShown && keyOf(win, currentSelection, currentShown) === ownerKey && proof.current(true) && PINS.every(function (k) { return proof.info[k] === shown.pin[k]; }); }
+      catch (_) { return false; }
+    };
     var frame = proof.selector.frame, one = function (view) { return proof.session.readProperty({ instanceId: proof.info.instanceId, documentId: proof.info.documentId, atRevision: proof.info.contentRevision, documentSnapshotId: proof.info.documentSnapshotId, view: view }); };
-    var seen = {}, targets = [];
-    for (var i = 0; i < sel.length && targets.length < MAX_ELEMENTS; i++) {
+    var read = async function (view) {
+      if (!current()) return null;
+      if (reads >= MAX_PROPERTY_READS) return { blocked: READ_LIMIT };
+      try {
+        var value = await one(view); reads++;
+        return current() ? { value: value } : null;
+      } catch (_) { return current() ? { blocked: 'Unified Motion path unavailable: native Position data could not be read.' } : null; }
+    };
+    var seen = new Set(), targets = [];
+    for (var i = 0; i < sel.length; i++) {
       var t = sel[i].data.nativeStableTarget, id = t.strokeId;
-      if (seen[id]) continue; seen[id] = true;
+      if (seen.has(id)) continue; seen.add(id);
       var target = { contextId: proof.selector.contextId, layerUid: t.layerUid, strokeId: id }, keys = [];
-      for (var offset = 0, n = 0; n < MAX_PAGES; n++) {
-        var page = await one({ kind: 'authoredKeys', target: target, property: 'position', offset: offset, limit: 8 });
+      var complete = false;
+      for (var offset = 0, n = 0; n < MAX_KEY_PAGES; n++) {
+        var result = await read({ kind: 'authoredKeys', target: target, property: 'position', offset: offset, limit: PAGE_SIZE });
+        if (!result || result.blocked) return result;
+        var page = result.value;
+        if (!page || !Array.isArray(page.items) || page.items.length > PAGE_SIZE) return { blocked: 'Unified Motion path unavailable: native Position key pagination returned an invalid page.' };
         page.items.forEach(function (k) { keys.push(k); });
-        if (page.nextOffset === null || page.nextOffset === undefined) break;
+        if (page.nextOffset === null || page.nextOffset === undefined) { complete = true; break; }
+        if (!Number.isInteger(page.nextOffset) || page.nextOffset <= offset || page.nextOffset > 4294967295) return { blocked: 'Unified Motion path unavailable: native Position key pagination did not advance.' };
         offset = page.nextOffset;
       }
+      if (!complete) return { blocked: PAGE_LIMIT };
       if (keys.length) targets.push({ target: target, keys: keys, idx: sel[i].data.nativeLayerIndex });
     }
     if (targets.length < 2) return null;
     var set = {}; targets.forEach(function (x) { x.keys.forEach(function (k) { set[k.frame] = true; }); });
     var frames = Object.keys(set).map(Number).sort(function (a, b) { return a - b; });
-    if (frames.length > MAX_FRAMES) return null;
+    targets.forEach(function (x) { x.byFrame = Object.create(null); x.keys.forEach(function (k) { x.byFrame[k.frame] = k; }); });
+    var required = reads;
+    targets.forEach(function (x) { frames.forEach(function (fr) { if (!x.byFrame[fr]) required++; }); });
+    if (required > MAX_PROPERTY_READS) return { blocked: READ_LIMIT };
     for (var j = 0; j < targets.length; j++) {
       var x = targets[j]; x.values = {};
       for (var f = 0; f < frames.length; f++) {
-        var own = x.keys.find(function (k) { return k.frame === frames[f]; });
-        x.values[frames[f]] = own ? { v: own.v.slice(), keyed: true } : { v: (await one({ kind: 'rawSample', target: x.target, property: 'position', frame: frames[f] })).value.slice(), keyed: false };
+        if (!current()) return null;
+        var own = x.byFrame[frames[f]];
+        if (own) x.values[frames[f]] = { v: own.v.slice(), keyed: true };
+        else {
+          var sampled = await read({ kind: 'rawSample', target: x.target, property: 'position', frame: frames[f] });
+          if (!sampled || sampled.blocked) return sampled;
+          var sample = sampled.value;
+          if (!sample || !Array.isArray(sample.value) || sample.value.length < 2) return { blocked: 'Unified Motion path unavailable: native Position sampling returned an invalid value.' };
+          x.values[frames[f]] = { v: sample.value.slice(), keyed: false };
+        }
       }
     }
     var cx = 0, cy = 0; sel.forEach(function (p) { var c = p.bounds.center; cx += c.x; cy += c.y; }); cx /= sel.length; cy /= sel.length;
@@ -73,7 +115,12 @@
     var key = keyOf(win, sel, shown);
     if (key === s.key) return s.data;
     s.key = key; s.data = null;
-    var mine = s.loading = load(win, sel, shown).then(function (d) { if (s.loading === mine && s.key === key) { s.data = d; redraw(win); } }, function () { /* nothing to draw */ });
+    var scope = noticeScope(sel, shown);
+    var mine = s.loading = load(win, sel, shown, key).then(function (d) { if (s.loading === mine && s.key === key) {
+      if (d && d.blocked) { noticeOnce(win, scope, 'read', d.blocked); s.data = null; }
+      else s.data = d;
+      redraw(win);
+    } }, function () { if (s.loading === mine && s.key === key) noticeOnce(win, scope, 'read', 'Unified Motion path unavailable: native Position data could not be read.'); });
     return null;
   }
   function pointsOf(win, d) {
@@ -99,17 +146,24 @@
       proof = W.proofNow(win, 'readProperty', heldArg);
     }
     if (drag.cancelled) return 'cancelled';
-    if (!proof || !proof.current(true) || PINS.some(function (k) { return proof.info[k] !== drag.shown.pin[k]; }) || proof.selector.frame !== drag.current || I.pickContext(win) !== drag.ctx) { notice(win, GONE); return 'stale'; }
+    var currentSelection = selection(win), currentShown = currentSelection && at(win);
+    if (!proof || !proof.current(true) || PINS.some(function (k) { return proof.info[k] !== drag.shown.pin[k]; }) || proof.selector.frame !== drag.current || I.pickContext(win) !== drag.ctx || !currentSelection || !currentShown || keyOf(win, currentSelection, currentShown) !== drag.ownerKey) { notice(win, GONE); return 'stale'; }
+    if (d.targets.length > MAX_BATCH_EDITS) { noticeOnce(win, noticeScope(currentSelection, drag.shown), 'drag', DRAG_LIMIT); return 'refused'; }
     if (!proof.session || typeof proof.session.editPropertyBatch !== 'function') { notice(win, 'Native property batch is unavailable.'); return 'refused'; }
+    var ownerCurrent = function () {
+      try { var selected = selection(win), shown = selected && at(win); return !!selected && !!shown && keyOf(win, selected, shown) === drag.ownerKey && proof.current() && proof.selector.frame === drag.current && I.pickContext(win) === drag.ctx; }
+      catch (_) { return false; }
+    };
     try {
       var edits = [];
       for (var i = 0; i < d.targets.length; i++) {
+        if (!ownerCurrent()) { notice(win, GONE); return 'stale'; }
         var x = d.targets[i], local = M ? await M.localDelta(win, x.idx, proof.info, proof.selector.frame, drag.delta) : drag.delta.slice(), v = x.values[drag.frame].v;
         edits.push({ target: x.target, property: 'position', action: { kind: 'setKey', frame: drag.frame, values: [round(v[0] + local[0]), round(v[1] + local[1])] } });
       }
       var pin = {}; PINS.forEach(function (k) { pin[k] = proof.info[k]; });
-      if (!proof.current(true)) { notice(win, GONE); return 'stale'; }
-      var response = await proof.session.editPropertyBatch({ command: 'object.property.batch', edits: edits }, pin, function () { return proof.current(); });
+      if (!ownerCurrent()) { notice(win, GONE); return 'stale'; }
+      var response = await proof.session.editPropertyBatch({ command: 'object.property.batch', edits: edits }, pin, ownerCurrent);
       if (!response || response.ok !== true || !response.result || typeof response.result.applied !== 'boolean') throw new Error('Native property edit was not confirmed.');
       if (!response.result.applied) return 'noop';
       // The committed elements as fresh presented paths (the old ones hold the geometry from before the edit), still selected.
@@ -133,7 +187,8 @@
       d.points.forEach(function (p) { var dist = Math.hypot(p.x - here.x, p.y - here.y); if (dist <= reach && (!best || dist < best.dist)) best = { frame: p.frame, dist: dist }; });
       if (!best) return;
       consume(e);
-      s.drag = { frame: best.frame, from: here, shown: shown, current: d.current, ctx: I.pickContext(win), x: e.clientX, y: e.clientY, delta: [0, 0], armed: false, cancelled: false, pointerId: e.pointerId };
+      if (d.targets.length > MAX_BATCH_EDITS) { noticeOnce(win, noticeScope(sel, shown), 'drag', DRAG_LIMIT); return; }
+      s.drag = { frame: best.frame, from: here, shown: shown, current: d.current, ownerKey: s.key, ctx: I.pickContext(win), x: e.clientX, y: e.clientY, delta: [0, 0], armed: false, cancelled: false, pointerId: e.pointerId };
     }, { capture: true });
     doc.addEventListener('pointermove', function (e) {
       var s = st(win), drag = s.drag;

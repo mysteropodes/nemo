@@ -37,15 +37,14 @@ fn read_capped(path: &std::path::Path, cap: u64) -> Option<Vec<u8>> {
 }
 
 /// Run ffmpeg over `input` (written to a temp file, never a shell string) and return the bytes of the output file.
-fn convert(input: &[u8], in_ext: &str, out_ext: &str, args: &[&str]) -> Option<Vec<u8>> {
-    let (source, target) = (scratch(in_ext), scratch(out_ext));
+fn convert(input: &[u8], source: &std::path::Path, target: &std::path::Path, args: &[&str]) -> Option<Vec<u8>> {
     let result = (|| {
-        std::fs::write(&source, input).ok()?;
+        std::fs::write(source, input).ok()?;
         let mut child = Command::new(crate::video_decode::sidecar_path())
             .args(["-hide_banner", "-loglevel", "error", "-y", "-i"])
-            .arg(&source)
+            .arg(source)
             .args(args)
-            .arg(&target)
+            .arg(target)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -66,10 +65,10 @@ fn convert(input: &[u8], in_ext: &str, out_ext: &str, args: &[&str]) -> Option<V
         if !status.success() {
             return None;
         }
-        read_capped(&target, MAX_OUTPUT)
+        read_capped(target, MAX_OUTPUT)
     })();
-    let _ = std::fs::remove_file(&source);
-    let _ = std::fs::remove_file(&target);
+    let _ = std::fs::remove_file(source);
+    let _ = std::fs::remove_file(target);
     result
 }
 
@@ -91,16 +90,16 @@ impl MediaTranscoder for FfmpegTranscoder {
     fn to_png(&self, mime: &str, bytes: &[u8]) -> Option<Vec<u8>> {
         convert(
             bytes,
-            extension(mime),
-            "png",
+            &scratch(extension(mime)),
+            &scratch("png"),
             &["-frames:v", "1", "-c:v", "png"],
         )
     }
     fn to_wav(&self, mime: &str, bytes: &[u8]) -> Option<Vec<u8>> {
         convert(
             bytes,
-            extension(mime),
-            "wav",
+            &scratch(extension(mime)),
+            &scratch("wav"),
             &["-vn", "-acodec", "pcm_s16le"],
         )
     }
@@ -112,15 +111,33 @@ mod tests {
 
     #[test]
     fn unreadable_media_converts_to_nothing_and_leaves_no_scratch_file() {
-        let before = std::fs::read_dir(std::env::temp_dir())
-            .map(|d| d.count())
-            .unwrap_or(0);
-        assert_eq!(FfmpegTranscoder.to_png("image/jpeg", b"not an image"), None);
-        assert_eq!(FfmpegTranscoder.to_wav("audio/mpeg", b"not audio"), None);
-        let after = std::fs::read_dir(std::env::temp_dir())
-            .map(|d| d.count())
-            .unwrap_or(0);
-        assert!(after <= before + 8, "scratch files are removed");
+        for (input, in_ext, out_ext, args) in [
+            (
+                b"not an image".as_slice(),
+                "jpg",
+                "png",
+                &["-frames:v", "1", "-c:v", "png"][..],
+            ),
+            (
+                b"not audio".as_slice(),
+                "mp3",
+                "wav",
+                &["-vn", "-acodec", "pcm_s16le"][..],
+            ),
+        ] {
+            let source = scratch(in_ext);
+            let target = scratch(out_ext);
+            std::fs::write(&target, b"partial output").unwrap();
+            let result = convert(input, &source, &target, args);
+            let source_exists = source.try_exists().unwrap();
+            let target_exists = target.try_exists().unwrap();
+            // Remove any leaked file before reporting a regression.
+            if source_exists { std::fs::remove_file(&source).unwrap(); }
+            if target_exists { std::fs::remove_file(&target).unwrap(); }
+            assert_eq!(result, None);
+            assert!(!source_exists, "{in_ext} input scratch file is removed");
+            assert!(!target_exists, "{out_ext} output scratch file is removed");
+        }
         assert_eq!(extension("audio/x-m4a"), "m4a");
         assert_eq!(extension("image/jpeg"), "jpg");
     }

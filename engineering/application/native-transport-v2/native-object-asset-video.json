@@ -1,0 +1,183 @@
+{
+  "capability": "native.object.asset.video",
+  "definitions": {
+    "ObjectVideoLinkPayload": {
+      "order": 337,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "documentSnapshotId",
+          "lifecycleGeneration",
+          "source",
+          "intent"
+        ],
+        "description": "T12: link one desktop video file. The host canonicalizes the path inside the request filesystem scope and probes width, height and frame count; the owner publishes one revision. Whitespace-only or NUL-bearing ids and paths are refused by the contract. The path bound (2048 bytes) fits the 4096-byte request with every other field at its maximum. The optional contextId (a newLayer only) names the declared component the new layer joins; absent is the scene root.",
+        "properties": {
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "lifecycleGeneration": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "path"
+            ],
+            "properties": {
+              "kind": {
+                "const": "file"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              }
+            }
+          },
+          "intent": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "newLayer"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "placementId"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "replace"
+                  },
+                  "placementId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ObjectVideoLinkResult": {
+      "order": 338,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applied",
+          "historyEntriesAdded",
+          "assetId",
+          "placementId",
+          "target",
+          "newLayer",
+          "sourceWidth",
+          "sourceHeight",
+          "sourceFrameCount"
+        ],
+        "description": "T12: one applied linked-video revision. A new layer names the placement minted from its request id in the scene root; a replace names the unchanged placement id and its own target, whose context may be a component.",
+        "properties": {
+          "applied": {
+            "const": true
+          },
+          "historyEntriesAdded": {
+            "const": 1
+          },
+          "assetId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "placementId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "contextId",
+              "layerUid"
+            ],
+            "properties": {
+              "contextId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "layerUid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              }
+            }
+          },
+          "newLayer": {
+            "type": "boolean"
+          },
+          "sourceWidth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "sourceHeight": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "sourceFrameCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 111,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.asset.video.link"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectVideoLinkPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

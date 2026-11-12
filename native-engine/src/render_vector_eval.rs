@@ -5,7 +5,8 @@
 //! the order one would design:
 //! 1. path effects first: the layer's ordered `pathFx` stack applied to the stored anchors (app.js:1813
 //!    `getEffectiveStrokesRendered`, `SMPathFx.apply(base, ld, frameIdx)`), the L01-A kernel;
-//! 2. the parametric rebuild afterwards (engine-bridge.js:1652/1672, export.js:193 `applyParamShapeFor`), the L01-B
+//! 2. element `vtxN` offsets on the post-effect anchors (engine-bridge.js:1595), then
+//! 3. the parametric rebuild afterwards (engine-bridge.js:1652/1672, export.js:193 `applyParamShapeFor`), the L01-B
 //!    kernel, and only for a shape with an animated parameter (`hasParamShapeMotionFor`). The rebuild takes the min/max
 //!    rectangle of the anchors it is GIVEN, which are the post-effect anchors, and replaces them with a fresh shape:
 //!    a zigzagged animated rectangle is rebuilt as a clean rounded rectangle in the zigzag-expanded box. That is the
@@ -39,6 +40,8 @@ use serde_json::Number;
 pub(crate) mod motion;
 #[path = "render_vector_eval_vertex.rs"]
 pub(crate) mod vertex;
+pub(crate) use vertex::painted_record;
+use vertex::vertex_then_param;
 
 #[path = "render_vector_eval_params.rs"]
 pub(crate) mod params;
@@ -79,6 +82,7 @@ pub(crate) enum VectorEvalError {
     },
     LayerMotionUnavailable,
     RigCompositionUnavailable,
+    BrushVertexUnavailable,
     ExpressionUnavailable {
         property: &'static str,
     },
@@ -96,6 +100,7 @@ impl VectorEvalError {
             Self::PathFx(_) => "path effect exceeds the native sample budget",
             Self::Rebuild(_) => "parametric rebuild refused its input",
             Self::Sample { .. } => "animated shape parameter could not be sampled",
+            Self::BrushVertexUnavailable => "vertex Motion on a vector-brush centerline is unavailable",
             Self::RigCompositionUnavailable => {
                 "rig pose with path effects, animated shape rebuild or brush mirrors is unavailable"
             }
@@ -313,7 +318,7 @@ pub(crate) fn duplicator_base(
     Ok(output)
 }
 
-/// Post-placement half of the ORIGINAL pathFX -> duplicator -> parametric ->
+/// Post-placement half of the ORIGINAL pathFX -> duplicator -> vertex -> parametric ->
 /// element Motion -> layer Position order. `record` is a detached copy whose
 /// local render target names its host, never a rewritten document record.
 pub(crate) fn duplicator_geometry(
@@ -332,10 +337,7 @@ pub(crate) fn duplicator_geometry(
     }
     let stored = stored_from_record(record, Some(layer))?;
     let anchors = stored.stroke.segments.as_deref().unwrap_or(&[]);
-    let mut segments = match run_param_shape(packet.snapshot(), record, anchors, packet.frame())? {
-        Some(rebuilt) => rebuilt.iter().map(from_param).collect(),
-        None => anchors.iter().map(from_path).collect(),
-    };
+    let mut segments = vertex_then_param(packet.snapshot(), record, anchors, packet.frame())?;
     let authored = packet
         .snapshot()
         .document()
@@ -349,7 +351,7 @@ pub(crate) fn duplicator_geometry(
         });
     if authored {
         segments =
-            motion::apply_element_motion(packet.snapshot(), record, packet.frame(), segments)?;
+            motion::apply_element_pose(packet.snapshot(), record, packet.frame(), segments)?;
     }
     // A 3D layer's Position is part of its Pose3D: the projector replaces the 2D layer Position (baseline `is3D`).
     if layer.three_d.value() != Some(&true) {
@@ -366,6 +368,15 @@ pub(crate) fn run_param_shape(
     anchors: &[PathSegment],
     frame: u32,
 ) -> Result<Option<Vec<ParamSegment>>, VectorEvalError> {
+    run_param_shape_with(snapshot, record, frame, || anchors.iter().map(param_segment).collect())
+}
+
+pub(crate) fn run_param_shape_with(
+    snapshot: &ObjectSnapshot,
+    record: &ObjectRecord,
+    frame: u32,
+    anchors: impl FnOnce() -> Vec<ParamSegment>,
+) -> Result<Option<Vec<ParamSegment>>, VectorEvalError> {
     let Some(shape) = params::shape_of(record)? else {
         return Ok(None);
     };
@@ -374,7 +385,7 @@ pub(crate) fn run_param_shape(
     if !has_param_shape_motion(Some(kind), &animated) {
         return Ok(None);
     }
-    let stored: Vec<ParamSegment> = anchors.iter().map(param_segment).collect();
+    let stored = anchors();
     apply_param_shape_animated(&shape, &stored, &animated)
         .map(Some)
         .map_err(VectorEvalError::Rebuild)
@@ -415,7 +426,7 @@ pub(crate) fn evaluate_vector_rest(
     evaluate_stored_rest(snapshot, object_index, frame, stored)
 }
 
-/// The original pathFX -> parametric rebuild stages, shared without changing math.
+/// The original pathFX -> vertex offsets -> parametric rebuild -> element pose stages.
 fn evaluate_stored_rest(
     snapshot: &ObjectSnapshot,
     object_index: usize,
@@ -424,14 +435,11 @@ fn evaluate_stored_rest(
 ) -> Result<EvaluatedVector, VectorEvalError> {
     let after_effects = run_path_fx(stored.stack.as_deref(), &stored.stroke, frame)?;
     let anchors = after_effects.segments.as_deref().unwrap_or(&[]);
-    let segments = match run_param_shape(snapshot, stored.record, anchors, frame)? {
-        Some(rebuilt) => rebuilt.iter().map(from_param).collect(),
-        None => anchors.iter().map(from_path).collect(),
-    };
+    let segments = vertex_then_param(snapshot, stored.record, anchors, frame)?;
     Ok(EvaluatedVector {
         source_object_index: object_index,
         closed: after_effects.closed,
-        segments: motion::apply_element_motion(snapshot, stored.record, frame, segments)?,
+        segments: motion::apply_element_pose(snapshot, stored.record, frame, segments)?,
     })
 }
 

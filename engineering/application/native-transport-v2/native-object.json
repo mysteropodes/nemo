@@ -1,0 +1,1090 @@
+{
+  "capability": "native.object",
+  "definitions": {
+    "ObjectQueryPayload": {
+      "order": 56,
+      "schema": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/ObjectStableTargetQueryPayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectImageMeshQueryPayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectPresentationQueryPayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectSubselectQueryPayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectSubselectViewPayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectWidgetViewPayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectGhostViewPayload"
+          },
+          {
+            "$ref": "#/$defs/ObjectRigViewPayload"
+          }
+        ]
+      }
+    },
+    "ObjectPresentationQueryPayload": {
+      "order": 57,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "view"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "view": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "presentation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ObjectStableTargetQueryPayload": {
+      "order": 58,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "stableTarget"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "stableTarget": {
+            "$ref": "#/$defs/ObjectTarget"
+          }
+        }
+      }
+    },
+    "ObjectImageMeshSelectionPage": {
+      "order": 60,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "const": "selection"
+          }
+        }
+      }
+    },
+    "ObjectImageMeshDataPageRequest": {
+      "order": 61,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "meshId",
+          "cursor",
+          "limit"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "outline",
+              "verts",
+              "tris",
+              "offsets"
+            ]
+          },
+          "meshId": {
+            "$ref": "#/$defs/ObjectImageMeshQueryId"
+          },
+          "cursor": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
+          }
+        }
+      }
+    },
+    "ObjectImageMeshQueryView": {
+      "order": 62,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "contextId",
+          "layerUid",
+          "frame",
+          "workId",
+          "viewGeneration",
+          "page"
+        ],
+        "properties": {
+          "kind": {
+            "const": "imageMesh"
+          },
+          "contextId": {
+            "$ref": "#/$defs/ObjectImageMeshQueryId"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectImageMeshQueryId"
+          },
+          "frame": {
+            "$ref": "#/$defs/ObjectFrame"
+          },
+          "workId": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "viewGeneration": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ObjectImageMeshSelectionPage"
+              },
+              {
+                "$ref": "#/$defs/ObjectImageMeshDataPageRequest"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ObjectImageMeshQueryPayload": {
+      "order": 63,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "view"
+        ],
+        "properties": {
+          "atRevision": {
+            "$ref": "#/$defs/Revision"
+          },
+          "documentSnapshotId": {
+            "$ref": "#/$defs/ObjectImageMeshQueryId"
+          },
+          "view": {
+            "$ref": "#/$defs/ObjectImageMeshQueryView"
+          }
+        }
+      }
+    },
+    "ObjectUndoPayload": {
+      "order": 109,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.undo"
+          },
+          "steps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Optional (default 1): move that many history entries as one restore and one new revision. The History panel's jump."
+          }
+        }
+      }
+    },
+    "ObjectRedoPayload": {
+      "order": 110,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.redo"
+          },
+          "steps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Optional (default 1): move that many history entries as one restore and one new revision. The History panel's jump."
+          }
+        }
+      }
+    },
+    "ObjectLayerVisibilityPayload": {
+      "order": 112,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "layerUid",
+          "visible"
+        ],
+        "properties": {
+          "contextId": {
+            "$ref": "#/$defs/ObjectOpaqueId",
+            "description": "The declared component the edit works inside (#2256); absent is the scene root."
+          },
+          "command": {
+            "const": "object.layer.visibility.set"
+          },
+          "layerUid": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "ObjectSubselectQueryPayload": {
+      "order": 368,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "stableTarget",
+          "subselect"
+        ],
+        "properties": {
+          "atRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "documentSnapshotId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stableTarget": {
+            "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+          },
+          "subselect": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "cursor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 256
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              },
+              "preview": {
+                "$ref": "#/$defs/ObjectSubselectIntent"
+              },
+              "paint": {
+                "const": true
+              },
+              "hitTest": {
+                "const": true
+              },
+              "center": {
+                "const": true
+              },
+              "atFrame": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "atFrame"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "hitTest"
+                  ],
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "center"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "paint"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "preview"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ObjectWidgetViewPayload": {
+      "order": 370,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "view"
+        ],
+        "properties": {
+          "atRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "documentSnapshotId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "view": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "contextId",
+              "frame",
+              "workId",
+              "viewGeneration",
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "widget"
+              },
+              "contextId": {
+                "const": "scene-root"
+              },
+              "frame": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "workId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+              },
+              "viewGeneration": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "cursor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1024
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4
+              }
+            }
+          }
+        }
+      }
+    },
+    "ObjectGhostViewPayload": {
+      "order": 372,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "view"
+        ],
+        "properties": {
+          "atRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "documentSnapshotId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "view": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "contextId",
+              "frame",
+              "workId",
+              "viewGeneration",
+              "layerUid",
+              "onion",
+              "ghostAll",
+              "from",
+              "to",
+              "previousOpacity",
+              "nextOpacity",
+              "mode",
+              "ghost",
+              "cursor"
+            ],
+            "properties": {
+              "kind": {
+                "const": "ghosts"
+              },
+              "contextId": {
+                "const": "scene-root"
+              },
+              "frame": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "workId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+              },
+              "viewGeneration": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "layerUid": {
+                "type": "string",
+                "minLength": 1
+              },
+              "onion": {
+                "type": "boolean"
+              },
+              "ghostAll": {
+                "type": "boolean"
+              },
+              "from": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "to": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "previousOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "nextOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "mode": {
+                "enum": [
+                  "default",
+                  "tinted",
+                  "outline"
+                ]
+              },
+              "previousTint": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "nextTint": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "shift": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "x",
+                  "y",
+                  "next"
+                ],
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "next": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "ghost": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4095
+              },
+              "cursor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 262144
+              }
+            }
+          }
+        }
+      }
+    },
+    "ObjectSubselectViewPayload": {
+      "order": 374,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "view"
+        ],
+        "properties": {
+          "atRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "documentSnapshotId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "view": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "contextId",
+              "layerUid",
+              "frame",
+              "workId",
+              "viewGeneration",
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "subselect"
+              },
+              "contextId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+                "description": "#2256: the scene root or the id of the declared component context the viewport presents; the host answers only the presented one."
+              },
+              "layerUid": {
+                "type": "string",
+                "minLength": 1
+              },
+              "frame": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "workId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+              },
+              "viewGeneration": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "cursor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1024
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "preview": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "stableTarget",
+                  "intent"
+                ],
+                "properties": {
+                  "stableTarget": {
+                    "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+                  },
+                  "intent": {
+                    "$ref": "#/$defs/ObjectSubselectIntent"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ObjectRigViewPayload": {
+      "order": 376,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atRevision",
+          "documentSnapshotId",
+          "view"
+        ],
+        "properties": {
+          "atRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "documentSnapshotId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "view": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "contextId",
+              "frame",
+              "workId",
+              "viewGeneration",
+              "layerUid",
+              "part",
+              "bind",
+              "vertex",
+              "cursor",
+              "limit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "rig"
+              },
+              "contextId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+                "description": "#2256: the scene root or the id of the declared component context the viewport presents; the host answers only the presented one."
+              },
+              "frame": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "workId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+              },
+              "viewGeneration": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "layerUid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "part": {
+                "enum": [
+                  "bones",
+                  "vertices",
+                  "chains",
+                  "binds",
+                  "bound",
+                  "weights",
+                  "posed"
+                ]
+              },
+              "bind": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "vertex": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "cursor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64
+              },
+              "preview": {
+                "type": "object",
+                "description": "#2255: a held pose drag. The view answers every part from a CANDIDATE rig (the stored one with the vertex writes the edit would make); nothing is published, kept or added to history. Exactly one of segment (moveSegment) or ik (dragIk).",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "segment"
+                    ],
+                    "properties": {
+                      "segment": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "boneId",
+                          "vi",
+                          "part",
+                          "to"
+                        ],
+                        "properties": {
+                          "boneId": {
+                            "$ref": "#/$defs/ObjectRigId"
+                          },
+                          "vi": {
+                            "$ref": "#/$defs/ObjectFrame"
+                          },
+                          "part": {
+                            "enum": [
+                              "point",
+                              "handleIn",
+                              "handleOut"
+                            ]
+                          },
+                          "to": {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "minimum": -1000000000,
+                              "maximum": 1000000000
+                            },
+                            "minItems": 2,
+                            "maxItems": 2
+                          },
+                          "breakTangent": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "ik"
+                    ],
+                    "properties": {
+                      "ik": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "boneId",
+                          "vi",
+                          "to"
+                        ],
+                        "properties": {
+                          "boneId": {
+                            "$ref": "#/$defs/ObjectRigId"
+                          },
+                          "vi": {
+                            "$ref": "#/$defs/ObjectFrame"
+                          },
+                          "to": {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "minimum": -1000000000,
+                              "maximum": 1000000000
+                            },
+                            "minItems": 2,
+                            "maxItems": 2
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "part": {
+                      "const": "bones"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 8
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "part": {
+                      "const": "vertices"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 16
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "part": {
+                      "const": "chains"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 8
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "part": {
+                      "const": "binds"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 8
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "part": {
+                      "const": "bound"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 64
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "part": {
+                      "const": "weights"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 8
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "part": {
+                      "const": "posed"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 24
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "part": {
+                      "const": "weights"
+                    }
+                  },
+                  "required": [
+                    "part"
+                  ]
+                },
+                "else": {
+                  "properties": {
+                    "bind": {
+                      "const": 0
+                    },
+                    "vertex": {
+                      "const": 0
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 0,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.undo"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectUndoPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 1,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.redo"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectRedoPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 80,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/ForbiddenRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "query.document.object"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectQueryPayload"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "order": 81,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.visibility.set"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerVisibilityPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

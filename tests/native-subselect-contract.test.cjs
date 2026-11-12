@@ -158,3 +158,17 @@ test('a hit-test listing may carry the layer\'s pose as six finite non-singular 
   const {hitTest,...plain}=r;
   assert.throws(()=>C.viewResult({...plain,layerMatrix:[1,0,0,1,7,-3]}),undefined,'an editable page has no pose');
 });
+
+test('evaluated hit contours require a finite frame and correlate it without changing editable pages',()=>{
+  const q={...p,subselect:{...p.subselect,hitTest:true,atFrame:10}};
+  const a={...r,subselect:{...r.subselect,hitTest:true,atFrame:10}};
+  C.readCorrelate(q,a,'document');Q.payload(q);Q.result(a);
+  for(const atFrame of [-1,1.5,4294967296,NaN])assert.throws(()=>C.readPayload({...q,subselect:{...q.subselect,atFrame}}));
+  for(const patch of [{hitTest:false},{center:true},{paint:true},{preview:{kind:'move',indices:[0],delta:[1,1]}}])assert.throws(()=>C.readPayload({...q,subselect:{...q.subselect,...patch}}));
+  assert.throws(()=>C.readPayload({...p,subselect:{...p.subselect,atFrame:10}}));
+  for(const atFrame of [0,11,undefined]){
+    const subselect={...a.subselect,atFrame};if(atFrame===undefined)delete subselect.atFrame;
+    assert.throws(()=>C.readCorrelate(q,{...a,subselect},'document'));
+  }
+  assert.throws(()=>C.readCorrelate({...p,subselect:{...p.subselect,hitTest:true}},a,'document'));
+});

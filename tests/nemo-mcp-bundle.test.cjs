@@ -31,7 +31,7 @@ fs.writeFileSync(path.join(dir,target.includes('windows')?'nemo-mcp.exe':'nemo-m
 }
 test('normal Tauri build keeps FFmpeg and guard while staging MCP', () => {
   const config = JSON.parse(fs.readFileSync(path.join(repo, 'src-tauri/tauri.conf.json')));
-  assert.equal(config.build.beforeBuildCommand, 'python3 scripts/assert-no-private-labs.py && node scripts/build-mcp-sidecar.cjs');
+  assert.equal(config.build.beforeBuildCommand, 'python3 scripts/assert-no-private-labs.py && node scripts/nemo/lib/native-transport-schema.cjs --check && node scripts/build-mcp-sidecar.cjs');
   assert.ok(config.bundle.externalBin.includes('binaries/ffmpeg'));
   assert.ok(config.bundle.externalBin.includes('binaries/nemo-mcp'));
 });

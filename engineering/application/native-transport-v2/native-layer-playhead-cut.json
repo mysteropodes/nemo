@@ -1,0 +1,60 @@
+{
+  "capability": "native.layer-playhead-cut",
+  "definitions": {
+    "ObjectLayerPlayheadCutPayload": {
+      "order": 256,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "contextId",
+          "layerUid",
+          "frame"
+        ],
+        "properties": {
+          "command": {
+            "const": "object.layer.cut"
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Authored context identity; Rust/JS enforce128 UTF8bytes. Only scene-root has an admitted positive copy owner; other contexts return typed unavailable."
+          },
+          "layerUid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Original opaque authored layer identity; no identifier grammar invented. Native/JS enforce128 UTF8bytes."
+          },
+          "frame": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    }
+  },
+  "requests": [
+    {
+      "order": 121,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/RequiredRevisionRequest"
+          },
+          {
+            "properties": {
+              "operation": {
+                "const": "command.document.object.layer.cut"
+              },
+              "payload": {
+                "$ref": "#/$defs/ObjectLayerPlayheadCutPayload"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
