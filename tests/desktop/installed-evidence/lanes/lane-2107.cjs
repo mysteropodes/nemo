@@ -49,6 +49,48 @@ const rows = [
       ctx.eq('read', 'records after reopen equal the records before', after.map(r => r.ok && r.object), [ra.object, rb.object, rc.object]);
     } },
 
+  { id: '2107-stroke-style-pressure-fields', title: 'stroke join, miter limit, dash, paint order and pressure fields: read back exactly, visible in the export, undo, save and reopen', tasks: ['G14'],
+    limitations: ['Pressure fields are read back and persisted; the ribbon itself is the record geometry, so the export shows the geometry sent.'],
+    async run(ctx) {
+      const { layerUid } = await K.fresh(ctx);
+      const GREEN = [0.1, 0.7, 0.3, 1], BLACK = [0, 0, 0, 1];
+      const fields = v => ({ join: v.strokeJoin, miterLimit: v.miterLimit, dashArray: v.dashArray, dashOffset: v.dashOffset, paintOrder: v.paintOrder });
+      const first = await createRecord(ctx, 'create a stroked, filled rectangle painting the stroke first', layerUid, { segments: P.rectSegments(40, 40, 200, 140), fill: GREEN, stroke: BLUE, width: 24, style: { paintOrder: 'strokeFirst' } });
+      const second = await createRecord(ctx, 'create the same rectangle painting the fill first', layerUid, { segments: P.rectSegments(260, 40, 420, 140), fill: GREEN, stroke: BLUE, width: 24, style: { paintOrder: 'fillFirst' } });
+      const dashed = await createRecord(ctx, 'create a dashed open path', layerUid, { closed: false, segments: [P.seg(40, 190), P.seg(300, 190)], stroke: BLUE, width: 6, cap: 'butt', style: { dashArray: [12, 8], dashOffset: 0 } });
+      const mitred = await createRecord(ctx, 'create a mitred corner', layerUid, { closed: false, segments: [P.seg(40, 340), P.seg(100, 250), P.seg(160, 340)], stroke: BLUE, width: 20, cap: 'butt', join: 'miter', style: { miterLimit: 4 } });
+      const bevelled = await createRecord(ctx, 'create a bevelled corner', layerUid, { closed: false, segments: [P.seg(200, 340), P.seg(260, 250), P.seg(320, 340)], stroke: BLUE, width: 20, cap: 'butt', join: 'bevel' });
+      const pressure = { centerSegments: [{ point: { x: 420, y: 230 }, handleIn: { x: 0, y: 0 }, handleOut: { x: 0, y: 0 }, width: 6 }, { point: { x: 580, y: 230 }, handleIn: { x: 0, y: 0 }, handleOut: { x: 0, y: 0 }, width: 30 }],
+        widthProfile: [{ t: 0, width: 2 }, { t: 1, width: 12 }], strokeProfile: 'taper-out', profileBase: 3 };
+      const ribbon = await createRecord(ctx, 'create a pressure ribbon', layerUid, { segments: [P.seg(420, 227), P.seg(580, 215), P.seg(580, 245), P.seg(420, 233)], fill: BLACK, ext: { pressure } });
+      const ids = [first, second, dashed, mitred, bevelled, ribbon], reads = await Promise.all(ids.map(id => K.readObject(ctx, P.target(layerUid, id))));
+      ctx.ok('read', 'every record reads back', reads.every(r => r.ok), reads.map(r => r.ok));
+      const [rFirst, rSecond, rDashed, rMitred, rBevelled, rRibbon] = reads.map(r => r.object);
+      ctx.eq('read', 'paint order is stored as sent, for both orders', [rFirst.vector.paintOrder, rSecond.vector.paintOrder], ['strokeFirst', 'fillFirst']);
+      ctx.eq('read', 'dash array and an explicit zero dash offset are stored as sent', [rDashed.vector.dashArray, rDashed.vector.dashOffset], [[12, 8], 0]);
+      ctx.eq('read', 'join and miter limit are stored as sent', [rMitred.vector.strokeJoin, rMitred.vector.miterLimit, rBevelled.vector.strokeJoin], ['miter', 4, 'bevel']);
+      ctx.eq('read', 'pressure fields are stored as sent', rRibbon.vectorExt.pressure, pressure);
+      const scene = await K.exportPng(ctx, 'styles');
+      ctx.near('pixel', 'stroke-first: the fill paints over the inner half of the stroke', probe.over(scene.image, 46, 90), [26, 179, 77], 14);
+      ctx.near('pixel', 'fill-first: the stroke paints over the fill edge', probe.over(scene.image, 266, 90), [0, 69, 204], 14);
+      let inked = 0, total = 0;
+      for (let x = 60; x < 280; x++) { total++; if (probe.alphaAt(scene.image, x, 190) > 128) inked++; }
+      ctx.within('pixel', 'the dash pattern 12 on / 8 off leaves about 60% of the line inked', inked / total, 0.45, 0.75);
+      const top = box => probe.inkBounds(scene.image, { box }).box[1];
+      ctx.ok('pixel', 'a miter join reaches farther than a bevel join at the same corner', top([0, 230, 180, 359]) < top([180, 230, 340, 359]) - 4, [top([0, 230, 180, 359]), top([180, 230, 340, 359])]);
+      await K.step(ctx, 'undo the last create', 'undo');
+      ctx.eq('read', 'the undone ribbon no longer reads', (await K.readObject(ctx, P.target(layerUid, ribbon))).ok, false);
+      await K.step(ctx, 'redo the last create', 'redo');
+      ctx.eq('read', 'redo restores the pressure fields', (await K.readObject(ctx, P.target(layerUid, ribbon))).object.vectorExt.pressure, pressure);
+      const final = await K.exportPng(ctx, 'styles-final');
+      ctx.eq('pixel', 'redo restores the export', final.digest, scene.digest);
+      await K.roundTrip(ctx, 'styles', final, async () => {
+        const again = await Promise.all(ids.map(id => K.readObject(ctx, P.target(layerUid, id))));
+        ctx.eq('read', 'every stroke field survived save and reopen', again.map(r => r.ok && fields(r.object.vector)), reads.map(r => fields(r.object.vector)));
+        ctx.eq('read', 'the pressure fields survived save and reopen', again[5].ok && again[5].object.vectorExt.pressure, pressure);
+      });
+    } },
+
   { id: '2107-vector-replace-delete-undo-redo', title: 'replace, delete, no-op, undo and redo restore exact pixels; stale target, stale revision and locked layer refuse', tasks: ['G14'],
     async run(ctx) {
       const { layerUid } = await K.fresh(ctx);

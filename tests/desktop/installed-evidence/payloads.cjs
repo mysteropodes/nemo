@@ -13,12 +13,13 @@ const rectSegments = (x0, y0, x1, y1) => [seg(x0, y0), seg(x1, y0), seg(x1, y1),
 const solid = ([r, g, b, a = 1]) => ({ kind: 'solid', r, g, b, a });
 
 // An editable-vector-path record. fill / stroke are [r,g,b,a] in 0..1 or null.
-function vectorRecord({ layerUid, segments, closed = true, fill = null, stroke = null, width = 4, strokeId = '', frame = 0, opacity = 1, cap = 'round', join = 'round', ext }) {
+// `style` adds the optional stroke members (miterLimit, dashArray, dashOffset, paintOrder), which keep absent distinct from explicit.
+function vectorRecord({ layerUid, segments, closed = true, fill = null, stroke = null, width = 4, strokeId = '', frame = 0, opacity = 1, cap = 'round', join = 'round', style = {}, ext }) {
   const record = {
     schemaVersion: 1, family: 'editable-vector-path', target: target(layerUid, strokeId, frame),
     geometry: { kind: 'cubic-path', closed, coordinateSpace: 'document-world', handleSpace: 'relative', segments },
     fill: fill ? solid(fill) : null,
-    vector: { stroke: stroke ? solid(stroke) : null, hasRealStroke: stroke !== null, strokeWidth: width, strokeCap: cap, strokeJoin: join, opacity },
+    vector: { stroke: stroke ? solid(stroke) : null, hasRealStroke: stroke !== null, strokeWidth: width, strokeCap: cap, strokeJoin: join, opacity, ...style },
   };
   if (ext) record.vectorExt = ext;
   return record;
@@ -92,6 +93,11 @@ const propertyOpacity = (layerUid, values) => ({ operation: OBJ + 'property.edit
   payload: { command: 'object.property.edit', target: { contextId: ROOT, layerUid }, property: 'opacity', action: { kind: 'setValue', frame: 0, values } } });
 const meshAttach = (stableTarget, mesh) => ({ operation: OBJ + 'image.mesh.edit', payload: { command: 'object.image.mesh.edit', action: { kind: 'attach', target: stableTarget, mesh } } });
 const meshSetOffset = (meshId, index, du, dv) => ({ operation: OBJ + 'image.mesh.edit', payload: { command: 'object.image.mesh.edit', meshId, action: { kind: 'setOffset', index, du, dv } } });
+// The presentation view names the context, frame, work token and view generation the imageMesh view must echo.
+const presentationRead = revision => ({ operation: QOBJ, payload: { atRevision: revision, view: { kind: 'presentation' } } });
+// page: {kind:'selection'} or {kind:'outline'|'verts'|'tris'|'offsets', meshId, cursor, limit}.
+const meshQuery = (revision, pin, { contextId, layerUid, frame, workId, viewGeneration, page }) => ({ operation: QOBJ,
+  payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'imageMesh', contextId, layerUid, frame, workId, viewGeneration, page } } });
 const propertyMetadata = (revision, pin, layerUid) => ({ operation: 'query.document.object.property.metadata', payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'properties', target: { contextId: ROOT, layerUid }, offset: 0, limit: 8 } } });
 const snapshotAcquire = () => ({ operation: 'query.document.snapshot.acquire', payload: {} });
 const historyRead = (revision, pin) => ({ operation: QOBJ + '.history', payload: { atRevision: revision, documentSnapshotId: pin } });
@@ -102,4 +108,4 @@ module.exports = { OBJ, ROOT, target, seg, rectSegments, solid, vectorRecord, ve
   pathEffects, layerPolicy, undo, redo, groupCreate, groupUngroup, groupCombine, groupMode, groupRename, groupMemberRemove, booleanApply, booleanErase, booleanFlatten,
   layerCreate, layerDuplicate, layerRename, layerReorder, layerDelete, layerVisibility, layerSplit, selectionDelete, selectionDuplicate, clipboardCopy, clipboardCut, clipboardPaste,
   assetAttach, assetRemove, rasterMove, rasterResize, rasterRotate, rasterOpacity, textBlock, textCreate, textEdit, textDelete, textTargets, textInspect, textBody,
-  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, propertyMetadata, meshAttach, meshSetOffset, snapshotAcquire, historyRead, evaluate, serialize };
+  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, propertyMetadata, meshAttach, meshSetOffset, presentationRead, meshQuery, snapshotAcquire, historyRead, evaluate, serialize };

@@ -8,6 +8,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const P = require('../installed-evidence/payloads.cjs');
 const { allRows, selectRows, LANES } = require('../installed-evidence/runner.cjs');
+const { ASSIGNED, NOT_COVERED, laneCoverage } = require('../installed-evidence/coverage.cjs');
+const { buildReceipt } = require('../installed-evidence/receipt.cjs');
 const ROOT = path.resolve(__dirname, '../../..');
 const load = file => JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application', file), 'utf8'));
 const transport = load('native-transport-v2.schema.json'), items = load('native-object-item-v1.schema.json'), brush = load('native-bitmap-brush-resources-v1.schema.json'), metadata = load('native-property-metadata-v1.schema.json');
@@ -81,6 +83,9 @@ const samples = [
   P.compositingBlend('L1', 'multiply'), P.objectRead(0, T), P.propertyOpacity('L1', [50]), P.propertyMetadata(0, 'snap-1', 'L1'),
   P.meshAttach(T, { outline: [[0, 0], [1, 0], [1, 1]], verts: [[0, 0], [1, 0], [1, 1]], tris: [0, 1, 2], offsets: [[0, 0], [0, 0], [0, 0]], cols: 1, rows: 1 }), P.meshSetOffset('im_1', 2, 0.3, 0.25),
   P.snapshotAcquire(), P.historyRead(0, 'snap-1'), P.evaluate(0), P.serialize(0),
+  P.vectorCreate(P.vectorRecord({ layerUid: 'L1', closed: false, segments: [P.seg(1, 1), P.seg(5, 5), P.seg(9, 1)], stroke: [0, 0, 1, 1], join: 'miter', cap: 'butt', style: { miterLimit: 3, dashArray: [12, 8], dashOffset: 0, paintOrder: 'strokeFirst' } })),
+  P.vectorCreate(P.vectorRecord({ layerUid: 'L1', segments: P.rectSegments(0, 0, 4, 4), fill: [0, 0, 0, 1], ext: { pressure: { centerSegments: [{ point: { x: 0, y: 0 }, handleIn: { x: 0, y: 0 }, handleOut: { x: 0, y: 0 }, width: 6 }],
+    widthProfile: [{ t: 0, width: 2 }, { t: 1, width: 12 }], strokeProfile: 'taper-out', profileBase: 3 } } })),
 ];
 
 test('every request builder emits a payload the published schema accepts, for an operation the contract defines', () => {
@@ -107,6 +112,7 @@ test('lane rows: the four lanes, unique ids, each row names tasks and issue, and
   assert.deepEqual(LANES, ['2107', '2108', '2112', '2113']);
   assert.equal(new Set(rows.map(r => r.id)).size, rows.length);
   for (const lane of LANES) assert.ok(rows.filter(r => r.lane === lane).length >= 3, lane + ' has too few rows');
+  assert.ok(rows.some(r => r.id === '2113-image-mesh-sculpt') && rows.some(r => r.id === '2112-asset-remove-lifetime') && rows.some(r => r.id === '2107-stroke-style-pressure-fields'));
   for (const row of rows) {
     assert.ok(row.id.startsWith(row.lane + '-') && typeof row.title === 'string' && row.title.length > 10 && Array.isArray(row.tasks) && row.tasks.length > 0 && typeof row.run === 'function' && row.issue === Number(row.lane), row.id);
   }
@@ -133,4 +139,27 @@ test('lane and row selection: default is everything, a lane or row subset is exa
   for (const bad of [{ lanes: ['9999'] }, { lanes: [] }, { lanes: ['2107', '2107'] }, { rows: ['nope'] }, { rows: [] }, { lanes: 'all' }, { lanes: ['2107'], rows: ['2108-layer-lifecycle'] }]) {
     assert.throws(() => selectRows(bad, catalog), Error, JSON.stringify(bad));
   }
+});
+
+test('the mesh read requests are the ones the published transport schema declares', () => {
+  const base = { contextId: 'scene-root', layerUid: 'L1', frame: 0, workId: 'native-work-1', viewGeneration: 1 };
+  const checks = [[transport.$defs.ObjectPresentationQueryPayload, P.presentationRead(3).payload],
+    ...[{ kind: 'selection' }, { kind: 'offsets', meshId: 'im_1', cursor: 0, limit: 16 }, { kind: 'verts', meshId: 'im_1', cursor: 16, limit: 1 }].map(page => [transport.$defs.ObjectImageMeshQueryPayload, P.meshQuery(3, 'native-object:d:3', { ...base, page }).payload])];
+  for (const [schema, payload] of checks) assert.deepEqual(errors(schema, payload, transport.$defs), [], JSON.stringify(payload));
+  assert.ok(errors(transport.$defs.ObjectImageMeshQueryPayload, P.meshQuery(3, 'p', { ...base, page: { kind: 'offsets', meshId: 'im_1', cursor: 0, limit: 99 } }).payload, transport.$defs).length > 0, 'a drifted page size is rejected');
+});
+
+test('coverage: every id a lane assigns is covered by a row or listed as not covered, every task a row names is assigned, and the receipt carries the table', () => {
+  const rows = allRows();
+  for (const lane of LANES) {
+    const c = laneCoverage(lane, rows), mine = rows.filter(r => r.lane === lane);
+    for (const row of mine) for (const task of row.tasks) assert.ok(ASSIGNED[lane].includes(task), row.id + ' names ' + task + ' which lane ' + lane + ' does not assign');
+    for (const id of ASSIGNED[lane]) assert.ok(c.coveredByRows[id].length > 0 || NOT_COVERED[lane].some(e => e.id === id), lane + ' assigns ' + id + ' with no row and no not-covered entry');
+    for (const entry of NOT_COVERED[lane]) assert.ok(typeof entry.what === 'string' && entry.what.length > 15 && typeof entry.reason === 'string' && entry.reason.length > 15, lane);
+    assert.equal(c.laneComplete, false, 'a lane with listed gaps is never reported complete');
+  }
+  assert.deepEqual(laneCoverage('2112', rows).uncoveredIds, ['G38b']);
+  const receipt = buildReceipt({ rows: rows.map(r => ({ ...r, verdict: 'pass', operations: [], assertions: [] })), selection: { lanes: LANES, rows: rows.map(r => r.id), omitted: [], catalogRows: {} }, cleanup: { ok: true } });
+  assert.deepEqual(Object.keys(receipt.coverage).sort(), LANES);
+  assert.ok(receipt.coverage['2113'].notCovered.length > 0 && receipt.residualHandsOn.some(line => /coverage\.notCovered/.test(line)));
 });

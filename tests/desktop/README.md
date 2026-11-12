@@ -304,15 +304,28 @@ exactly +1 with redo cleared; a no-op or refused command moves neither; undo and
 direction and restore or reapply the same state; `object` reads give the record that was sent; the PNG exported through the app
 (`project.export`) is decoded and measured (ink bounds, colours at probe points, coverage ratios, equality of decoded pixels);
 `project.saveAs`, `project.open` in the same session reproduces the export and the objects, and a second save is byte-identical.
-A row passes only if every assertion passes and at least one is an independent observation (a read, a pixel or a file). Negative
-controls come from the lane texts: stale target, stale revision, locked layer, a layer with an active path effect, corrupt, oversize
-and missing assets, an absent font, an unknown asset, a refused bitmap-brush publication. There are no sleeps; every wait is the
-reply of the operation itself.
+A row passes only if every assertion passes and at least one is an independent observation of the row's own (a read, a pixel or a
+file that is not kit bookkeeping: setup and the per-command revision and history deltas are recorded as `bookkeeping` and never
+count), and a step wrapped in `ctx.behavior` fails when its claim rests on replies and bookkeeping alone. Save then open loads the
+file from a copy at another path and requires a different `documentId` (and an advanced `lifecycleGeneration` when reported), so
+an app that kept the in-memory document cannot pass. A negative control counts only as a typed refusal by the native owner: a
+`frontDoor` reply (nemo-mcp's own request-shape check) fails it, and so does `unavailable` or `internal`; a control names the codes
+its rule produces (default `invalid_request`, `not_found`, `busy_conflict`; `stale_revision` for the stale-revision control; a
+missing image source is `unavailable` with `disposition: notDispatched`). Controls come from the lane texts: stale target, stale
+revision, locked layer, a layer with an active path effect, a corrupt PNG, a decodable PNG one pixel past the 8192 size cap, a
+missing file, an asset still in use, an absent font, an unknown asset, a wrong-size or unknown bitmap-brush publication. An asset
+the catalog does not hold is a no-op by contract (not a refusal). Resource publications (`brush.bitmap.publish`) are judged as
+resources: no revision, no history entry. There are no sleeps; every wait is the reply of the operation itself.
 
-**Rows.** `2107-vector-create-export-reopen`, `2107-vector-replace-delete-undo-redo`, `2107-parametric-set-translate-scale`,
-`2107-path-effects-stack`; `2108-group-combine-flatten`, `2108-boolean-apply-erase`, `2108-layer-lifecycle`,
-`2108-selection-clipboard-remap`; `2112-asset-attach-dedup-refusals`, `2112-raster-edit-save-reopen`,
-`2112-text-layout-edit-reopen`; `2113-mixed-scene-one-export`, `2113-bitmap-brush-resources`, `2113-evaluate-vs-export-pin`. Select by
+**Rows.** `2107-vector-create-export-reopen`, `2107-stroke-style-pressure-fields`, `2107-vector-replace-delete-undo-redo`,
+`2107-parametric-set-translate-scale`, `2107-path-effects-stack`; `2108-group-combine-flatten`, `2108-boolean-apply-erase`,
+`2108-layer-lifecycle`, `2108-selection-clipboard-remap`; `2112-asset-attach-dedup-refusals`, `2112-asset-remove-lifetime`,
+`2112-raster-edit-save-reopen`, `2112-text-layout-edit-reopen`; `2113-mixed-scene-one-export`, `2113-image-mesh-sculpt`,
+`2113-bitmap-brush-resources`, `2113-evaluate-vs-export-pin`. The mesh id and offsets are read through the object query's `imageMesh`
+view (the `image.mesh.edit` reply is only its receipt). **A lane total counts the rows that ran, not the lane**: `coverage.cjs` lists
+the ids each lane assigns and the behaviours no row observes (`coverage.notCovered` in the receipt, for example component and rig
+producers, nested groups, Motion flatten, glyph and layout output for G38b), and a unit test fails when an assigned id is neither
+covered by a row nor listed. Select by
 lane (`--lane`) or row (`--row`); an unknown lane or row refuses before anything starts. A row whose operation the package does not
 offer (a front-door `unsupported_capability` or `unavailable` from `nemo-mcp`, or a host that reports no lifecycle generation) is
 `unrun` with the reason, never `pass`; a refusal by the application itself is an observation the row judges. Request payloads are built by
@@ -322,8 +335,11 @@ schemas.
 **Receipt and exit status.** `installed-client-evidence.json` in the report directory (and `transcript.jsonl`, the requests and raw
 replies, private, mode 0600) records the candidate identity (source head, tree, app version, build id, instance id, pid, task id,
 executable, `nemo-mcp` and proof digests), per row the operations sent (request and reply digests, revisions), every assertion with
-`observed`, `expected` and kind, a verdict `pass`, `fail` or `unrun`, and totals per lane. Exit status: `0` all selected rows
-passed; `1` a row failed or cleanup was incomplete; `2` refused before any row; `4` no failure but at least one row is `unrun`. The
+`observed`, `expected` and kind, a verdict `pass`, `fail` or `unrun`, totals per lane (with the catalog row count and whether the
+lane ran in full), the coverage table, and the selection (`selection.omitted`). Exit status: `0` every catalog row ran and passed;
+`1` a row failed or cleanup was incomplete; `2` refused before any row; `4` no failure but at least one row is `unrun`; `5`
+`subset-pass`: the selected rows all passed but the selection left rows out (a one-row receipt is not a lane receipt; the stdout
+line carries the selection and the uncovered ids). The
 receipt states that it is not the CS7 batched session (#2348) and that it does not record any lane's installed/client acceptance
 disposition; the rows that need real input (drawing-tool strokes, keyboard shortcuts, UI buttons, how text looks in the viewport,
 the export modal and video export) stay hands-on and are listed in `residualHandsOn`.
@@ -333,7 +349,10 @@ compared with ranges derived from the declared size; the CS7 read route and this
 the registry, `lsof` and the build id because `nemo-mcp` reports no pid of its own; rows cannot show that a UI caller reaches the
 owner, only that the owner honours the contract. Unit tests (`node --test tests/desktop/unit/installed-evidence-*.test.cjs`) run the kit, wire
 and runner against stub transports only: a real pass, a product failure, a foreign instance, malformed replies and an unavailable
-operation. No installed run has been made with this runner.
+operation, plus one injected fault per kit guard (`installed-evidence-defects.test.cjs`: an unbound mesh, a front-door or wrong-code
+refusal, an edit disguised as a publication, a host that keeps the in-memory document on open, a flatten that only bumps the
+revision, an export file changed on disk). The stub follows the published reply shapes; it is not what is being proved. No
+installed run has been made with this runner.
 
 ## Real client workflow, Codex and Claude Code (`installed-evidence/f03-clients.cjs`, #1049)
 

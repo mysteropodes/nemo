@@ -16,11 +16,26 @@ function collect(value, key, out = []) {
   else if (value && typeof value === 'object') for (const [k, v] of Object.entries(value)) { if (k === key && typeof v === 'string') out.push(v); collect(v, key, out); }
   return out;
 }
+// Flatten, observed: the saved project before and after. The members and the group id are consumed and at least one result
+// record replaces them, everything else is untouched. (A revision and a history entry alone do not show a flatten.)
+async function flattenGroup(ctx, layerUid, groupId, members) {
+  const before = await K.saveAs(ctx, 'pre-flatten'), idsBefore = K.objectStrokeIds(before.document);
+  ctx.ok('file', 'before the flatten the group and its members exist', members.every(id => idsBefore.includes(id)) && collect(before.document, 'groupId').includes(groupId), { idsBefore, groups: collect(before.document, 'groupId') });
+  await K.apply(ctx, 'flatten the group', P.booleanFlatten(layerUid, groupId));
+  const after = await K.saveAs(ctx, 'post-flatten'), idsAfter = K.objectStrokeIds(after.document);
+  ctx.eq('file', 'flatten consumed the members', members.filter(id => idsAfter.includes(id)), []);
+  ctx.eq('file', 'flatten consumed the group id', collect(after.document, 'groupId').includes(groupId), false);
+  const results = idsAfter.filter(id => !idsBefore.includes(id));
+  ctx.ok('file', 'at least one flattened result replaces the members', results.length >= 1, results, '>=1');
+  ctx.eq('file', 'no other record changed', idsAfter.filter(id => !results.includes(id)).sort(), idsBefore.filter(id => !members.includes(id)).sort());
+  return { results };
+}
 const inked = (image, x, y) => probe.alphaAt(image, x, y) > 200;
 const clear = (image, x, y) => probe.alphaAt(image, x, y) < 16;
 
 const rows = [
-  { id: '2108-group-combine-flatten', title: 'nested group, combine mode, rename, flatten with one undo, ungroup', tasks: ['G24'],
+  { id: '2108-group-combine-flatten', title: 'group, combine mode, rename, flatten consumes the group with one undo, ungroup', tasks: ['G24'],
+    limitations: ['One flat group on Animation 2D records: nested groups, group reorder and Motion flatten are listed under coverage.notCovered.'],
     async run(ctx) {
       const { layerUid } = await K.fresh(ctx);
       const a = await stroke(ctx, 'create outer rectangle', rect(layerUid, 100, 60, 300, 240, RED));
@@ -43,7 +58,7 @@ const rows = [
       await K.apply(ctx, 'combine mode subtract again', P.groupMode(layerUid, 'grp_evidence_a', 'subtract'));
       const e2 = await K.exportPng(ctx, 'subtract-again');
       ctx.eq('pixel', 'subtract mode is deterministic', e2.digest, e1.digest);
-      await K.apply(ctx, 'flatten the group', P.booleanFlatten(layerUid, 'grp_evidence_a'));
+      await flattenGroup(ctx, layerUid, 'grp_evidence_a', [a, b]);
       const e3 = await K.exportPng(ctx, 'flattened');
       ctx.eq('pixel', 'flatten keeps the combined pixels', e3.digest, e1.digest);
       await K.step(ctx, 'one undo of flatten', 'undo');
@@ -182,4 +197,4 @@ const rows = [
     } },
 ];
 
-module.exports = { lane: '2108', issue: 2108, rows };
+module.exports = { lane: '2108', issue: 2108, rows, helpers: { flattenGroup } };
