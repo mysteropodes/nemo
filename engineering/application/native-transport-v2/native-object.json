@@ -659,8 +659,27 @@
                     "$ref": "#/$defs/ObjectSubselectIntent"
                   }
                 }
+              },
+              "hitTest": {
+                "const": true
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "hitTest"
+                  ]
+                },
+                "then": {
+                  "not": {
+                    "required": [
+                      "preview"
+                    ]
+                  }
+                }
+              }
+            ]
           }
         }
       }

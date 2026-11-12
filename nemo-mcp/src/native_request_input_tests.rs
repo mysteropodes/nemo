@@ -259,33 +259,32 @@ fn registration_identity_and_cancellation_remain_separate_from_availability() {
 
 #[test]
 fn exact_complete_utf8_byte_boundary_is_preserved() {
-    let mut request = object_request(0);
-    request.operation = "query.document.opacity".into();
-    request.payload = json!({"pad":""});
+    let mut request = visibility_request();
+    request.payload["layerUid"] = json!("");
     let base = serde_json::to_vec(&request).unwrap().len();
-    request.payload["pad"] = json!("x".repeat(4096 - base));
+    request.payload["layerUid"] = json!("x".repeat(4096 - base));
     assert_eq!(serde_json::to_vec(&request).unwrap().len(), 4096);
     assert!(request.validate_input().is_ok());
     assert!(request.validate().is_ok());
-    request.payload["pad"] = json!("x".repeat(4097 - base));
+    request.payload["layerUid"] = json!("x".repeat(4097 - base));
     same_failure(
         &request,
         "invalid_request",
         "native requests are limited to 4096 encoded bytes",
     );
     let padding = 4096 - base;
-    request.payload["pad"] = json!(format!(
+    request.payload["layerUid"] = json!(format!(
         "{}{}",
         "🟠".repeat(padding / 4),
         "x".repeat(padding % 4)
     ));
     assert_eq!(serde_json::to_vec(&request).unwrap().len(), 4096);
     assert!(request.validate_input().is_ok());
-    request.payload["pad"]
+    request.payload["layerUid"]
         .as_str()
         .map(str::to_owned)
         .map(|pad| {
-            request.payload["pad"] = json!(format!("{pad}x"));
+            request.payload["layerUid"] = json!(format!("{pad}x"));
         })
         .unwrap();
     same_failure(

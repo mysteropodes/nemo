@@ -3,23 +3,9 @@ use crate::native_contract::{exact, object};
 use serde_json::Value;
 pub(crate) const OP: &str = "command.document.object.layer.policy.edit";
 pub(super) fn request(value: &Value) -> bool {
-    exact(value, &["command", "layerUid", "flag", "value"], &["contextId"]).is_some_and(|p| {
-        p.get("command").and_then(Value::as_str) == Some("object.layer.policy.edit")
-            // #2256: the declared component the flag is set inside; absent is the scene root.
-            && p.get("contextId").is_none_or(|id| id.as_str().is_some_and(|id| !id.is_empty()))
-            && p.get("layerUid")
-                .and_then(Value::as_str)
-                .is_some_and(|uid| !uid.is_empty())
-            && match (p.get("flag").and_then(Value::as_str), p.get("value")) {
-                (Some("locked" | "shy" | "threeD"), Some(value)) => value.is_boolean(),
-                // D37: one layer key-lock mode, null clears it.
-                (Some("keyLock"), Some(value)) => {
-                    value.is_null() || matches!(value.as_str(), Some("in" | "out" | "layer"))
-                }
-                _ => false,
-            }
-    })
+    super::request_schema::payload(OP, value) == Some(true)
 }
+
 pub(super) fn result(value: &Value) -> bool {
     object::visibility_result(value)
 }

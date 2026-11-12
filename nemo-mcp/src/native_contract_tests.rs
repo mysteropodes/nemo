@@ -268,21 +268,10 @@ fn declared_native_operations() -> Vec<String> {
 }
 
 #[test]
-fn request_validation_is_explicit_or_pinned_forwarded() {
-    let mut actual: Vec<_> = declared_native_operations()
-        .into_iter()
-        .filter(|operation| !has_request_validator(operation))
-        .collect();
-    actual.sort_unstable();
-    let mut pinned: Vec<_> = MCP_REQUEST_FORWARDED
-        .iter()
-        .map(|op| op.to_string())
-        .collect();
-    pinned.sort_unstable();
-    assert_eq!(
-        actual, pinned,
-        "MCP_REQUEST_FORWARDED must equal the declared operations without a request validator"
-    );
+fn every_declared_request_has_schema_validation() {
+    for operation in declared_native_operations() {
+        assert!(has_request_validator(&operation), "{operation}");
+    }
 }
 
 #[test]
@@ -304,17 +293,10 @@ fn result_validation_is_explicit_or_pinned_unchecked() {
 }
 
 #[test]
-fn forwarded_and_undeclared_operations_route_as_documented() {
-    // A newly declared operation with neither a validator nor a forward is caught
-    // by request_validation_is_explicit_or_pinned_forwarded; this pins the rest.
-    let declared = declared_native_operations();
-    let forwarded = declared
-        .iter()
-        .find(|op| MCP_REQUEST_FORWARDED.contains(&op.as_str()))
-        .expect("a forwarded operation");
-    assert!(!has_request_validator(forwarded));
-    assert!(validate_request(forwarded, &json!({})));
-    assert!(!MCP_REQUEST_FORWARDED.contains(&"command.document.object.cs1.unlisted"));
+fn schema_validated_and_undeclared_operations_route_as_documented() {
+    assert!(has_request_validator("query.document.opacity"));
+    assert!(!validate_request("query.document.opacity", &json!({})));
+    assert!(validate_request("query.document.opacity", &json!({"stableTarget":{"layerUid":"layer"}})));
     // Undeclared operations are left to the registration check.
     assert!(validate_request(
         "command.document.object.cs1.unlisted",

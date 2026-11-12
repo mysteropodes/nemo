@@ -301,15 +301,17 @@ fn shape_clip_budgets_are_64kib_for_the_paste_request_and_the_copy_cut_replies_o
 }
 #[test]
 fn a_shape_paste_request_between_4096_and_65536_bytes_is_admitted_and_one_over_is_not() {
+    // Actual copy results carry complete canonical geometry, not empty DTO stubs.
+    let cases: serde_json::Value = serde_json::from_str(include_str!(
+        "../../engineering/application/examples/native-object-v1/cases.json"
+    )).unwrap();
     let records = |count: usize| -> Vec<serde_json::Value> {
-        (0..count)
-            .map(|n| {
-                json!({"schemaVersion":1,"family":"closed-solid-fill-cubic-path",
-                "target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
-                    "layerUid":"layer-a","strokeId":format!("stroke-{n}")},
-                "geometry":{}})
-            })
-            .collect()
+        (0..count).map(|n| {
+            let mut record = cases["records"][0].clone();
+            record["target"] = json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
+                "layerUid":"layer-a","strokeId":format!("stroke-{n}")});
+            record
+        }).collect()
     };
     let paste = |count: usize| -> NativeApplicationRequest {
         serde_json::from_value(json!({"apiVersion":2,"requestId":"shape-paste",
@@ -320,8 +322,11 @@ fn a_shape_paste_request_between_4096_and_65536_bytes_is_admitted_and_one_over_i
         .unwrap()
     };
     let size = |q: &NativeApplicationRequest| serde_json::to_vec(q).unwrap().len();
-    let (small, mid, over) = (paste(2), paste(100), paste(400));
+    let (small, mid, over) = (paste(2), paste(40), paste(160));
     assert!(size(&small) < 4096 && small.validate_input().is_ok());
+    let mut incomplete = small.clone();
+    incomplete.payload["clip"]["records"][0]["geometry"] = json!({});
+    assert!(incomplete.validate_input().is_err(), "empty geometry is outside the public shape contract");
     assert!(size(&mid) > 4096 && size(&mid) <= 65_536, "{}", size(&mid));
     assert!(mid.validate_input().is_ok());
     assert!(size(&over) > 65_536, "{}", size(&over));

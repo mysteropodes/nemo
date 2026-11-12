@@ -251,7 +251,13 @@ pub(super) fn request(v: &Value) -> bool {
             .as_str()
             .is_some_and(|s| !s.is_empty())
         && super::view_target(&v["stableTarget"])
-        && exact(&v["subselect"], &["cursor", "limit"], &["preview", "paint", "hitTest", "center"]).is_some()
+        && exact(&v["subselect"], &["cursor", "limit"], &["preview", "paint", "hitTest", "center", "atFrame"]).is_some()
+        // GUI painted-outline reads bind evaluated geometry to the presented frame.
+        && v["subselect"].get("atFrame").is_none_or(|frame| {
+            frame.as_u64().is_some_and(|frame| frame <= u64::from(u32::MAX))
+                && v["subselect"]["hitTest"] == true
+                && ["center", "paint", "preview"].iter().all(|key| v["subselect"].get(key).is_none())
+        })
         // #2362 sculpt: `center` reads a ribbon's centreline and widths, on a hit-test read only.
         && v["subselect"].get("center").is_none_or(|c| c == true && v["subselect"]["hitTest"] == true)
         // #2362: hit-test geometry is the painted outline of any record, never with a preview or the paint mode.

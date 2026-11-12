@@ -207,7 +207,7 @@ impl NativeApplicationRequest {
                 "native payload must be a JSON object".into(),
             ));
         }
-        if !crate::native_contract::validate_request(&self.operation, &self.payload) {
+        if !crate::native_contract::retained_request_constraints(&self.operation, &self.payload) {
             return Err(RequestError::MalformedPayload(
                 "native pinned-read payload does not match its declared contract".into(),
             ));
@@ -218,7 +218,18 @@ impl NativeApplicationRequest {
                 "native requests are limited to {request_limit} encoded bytes"
             )));
         }
-        crate::capabilities::validate_native_operation_registration(&self.operation)
+        if !crate::native_contract::validate_request(&self.operation, &self.payload) {
+            return Err(RequestError::MalformedPayload(
+                "native pinned-read payload does not match its declared contract".into(),
+            ));
+        }
+        crate::capabilities::validate_native_operation_registration(&self.operation)?;
+        if crate::native_contract::request_schema::envelope(self) != Some(true) {
+            return Err(RequestError::InvalidRequest(
+                "native request envelope does not match its declared contract".into(),
+            ));
+        }
+        Ok(())
     }
 }
 
