@@ -79,6 +79,19 @@ test('a changed baseline file fails original-untouched and the clause being judg
   assert.equal(result.safeToContinue, false);
 });
 
+test('Save-again holds and stops when the accessibility read is unavailable', async t => {
+  const { session, workflow, directory } = setup(t, { observeUnavailableAt: 'save-again' });
+  const result = await workflow.run({ session, row: row() });
+  const s = statuses(result);
+  assert.equal(s['first-save-save-as'], 'pass');
+  assert.equal(s['save-reopen'], 'unrun');
+  assert.equal(s['media-text-open'], 'unrun');
+  assert.equal(result.safeToContinue, false);
+  const outcome = JSON.parse(fs.readFileSync(path.join(directory, 'legacy-import/outcome.json'), 'utf8'));
+  assert.match(outcome.reason, /accessibility read was unavailable, so a repeat name dialog was not observed/);
+  assert.match(outcome.reasons['save-reopen'], /accessibility read was unavailable/);
+});
+
 test('toast text that cannot be read leaves the clauses that need it unrun, with the reason, and never passes them', async t => {
   const { session, workflow, directory } = setup(t, { toastHidden: true });
   const result = await workflow.run({ session, row: row() });

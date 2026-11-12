@@ -32,6 +32,8 @@ test('five declared Ready rows use exactly one candidate lifetime and cleanup', 
   assert.ok(result.checks.every(c => c.passed === 1 && c.failed === 0 && c.ignored === 0));
   assert.equal(result.format, 'nemo.parity-family-result/1');
   assert.notEqual(result.schema, result.format); // Cannot silently become headless evidence.
+  assert.deepEqual(result.tasks, ['F03']);
+  assert.deepEqual(result.expected.tasks, ['F03']);
 });
 test('Ready is never inferred from closed issues, empty input or missing scripts', () => {
   for (const mutate of [s => { s.rows = []; }, s => { s.rows[0].status = 'issues-closed'; },
@@ -56,6 +58,12 @@ test('operator failure aborts without replay and retains every unrun obligation'
   assert.equal(result.installed.operatorInputFailures, 1);
   assert.equal(result.installed.rows.length, 5);
   assert.equal(result.installed.rows[0].status, 'pass');
+  assert.deepEqual(result.installed.rows[0].tasks, ['F03']);
+  assert.deepEqual(result.installed.rows[1].tasks, []);
+  assert.deepEqual(result.installed.rows[1].expected.tasks, ['F03']);
+  assert.deepEqual(result.installed.rows[4].partialTasks, {});
+  assert.deepEqual(result.installed.rows[4].expected.tasks, ['F03']);
+  assert.deepEqual(result.tasks, ['F03']);
   assert.equal(result.installed.rows[4].checks[0].status, 'unrun');
   assert.equal(result.verdict, 'fail');
   assert.ok(!JSON.stringify(result).includes('private path and token'));
@@ -84,6 +92,9 @@ test('partial startup, invalid assertions and failed cleanup cannot pass', async
     s => { s.scenarios['case-0'].run = async () => ({ checks: [{ id: 'workflow', status: 'pass' }, { id: 'workflow', status: 'pass' }], safeToContinue: true }); }]) {
     const state = setup(); mutate(state); const result = await runInstalledRows(state);
     assert.equal(result.verdict, 'fail');
+    if (state.session.cleanup !== undefined && state.calls.includes('cleanup')) {
+      if (result.installed.cleanup === 'incomplete') assert.deepEqual(result.tasks, []);
+    }
   }
 });
 test('unsafe product continuation and unrun clauses remain incomplete', async () => {
@@ -119,9 +130,12 @@ test('installed collection is verified after owner cleanup, never from a provisi
   const result = await runInstalledRows({ ...state, save: async r => journals.push(structuredClone(r)) });
   assert.equal(journals[0].rows[0].status, 'pending-verification');
   assert.equal(journals[0].rows[0].checks[0].status, 'unrun');
+  assert.deepEqual(journals[0].rows[0].tasks, []);
+  assert.deepEqual(journals[0].rows[0].expected.tasks, ['F03']);
   assert.deepEqual(state.calls, ['start', 'row-1', 'cleanup', 'verify-retained-copy']);
   assert.equal(result.installed.rows[0].checks[0].clause, 'Original installed workflow');
   assert.equal(result.verdict, 'installed-pass');
+  assert.deepEqual(result.tasks, ['F03']);
 });
 test('failed cleanup prevents final verification and a broken finalizer is not an input failure', async () => {
   for (const badCleanup of [true, false]) {
@@ -135,6 +149,9 @@ test('failed cleanup prevents final verification and a broken finalizer is not a
     assert.equal(result.installed.operatorInputFailures, 0);
     assert.equal(result.installed.terminalCode, badCleanup ? 'cleanup-incomplete' : 'evidence-finalization-failed');
     assert.equal(result.installed.rows[0].checks[0].status, 'unrun');
+    assert.deepEqual(result.installed.rows[0].tasks, []);
+    assert.deepEqual(result.tasks, []);
+    assert.deepEqual(result.expected.tasks, ['F03']);
     assert.ok(!JSON.stringify(result).includes('private artifact path'));
   }
 });
@@ -267,11 +284,29 @@ test('a pass of fewer rows than every Ready row has its own verdict; all-ready k
     const result = await runInstalledRows({ ...state, ...(selection ? { selection } : {}) });
     assert.equal(result.verdict, verdict);
     assert.equal(result.selection?.scope, selection ? (selection.omittedReady.length ? 'subset' : 'all-ready') : undefined);
+    assert.deepEqual(result.tasks, ['F03']);
   }
   // A failure is a failure whatever the selection.
   const state = setup(1); state.rows = ready(state);
   state.scenarios['case-0'] = { run: async () => ({ checks: [{ id: 'workflow', status: 'fail' }], safeToContinue: false }) };
   assert.equal((await runInstalledRows({ ...state, selection: { omittedReady: ['row-9'] } })).verdict, 'fail');
+});
+
+test('declared coverage is expected scope until a row passes safely and cleanup completes', async () => {
+  const state = setup(3);
+  state.rows[0].partialTasks = { F04: ['blur'] };
+  state.rows[1].dependsOn = ['row-0'];
+  state.scenarios['case-0'].run = async () => ({ checks: [{ id: 'workflow', status: 'pass' }], safeToContinue: false });
+  state.scenarios['case-2'].run = async () => ({ checks: [{ id: 'workflow', status: 'fail' }], safeToContinue: true });
+  const result = await runInstalledRows({ ...state, selection: { omittedReady: ['row-9'] } });
+  assert.deepEqual(result.expected.tasks, ['F03']);
+  assert.deepEqual(result.expected.partialTasks.F04, ['blur']);
+  assert.deepEqual(result.tasks, []);
+  assert.deepEqual(result.partialTasks, {});
+  assert.deepEqual(result.surfaces, []);
+  assert.deepEqual(result.installed.rows.map(r => r.tasks), [[], [], []]);
+  assert.deepEqual(result.installed.rows.map(r => r.expected.tasks), [['F03'], ['F03'], ['F03']]);
+  assert.deepEqual(result.installed.rows[0].expected.partialTasks, { F04: ['blur'] });
 });
 
 test('checkTaskCoverage and taskSurfaceIndex read the real matrix shape', () => {

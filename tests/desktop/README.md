@@ -72,10 +72,14 @@ row's `surfaces`. A task the row exercises only in part goes in `partialTasks`, 
 `{ "<task>": ["<matrix surface the row does not exercise>", ...] }` that lists exactly the missing surfaces
 (never empty, never a task also in `tasks`). The runner refuses a row that lists a partly exercised task in
 `tasks` or states a wrong missing list, before any session is created, and a node test checks every shipped
-declaration the same way. The receipt publishes the two separately: `tasks` (fully exercised) and
-`partialTasks` (`{task: surfaces no run row exercised}`), also per row under `installed.rows[]`. Read
+declaration the same way. The receipt keeps declarations under `expected`; top-level and per-row
+`tasks`, `partialTasks`, `surfaces`, and `operatorAttestedSurfaces` show only coverage from rows whose checks
+pass, whose scenario permits continuation, and whose owner cleanup and deferred evidence finalizers complete.
+Failed, unsafe, blocked, unrun, pending, or cleanup/finalizer-failed rows contribute no actual coverage.
+Subset runs retain expected scope while actual coverage is limited to validated selected rows. Read
 `partialTasks` as "part of this task was exercised; the listed surfaces were not": a pass is never acceptance
-of those. A Ready row needs at least one task in `tasks` or `partialTasks`. Every Ready scenario must
+of those. Non-inventory keyboard routes may be separately recorded as `operatorAttestedRoutes`; they do not
+count toward task surface coverage. A Ready row needs at least one task in `tasks` or `partialTasks`. Every Ready scenario must
 exist as a reviewed `cs7-scenarios/<scenario>.cjs` module exporting
 `run({session,row})`. It returns every declared assertion's `pass`, `fail` or
 `unrun` status and an explicit `safeToContinue` disposition. The scenario must

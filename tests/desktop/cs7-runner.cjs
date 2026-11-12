@@ -86,6 +86,9 @@ function readyRows(declarations, { taskIds, surfaceIds, taskSurfaces, scenarios,
       const attested = row.operatorAttestedSurfaces === undefined ? [] : row.operatorAttestedSurfaces;
       check(Array.isArray(attested) && new Set(attested).size === attested.length && attested.every(id => surfaceIds.has(id)) &&
         attested.every(id => !row.surfaces.includes(id)), 'installed operatorAttestedSurfaces unknown, duplicate or also in surfaces');
+      const routes = row.operatorAttestedRoutes === undefined ? [] : row.operatorAttestedRoutes;
+      check(Array.isArray(routes) && new Set(routes).size === routes.length && routes.every(id => typeof id === 'string' && /^[a-z][a-z0-9-]*:.+$/.test(id)),
+        'installed operatorAttestedRoutes invalid');
       checkTaskCoverage(row, taskSurfaces);
       check(Array.isArray(row.dependsOn) && new Set(row.dependsOn).size === row.dependsOn.length, 'installed dependencies required');
       check(Array.isArray(row.checks) && row.checks.length > 0, 'installed assertions required');
@@ -141,8 +144,12 @@ function rowResult(row, observations, status) {
   const byId = new Map(observations.map(c => [c.id, c]));
   check(byId.size === observations.length && observations.every(c => row.checks.some(d => d.id === c.id)), 'unexpected installed assertion');
   return {
-    id: row.id, issue: row.issue, status, tasks: row.tasks, partialTasks: structuredClone(row.partialTasks || {}), surfaces: row.surfaces,
-    operatorAttestedSurfaces: [...(row.operatorAttestedSurfaces || [])],
+    id: row.id, issue: row.issue, status,
+    // Declarations describe the planned denominator. Coverage fields below are populated only
+    // after this row's evidence, safe disposition, cleanup and any deferred verification pass.
+    expected: { tasks: [...row.tasks], partialTasks: structuredClone(row.partialTasks || {}), surfaces: [...row.surfaces],
+      operatorAttestedSurfaces: [...(row.operatorAttestedSurfaces || [])], operatorAttestedRoutes: [...(row.operatorAttestedRoutes || [])] },
+    tasks: [], partialTasks: {}, surfaces: [], operatorAttestedSurfaces: [], operatorAttestedRoutes: [],
     ...(row.acceptanceReference ? { acceptanceReference: row.acceptanceReference } : {}),
     checks: row.checks.map(c => {
       const result = byId.get(c.id);
@@ -174,7 +181,7 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
   const selected = selection ? { scope: selection.omittedReady.length ? 'subset' : 'all-ready',
     selected: rows.map(r => r.id), omittedReady: [...selection.omittedReady] } : null;
   const results = rows.map(row => rowResult(row, [], 'unrun'));
-  const finalizers = [], recorded = new Set();
+  const finalizers = [], recorded = new Set(), safeRows = new Map();
   let identity, operatorInputFailures = 0, evidenceFailures = 0, cleanup = 'unrun', terminalCode = null, activeRow = null, failure = null;
   function record(i, observed) {
     check(!recorded.has(i), 'installed row already recorded');
@@ -189,6 +196,7 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
       if (result.status !== 'fail') result.status = 'pending-verification';
     }
     results[i] = result; recorded.add(i);
+    safeRows.set(i, observed.safeToContinue);
   }
   try {
     identity = verifiedIdentity(await session.start());
@@ -247,6 +255,17 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
       failure ||= { row: rows[i].id, command: null, ordinal: null };
     }
   }
+  // Publish actual coverage only for fully validated rows after the owner is stopped and
+  // deferred evidence has been finalized. Failed, blocked, unrun and unsafe rows remain zero.
+  if (cleanup === 'complete') results.forEach((result, i) => {
+    if (result.status !== 'pass' || safeRows.get(i) !== true) return;
+    const row = rows[i];
+    result.tasks = [...row.tasks];
+    result.partialTasks = structuredClone(row.partialTasks || {});
+    result.surfaces = [...row.surfaces];
+    result.operatorAttestedSurfaces = [...(row.operatorAttestedSurfaces || [])];
+    result.operatorAttestedRoutes = [...(row.operatorAttestedRoutes || [])];
+  });
   const checks = results.flatMap(row => row.checks.map(c => ({
     id: row.id + '.' + c.id, target: 'installed-desktop', filter: row.id,
     passed: c.status === 'pass' ? 1 : 0, failed: c.status === 'fail' ? 1 : 0, ignored: c.status === 'unrun' ? 1 : 0,
@@ -264,9 +283,14 @@ async function runInstalledRows({ rows, scenarios, session, now = () => new Date
     sourceSha: identity?.sourceSha || null, tree: identity?.tree || null, generatedAt: now(), checks,
     kindsCovered: KINDS.filter(k => covered.has(k)), kindsMissing: KINDS.filter(k => !covered.has(k)), verdict,
     ...(selected ? { selection: selected } : {}),
-    ...publishedTasks(rows),
-    // Routes the harness could not observe, reported apart from the observed `surfaces` of each row so they never read as observed.
-    operatorAttestedSurfaces: [...new Set(rows.flatMap(r => r.operatorAttestedSurfaces || []))],
+    expected: { ...publishedTasks(rows), surfaces: [...new Set(rows.flatMap(r => r.surfaces))],
+      operatorAttestedSurfaces: [...new Set(rows.flatMap(r => r.operatorAttestedSurfaces || []))],
+      operatorAttestedRoutes: [...new Set(rows.flatMap(r => r.operatorAttestedRoutes || []))] },
+    ...publishedTasks(results),
+    surfaces: [...new Set(results.flatMap(r => r.surfaces))],
+    // Routes the harness could not observe stay separate from observed surfaces.
+    operatorAttestedSurfaces: [...new Set(results.flatMap(r => r.operatorAttestedSurfaces || []))],
+    operatorAttestedRoutes: [...new Set(results.flatMap(r => r.operatorAttestedRoutes || []))],
     installed: { identity: identity || null, operatorInputFailures, evidenceFailures, cleanup, terminalCode, failure, rows: results },
   };
   await save(result);

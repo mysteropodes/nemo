@@ -170,6 +170,7 @@ test('finding 2: routes the harness cannot observe are operatorAttestedSurfaces,
   assert.equal(by['frame-edit-ui'].operatorAttestedSurfaces.length, 10);
   assert.ok(by['frame-edit-ui'].operatorAttestedSurfaces.every(id => /^(menu|shortcut):/.test(id)));
   assert.deepEqual(by['legacy-import'].operatorAttestedSurfaces, ['dom:#btn-open', 'dom:#btn-saveas']);
+  assert.deepEqual(by['legacy-import'].operatorAttestedRoutes, ['keyboard:Cmd+S']);
   assert.ok(by['component-edit-draw'].operatorAttestedSurfaces.every(id => /^(shortcut|menu):|^dom:(tools-panel|shape-tool-stack)>/.test(id)));
   assert.deepEqual(by['component-edit-draw'].surfaces, ['dom:p-fillbrushmode-grp>button[data-value=above]', 'dom:app-mode-switch>button[data-mode=motion]', 'dom:app-mode-switch>button[data-mode=anim2d]']);
   for (const r of rows) assert.ok((r.operatorAttestedSurfaces || []).every(id => !r.surfaces.includes(id)), r.id);
@@ -180,6 +181,7 @@ test('finding 2: routes the harness cannot observe are operatorAttestedSurfaces,
   assert.deepEqual(result.installed.rows[0].surfaces, []);
   assert.deepEqual(result.installed.rows[0].operatorAttestedSurfaces, by['frame-edit-ui'].operatorAttestedSurfaces);
   assert.deepEqual(result.operatorAttestedSurfaces, by['frame-edit-ui'].operatorAttestedSurfaces);
+  assert.deepEqual(result.expected.operatorAttestedSurfaces, by['frame-edit-ui'].operatorAttestedSurfaces);
   assert.deepEqual(result.tasks, []);
   assert.deepEqual(Object.keys(result.partialTasks).sort(), ['F09', 'F10', 'F11', 'F12', 'F13']);
   // A declaration may not list one surface as both observed and attested, nor attest an unknown surface.

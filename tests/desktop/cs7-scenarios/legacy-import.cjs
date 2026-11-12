@@ -320,6 +320,11 @@ function createWorkflow({ reportDirectory, fixtureDirectory = FIXTURES }) {
         if (step.type === 'save-again') {
           if (ev.nameDialogOpened === true) failure = 'save-asked-for-a-name-again';
           else if (typeof ev.nameDialogOpened !== 'boolean' || ev.savedFile !== SAVED) throw malformed(ROW, step.id);
+          else if (!afterNodes) {
+            const reason = 'the accessibility read was unavailable, so a repeat name dialog was not observed';
+            hold(step.check, reason);
+            return finish(true, step.id + ': ' + reason);
+          }
         }
         if (!failure && (!f || !plain(json) || !firstSave)) throw malformed(ROW, step.id);
         if (!failure && step.type === 'save-again') {
