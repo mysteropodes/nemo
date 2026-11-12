@@ -136,5 +136,19 @@
     }
     return step(0);
   }
-  return Object.freeze({ run: run });
+  // I33: a run is ONE undo group. The undo depth is read before and after the drain (ctx.ports.history.depth) and both reads go to
+  // history.group, which records the entries the drain added (script-native-groups.js). A partial drain groups what it did: no rollback, as the
+  // baseline kept its edits. An unreadable history never blocks the drain.
+  function runGrouped(items, ctx) {
+    var h = ctx.ports.history, before = null;
+    if (!items.length || !h || typeof h.depth !== 'function' || typeof h.group !== 'function') return run(items, ctx);
+    return Promise.resolve().then(function () { return h.depth(); }).then(function (b) { before = b; }, function () { before = null; })
+      .then(function () { return run(items, ctx); })
+      .then(function (result) {
+        if (!before) return result;
+        return Promise.resolve().then(function () { return h.depth(); }).then(function (after) { if (after) h.group(before, after); }, function () {})
+          .then(function () { return result; });
+      });
+  }
+  return Object.freeze({ run: run, runGrouped: runGrouped });
 }));

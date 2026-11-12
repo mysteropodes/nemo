@@ -387,21 +387,11 @@
     nemo = guard(nemo, '');
     // Drains the queue in order (script-native-drain.js): each step re-reads the pin, calls the same native entry the UI uses and counts
     // only what the native read model then shows; it stops at the first refusal.
-    // With ports.history the drain is bracketed by two reads of the undo depth, and the entries it added are recorded as ONE undo group
-    // (script-native-groups.js): the run is the group, a partial drain groups what it did (no rollback, as the baseline kept its edits).
+    // With ports.history the drain is bracketed by two reads of the undo depth and the entries it added are ONE undo group (Drain.runGrouped).
     function commit() {
-      var items = queue.splice(0), h = ports.history;
+      var items = queue.splice(0);
       closed = true;
-      var ctx = { ports: ports, pin: pin, ops: ops, keys: PIN, learned: function (from, to) { learnt[from] = to; } };
-      if (!items.length || !h || typeof h.depth !== 'function' || typeof h.group !== 'function') return Drain.run(items, ctx);
-      var before = null;
-      return Promise.resolve().then(function () { return h.depth(); }).then(function (b) { before = b; }, function () { before = null; })
-        .then(function () { return Drain.run(items, ctx); })
-        .then(function (result) {
-          if (!before) return result;
-          return Promise.resolve().then(function () { return h.depth(); }).then(function (after) { if (after) h.group(before, after); }, function () {})
-            .then(function () { return result; });
-        });
+      return Drain.runGrouped(items, { ports: ports, pin: pin, ops: ops, keys: PIN, learned: function (from, to) { learnt[from] = to; } });
     }
     return { nemo: nemo, commit: commit, discard: function () { queue.splice(0); closed = true; }, log: function () { return log.slice(); },
       resolve: function (uid) { return learnt[uid] || uid; } };
