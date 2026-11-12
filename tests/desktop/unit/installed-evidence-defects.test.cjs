@@ -253,3 +253,14 @@ test('an object project refuses the opacity-document queries: the pin comes from
   assert.deepEqual(await K.layerOrder(ctx), ['L1']);
   assert.ok(app);
 });
+
+test('a save refused once as unavailable right after a change is retried and the refusal stays on record', async t => {
+  const { wire, work } = setup(t, { saveRace: true });
+  const ctx = K.createContext({ wire, work, rowId: 'x' });
+  const { layerUid } = await K.fresh(ctx);
+  await K.apply(ctx, 'create', rect(layerUid, 0, 0, 10, 10));
+  const saved = await K.saveAs(ctx, 'race');
+  assert.ok(saved.document, 'the retried save wrote the file');
+  const refused = ctx.assertions.filter(a => /save attempt 1 refused as unavailable \(pin-changed-before-picker\)/.test(a.id));
+  assert.equal(refused.length, 1);
+});

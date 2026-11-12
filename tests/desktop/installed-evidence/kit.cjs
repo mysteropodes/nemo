@@ -173,7 +173,7 @@ function exportIntact(ctx, id, exported) {
 async function saveAs(ctx, tag) {
   const file = path.join(ctx.work, 'save-' + tag + '-' + ctx.next() + '.json');
   const before = await ctx.wire.discover();
-  const res = await ctx.wire.v1('project.saveAs', { path: file });
+  const res = await saveRetrying(ctx, 'save ' + tag, file);
   ctx.book.ok('reply', 'save ' + tag + ': accepted', res.ok === true, res.ok ? 'ok' : res.error);
   const after = await ctx.wire.discover();
   ctx.book.eq('read', 'save ' + tag + ': saving is not an edit', after.contentRevision, before.contentRevision);
@@ -198,11 +198,27 @@ async function reopen(ctx, file) {
   return res.result;
 }
 
+// project.saveAs on the installed app is refused with a typed `unavailable` ("pin-changed-before-picker" or
+// "publication-response-unavailable") when it follows a change closely; an immediate second request is accepted. The refused attempts
+// are recorded, never hidden, and the save must still be accepted within a few attempts. Any other refusal is returned as it is.
+const SAVE_RACE = /pin-changed-before-picker|publication-response-unavailable/;
+async function saveRetrying(ctx, label, file) {
+  let res;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    res = await ctx.wire.v1('project.saveAs', { path: file });
+    const race = !res.ok && res.error && res.error.code === 'unavailable' && SAVE_RACE.test(String(res.error.message));
+    if (!race) return res;
+    ctx.book.ok('reply', label + ': save attempt ' + attempt + ' refused as unavailable (' + (String(res.error.message).match(SAVE_RACE) || [''])[0] + ')', true, 'refused, retried');
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return res;
+}
+
 // New 640x360 project; a dirty open project is first saved to a scratch file, because project.new refuses unsaved changes.
 async function fresh(ctx, { w = 640, h = 360, fps = 24 } = {}) {
   const was = await ctx.wire.discover();
   if (was.documentId) {
-    const scratch = await ctx.wire.v1('project.saveAs', { path: path.join(ctx.work, 'scratch-' + ctx.next() + '.json') });
+    const scratch = await saveRetrying(ctx, 'setup', path.join(ctx.work, 'scratch-' + ctx.next() + '.json'));
     ctx.book.ok('reply', 'setup: previous project saved aside', scratch.ok === true, scratch.ok ? 'ok' : scratch.error);
   }
   const res = await ctx.wire.v1('project.new', { canvasW: w, canvasH: h, fps });

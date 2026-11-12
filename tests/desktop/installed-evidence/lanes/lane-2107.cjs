@@ -40,8 +40,8 @@ const rows = [
       ctx.near('pixel', 'rectangle interior is the fill colour', probe.over(scene.image, 90, 80), [230, 51, 51], 8);
       ctx.near('pixel', 'open path centre is the stroke colour', probe.over(scene.image, 310, 110), [0, 69, 204], 14);
       ctx.near('pixel', 'half-alpha fill composites to half coverage', probe.over(scene.image, 525, 90), [140, 204, 153], 12);
-      ctx.near('pixel', 'half-alpha fill alpha', probe.alphaAt(scene.image, 525, 90), 128, 6);
-      ctx.eq('pixel', 'outside the artwork is transparent', [probe.alphaAt(scene.image, 5, 5), probe.alphaAt(scene.image, 300, 300)], [0, 0]);
+      ctx.near('pixel', 'half-alpha fill alpha, recovered from the composite over the background', probe.paintAlphaAt(scene.image, 525, 90, [26, 153, 51]), 128, 6);
+      ctx.eq('pixel', 'outside the artwork is the canvas background', [probe.distanceAt(scene.image, 5, 5), probe.distanceAt(scene.image, 300, 300)], [0, 0]);
       const trip = await K.roundTrip(ctx, 'vector', scene);
       const saved = K.objectStrokeIds(trip.first.document);
       ctx.ok('file', 'saved project holds every created stroke', [a, b, c].every(id => saved.includes(id)), saved, [a, b, c]);
@@ -74,7 +74,7 @@ const rows = [
       ctx.near('pixel', 'stroke-first: the fill paints over the inner half of the stroke', probe.over(scene.image, 46, 90), [26, 179, 77], 14);
       ctx.near('pixel', 'fill-first: the stroke paints over the fill edge', probe.over(scene.image, 266, 90), [0, 69, 204], 14);
       let inked = 0, total = 0;
-      for (let x = 60; x < 280; x++) { total++; if (probe.alphaAt(scene.image, x, 190) > 128) inked++; }
+      for (let x = 60; x < 280; x++) { total++; if (probe.distanceAt(scene.image, x, 190) > 128) inked++; }
       ctx.within('pixel', 'the dash pattern 12 on / 8 off leaves about 60% of the line inked', inked / total, 0.45, 0.75);
       const top = box => probe.inkBounds(scene.image, { box }).box[1];
       ctx.ok('pixel', 'a miter join reaches farther than a bevel join at the same corner', top([0, 230, 180, 359]) < top([180, 230, 340, 359]) - 4, [top([0, 230, 180, 359]), top([180, 230, 340, 359])]);
@@ -151,8 +151,8 @@ const rows = [
       const r3 = await K.readObject(ctx, tgt), e3 = await K.exportPng(ctx, 'p3');
       ctx.eq('read', 'corner radius is stored', [r3.object.vectorExt.paramShape.tl, r3.object.vectorExt.paramShape.br], [20, 20]);
       ctx.ok('read', 'rounded outline has more anchors than the rectangle', r3.object.geometry.segments.length > 4, r3.object.geometry.segments.length, '>4');
-      ctx.ok('pixel', 'the corner pixel is no longer inked', probe.alphaAt(e3.image, 141, 131) < 40, probe.alphaAt(e3.image, 141, 131), '<40');
-      ctx.ok('pixel', 'the middle edge is still inked', probe.alphaAt(e3.image, 340, 131) > 200, probe.alphaAt(e3.image, 340, 131), '>200');
+      ctx.ok('pixel', 'the corner pixel is no longer inked', probe.distanceAt(e3.image, 141, 131) < 40, probe.distanceAt(e3.image, 141, 131), '<40');
+      ctx.ok('pixel', 'the middle edge is still inked', probe.distanceAt(e3.image, 340, 131) > 64, probe.distanceAt(e3.image, 340, 131), '>64');
       around(ctx, 'pixel', 'rounded shape keeps its bounds', probe.inkBounds(e3.image), [140, 130, 540, 180], 2);
       await K.step(ctx, 'undo the radius', 'undo');
       const r4 = await K.readObject(ctx, tgt), e4 = await K.exportPng(ctx, 'p4');

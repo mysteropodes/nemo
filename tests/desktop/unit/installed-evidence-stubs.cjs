@@ -79,10 +79,15 @@ function createStubApp(options = {}) {
     return mesh ? mesh.outline.map(([x, y], i) => [x + mesh.offsets[i][0], y + mesh.offsets[i][1]]) : null;
   }
   function render(doc) {
-    const image = png.canvas(doc.w, doc.h, [0, 0, 0, 0]);
+    // The real export is opaque: the canvas background (#ffffff) is painted under everything and fills composite over it.
+    const image = png.canvas(doc.w, doc.h, [255, 255, 255, 255]);
     for (const s of doc.strokes) {
       const { x0, y0, x1, y1 } = bounds(s.record.geometry.segments), fill = s.record.fill;
-      if (fill) png.fillRect(image, x0, y0, x1 - x0, y1 - y0, [Math.round(fill.r * 255), Math.round(fill.g * 255), Math.round(fill.b * 255), Math.round(fill.a * 255)]);
+      if (!fill) continue;
+      const c = [fill.r, fill.g, fill.b].map(v => Math.round(v * 255)), a = fill.a;
+      for (let y = Math.max(0, Math.round(y0)); y < Math.min(doc.h, Math.round(y1)); y++) for (let x = Math.max(0, Math.round(x0)); x < Math.min(doc.w, Math.round(x1)); x++) {
+        png.fillRect(image, x, y, 1, 1, c.map(v => Math.round(v * a + 255 * (1 - a))));
+      }
     }
     for (const r of doc.rasters) {
       const asset = doc.assets.find(a => a.id === r.assetId), polygon = flags.meshNeverBound ? null : meshPolygon(doc, r);
@@ -119,6 +124,8 @@ function createStubApp(options = {}) {
     }
     if (!state.doc || request.documentId !== state.doc.id || request.expectedRevision !== state.doc.rev) return refuse(1, request, 'stale_revision', 'Read a current snapshot.');
     if (request.operation === 'project.saveAs') {
+      // Observed on the installed app: the first save after a change is refused as unavailable, the next one is accepted.
+      if (flags.saveRace && state.raceRev !== state.doc.rev) { state.raceRev = state.doc.rev; return refuse(1, request, 'unavailable', 'The project was not saved (refused: pin-changed-before-picker). App notice: Save cancelled or unavailable. Choose a new file path.'); }
       fs.writeFileSync(p.path, JSON.stringify(fileOf(state.doc)));
       state.dirty = false; return ok(1, request, { path: p.path });
     }

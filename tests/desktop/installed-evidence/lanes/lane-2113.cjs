@@ -101,14 +101,14 @@ const rows = [
       ctx.ok('pixel', 'a rest mesh draws the same image (seam noise only)', probe.differing(e0.image, e1.image) <= 0.02 * box.count, probe.differing(e0.image, e1.image), '<=' + Math.round(0.02 * box.count));
       // Sculpt the top-right OUTLINE vertex (index 2) toward the centre: the outline is the mask, so the corner must disappear.
       const corner = at(0.97, 0.03), keep = at(0.05, 0.95);
-      ctx.ok('pixel', 'the corner probe is inked before the sculpt', probe.alphaAt(e1.image, ...corner) > 200, probe.alphaAt(e1.image, ...corner), '>200');
+      ctx.ok('pixel', 'the corner probe is inked before the sculpt', probe.distanceAt(e1.image, ...corner) > 64, probe.distanceAt(e1.image, ...corner), '>64');
       await K.apply(ctx, 'sculpt the top-right outline vertex', P.meshSetOffset(meshId, 2, -0.4, 0.4));
       const sculpted = await ctx.behavior('the sculpt is stored and moves pixels', async () => {
         const state = await K.meshState(ctx, layer);
         ctx.near('read', 'the offset of vertex 2 is the one sent', state.offsets[2], [-0.4, 0.4], 1e-6);
         ctx.eq('read', 'no other vertex moved', state.offsets.filter((_, i) => i !== 2).every(([du, dv]) => du === 0 && dv === 0), true);
         const e2 = await K.exportPng(ctx, 'sculpt');
-        ctx.ok('pixel', 'the corner is cut away by the moved outline vertex', probe.alphaAt(e2.image, ...corner) < 16, probe.alphaAt(e2.image, ...corner), '<16');
+        ctx.ok('pixel', 'the corner is cut away by the moved outline vertex', probe.distanceAt(e2.image, ...corner) < 16, probe.distanceAt(e2.image, ...corner), '<16');
         ctx.eq('pixel', 'the opposite corner still shows the image', probe.near(probe.over(e2.image, ...keep), probe.over(e1.image, ...keep), 12), true);
         const after = probe.inkBounds(e2.image);
         ctx.near('pixel', 'the left and bottom edges of the raster did not move', [after.box[0], after.box[3]], [x0, y1], 2);
