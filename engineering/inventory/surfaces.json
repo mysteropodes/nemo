@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "1026d7cccb0636302c01b547dc761ffb1fa12209",
-  "describe": "v0.7.0-alpha.4-5644-g1026d7ccc-dirty"
+  "head": "cf296a841a0f65fdcf1b9d4c7449b6b47d370685",
+  "describe": "v0.7.0-alpha.4-5644-gcf296a841-dirty"
  },
- "inputsDigest": "dde8ac3091db011d7a65566fa0613eda7271aea04c329bcb882f2645bf522a94",
+ "inputsDigest": "e4499c7cd3a27d3b3dffbc5ca5389bcece1ac0d2e2e21324ae8c5ccae3164dbe",
  "states": [
   "inventoried",
   "characterized",
@@ -26,21 +26,21 @@
   "native"
  ],
  "counts": {
-  "total": 943,
+  "total": 944,
   "byKind": {
    "dom": 485,
    "labs": 36,
    "menu": 297,
-   "sdk": 75,
+   "sdk": 76,
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 907,
+   "inventoried": 908,
    "unmapped": 35,
    "unavailable-with-reason": 1
   },
   "byArea": {
-   "project-lifecycle-integrations": 126,
+   "project-lifecycle-integrations": 127,
    "drawing-selection": 270,
    "media-import-export": 52,
    "timeline-layers-frames": 175,
@@ -252,7 +252,7 @@
   "SMPlugin": {
    "file": "src/js/nemo-plugin.js",
    "line": 223,
-   "members": 2
+   "members": 3
   },
   "SMScript": {
    "file": "src/js/nemo-script.js",
@@ -32991,6 +32991,34 @@
    "source": "src/js/nemo-plugin.js:229",
    "meta": {
     "functionsVisited": 0
+   },
+   "fixtures": [
+    "media",
+    "migration"
+   ]
+  },
+  {
+   "id": "sdk:nemo-plugin.setTitle",
+   "kind": "sdk",
+   "surface": "SMPlugin.setTitle",
+   "capability": "setTitle",
+   "area": "project-lifecycle-integrations",
+   "handler": [
+    "src/js/nemo-plugin.js:230 setTitle"
+   ],
+   "events": [],
+   "exposure": [
+    "script API"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "SMPlugin",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R14: expose through the MCP adapter with the same handler",
+   "source": "src/js/nemo-plugin.js:230",
+   "meta": {
+    "functionsVisited": 2
    },
    "fixtures": [
     "media",
