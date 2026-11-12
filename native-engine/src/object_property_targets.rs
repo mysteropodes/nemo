@@ -43,7 +43,7 @@ fn path_vertices(records: &[ObjectRecord], target: &PropertyHolderTarget) -> Opt
         .filter(|r| {
             same_layer(r.target(), target) && Some(r.target().stroke_id()) == target.stroke_id()
         })
-        .map(|r| r.geometry.segments.len())
+        .map(|r| r.vector_ext.value().and_then(|e|e.pressure.value()).and_then(|p|p.center_segments.value()).filter(|c|c.len()>=2).map_or(r.geometry.segments.len(),|c|c.len()))
         .max()
 }
 

@@ -2,7 +2,7 @@
  * buildOverlayItems (~5600-5640: a violet diamond per vertex while the element's Path group is expanded) and onDown/onDrag 'vertex' (~6322-6345, ~6608):
  * a press on a dot grabs it, the drag moves it, and the vertex's `vtxN` Motion property takes the new OFFSET (a key at the playhead when the property
  * is animated, the static value otherwise), never the stored geometry.
- * The dots are the anchors of the selected element as PAINTED: the hit-test listing already carries the `vtxN` offsets in its points (readPresentedStrokes),
+ * Ordinary path dots use presented anchors; ribbon dots use presented source centerline vertices: the hit-test listing already carries the `vtxN` offsets in its points (readPresentedStrokes),
  * so a dot always sits where the shape is drawn. The drag is a local preview (the dot follows the pointer); the release is ONE `object.property.edit` of
  * `vtxN` (one revision, one history entry). The world delta is pulled back through the item's presented matrix (element pose and layer pose), so the offset
  * stays in the shape's own space. Escape, a changed document or frame, a stale selection and a refused edit write nothing.
@@ -34,8 +34,10 @@
     return t.strokeId === s.target.strokeId && t.layerUid === s.target.layerUid && t.contextId === s.target.contextId && Array.isArray(p.segments) && p.segments.length && Array.isArray(p.data.nativeMatrix) ? p : null;
   }
   function dots(win, p) {
-    var d = st(win).drag;
-    return p.segments.map(function (s, i) { return d && d.armed && d.i === i ? [s.point.x + d.delta[0], s.point.y + d.delta[1]] : [s.point.x, s.point.y]; });
+    var d = st(win).drag, center = p.data && p.data.centerSegments;
+    // A ribbon's editable identity is its centerline, never its painted edge.
+    var points = Array.isArray(center) && center.length >= 2 ? center.map(function(s) { return s.point; }) : p.segments.map(function(s) { return [s.point.x,s.point.y]; });
+    return points.map(function (at, i) { return d && d.armed && d.i === i ? [at[0] + d.delta[0], at[1] + d.delta[1]] : at; });
   }
   // Drawn by native-select-overlay.js inside its svg: `c` = { V, pin, bounds } (world to canvas units), `shown` the paths it outlines.
   function draw(win, svg, c, shown) {

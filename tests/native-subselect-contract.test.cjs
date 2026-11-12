@@ -164,11 +164,28 @@ test('evaluated hit contours require a finite frame and correlate it without cha
   const a={...r,subselect:{...r.subselect,hitTest:true,atFrame:10}};
   C.readCorrelate(q,a,'document');Q.payload(q);Q.result(a);
   for(const atFrame of [-1,1.5,4294967296,NaN])assert.throws(()=>C.readPayload({...q,subselect:{...q.subselect,atFrame}}));
-  for(const patch of [{hitTest:false},{center:true},{paint:true},{preview:{kind:'move',indices:[0],delta:[1,1]}}])assert.throws(()=>C.readPayload({...q,subselect:{...q.subselect,...patch}}));
+  for(const patch of [{hitTest:false},{paint:true},{preview:{kind:'move',indices:[0],delta:[1,1]}}])assert.throws(()=>C.readPayload({...q,subselect:{...q.subselect,...patch}}));
   assert.throws(()=>C.readPayload({...p,subselect:{...p.subselect,atFrame:10}}));
   for(const atFrame of [0,11,undefined]){
     const subselect={...a.subselect,atFrame};if(atFrame===undefined)delete subselect.atFrame;
     assert.throws(()=>C.readCorrelate(q,{...a,subselect},'document'));
   }
   assert.throws(()=>C.readCorrelate({...p,subselect:{...p.subselect,hitTest:true}},a,'document'));
+});
+
+test('evaluated ribbon center pages preserve width cardinality and frame correlation',()=>{
+ const q={...p,subselect:{...p.subselect,hitTest:true,center:true,atFrame:10}};
+ const a={...r,subselect:{...r.subselect,hitTest:true,center:true,widths:[3,7],atFrame:10}};
+ C.readCorrelate(q,a,'document');
+ for(const patch of [{atFrame:11},{widths:[3]},{center:false}])assert.throws(()=>C.readCorrelate(q,{...a,subselect:{...a.subselect,...patch}},'document'));
+});
+test('entered component geometry targets validate and remain pinned to that component and revision',()=>{
+ const saved=globalThis.NemoNativeComponentContext;
+ globalThis.NemoNativeComponentContext={contextId:()=> 'comp-a'};
+ try{
+  const target={...p.stableTarget,contextId:'comp-a'},q={...p,stableTarget:target};
+  const a={...r,subselect:{...r.subselect,stableTarget:target}};
+  C.readCorrelate(q,a,'document');Q.result(a);
+  for(const patch of [{atRevision:8},{documentSnapshotId:'native-object:document:8'},{subselect:{...a.subselect,stableTarget:{...target,contextId:'comp-b'}}},{subselect:{...a.subselect,stableTarget:{...target,strokeId:'other'}}}])assert.throws(()=>C.readCorrelate(q,{...a,...patch},'document'));
+ }finally{globalThis.NemoNativeComponentContext=saved;}
 });
