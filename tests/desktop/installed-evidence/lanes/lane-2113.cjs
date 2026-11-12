@@ -12,9 +12,9 @@ const same = (image, other, points) => points.filter(([x, y]) => probe.over(imag
 const attach = (ctx, label, file, name) => K.apply(ctx, label, () => K.pinned(ctx, ({ pin, lifecycleGeneration }) => P.assetAttach({ pin, name, path: file, lifecycleGeneration })));
 async function opacityBuilder(ctx, layerUid, fraction) {
   const { revision, pin } = await K.pinNow(ctx);
-  const view = { view: { kind: 'properties', target: { contextId: P.ROOT, layerUid }, offset: 0, limit: 8 } };
-  const meta = await ctx.wire.query('query.document.object.property.metadata', view);
-  ctx.ok('reply', 'property metadata read', meta.ok, meta.ok ? 'ok' : meta.error, { revision, pin: typeof pin });
+  const read = P.propertyMetadata(revision, pin, layerUid);
+  const meta = await ctx.wire.query(read.operation, read.payload);
+  ctx.ok('reply', 'property metadata read', meta.ok, meta.ok ? 'ok' : meta.error);
   const item = (meta.result.items || []).find(i => i.property === 'opacity');
   ctx.ok('read', 'the layer exposes an opacity property', !!item, Object.keys(meta.result));
   const base = item.defaultValue;

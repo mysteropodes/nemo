@@ -92,6 +92,7 @@ const propertyOpacity = (layerUid, values) => ({ operation: OBJ + 'property.edit
   payload: { command: 'object.property.edit', target: { contextId: ROOT, layerUid }, property: 'opacity', action: { kind: 'setValue', frame: 0, values } } });
 const meshAttach = (stableTarget, mesh) => ({ operation: OBJ + 'image.mesh.edit', payload: { command: 'object.image.mesh.edit', action: { kind: 'attach', target: stableTarget, mesh } } });
 const meshSetOffset = (meshId, index, du, dv) => ({ operation: OBJ + 'image.mesh.edit', payload: { command: 'object.image.mesh.edit', meshId, action: { kind: 'setOffset', index, du, dv } } });
+const propertyMetadata = (revision, pin, layerUid) => ({ operation: 'query.document.object.property.metadata', payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'properties', target: { contextId: ROOT, layerUid }, offset: 0, limit: 8 } } });
 const snapshotAcquire = () => ({ operation: 'query.document.snapshot.acquire', payload: {} });
 const historyRead = (revision, pin) => ({ operation: QOBJ + '.history', payload: { atRevision: revision, documentSnapshotId: pin } });
 const evaluate = (revision, frame = 0) => ({ operation: 'query.document.evaluate', payload: { atRevision: revision, contextId: ROOT, frame } });
@@ -101,4 +102,4 @@ module.exports = { OBJ, ROOT, target, seg, rectSegments, solid, vectorRecord, ve
   pathEffects, layerPolicy, undo, redo, groupCreate, groupUngroup, groupCombine, groupMode, groupRename, groupMemberRemove, booleanApply, booleanErase, booleanFlatten,
   layerCreate, layerDuplicate, layerRename, layerReorder, layerDelete, layerVisibility, layerSplit, selectionDelete, selectionDuplicate, clipboardCopy, clipboardCut, clipboardPaste,
   assetAttach, assetRemove, rasterMove, rasterResize, rasterRotate, rasterOpacity, textBlock, textCreate, textEdit, textDelete, textTargets, textInspect, textBody,
-  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, meshAttach, meshSetOffset, snapshotAcquire, historyRead, evaluate, serialize };
+  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, propertyMetadata, meshAttach, meshSetOffset, snapshotAcquire, historyRead, evaluate, serialize };
