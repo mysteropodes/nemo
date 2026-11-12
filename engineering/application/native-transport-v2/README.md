@@ -47,11 +47,13 @@ aggregate by exclusive sibling temporary file and atomic rename.
 Direct Cargo invocations do not run the Tauri hook; use the schema check explicitly
 for those source workflows. No Rust build dependency or runtime validator changed.
 
-The migration test pins the independent pre-split aggregate digest for the
-contiguous historical prefix (387 definitions and 151 request variants) at source
-`ea1b3c62766fbd67f8857ce4432230491bc1df32`, proving preservation of all original
-constraints, refs, examples and ordering. Additive entries follow that prefix and require no central pin edit. A deliberate
-change to the historical wire contract must update that oracle with its own review
-and negative behavior evidence.
-The addition fixture proves schema registration only; the issue's complete
-handler/runtime fresh-agent acceptance remains separate.
+The one-time migration comparison and digest belong in the PR receipt, rather
+than a permanent wire-contract pin. Ongoing
+tests check live aggregate freshness and deterministic serialization/order using
+a small independent fixture, so legitimate contract evolution does not require a
+central digest edit. The addition fixture proves schema registration only; the
+issue's complete handler/runtime fresh-agent acceptance remains separate.
+
+The existing v2 declaration schema requires at least one operation even when a
+capability is temporarily unavailable. Availability does not suppress its request
+variants; the generator preserves this discovery and refusal contract.

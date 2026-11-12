@@ -89,7 +89,11 @@ function assemble(root = ROOT) {
       demand(!file.includes('://'), `unsupported remote ref ${node.$ref}`);
       let target = file ? read(root, path.posix.join(APP, file)) : schema;
       demand(!pointer || pointer.startsWith('/'), `unsupported ref ${node.$ref}`);
-      for (const part of pointer ? pointer.slice(1).split('/') : []) target = target?.[part.replace(/~1/g, '/').replace(/~0/g, '~')];
+      for (const part of pointer ? pointer.slice(1).split('/') : []) {
+        const key = part.replace(/~1/g, '/').replace(/~0/g, '~');
+        demand(target !== null && typeof target === 'object' && Object.hasOwn(target, key), `unresolved ref ${node.$ref}`);
+        target = target[key];
+      }
       demand(target !== undefined, `unresolved ref ${node.$ref}`);
     }
     for (const value of Object.values(node)) refs(value);

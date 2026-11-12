@@ -4,7 +4,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const transport = require('../scripts/nemo/lib/native-transport-schema.cjs');
 const drift = require('../scripts/nemo/lib/capability-drift.cjs');
@@ -26,19 +25,46 @@ function cli(root, flag) {
 }
 function mutate(root, name, fn) { const d = read(root, name); fn(d); write(root, name, d); }
 
-test('aggregate exactly preserves the frozen ea1b3c6 schema, order, constraints and references', () => {
-  const aggregate = transport.assemble();
-  const bytes = JSON.stringify(aggregate, null, 2) + '\n';
-  // The independent pre-migration wire contract is the contiguous historical
-  // prefix. Additive capabilities append entries and need no central pin edit;
-  // changing an existing wire constraint still requires explicit oracle review.
-  const frozen = structuredClone(aggregate);
-  frozen.$defs = Object.fromEntries(Object.entries(frozen.$defs).slice(0, 387));
-  frozen.$defs.Request.oneOf = frozen.$defs.Request.oneOf.slice(0, 151);
-  const frozenBytes = JSON.stringify(frozen, null, 2) + '\n';
-  assert.equal(crypto.createHash('sha256').update(frozenBytes).digest('hex'), 'ab459a63a0695fea3941fc84e1a970d4bd6afa9d2f0f9dbcfb0a16c3281c4474');
+test('live aggregate is freshly serialized from its inputs', () => {
+  const bytes = JSON.stringify(transport.assemble(), null, 2) + '\n';
   assert.equal(bytes, fs.readFileSync(path.join(ROOT, transport.OUTPUT), 'utf8'));
   assert.deepEqual(transport.check().problems, []);
+});
+
+test('small fixture preserves explicit order and deterministically appends unordered entries', (t) => {
+  const root = fixture(t);
+  for (const dir of [`${APP}/capabilities-v2`, transport.INPUT]) {
+    fs.rmSync(path.join(root, dir), { recursive: true });
+    fs.mkdirSync(path.join(root, dir));
+  }
+  const common = { type: 'object' };
+  const branch = (operation) => ({ allOf: [{ $ref: '#/$defs/Common' }, { properties: { operation: { const: operation } } }] });
+  const zulu = branch('query.zulu'), alpha = branch('query.alpha'), extra = branch('query.extra');
+  write(root, `${transport.INPUT}/shared.json`, {
+    schema: { title: 'fixture' },
+    definitions: { Request: { order: 2, schema: { oneOf: [] } }, Common: { order: 0, schema: common } },
+  });
+  // Create reverse file/key order; output must follow ordinals then stable keys.
+  write(root, `${APP}/capabilities-v2/zulu.json`, { id: 'zulu', operations: ['query.zulu'] });
+  write(root, `${APP}/capabilities-v2/alpha.json`, { id: 'alpha', operations: ['query.alpha', 'query.extra'] });
+  write(root, `${transport.INPUT}/zulu.json`, {
+    capability: 'zulu', definitions: { Later: { schema: { type: 'number' } } }, requests: [{ order: 0, schema: zulu }],
+  });
+  write(root, `${transport.INPUT}/alpha.json`, {
+    capability: 'alpha', definitions: { Zeta: { schema: { type: 'boolean' } }, Alpha: { order: 1, schema: { type: 'string' } } },
+    requests: [{ schema: extra }, { order: 1, schema: alpha }],
+  });
+  const expected = { title: 'fixture', $defs: {
+    Common: common, Alpha: { type: 'string' }, Request: { oneOf: [zulu, alpha, extra] },
+    Later: { type: 'number' }, Zeta: { type: 'boolean' },
+  } };
+  const bytes = JSON.stringify(expected, null, 2) + '\n';
+  assert.equal(JSON.stringify(transport.assemble(root), null, 2) + '\n', bytes);
+  for (let i = 0; i < 2; i++) {
+    assert.equal(cli(root, '--write').status, 0);
+    assert.equal(fs.readFileSync(path.join(root, transport.OUTPUT), 'utf8'), bytes);
+    assert.equal(cli(root, '--check').status, 0);
+  }
 });
 
 test('existing descriptor refs resolve through the unchanged aggregate path', () => {
@@ -77,6 +103,8 @@ test('missing or duplicate variants, duplicate definitions, broken refs and orph
     ['missing variant', (r) => mutate(r, fragment, (d) => d.requests.shift()), /missing request variant/],
     ['duplicate variant', (r) => mutate(r, fragment, (d) => d.requests.push(d.requests[0])), /duplicate request operation/],
     ['duplicate definition', (r) => mutate(r, fragment, (d) => { d.definitions.Identifier = { schema: {} }; }), /duplicate definition Identifier/],
+    ['inherited local ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[0].$ref = '#/$defs/constructor'; }), /unresolved ref/],
+    ['inherited external ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[0].$ref = 'native-object-v1.schema.json#/$defs/toString'; }), /unresolved ref/],
     ['broken local ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[0].$ref = '#/$defs/Absent'; }), /unresolved ref/],
     ['missing external ref', (r) => mutate(r, fragment, (d) => { d.requests[0].schema.allOf[0].$ref = 'native-object-v1.schema.json#/$defs/Absent'; }), /unresolved ref/],
     ['wrong owner', (r) => mutate(r, fragment, (d) => { d.capability = 'wrong'; }), /does not match/],
@@ -143,4 +171,20 @@ test('aggregate publication renames a complete exclusive sibling and cleans up a
     assert.equal(fs.readFileSync(destination, 'utf8'), original);
     assert.deepEqual(fs.readdirSync(path.dirname(destination)).filter((f) => f.endsWith('.tmp')), []);
   } finally { fs.renameSync = rename; }
+});
+
+
+test('descriptor minimum excludes empty operation sets while unavailable capabilities retain their variants', (t) => {
+  const root = fixture(t);
+  const name = `${APP}/capabilities-v2/native-opacity.json`;
+  const schema = read(root, `${APP}/capability-v2.schema.json`);
+  const unavailable = read(root, name);
+  unavailable.availability = { state: 'unavailable', reason: 'fixture temporary unavailability' };
+  assert.deepEqual(drift.validate(schema, unavailable), []);
+  write(root, name, unavailable);
+  assert.deepEqual(transport.check(root).problems, []);
+  unavailable.operations = [];
+  assert.ok(drift.validate(schema, unavailable).some((error) => error.includes('minItems')));
+  write(root, name, unavailable);
+  assert.match(transport.check(root).problems.join('; '), /missing operations/);
 });
