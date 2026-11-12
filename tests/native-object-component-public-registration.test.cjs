@@ -74,7 +74,7 @@ test('the Rust contract and its two test children are members of the MCP transpo
   assert.match(contract, /op if object_component::owns\(op\) => object_component::request\(op, payload\)/);
   assert.match(contract, /op if object_component::owns\(op\) => \|o, _, p, r\| object_component::result_for\(o, p, r\),/);
   assert.match(read('nemo-mcp/src/wire.rs'), /object_component::response_matches\(request, response\)/);
-  assert.match(read('nemo-mcp/src/native_request_input.rs'), /native component command requires expectedRevision/);
+  assert.match(read('nemo-mcp/src/native_request_input.rs'), /native command requires expectedRevision/);
 });
 
 test('the JS contract, intent core and two adapters have ordinary, layered, size-bounded profile membership', () => {

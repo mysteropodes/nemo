@@ -80,7 +80,7 @@ test('the MCP crate registers the validators, the descriptor, the response check
   assert.ok(contract.includes('| brush::QUERY'), 'the read forbids expectedRevision');
   assert.ok(contract.includes('brush::result(o, p, r)'));
   assert.ok(text('nemo-mcp/src/wire.rs').includes('crate::native_contract::brush::response_matches(request, response)'));
-  assert.ok(text('nemo-mcp/src/native_request_input.rs').includes('crate::native_contract::brush::PUBLISH'));
+  assert.match(text('nemo-mcp/src/native_request_input.rs'), /expected_revision_policy\(&self\.operation\)/);
   const server = text('nemo-mcp/src/server.rs');
   assert.equal(count(server, 'native-bitmap-brush-resources-v1.schema.json'), 1);
   assert.equal(count(server, '"nativeBitmapBrushResources"'), 1);

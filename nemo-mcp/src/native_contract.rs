@@ -120,35 +120,10 @@ fn frame(value: Option<&Value>) -> Option<u64> {
     value?.as_u64().filter(|frame| *frame <= u32::MAX as u64)
 }
 
+/// Derived from the operation's declared transport branch (`ForbiddenRevisionRequest`).
+#[cfg(test)]
 pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
-    matches!(
-        operation,
-        "query.document.object"
-            | history_read::OP | object_component::read::OP | object_component::workspace::OP
-            | text_read::OP
-            | metadata::OP
-            | property_read::OP
-            | composition::READ
-            | palette::READ
-            | guide::READ
-            | shadow::READ
-            | perspective::READ
-            | settings::symmetry::READ | settings::camera::READ
-            | workspace::READ
-            | custom_brush::READ
-            | comments::READ
-            | font::QUERY
-            | brush::QUERY
-            | "query.document.object.layer.timing"
-            | "query.document.serialize"
-            | "query.document.evaluate"
-            | "query.diagnostics.recent"
-            | "command.reproduction.opt_in"
-            | "query.reproduction.status"
-            | "query.reproduction.export"
-            | "query.reproduction.report"
-            | "query.reproduction.replay"
-    )
+    request_schema::expected_revision_policy(operation) == Some(false)
 }
 
 /// Retained semantic protections precede schema shapes. Unknown operations are

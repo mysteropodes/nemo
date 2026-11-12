@@ -76,7 +76,7 @@ test('the MCP crate registers the validators, the descriptors and the shared res
   const sources = require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles().map((file) => path.basename(file));
   for (const file of ['native-object-item.json', 'native-object-asset.json']) assert.ok(sources.includes(file), file);
   assert.match(read('nemo-mcp/src/wire.rs'), /crate::native_contract::item::response_matches\(request, response\)/);
-  for (const op of ['ITEM', 'ATTACH', 'REMOVE']) assert.match(read('nemo-mcp/src/native_request_input.rs'), new RegExp('crate::native_contract::item::' + op));
+  assert.match(read('nemo-mcp/src/native_request_input.rs'), /expected_revision_policy\(&self\.operation\)/);
   // The relative references of the request union resolve through the schema embedded in the advertised command schema.
   assert.match(read('nemo-mcp/src/server.rs'), /include_str!\(\s*"\.\.\/\.\.\/engineering\/application\/native-object-item-v1\.schema\.json"/);
   assert.match(read('nemo-mcp/src/server.rs'), /"nativeObjectItem": native_items\}/);

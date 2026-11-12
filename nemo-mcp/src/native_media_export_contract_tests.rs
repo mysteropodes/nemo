@@ -335,7 +335,7 @@ fn both_capabilities_are_registered_unavailable_and_still_admit_input() {
     let refused = envelope(SVG_BEGIN, malformed, Some(0));
     assert_eq!(
         refused.validate_input().unwrap_err().code(),
-        "malformed_payload"
+        "invalid_request"
     );
 }
 

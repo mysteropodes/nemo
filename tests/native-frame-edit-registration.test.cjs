@@ -88,7 +88,7 @@ test('the SDK, the session and the MCP contract are wired to the one declaration
   assert.ok(contract.indexOf('native_frame_edit_contract.rs') < contract.indexOf('native_layer_policy_contract.rs'), 'frame_edit precedes layer_policy (rustfmt order)');
   assert.match(contract, /op if frame_edit::declares\(op\) => frame_edit::request\(op, payload\),/);
   assert.match(contract, /op if frame_edit::declares\(op\) => \|o, _, _, r\| frame_edit::result_for_operation\(o, r\),/);
-  assert.match(text('nemo-mcp/src/native_request_input.rs'), /frame_edit::declares\(&self\.operation\)[\s\S]{0,200}requires expectedRevision/);
+  assert.match(text('nemo-mcp/src/native_request_input.rs'), /expected_revision_policy\(&self\.operation\)/);
   const wire = text('nemo-mcp/src/wire.rs');
   assert.match(wire, /#\[path = "native_wire_response_owner\.rs"\]\s*mod response_owner;/);
   assert.equal(count(wire, 'let correlated_identity = response_owner::correlated(request, response);'), 1);

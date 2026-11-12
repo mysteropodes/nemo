@@ -45,7 +45,7 @@ test('the nemo-mcp validators are wired: module, request arm, result arm, revisi
   assert.match(contractRs, /#\[path = "native_import_contract\.rs"\]\npub\(crate\) mod import;/);
   assert.match(contractRs, /import::OP => import::request\(payload\),/);
   assert.match(contractRs, /import::OP => \|_, _, _, r\| import::result\(r\),/);
-  assert.match(read('nemo-mcp/src/native_request_input.rs'), /crate::native_contract::import::admitted\(&self\.operation\)/);
+  assert.match(read('nemo-mcp/src/native_request_input.rs'), /expected_revision_policy\(&self\.operation\)/);
   const wire = read('nemo-mcp/src/wire.rs');
   assert.match(wire, /#\[path = "native_wire_response_owner\.rs"\]\s*mod response_owner;/);
   assert.equal(wire.split('let correlated_identity = response_owner::correlated(request, response);').length, 2);

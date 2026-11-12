@@ -9,6 +9,7 @@ include!(concat!(env!("OUT_DIR"), "/native_request_resources.rs"));
 
 struct Operation {
     branch: usize,
+    revision: Option<bool>,
     payload: OnceLock<Result<Validator, String>>,
     envelope: OnceLock<Result<Validator, String>>,
 }
@@ -70,6 +71,15 @@ fn build_catalog_from(schema: Value, sources: &[(&str, &str)]) -> Result<Catalog
         if !base.starts_with("#/$defs/") {
             return Err("nonlocal request envelope".into());
         }
+        // The declared envelope branch is the single source of the revision policy:
+        // `RequiredRevisionRequest` requires it, `ForbiddenRevisionRequest` forbids it.
+        let revision = if base.ends_with("/RequiredRevisionRequest") {
+            Some(true)
+        } else if base.ends_with("/ForbiddenRevisionRequest") {
+            Some(false)
+        } else {
+            None
+        };
         let op = &properties["operation"];
         let names: Vec<_> = match op.get("const") {
             Some(name) => vec![name],
@@ -86,6 +96,7 @@ fn build_catalog_from(schema: Value, sources: &[(&str, &str)]) -> Result<Catalog
                     name,
                     Operation {
                         branch: index,
+                        revision,
                         payload: OnceLock::new(),
                         envelope: OnceLock::new(),
                     },
@@ -177,6 +188,12 @@ pub(crate) fn envelope(request: &NativeApplicationRequest) -> Option<bool> {
         value["expectedRevision"] = json!(revision);
     }
     Some(validator.is_valid(&value))
+}
+
+/// Whether the operation's declared transport branch requires (`Some(true)`) or
+/// forbids (`Some(false)`) `expectedRevision`; `None` for an undeclared operation.
+pub(crate) fn expected_revision_policy(operation: &str) -> Option<bool> {
+    catalog().ok()?.operations.get(operation)?.revision
 }
 
 #[cfg(test)]
