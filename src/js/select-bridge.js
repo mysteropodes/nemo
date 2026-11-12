@@ -21,7 +21,7 @@
 // rotate transform box with opposite-corner anchoring, and group move are
 // all ported too.
 (function () {
-  var mode = null; // 'xform-scale' | 'xform-rotate' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | 'null-drag' | 'cornerRadius' | null
+  var mode = null; // 'xform-scale' | 'marquee' | 'move' | 'arc' | 'nv-drag' | 'nv-scale' | 'nv-rotate' | 'null-drag' | 'cornerRadius' | null
   // Animation 2D hover-highlight box (2026-08, feedback: "roll hover n'existe
   // pas sur animation 2D" — Motion mode already has this, see SMMotion's own
   // _hoverLi/onHoverMove/hoverOverlayItems; this is the same idea for a plain
@@ -417,7 +417,6 @@
   // to draw the ACTUAL warped quad instead of the static pre-distort
   // rectangle while dragging.
   var distortDstQuad = null;
-  var rotCenter = null, rotStartAngle = 0, rotLastAngle = 0;
   var marqueeStart = null;
   var moveStarted = false;
   // Shift axis-lock (2026-09, Illustrator-style: hold Shift while dragging
@@ -533,6 +532,15 @@
     });
     return nativePointerIntent;
   }
+  function refusesLegacyRotate(e) {
+    if (!e || e.button !== 0 || state.appMode === 'motion' || !shouldIntercept() || !selectedPaths.length) return false;
+    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    var hit = hitTestHandles(new Point(w[0], w[1]), e.altKey);
+    if (!hit || hit.type !== 'rotate') return false;
+    if (window.showToast) showToast('Selection rotation requires the native gesture owner; this fallback cannot rotate selections.');
+    e.stopImmediatePropagation(); e.preventDefault();
+    return true;
+  }
   function nativePointerEvent(method, e) {
     if(window.NemoNativeCommentsUI&&NemoNativeCommentsUI.handle(window,method,e,nativePointerIntent&&nativePointerIntent.cancel))return true;
     if(window.NemoNativeTextToolDesktop&&window.NemoNativeTextToolDesktop.handle(window,method,e,nativePointerIntent&&nativePointerIntent.cancel))return true;
@@ -541,13 +549,17 @@
         nativePointerIntent.cancel(); e.stopImmediatePropagation(); e.preventDefault(); return true;
       } } catch (_) { nativePointerIntent.cancel(); e.stopImmediatePropagation(); e.preventDefault(); return true; }
     }
-    if (!Object.prototype.hasOwnProperty.call(window, 'NemoNativeOpacityCutover')) return false;
+    if (!Object.prototype.hasOwnProperty.call(window, 'NemoNativeOpacityCutover')) return method === 'down' && refusesLegacyRotate(e) ? true : false;
     try {
       var c = window.NemoNativeOpacityCutover;
-      if (c && typeof c.blocksLegacy === 'function' && c.blocksLegacy() === false) return false;
+      if (c && typeof c.blocksLegacy === 'function' && c.blocksLegacy() === false) return method === 'down' && refusesLegacyRotate(e) ? true : false;
       if (state.tool === 'subselect') return true; // Direct Select owns its native controller (subselect-bridge, document capture): never consume its gesture
+      if (method === 'down' && !window.NemoNativeSelectGesture && refusesLegacyRotate(e)) return true;
       nativePointer()[method](e);
-    } catch (_) { e.stopImmediatePropagation(); e.preventDefault(); }
+    } catch (_) {
+      if (method === 'down') { try { if (refusesLegacyRotate(e)) return true; } catch (_) {} }
+      e.stopImmediatePropagation(); e.preventDefault();
+    }
     return true;
   }
 
@@ -1110,24 +1122,7 @@
         selectedPaths = state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean);
       }
       var h = computeHandles();
-      if (hh.type === 'rotate') {
-        mode = 'xform-rotate';
-        // Rotation pivots around the redesign's 9-dot anchor widget
-        // (tools.js xformAnchorPoint, state.xformAnchorKey) instead of
-        // always the bounding-box center — defaults to center so existing
-        // behavior is unchanged until the artist actually picks a corner.
-        // xformAnchorPoint works in the box's de-rotated space (h.bounds)
-        // — map the pivot back to world through the box angle.
-        var apr = xformAnchorPoint(h.bounds);
-        // Custom pivot (Alt+click) is already world — don't re-rotate it,
-        // but DO pull it back to geometry space if a Motion transform is on.
-        rotCenter = (h.box && !state.xformAnchorCustom) ? selBoxPt(apr.x, apr.y, h.box) : apr.clone();
-        xformMap = h.map;
-        if (state.xformAnchorCustom && h.map) { var rcg = h.map.inv(rotCenter.x, rotCenter.y); rotCenter = new Point(rcg[0], rcg[1]); }
-        var ptg0 = xformMap ? (function () { var g = xformMap.inv(pt.x, pt.y); return new Point(g[0], g[1]); })() : pt;
-        rotStartAngle = Math.atan2(ptg0.y - rotCenter.y, ptg0.x - rotCenter.x) * 180 / Math.PI;
-        rotLastAngle = 0;
-      } else if (hh.type === 'skew') {
+      if (hh.type === 'skew') {
         mode = 'xform-skew';
         xformSkewEdge = hh.edge;
         // Same opposite-edge anchor convention as scale's ANCHOR_MAP (the
@@ -2440,53 +2435,6 @@
     } else if (mode === 'arc') {
       setArcHandle(draggingArc.fA, draggingArc.fB, draggingArc.matchIdx, draggingArc.which, draggingArc.ptA, draggingArc.ptB, pt.x, pt.y);
       renderArcs(arcDragCache);
-    } else if (mode === 'xform-rotate') {
-      var ptR = pt;
-      if (xformMap) { var ptgR = xformMap.inv(pt.x, pt.y); ptR = new Point(ptgR[0], ptgR[1]); }
-      var curAngle = Math.atan2(ptR.y - rotCenter.y, ptR.x - rotCenter.x) * 180 / Math.PI;
-      var deltaFromStart = curAngle - rotStartAngle;
-      // Shift = snap to 15° increments of TOTAL rotation from where the
-      // drag started (UI/UX audit, 2026-07) — Illustrator/Figma
-      // convention, absent before this. Snapping deltaFromStart (not the
-      // raw angle) is what makes it land on clean values relative to the
-      // shape's own starting orientation, not clean values in absolute
-      // canvas space.
-      if (e.shiftKey) deltaFromStart = Math.round(deltaFromStart / 15) * 15;
-      var stepAngle = deltaFromStart - rotLastAngle;
-      // Motion mode: same reasoning as 'move'/'xform-scale' above — the
-      // per-tick angle STEP goes into ld.motion.rotation, raw geometry
-      // untouched. Same pivot note as scale: renders around bounds-center
-      // + Motion Anchor Point regardless of which corner/custom pivot this
-      // particular drag rotated around.
-      if (state.appMode === 'motion') {
-        rotLastAngle = deltaFromStart;
-        var mrLi = state.activeLayerIdx;
-        var mrCur = SMMotion.getLayerValue(mrLi, 'rotation');
-        SMMotion.setLayerValue(mrLi, 'rotation', [mrCur[0] + stepAngle]);
-        window._sceneVersion++;
-        lastPt = pt;
-        // feedback #211 — same cheap in-place field sync as the layer-body
-        // drag above, needed here too since this writes Rotation through the
-        // identical setLayerValue path.
-        if (window.SMMotion && SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
-        window.SMEngineBridge.renderNow();
-        return;
-      }
-      selectedPaths.forEach(function (p) {
-        p.rotate(stepAngle, rotCenter);
-        transformFillGradient(p, function (gp) { return gp.rotate(stepAngle, rotCenter); });
-        if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
-          rotateCenterSegments(p.data.centerSegments, stepAngle, rotCenter.x, rotCenter.y);
-          rebuildVectorBrushOutline(p);
-        }
-        // See the identical companion-transform comment in xform-scale above.
-        if (p.data && p.data.brushCompanions) {
-          p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.rotate(stepAngle, rotCenter); });
-        }
-      });
-      rotLastAngle = deltaFromStart;
-      selectedPaths.forEach(function (p) { if (p) p.data.boxAngle = (((p.data && p.data.boxAngle) || 0) + stepAngle) % 360; }); // orientation lives on the stroke
-      symGestureAccumulate(new Matrix().rotate(stepAngle, rotCenter));
     }
     lastPt = pt;
     window.SMEngineBridge.renderNow();
@@ -2569,7 +2517,7 @@
       draggingArc = null;
       arcDragCache = null;
       generateTweens(undefined,true);
-    } else if (mode === 'xform-scale' || mode === 'xform-rotate' || mode === 'xform-skew') {
+    } else if (mode === 'xform-scale' || mode === 'xform-skew') {
       // Motion mode: geometry was never touched during this gesture (see
       // onMove's early-return) — none of the fork/regenerate/save-frame
       // work below applies to anything this drag actually changed, and
@@ -2694,13 +2642,13 @@
       renderArcs(); updateUI();
     } else if (mode === 'xform-distort') {
       selectedPaths.forEach(function (p) { forkIfForeignOwner(p); });
-      // See the xform-scale/xform-rotate branch's own comment above — same
+      // See the xform-scale branch's own comment above — same
       // "manual edit must stay put" unlink, same reason.
       selectedPaths.forEach(function (p) { fsUnlinkFillRegen(p); });
-      // Per-path calls, not one null call — see the xform-scale/xform-rotate
+      // Per-path calls, not one null call — see the xform-scale
       // branch's own comment above for why.
       selectedPaths.forEach(function (p) { fillRegenerateLinked(userLayers[state.activeLayerIdx], p); });
-      // Same re-bake as the xform-scale/xform-rotate tail above — a corner-pin
+      // Same re-bake as the xform-scale tail above — a corner-pin
       // distort warps the path's own segments live, but never touched the
       // bitmap-brush raster companion (not a simple scale/rotate, so onMove
       // above leaves it untouched during the drag); without this it stays
@@ -2837,7 +2785,7 @@
           if (window.SMEngineBridge) SMEngineBridge.renderNow();
         }
       }
-      // Motion mode: same reasoning as the xform-scale/xform-rotate guard
+      // Motion mode: same reasoning as the xform-scale guard
       // above — this gesture never touched geometry (onMove's early
       // return), so re-loading/re-saving frame content here would be pure
       // unrelated side effect risk, not a no-op.
@@ -2869,7 +2817,7 @@
         // a plain click-release never touched geometry, nothing to unlink.
         if (didMove) selectedPaths.forEach(function (p) { fsUnlinkFillRegen(p); });
         // Per-path calls (not one null call) when something actually moved —
-        // see the xform-scale/xform-rotate branch's own comment above for
+        // see the xform-scale branch's own comment above for
         // why touchedPath=null can't reach fillRegenerateLinked's own last-
         // resort retry rung. A plain click-release (didMove false) never
         // touched geometry, so the cheap unconditional null call is still
@@ -2877,7 +2825,7 @@
         if (didMove) selectedPaths.forEach(function (p) { fillRegenerateLinked(userLayers[state.activeLayerIdx], p); });
         else fillRegenerateLinked(userLayers[state.activeLayerIdx], null);
         saveActiveLayerFrame();
-        // Same stale-onion-ghost fix as the xform-scale/xform-rotate branch
+        // Same stale-onion-ghost fix as the xform-scale branch
         // above — a plain move commits through this branch too.
         if (didMove) renderOS();
         // Every sibling commit branch in this handler (xform-scale/rotate,

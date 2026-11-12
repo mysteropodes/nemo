@@ -253,27 +253,36 @@ test('Direct Select rotation is untouched: the subselect bridge never enters the
   assert.match(bridge, /if \(state\.tool === 'subselect'\) return true;/, 'a Direct Select gesture is never consumed by the Select intent');
 });
 
-test('the legacy select-bridge rotate writer cannot run on a native project: every pointer route goes through nativePointerEvent first', () => {
+test('the duplicate select-bridge rotate writer is retired while scale, skew, layer rotation and Motion rotation remain', () => {
   const bridge = src('src/js/select-bridge.js');
   for (const [type, legacy] of [['pointerdown', 'onDown'], ['pointermove', 'onMove'], ['pointerup', 'onUp'], ['pointercancel', 'onUp']]) {
     assert.ok(bridge.includes(`addEventListener('${type}', function (e) { if (!nativePointerEvent(`) && bridge.includes(`) ${legacy}(e); }, { capture: true })`), `${type} -> ${legacy} only when native declines`);
   }
-  // xform-rotate (the legacy ring drag) is assigned only inside onDown, and onDown / onMove / onUp each begin with the native edit guard.
-  const modes = [...bridge.matchAll(/mode = 'xform-rotate'/g)].length;
-  assert.equal(modes, 1, 'one legacy rotate entry point');
+  assert.doesNotMatch(bridge, /xform-rotate|rotCenter|rotStartAngle|rotLastAngle/, 'no stale mode, state or writer references remain');
+  assert.match(bridge, /mode = 'xform-scale'/);
+  assert.match(bridge, /mode = 'xform-skew'/);
+  assert.match(bridge, /mode = 'layer-multi-' \+ mlHit\.type/);
+  assert.match(bridge, /mode = 'nv-rotate'/);
+  assert.match(bridge, /NemoNativeSelectGesture\.bind\(window\)/, 'native Select remains the engine-on rotation owner');
+  assert.match(bridge, /Selection rotation requires the native gesture owner; this fallback cannot rotate selections\./, 'the ring press has an explicit unavailable-authority notice');
   assert.match(bridge, /if \(mode && !allowLegacySelectionEdit\(e, 'select'\)\) return;/);
   assert.match(bridge, /if \(\(mode \|\| draggingArc \|\| motionGesture\) && !allowLegacySelectionEdit\(e, 'select'\)\) return;/);
   assert.match(bridge, /if \(shouldIntercept\(\) && !allowLegacySelectionEdit\(e, 'select'\)\) return;/);
 });
 
-function bootSelect(cutover) {
-  const handlers = {}, target = { addEventListener(type, fn) { handlers[type] = fn; } }, calls = { world: 0 };
+function bootSelect(cutover, opts = {}) {
+  const handlers = {}, target = { addEventListener(type, fn) { handlers[type] = fn; } }, calls = { world: 0, undo: 0, key: 0, suspend: 0, notices: [] };
   const context = { console, Object, state: { tool: 'select', playing: false, appMode: 'anim2d', layers: [{ locked: false }], activeLayerIdx: 0, selectedStrokeIndices: [] },
     document: { readyState: 'complete', addEventListener() {}, getElementById: () => target }, Point: function Point(x, y) { this.x = x; this.y = y; }, window: null };
-  context.window = context; context.addEventListener = () => {};
-  context.SMEngineBridge = { isEnabled: () => true, screenToWorld: () => { calls.world++; return [0, 0]; } };
+  context.window = context; context.addEventListener = () => {}; context.selectedPaths = opts.selected ? [{}] : [];
+  context.showToast = (message) => calls.notices.push(message);
+  context.SMEngineBridge = { isEnabled: () => true, screenToWorld: () => { calls.world++; return [0, 0]; }, suspend() { calls.suspend++; } };
+  context.pushUndo = () => { calls.undo++; };
+  context.ensureKeyframe = () => { calls.key++; };
   if (cutover !== undefined) context.NemoNativeOpacityCutover = cutover;
-  vm.runInNewContext(src('src/js/select-bridge.js'), context, { filename: 'select-bridge.js' });
+  let source = src('src/js/select-bridge.js');
+  if (opts.rotateHit) source = source.replace('return window.NemoSelectCanvasIntent.hitHandles(computeHandles(), pt, altHeld, view.zoom);', 'return { type: \'rotate\' };');
+  vm.runInNewContext(source, context, { filename: 'select-bridge.js' });
   return { handlers, calls };
 }
 const pointer = (type) => { const e = { type, button: 0, pointerId: 1, buttons: 1, clientX: 106, clientY: 70, stopped: 0, stopImmediatePropagation() { this.stopped++; }, preventDefault() {} }; return e; };
@@ -287,4 +296,17 @@ test('runtime: with the native cutover owning the canvas (or throwing) a Select 
   const { handlers, calls } = bootSelect(undefined); // no cutover at all: the legacy path is the owner, so the control is live
   try { handlers.pointerdown(pointer('pointerdown')); } catch (_) {}
   assert.ok(calls.world > 0, 'control: without the native cutover the legacy writer does run');
+});
+
+test('runtime: a rotation ring press without a usable native gesture is visibly refused before suspension or mutation', () => {
+  for (const cutover of [undefined, { blocksLegacy: () => false }, { blocksLegacy: () => true }]) {
+    const { handlers, calls } = bootSelect(cutover, { selected: true, rotateHit: true });
+    const e = pointer('pointerdown'); handlers.pointerdown(e);
+    assert.equal(calls.notices.length, 1, 'one explicit notice per press');
+    assert.match(calls.notices[0], /native gesture owner/);
+    assert.equal(e.stopped, 1, 'press consumed');
+    assert.equal(calls.suspend, 0, 'engine was not paused');
+    assert.equal(calls.undo, 0, 'no undo was created');
+    assert.equal(calls.key, 0, 'no held key was created');
+  }
 });
