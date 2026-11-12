@@ -122,6 +122,8 @@ function createStubApp(options = {}) {
       state.doc = newDoc(p.canvasW, p.canvasH); state.dirty = false; state.generation++; state.brushes = {};
       return ok(1, request, { documentId: state.doc.id, contentRevision: 0, layers: state.doc.layers.map(l => ({ ...l })) });
     }
+    // Real reply seen on the installed app once a failed command had left the project released.
+    if (flags.released) return { apiVersion: 1, requestId: request.requestId, instanceId: request.instanceId, documentId: '', ok: false, revision: 0, error: { code: 'unavailable', message: 'No native project is open.' } };
     if (!state.doc || request.documentId !== state.doc.id || request.expectedRevision !== state.doc.rev) return refuse(1, request, 'stale_revision', 'Read a current snapshot.');
     if (request.operation === 'project.saveAs') {
       // Observed on the installed app: the first save after a change is refused as unavailable, the next one is accepted.

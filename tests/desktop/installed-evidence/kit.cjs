@@ -221,7 +221,10 @@ async function fresh(ctx, { w = 640, h = 360, fps = 24 } = {}) {
   const was = await ctx.wire.discover();
   if (was.documentId) {
     const scratch = await saveRetrying(ctx, 'setup', path.join(ctx.work, 'scratch-' + ctx.next() + '.json'));
-    ctx.book.ok('reply', 'setup: previous project saved aside', scratch.ok === true, scratch.ok ? 'ok' : scratch.error);
+    // After a failed row the app may have released the project (observed after a layer.reorder whose consumer synchronization was
+    // indeterminate): "No native project is open." means there is nothing to save aside; any other refusal still fails the setup.
+    const released = scratch.ok === false && scratch.error && scratch.error.code === 'unavailable' && scratch.error.message === 'No native project is open.';
+    ctx.book.ok('reply', released ? 'setup: no project open, nothing to save aside' : 'setup: previous project saved aside', scratch.ok === true || released, scratch.ok ? 'ok' : scratch.error);
   }
   const res = await ctx.wire.v1('project.new', { canvasW: w, canvasH: h, fps });
   ctx.book.ok('reply', 'setup: project.new accepted', res.ok === true, res.ok ? 'ok' : res.error);

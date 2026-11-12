@@ -270,3 +270,11 @@ test('file names never repeat across rows: two contexts of one run do not share 
   const seen = new Set([a.next(), a.next(), b.next(), b.next()]);
   assert.equal(seen.size, 4);
 });
+
+test('a released project answers "No native project is open." with no document id: a typed refusal, not a foreign reply', async t => {
+  const { wire, work } = setup(t, { released: true });
+  await wire.discover();
+  const released = await wire.v1('project.saveAs', { path: path.join(work, 'x.json') });
+  assert.equal(released.ok, false);
+  assert.equal(released.error.message, 'No native project is open.');
+});
