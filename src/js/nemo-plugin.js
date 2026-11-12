@@ -116,7 +116,8 @@
   function bridgeSource(id) {
     return [
       '(function(){',
-      '  window.nemo = parent.SMPlugin.hostApi(' + JSON.stringify(id) + ');',
+      // The legacy builder is offered as a thunk and called only by a host with no native model, so a native host never builds it.
+      '  window.nemo = parent.SMPlugin.hostApi(' + JSON.stringify(id) + ', function(){ return parent.SMScript.api(); });',
       '})();'
     ].join('\n');
   }
@@ -125,14 +126,15 @@
   function setTitle(id, t) { _open.forEach(function (p) { if (p.id === id) p.title.textContent = t; }); }
   // The `nemo` object of one plugin panel. A native host (a Tauri shell or an open native document) never reaches state.layers: it gets the
   // native facade, or a refusing object when that module is missing. Only a host without any native model falls back to the legacy builder.
-  function hostApi(id) {
+  function hostApi(id, legacyApi) {
     var control = { close: function () { closeById(id); }, setTitle: function (t) { setTitle(id, t); } };
     var Api = window.NemoScriptNativeApi, Plug = window.NemoScriptNativePlugin;
     if (window.__TAURI__ || (Api && Api.owns(window))) {
       if (!Plug) throw new Error('Les plugins exigent le module natif des scripts (non chargé).');
       return Plug.create(window, { isOpen: isOpen }).api(id, control);
     }
-    var legacy = window.SMScript.api(); legacy.close = control.close; legacy.setTitle = control.setTitle;
+    if (typeof legacyApi !== 'function') throw new Error('Pas d\'API de script pour ce plugin.');
+    var legacy = legacyApi(); legacy.close = control.close; legacy.setTitle = control.setTitle;
     return legacy;
   }
 

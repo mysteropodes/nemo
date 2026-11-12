@@ -132,8 +132,8 @@ test('on a native host a mounted plugin gets the native facade through the bridg
   const f=fixture(),dom=fakeDom(),h=host({__TAURI__:{core:{}},NemoScriptNativeApi:Api,NemoScriptNativePlugin:Plugin,document:dom.document,DOMParser:dom.DOMParser,btoa,...f.root});
   const loaded=h.ctx.SMPlugin.loadFiles(PACKAGE);
   assert.equal(loaded.manifest.id,'fixture');assert.equal(h.ctx.SMPlugin.openCount(),1);assert.equal(h.ctx.SMPlugin.isOpen('fixture'),true);
-  assert.match(dom.frames[0].srcdoc,/parent\.SMPlugin\.hostApi\("fixture"\)/);assert.doesNotMatch(dom.frames[0].srcdoc,/SMScript/);
-  const nemo=h.ctx.SMPlugin.hostApi('fixture');
+  assert.match(dom.frames[0].srcdoc,/parent\.SMPlugin\.hostApi\("fixture"/);assert.match(dom.frames[0].srcdoc,/function\(\)\{ return parent\.SMScript\.api\(\); \}/,'the legacy builder is only a thunk the host may call');
+  const legacyThunk=()=>{h.calls.push('legacy');return h.legacy;},nemo=h.ctx.SMPlugin.hostApi('fixture',legacyThunk);
   assert.notEqual(nemo,h.legacy);assert.deepEqual(h.calls,[]);
   nemo.layer('A').name='Bridged';nemo.setTitle('Renamed panel');await turn();
   assert.deepEqual(f.sent,[['rename','a','Bridged']]);assert.equal(dom.frames.length,1);
@@ -141,11 +141,11 @@ test('on a native host a mounted plugin gets the native facade through the bridg
   assert.deepEqual(f.sent,[['rename','a','Bridged']],'closing the panel discards the tick still open');
   assert.equal(h.ctx.SMPlugin.openCount(),0);assert.throws(()=>nemo.layerCount,/is closed/);assert.deepEqual(h.calls,[]);
   const missing=host({__TAURI__:{core:{}}});
-  assert.throws(()=>missing.ctx.SMPlugin.hostApi('p1'),/module natif/);assert.deepEqual(missing.calls,[],'a native host without the module fails closed');
+  assert.throws(()=>missing.ctx.SMPlugin.hostApi('p1',()=>{missing.calls.push('legacy');return {};}),/module natif/);assert.deepEqual(missing.calls,[],'a native host without the module fails closed');
 });
 
 test('only a host with no native model falls back to the legacy builder, with close and setTitle attached',()=>{
-  const h=host();const nemo=h.ctx.SMPlugin.hostApi('p1');
+  const h=host();const nemo=h.ctx.SMPlugin.hostApi('p1',()=>{h.calls.push('legacy');return h.legacy;});
   assert.equal(nemo,h.legacy);assert.deepEqual(h.calls,['legacy']);assert.equal(typeof nemo.close,'function');assert.equal(typeof nemo.setTitle,'function');
 });
 

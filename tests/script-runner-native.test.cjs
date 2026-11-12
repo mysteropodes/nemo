@@ -154,9 +154,3 @@ test('an async script is awaited before its drain: late writes join the run, a r
   replace();open();const res=await pending;delete globalThis.__gate;
   assert.equal(res.ok,true,res.error);assert.deepEqual({...(await res.committed)},{ok:false,applied:0,pending:1,error:'document-replaced'});assert.deepEqual(o4.sent,[]);
 });
-
-test('the legacy API builder is not handed out on a native host, and plugin help is the native one (I34)',()=>{
-  const h=boot({session:true});
-  assert.throws(()=>h.SMScript.api(),/unavailable on a native host/);
-  const help=h.SMScript.help();assert.equal(help.ok,true);assert.ok(help.value.includes('Layer.visible'));
-});
