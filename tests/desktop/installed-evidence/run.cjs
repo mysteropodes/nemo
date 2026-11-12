@@ -4,7 +4,7 @@
 // starts it in a fresh isolated session, drives it only through the package's bundled nemo-mcp, and writes a receipt.
 //
 //   lockf -k /tmp/nemo-heavy-job.lock node tests/desktop/installed-evidence/run.cjs \
-//     --app /abs/Nemo.app --build-proof /abs/build-proof.json --report-dir /abs/empty-dir [--lane 2107,2108] [--row id,id]
+//     --app /abs/Nemo.app --build-proof /abs/build-proof.json --report-dir /abs/empty-dir [--lane 2107,2108] [--row id,id] [--reserve gpu-reference|none]
 //
 // Exit status: 0 all selected rows passed; 1 a row failed (or cleanup was incomplete); 2 refused before any row (usage, not the
 // candidate); 4 no row failed but at least one is unrun (an operation is unavailable).
@@ -32,6 +32,7 @@ function validateConfig(config) {
   const dir = config.reportDir;
   need(fs.existsSync(dir) && fs.lstatSync(dir).isDirectory() && !fs.lstatSync(dir).isSymbolicLink() && fs.realpathSync(dir) === dir, 'report directory must exist, be a real directory and be given by its real path');
   need(fs.readdirSync(dir).length === 0, 'report directory must be empty');
+  if (config.reserve !== undefined) need(Array.isArray(config.reserve) && config.reserve.every(slot => /^[a-z][a-z0-9-]{0,40}$/.test(slot)), 'invalid slot reservation');
   if (config.taskId !== undefined) need(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(config.taskId), 'invalid task id');
   if (config.sourceSha !== undefined) need(/^[0-9a-f]{40}$/.test(config.sourceSha), 'source sha must be 40 hex characters');
 }
@@ -79,6 +80,7 @@ function parse(argv) {
     const arg = argv[i], value = argv[i + 1];
     if (keys[arg]) { need(value !== undefined && !value.startsWith('--'), arg + ' needs a value'); out[keys[arg]] = value; i++; }
     else if (arg === '--lane') { need(value !== undefined, '--lane needs a value'); out.lanes = value === 'all' ? [...LANES] : list(value); i++; }
+    else if (arg === '--reserve') { need(value !== undefined, '--reserve needs a value'); out.reserve = value === 'none' ? [] : list(value); i++; }
     else if (arg === '--row') { need(value !== undefined, '--row needs a value'); out.rows = list(value); i++; }
     else throw new UsageError('unknown argument');
   }

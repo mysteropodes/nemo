@@ -266,3 +266,71 @@ Results retain the family result fields in an explicit
 `installed-pass` requires all Ready rows, unchanged candidate identity, zero operator
 failures and complete cleanup (a passing subset is `installed-subset-pass`, exit status 3). These receipts stay in the private report folder;
 they are never inserted into the headless `results/` census as `source-pass`.
+
+## Installed client evidence without input (`installed-evidence/`)
+
+`installed-evidence/run.cjs` lets an agent produce installed-app evidence for the "installed/client acceptance" clause of lanes
+#2107 (vectors, parametric shapes, path effects), #2108 (groups, boolean, eraser, layer lifecycle, selection and clipboard),
+#2112 (raster and text assets, text layout) and #2113 (typed scene and style producers, bitmap brush, evaluate versus export)
+with **no keyboard or mouse input**. It builds nothing: it takes an already built package, starts it in a fresh isolated
+session (`scripts/nemo/native.cjs` through `native-harness.cjs`, task roots allocated by the launcher, data removed on stop) and
+drives it only through the package's own `Contents/MacOS/nemo-mcp` (stdio JSON-RPC: `nemo_discover`, `nemo_command`).
+Run it as a manual, heavy job, under the same lock and local booking as other app runs:
+
+```sh
+lockf -k /tmp/nemo-heavy-job.lock node tests/desktop/installed-evidence/run.cjs \
+  --app /abs/Nemo.app --build-proof /abs/build-proof.json --report-dir /abs/empty-dir \
+  [--lane 2107,2108,2112,2113|all] [--row 2107-path-effects-stack,...] [--task ID] [--source-sha SHA] [--reserve gpu-reference|none]
+```
+
+The package comes from `NEMO_TASK_ID=<task> lockf -k /tmp/nemo-heavy-job.lock npm run build:desktop` on the clean, committed
+checkout; `--build-proof` is its `build-proof.json`. The window opens on the screen like any run of the app; the runner never
+sends input to it. Slots: `gpu-reference` is reserved by default for the PNG exports (`--reserve none` or `--reserve a,b` changes it); no `desktop-input` slot is needed.
+
+**The runner refuses (exit 2) unless the instance it talks to is the candidate.** Before the first row, and before and after
+every row, it checks: the clean checkout head equals the proof's source head; the package proof lists the app executable and
+the bundled `nemo-mcp` by sha256 and both match the files about to run (`requireMcpPinned`, `verifyPackage`); the registered
+build id equals the app version plus the clean source head (full string, no `-dirty`); exactly one application is discovered and
+it is the registered instance; the OS listener on the registered port is the pid the launcher started (`lsof`); the executable
+bytes and the pid are unchanged. On every request the wire re-discovers and requires that one application to keep the registered
+instance id and build id, and a reply that names another instance, document or request id is `foreign` or `malformed` and stops
+or fails the row. Cleanup always stops the app and closes `nemo-mcp`; an app process that is still alive, or a stop that is
+refused, fails the run.
+
+**What a row proves.** Each row starts from `project.new` (640x360 for the pixel oracle) and asserts the product contract from raw
+observations, never from "the command returned ok": for every command the reply (`applied`, `historyEntriesAdded`), then
+independent reads: the document revision from `nemo_discover` is exactly +1 and history depth (`query.document.object.history`)
+exactly +1 with redo cleared; a no-op or refused command moves neither; undo and redo move one revision and one entry in the right
+direction and restore or reapply the same state; `object` reads give the record that was sent; the PNG exported through the app
+(`project.export`) is decoded and measured (ink bounds, colours at probe points, coverage ratios, equality of decoded pixels);
+`project.saveAs`, `project.open` in the same session reproduces the export and the objects, and a second save is byte-identical.
+A row passes only if every assertion passes and at least one is an independent observation (a read, a pixel or a file). Negative
+controls come from the lane texts: stale target, stale revision, locked layer, a layer with an active path effect, corrupt, oversize
+and missing assets, an absent font, an unknown asset, a refused bitmap-brush publication. There are no sleeps; every wait is the
+reply of the operation itself.
+
+**Rows.** `2107-vector-create-export-reopen`, `2107-vector-replace-delete-undo-redo`, `2107-parametric-set-translate-scale`,
+`2107-path-effects-stack`; `2108-group-combine-flatten`, `2108-boolean-apply-erase`, `2108-layer-lifecycle`,
+`2108-selection-clipboard-remap`; `2112-asset-attach-dedup-refusals`, `2112-raster-edit-save-reopen`,
+`2112-text-layout-edit-reopen`; `2113-mixed-scene-one-export`, `2113-bitmap-brush-resources`, `2113-evaluate-vs-export-pin`. Select by
+lane (`--lane`) or row (`--row`); an unknown lane or row refuses before anything starts. A row whose operation the package does not
+offer (a front-door `unsupported_capability` or `unavailable` from `nemo-mcp`, or a host that reports no lifecycle generation) is
+`unrun` with the reason, never `pass`; a refusal by the application itself is an observation the row judges. Request payloads are built by
+`payloads.cjs` only, and a unit test validates every builder against `native-transport-v2.schema.json` and the item and bitmap-brush
+schemas.
+
+**Receipt and exit status.** `installed-client-evidence.json` in the report directory (and `transcript.jsonl`, the requests and raw
+replies, private, mode 0600) records the candidate identity (source head, tree, app version, build id, instance id, pid, task id,
+executable, `nemo-mcp` and proof digests), per row the operations sent (request and reply digests, revisions), every assertion with
+`observed`, `expected` and kind, a verdict `pass`, `fail` or `unrun`, and totals per lane. Exit status: `0` all selected rows
+passed; `1` a row failed or cleanup was incomplete; `2` refused before any row; `4` no failure but at least one row is `unrun`. The
+receipt states that it is not the CS7 batched session (#2348) and that it does not record any lane's installed/client acceptance
+disposition; the rows that need real input (drawing-tool strokes, keyboard shortcuts, UI buttons, how text looks in the viewport,
+the export modal and video export) stay hands-on and are listed in `residualHandsOn`.
+
+Known limits, stated so nobody reads more into a pass: there is no public read of glyph or layout boxes, so text bounds are
+compared with ranges derived from the declared size; the CS7 read route and this runner both bind replies to the candidate through
+the registry, `lsof` and the build id because `nemo-mcp` reports no pid of its own; rows cannot show that a UI caller reaches the
+owner, only that the owner honours the contract. Unit tests (`node --test tests/desktop/unit/installed-evidence-*.test.cjs`) run the kit, wire
+and runner against stub transports only: a real pass, a product failure, a foreign instance, malformed replies and an unavailable
+operation. No installed run has been made with this runner.

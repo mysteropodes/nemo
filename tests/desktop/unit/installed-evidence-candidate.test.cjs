@@ -130,6 +130,8 @@ test('a candidate that cannot be proven is refused with exit 2 and a refusal rec
 test('command line: lanes and rows parse, unknown flags refuse, exit status is the verdict', async t => {
   assert.deepEqual(parse(['--app', '/a/N.app', '--build-proof', '/p.json', '--report-dir', '/r', '--lane', '2107,2108', '--row', 'a,b', '--task', 't1']),
     { app: '/a/N.app', buildProof: '/p.json', reportDir: '/r', lanes: ['2107', '2108'], rows: ['a', 'b'], taskId: 't1' });
+  assert.deepEqual(parse(['--reserve', 'none']).reserve, []);
+  assert.deepEqual(parse(['--reserve', 'gpu-reference,x-y']).reserve, ['gpu-reference', 'x-y']);
   assert.deepEqual(parse(['--lane', 'all']).lanes, ['2107', '2108', '2112', '2113']);
   assert.throws(() => parse(['--nope']), /unknown argument/);
   assert.throws(() => parse(['--app']), /needs a value/);
