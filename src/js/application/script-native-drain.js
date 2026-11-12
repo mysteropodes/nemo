@@ -4,7 +4,8 @@
  * { ok, applied, pending[, error] }. Each step: re-read the pin (a replaced or closed document stops the drain), resolve its layer by
  * id (through the ids the drain has learned for layers the run created), call ONE native entry, then count the step only when the
  * native read model shows its effect. An entry's own answer is never proof. The first refusal stops the drain; nothing is retried.
- * Errors: document-replaced, layer-gone, write-refused, write-unconfirmed.
+ * Errors: document-replaced, layer-gone, write-refused, write-unconfirmed, write-indeterminate (the owner's model moved after a failed answer and
+ * does not show the step's effect).
  */
 (function (root, factory) {
   var api = factory();
@@ -28,18 +29,24 @@
       var fresh = after.layers.filter(function (l) { return !known[l.layerUid]; });
       return fresh.length === 1 ? fresh[0].layerUid : null;
     }
-    // Calls the entry; a refusal or rejection is 'write-refused', and the entry's own answer is never proof: verify(after, answer) decides.
+    // Calls the entry; the entry's own answer is never proof: verify(after, answer) decides. A refusal or a rejection that left the read model
+    // untouched is 'write-refused'. One after which the model DID move (a transport that failed after the owner committed) is reconciled
+    // against the model: the effect is there and counted, or the step is 'write-indeterminate' - it is never retried and never called refused.
+    var now0 = null;
     function perform(call, verify) {
-      return Promise.resolve().then(call).then(function (r) {
-        if (r === false || (r && r.ok === false)) return 'write-refused';
+      function settle(r, failed) {
         var after = ports.info();
-        return after ? verify(after, r || {}) : 'write-unconfirmed';
-      }, function () { return 'write-refused'; });
+        if (!failed) return after ? verify(after, r || {}) : 'write-unconfirmed';
+        if (!after || !samePin(after) || after.contentRevision === now0.contentRevision) return 'write-refused';
+        return verify(after, {}) === undefined ? undefined : 'write-indeterminate';
+      }
+      return Promise.resolve().then(call).then(function (r) { return settle(r, r === false || !!(r && r.ok === false)); },
+        function () { return settle(null, true); });
     }
     function minted(it, now, r, after, index) {
       var uid = added(now, after);
       if (!uid || (r.layerUid && r.layerUid !== uid) || (index !== undefined && after.layers[index].layerUid !== uid)) return 'write-unconfirmed';
-      alias[it.made || it.uid] = uid;
+      alias[it.made || it.uid] = uid; if (typeof ctx.learned === 'function') ctx.learned(it.made || it.uid, uid);
     }
     // An edit that leaves no trace in the layer rows is confirmed by the revision the owner then reports.
     function revised(now) {
@@ -120,6 +127,7 @@
       if (i >= items.length) return Promise.resolve({ ok: true, applied: applied, pending: 0 });
       var now = ports.info();
       if (!now || PIN.some(function (k) { return now[k] !== pin[k]; })) return Promise.resolve(stop(i, 'document-replaced'));
+      now0 = now;
       return Promise.resolve(handlers[items[i].kind](items[i], now)).then(function (result) {
         if (result === SKIP) return step(i + 1);
         if (typeof result === 'string') return stop(i, result);
@@ -128,5 +136,19 @@
     }
     return step(0);
   }
-  return Object.freeze({ run: run });
+  // I33: a run is ONE undo group. The undo depth is read before and after the drain (ctx.ports.history.depth) and both reads go to
+  // history.group, which records the entries the drain added (script-native-groups.js). A partial drain groups what it did: no rollback, as the
+  // baseline kept its edits. An unreadable history never blocks the drain.
+  function runGrouped(items, ctx) {
+    var h = ctx.ports.history, before = null;
+    if (!items.length || !h || typeof h.depth !== 'function' || typeof h.group !== 'function') return run(items, ctx);
+    return Promise.resolve().then(function () { return h.depth(); }).then(function (b) { before = b; }, function () { before = null; })
+      .then(function () { return run(items, ctx); })
+      .then(function (result) {
+        if (!before) return result;
+        return Promise.resolve().then(function () { return h.depth(); }).then(function (after) { if (after) h.group(before, after); }, function () {})
+          .then(function () { return result; });
+      });
+  }
+  return Object.freeze({ run: run, runGrouped: runGrouped });
 }));

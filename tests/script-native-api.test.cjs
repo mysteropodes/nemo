@@ -62,7 +62,6 @@ test('unbound and unavailable rows refuse with a typed error and never fall back
   typed(()=>layer.keys('position'),'sdk:nemo-script.Layer.keys','native-entry-absent');
   typed(()=>layer.strokes,'sdk:nemo-script.Layer.strokes','no-native-stroke-read');
   typed(()=>n.isKeyframe(0,1),'sdk:nemo-script.isKeyframe','native-entry-absent');
-  typed(()=>n.undoGroup(()=>{}),'sdk:nemo-script.undoGroup','script-run-grouping');
   typed(()=>n.markers.list(),'sdk:nemo-script.markers.list','native-entry-absent');typed(()=>n.comp.beats(),'sdk:nemo-script.comp.beats','native-entry-absent');
   typed(()=>n.camera.keys(),'sdk:nemo-script.camera.keys','no-native-camera');
   typed(()=>n.comp.setWorkArea(0,1),'sdk:nemo-script.comp.setWorkArea','native-entry-absent');
@@ -278,4 +277,78 @@ test('comp.setWorkArea then comp.trimToWorkArea in one run trims to the area jus
   assert.doesNotThrow(()=>{m.comp.setWorkArea(7,3);m.comp.setWorkArea(-4,999);m.comp.setWorkArea(5,5);});
   assert.deepEqual(await odd.commit(),{ok:true,applied:3,pending:0});
   assert.deepEqual(o.calls.slice(2),[['workArea',{inFrame:7,outFrame:3}],['workArea',{inFrame:-4,outFrame:999}],['workArea',{inFrame:5,outFrame:5}]]);
+});
+
+// ---- CS8-SDK I33: the run is the undo group; a finished run takes no late write; a failed answer is reconciled or indeterminate ----
+test('undoGroup is a bound host row: it runs the function inline, returns its value, and the run is the group',()=>{
+  const n=Api.createRun(harness(L).ports).nemo;
+  assert.equal(Api.ROUTES.find(r=>r.row==='sdk:nemo-script.undoGroup').kind,'host');assert.ok(n.help().includes('undoGroup'));
+  assert.equal(n.undoGroup(()=>{n.layer('A').visible=false;return n.layer('A').visible+'/'+n.layerCount;}),'false/3','the baseline returned fn()');
+  assert.throws(()=>n.undoGroup(()=>{throw new Error('inner');}),/inner/);
+  assert.throws(()=>n.undoGroup(5),e=>e.code==='refused'&&/takes a function/.test(e.message));
+});
+
+function depthed(o,start=0){
+  let depth=start;const reads=[],groups=[];
+  const wrap={};for(const k of Object.keys(o.ops))wrap[k]=(...a)=>o.ops[k](...a).then(r=>{if(r&&r.applied)depth+=1;return r;});
+  const flags=o.h.ports.write;for(const k of ['visible','locked','shy'])o.h.ports.write[k]=i=>flags[k]?Promise.resolve(true).then(()=>{depth+=1;return true;}):Promise.resolve(false);
+  const history={depth:()=>{const i=o.h.info;reads.push(depth);return Promise.resolve({instanceId:i.instanceId,documentId:i.documentId,lifecycleGeneration:i.lifecycleGeneration,contentRevision:i.contentRevision,undoDepth:depth});},
+    group:(before,after)=>groups.push([before.undoDepth,after.undoDepth,before.contentRevision,after.contentRevision])};
+  return {wrap,history,reads,groups};
+}
+
+test('a committed run records ONE undo group of the entries it added, measured by the owner\'s undo depth around the drain (I33)',async()=>{
+  const o=owner(L),d=depthed(o,5),run=o.run({ops:d.wrap,history:d.history}),n=run.nemo;
+  n.layer('A').name='Renamed';n.layer('B').set('opacity',50);n.markers.add(3,'M');
+  assert.deepEqual(d.groups,[],'nothing is recorded while the script runs');
+  assert.deepEqual(await run.commit(),{ok:true,applied:3,pending:0});
+  assert.deepEqual(d.groups,[[5,8,0,3]],'three entries, from revision 0 to 3');
+  const empty=o.run({ops:d.wrap,history:d.history});await empty.commit();assert.equal(d.groups.length,1,'a run that wrote nothing records nothing');
+  const failing=owner(L,{property:()=>Promise.resolve({ok:false})}),f=depthed(failing,0),again=failing.run({ops:f.wrap,history:f.history});
+  again.nemo.layer('A').name='kept';again.nemo.layer('B').set('opacity',1);
+  assert.equal((await again.commit()).error,'write-refused');assert.deepEqual(f.groups,[[0,1,0,1]],'a refusal groups the entry already made: no rollback, as the baseline kept its edits');
+  const blind=o.run({ops:d.wrap,history:{depth:()=>Promise.reject(new Error('no history')),group:()=>{throw new Error('must not be called');}}});
+  blind.nemo.layer('a').name='x';assert.equal((await blind.commit()).ok,true,'an unreadable history never blocks the drain');
+});
+
+test('a write made after the run has finished is refused, never queued for a drain that is over (promise completion cannot reach a later document)',async()=>{
+  const o=owner(L),run=o.run(),n=run.nemo,a=n.layer('A');
+  assert.deepEqual(await run.commit(),{ok:true,applied:0,pending:0});
+  const late=(fn)=>assert.throws(fn,e=>e.code==='refused'&&/has finished/.test(e.message));
+  late(()=>{a.name='late';});late(()=>a.set('opacity',1));late(()=>{a.visible=false;});late(()=>n.addLayer('late'));late(()=>n.markers.add(1));late(()=>a.remove());
+  assert.deepEqual(o.calls,[]);assert.deepEqual(await run.commit(),{ok:true,applied:0,pending:0});
+  const gone=o.run();gone.nemo.layer('a').name='x';gone.discard();assert.throws(()=>{gone.nemo.layer('a').name='y';},/has finished/);
+  assert.equal(a.name,'A','reads of the pinned model still answer');
+});
+
+test('a run knows the real id of a layer it created once its drain has run (plugin handles use it across ticks)',async()=>{
+  const o=owner(L),run=o.run(),made=run.nemo.addLayer('Ink');
+  assert.equal(run.resolve(made.layerUid),made.layerUid,'still provisional before the drain');
+  await run.commit();assert.equal(run.resolve(made.layerUid),'n1');assert.equal(run.resolve('a'),'a');
+});
+
+test('a failed answer is reconciled against the model or reported indeterminate, never silently refused or retried (I29)',async()=>{
+  // The owner committed, then the transport lost the answer: the effect is visible, so the step counts.
+  let o=owner(L,{rename:(uid,h)=>{h.info={...h.info,contentRevision:h.info.contentRevision+1,layers:h.info.layers.map(l=>l.layerUid===uid?{...l,name:'kept'}:l)};return Promise.reject(new Error('response lost'));}});
+  let run=o.run();run.nemo.layer('A').name='kept';
+  assert.deepEqual(await run.commit(),{ok:true,applied:1,pending:0});
+  // The owner moved the document but the effect is not what was asked: indeterminate, and the rest of the queue stays unsent.
+  o=owner(L,{rename:(uid,h)=>{h.info={...h.info,contentRevision:h.info.contentRevision+1};return Promise.resolve({ok:false});},remove:()=>Promise.resolve({ok:true,applied:true})});
+  run=o.run();run.nemo.layer('A').name='x';run.nemo.layer('B').remove();
+  assert.deepEqual(await run.commit(),{ok:false,applied:0,pending:2,error:'write-indeterminate'});assert.deepEqual(o.calls,[['rename','a','x']],'nothing was retried');
+  // A property edit whose answer is lost after the revision moved cannot be proven: indeterminate.
+  o=owner(L,{property:(spec,h)=>{h.info={...h.info,contentRevision:h.info.contentRevision+1};return Promise.reject(new Error('lost'));}});
+  run=o.run();run.nemo.layer('A').set('opacity',5);assert.equal((await run.commit()).error,'write-indeterminate');
+  // A refusal that left the model alone is a plain refusal.
+  o=owner(L,{rename:()=>Promise.reject(new Error('refused before dispatch'))});run=o.run();run.nemo.layer('A').name='x';
+  assert.equal((await run.commit()).error,'write-refused');
+});
+
+test('stale and wrong-instance pins change neither history nor document: the drain sends nothing and records nothing (I29)',async()=>{
+  for(const over of [{instanceId:'other'},{documentId:'other'},{lifecycleGeneration:9}]){
+    const o=owner(L),d=depthed(o,0),run=o.run({ops:d.wrap,history:d.history});run.nemo.layer('A').name='x';run.nemo.markers.add(2);
+    o.h.info={...o.h.info,...over};
+    assert.deepEqual(await run.commit(),{ok:false,applied:0,pending:2,error:'document-replaced'});
+    assert.deepEqual(o.calls,[],JSON.stringify(over));assert.ok(d.groups.every(g=>g[0]===g[1]),'no entry was added, so the group is empty and the registry refuses it');
+  }
 });

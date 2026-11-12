@@ -110,18 +110,32 @@
     return doc;
   }
 
-  // Injected ahead of the plugin's own scripts so `nemo` exists before they
-  // run. The parent's API object is handed over directly rather than proxied:
-  // a proxy would have to enumerate the surface and would silently rot as the
-  // API grows.
+  // Injected ahead of the plugin's own scripts so `nemo` exists before they run. The object comes from the host (hostApi) and is handed over
+  // directly rather than proxied here: on a native host it is the facade over the native script API (script-native-plugin.js), whose handles
+  // follow layerUid; the legacy builder is reached only on a host with no native document model (the browser build).
   function bridgeSource(id) {
     return [
       '(function(){',
-      '  window.nemo = parent.SMScript.api();',
-      '  window.nemo.close = function(){ parent.SMPlugin.close(' + JSON.stringify(id) + '); };',
-      '  window.nemo.setTitle = function(t){ parent.SMPlugin.setTitle(' + JSON.stringify(id) + ', t); };',
+      // The legacy builder is offered as a thunk and called only by a host with no native model, so a native host never builds it.
+      '  window.nemo = parent.SMPlugin.hostApi(' + JSON.stringify(id) + ', function(){ return parent.SMScript.api(); });',
       '})();'
     ].join('\n');
+  }
+
+  function isOpen(id) { return _open.some(function (p) { return p.id === id; }); }
+  function setTitle(id, t) { _open.forEach(function (p) { if (p.id === id) p.title.textContent = t; }); }
+  // The `nemo` object of one plugin panel. A native host (a Tauri shell or an open native document) never reaches state.layers: it gets the
+  // native facade, or a refusing object when that module is missing. Only a host without any native model falls back to the legacy builder.
+  function hostApi(id, legacyApi) {
+    var control = { close: function () { closeById(id); }, setTitle: function (t) { setTitle(id, t); } };
+    var Api = window.NemoScriptNativeApi, Plug = window.NemoScriptNativePlugin;
+    if (window.__TAURI__ || (Api && Api.owns(window))) {
+      if (!Plug) throw new Error('Les plugins exigent le module natif des scripts (non chargé).');
+      return Plug.create(window, { isOpen: isOpen }).api(id, control);
+    }
+    if (typeof legacyApi !== 'function') throw new Error('Pas d\'API de script pour ce plugin.');
+    var legacy = legacyApi(); legacy.close = control.close; legacy.setTitle = control.setTitle;
+    return legacy;
   }
 
   function mount(manifest, doc) {
@@ -215,6 +229,9 @@
     close: closeById,
     closeAll: function () { _open.slice().forEach(function (p) { closeById(p.id); }); },
     openCount: function () { return _open.length; },
-    setTitle: function (id, t) { _open.forEach(function (p) { if (p.id === id) p.title.textContent = t; }); }
+    setTitle: function (id, t) { setTitle(id, t); },
+    isOpen: isOpen,
+    hostApi: hostApi,
+    bridgeSource: bridgeSource
   };
 })();

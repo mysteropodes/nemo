@@ -15,7 +15,9 @@
  * writes; a read the pin cannot give throws a typed unavailable. Layer.strokes stays unavailable (the native reads carry no stroke colours).
  * Injected ports: info(), write.{visible,locked,shy}(index) -> Promise<boolean>, ops.{add,remove,duplicate,split,rename,
  * property,track,marker} -> Promise<{ok,applied,layerUid}> (a missing one makes its rows unavailable at the call),
- * goToFrame(frame), frame(), activeIndex(), selection() -> indices, toast(message).
+ * goToFrame(frame), frame(), activeIndex(), selection() -> indices, toast(message), history.{depth() -> Promise<pin + undoDepth>, group(before, after)}.
+ * A run is one undo group (I33): commit brackets the drain with history.depth() and hands both reads to history.group; undoGroup(fn) runs fn
+ * inline. Once a run has committed or been discarded a late write throws {code:'refused'} instead of queuing for a drain that is over.
  * Undeclared members throw instead of reading undefined. The script body still runs
  * in the page realm: common globals are shadowed as hygiene, which is not a sandbox
  * (the baseline runner had the same unsandboxed shape, recorded under I30).
@@ -56,9 +58,10 @@
   put(S, ['goToFrame'], present('viewport frame presentation; no document write', true));
   put(S, ['Layer.solo'], present('Solo view of the layer (a session view fact; the toggle asks the preview for one more frame, no document write)', true));
   put(S, ['selection.layers'], present('editor selection state', true));
-  put(S, ['selection.clear', 'selection.setLayers', 'selection.strokes', 'Layer.select'], present('editor selection state'));
   put(S, ['help', 'log', 'toast'], host('script console and editor toast', true));
-  put(P, ['closeAll', 'openCount', 'setTitle'], host('plugin window management; the plugin host is not admitted yet'));
+  // The run is the undo group (script-native-groups.js), so the wrapper only runs its function inline, as the baseline returned it.
+  put(S, ['undoGroup'], host('script run helper: the whole run is one undo group; fn runs inline and its value is returned', true));
+  put(P, ['closeAll', 'openCount', 'setTitle'], host('plugin window management (SMPlugin); the iframe bridge reaches this same API through script-native-plugin.js', true));
   var reasons = {
     'no-native-effects': ['Effect.enabled', 'Effect.get', 'Effect.key', 'Effect.keys', 'Effect.params', 'Effect.remove', 'Effect.set', 'Effect.type', 'Layer.addEffect', 'Layer.effects'],
     'no-native-layer-markers': ['Layer.addMarker', 'Layer.markers'], 'no-native-blend-matte': ['Layer.blendMode', 'Layer.matte'],
@@ -66,8 +69,8 @@
     'no-native-expressions': ['Layer.expression', 'Layer.setExpression'], 'no-native-layer-range': ['Layer.inFrame', 'Layer.outFrame'],
     'no-native-key-lock': ['Layer.keyLock'], 'no-native-time-link': ['Layer.linkTime', 'Layer.timeLink', 'Layer.unlinkTime'],
     'no-native-layer-merge': ['Layer.mergeWith'], 'no-native-motion-blur': ['Layer.motionBlur'], 'no-native-parenting': ['Layer.parent'],
+    'no-native-selection-write': ['selection.clear', 'selection.setLayers', 'Layer.select'], 'no-native-stroke-selection': ['selection.strokes'],
     'no-native-stroke-profile': ['Layer.strokeProfile'], 'no-native-stroke-read': ['Layer.strokes'], 'no-native-pivot': ['addPivot'], 'no-native-camera': ['camera.keys'],
-    'script-run-grouping': ['undoGroup'],
   };
   Object.keys(reasons).forEach(function (reason) { put(S, reasons[reason], gone(reason)); });
   var ROUTES = Object.freeze(Object.keys(table).sort().map(function (row) { return Object.freeze(Object.assign({ row: row }, table[row])); }));
@@ -126,7 +129,11 @@
     try { if (typeof reads.composition === 'function') comp = Reads.detached(reads.composition()) || null; } catch (_) { comp = null; }
     var pin = {}; PIN.forEach(function (k) { pin[k] = start[k]; });
     var layers = detached(start.layers), overlay = Object.create(null), queue = [], log = [], ops = ports.ops || {}, wa = { inF: start.waIn, outF: start.waOut };
-    var seen = Object.create(null), made = 0;
+    var seen = Object.create(null), made = 0, learnt = Object.create(null), closed = false;
+    // A run that has returned has committed (or discarded) its queue: a write made after it (a late callback, a resolved promise) is refused,
+    // never queued for a drain that already happened. The next run reads the document as it is then.
+    function finished() { return fail('this script run has finished; a write made after it returned is not applied'); }
+    Object.defineProperty(queue, 'push', { value: function () { if (closed) throw finished(); return Array.prototype.push.apply(this, arguments); } });
     layers.forEach(function (l) { if (seen[l.layerUid]) throw fail('duplicate layer id ' + l.layerUid); seen[l.layerUid] = true; });
     function find(uid) {
       for (var i = 0; i < layers.length; i++) if (layers[i].layerUid === uid) return { layer: layers[i], index: i };
@@ -135,7 +142,7 @@
     function provisional() { do { made += 1; } while (seen['pending-' + made]); seen['pending-' + made] = true; return 'pending-' + made; }
     // The native entry a write row needs, or the typed refusal - before anything is queued.
     function entry(row, name) {
-      need(row);
+      need(row); if (closed) throw finished();
       if (typeof ops[name] !== 'function') throw unavailable(row, 'native-entry-absent');
       return ops[name];
     }
@@ -374,13 +381,20 @@
         add: function (frame, name) { return marker(S + 'markers.add', 'add', frame, name); },
         removeAt: function (frame) { return marker(S + 'markers.removeAt', 'remove', frame); } }), 'markers.'),
       camera: guard(group(S + 'camera.', ['keys']), 'camera.'),
+      undoGroup: function (fn) { need(S + 'undoGroup'); if (typeof fn !== 'function') throw fail('undoGroup takes a function'); return fn(); },
     };
-    ['addPivot', 'undoGroup'].forEach(function (n) { nemo[n] = stub(S + n); });
+    nemo.addPivot = stub(S + 'addPivot');
     nemo = guard(nemo, '');
     // Drains the queue in order (script-native-drain.js): each step re-reads the pin, calls the same native entry the UI uses and counts
     // only what the native read model then shows; it stops at the first refusal.
-    function commit() { var items = queue.slice(); queue = []; return Drain.run(items, { ports: ports, pin: pin, ops: ops, keys: PIN }); }
-    return { nemo: nemo, commit: commit, discard: function () { queue = []; }, log: function () { return log.slice(); } };
+    // With ports.history the drain is bracketed by two reads of the undo depth and the entries it added are ONE undo group (Drain.runGrouped).
+    function commit() {
+      var items = queue.splice(0);
+      closed = true;
+      return Drain.runGrouped(items, { ports: ports, pin: pin, ops: ops, keys: PIN, learned: function (from, to) { learnt[from] = to; } });
+    }
+    return { nemo: nemo, commit: commit, discard: function () { queue.splice(0); closed = true; }, log: function () { return log.slice(); },
+      resolve: function (uid) { return learnt[uid] || uid; } };
   }
   return Object.freeze({ ROUTES: ROUTES, createRun: createRun, owns: Run.owns,
     runOnDesktop: function (root, source) { return Run.runOnDesktop(root, source, createRun); }, execute: function (ports, source) { return Run.execute(createRun, ports, source); } });

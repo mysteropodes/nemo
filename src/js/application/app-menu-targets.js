@@ -28,7 +28,8 @@
     'ctx-kitsu-publish':off('Kitsu publishing is unavailable in native Nemo.'),
     // The legacy script API writes state.layers directly; the native script API (#2354) replaces it when loaded.
     'ctx-nemo-script':function(root){return root.NemoScriptNativeApi?NATIVE:off('Scripts are unavailable in native Nemo.');},
-    // Plugins receive the legacy script API (nemo-plugin.js bridge) on every host.
+    // The plugin bridge is the native facade over the script API on a native host (script-native-plugin.js, #2354 I34). The entry stays off until the
+    // opacity cutover admits SMPlugin.openFile/loadArchive/loadFiles (native-opacity-operations.js) and the installed app is accepted.
     'ctx-nemo-plugin':off('Plugins are unavailable in native Nemo.'),
     // second-viewer.js renders SMEngineBridge.buildSceneJsonForFrame, the JavaScript scene evaluator.
     'ctx-new-view':off('A second viewer is unavailable in native Nemo.'),

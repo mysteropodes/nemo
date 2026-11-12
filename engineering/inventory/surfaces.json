@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "43b71012c8d9a23b9bafe3c3db7ca15c93449612",
-  "describe": "v0.7.0-alpha.4-5644-g43b71012c-dirty"
+  "head": "e863874cd0c2635b6f8341bd08112c32f1ce7426",
+  "describe": "v0.7.0-alpha.4-5645-ge863874cd-dirty"
  },
- "inputsDigest": "7af084816eaa2459a798951de64975a8ed532144f0da4641711c86e3e1b7372e",
+ "inputsDigest": "46242709acb7c05b44ca82c21deeceae0f6ea19f11c43cdf78e2085cbd177fbd",
  "states": [
   "inventoried",
   "characterized",
@@ -251,7 +251,7 @@
   },
   "SMPlugin": {
    "file": "src/js/nemo-plugin.js",
-   "line": 211,
+   "line": 225,
    "members": 3
   },
   "SMScript": {
@@ -8335,7 +8335,7 @@
     "container": "history-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 3,
+    "functionsVisited": 0,
     "via": "variable closeButton",
     "references": []
    },
@@ -32948,7 +32948,7 @@
    "capability": "closeAll",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-plugin.js:216 closeAll"
+    "src/js/nemo-plugin.js:230 closeAll"
    ],
    "events": [],
    "exposure": [
@@ -32960,7 +32960,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-plugin.js:216",
+   "source": "src/js/nemo-plugin.js:230",
    "meta": {
     "functionsVisited": 8
    },
@@ -32976,7 +32976,7 @@
    "capability": "openCount",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-plugin.js:217 openCount"
+    "src/js/nemo-plugin.js:231 openCount"
    ],
    "events": [],
    "exposure": [
@@ -32988,7 +32988,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-plugin.js:217",
+   "source": "src/js/nemo-plugin.js:231",
    "meta": {
     "functionsVisited": 0
    },
@@ -33004,7 +33004,7 @@
    "capability": "setTitle",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-plugin.js:218 setTitle"
+    "src/js/nemo-plugin.js:232 setTitle"
    ],
    "events": [],
    "exposure": [
@@ -33016,9 +33016,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-plugin.js:218",
+   "source": "src/js/nemo-plugin.js:232",
    "meta": {
-    "functionsVisited": 1
+    "functionsVisited": 2
    },
    "fixtures": [
     "media",
