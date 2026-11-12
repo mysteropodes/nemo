@@ -1,6 +1,6 @@
 //! #2372 SEL-MASK: the hit-test listing of a layer that holds masks lists its content and each mask (role `mask`, with the mode and the
-//! layer-shared feather the Mask panel shows); the editable read still refuses such a layer, and a layer with path effects leaves its
-//! vector records out item by item instead of refusing the layer.
+//! layer-shared feather the Mask panel shows); the editable read still refuses such a layer. Evaluated contour paging covers
+//! ordinary painted vectors; masks with path effects remain omitted from their unsupported mask-geometry reader.
 use super::*;
 use crate::object_render_scene::prepare_object_viewport_composition;
 
@@ -161,30 +161,46 @@ fn the_hit_listing_names_the_pose_the_layers_motion_applies_to_a_pointer_on_the_
     assert_eq!(full(&still).unwrap()["layerMatrix"], json!([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
 }
 
-/// Baseline `applyPathVertexOffsets`: a record whose element holder carries `vtxN` offsets is listed as PAINTED: its bounds cover the
-/// moved points, and `vertexOffsets` hands the reader the per-anchor offsets to add to the stored anchor points.
+/// Frozen point-offset semantics remain covered independently of the old
+/// offset-metadata transport: the client now pages evaluated paint at its frame.
 #[test]
-fn a_record_with_vertex_offsets_lists_its_painted_bounds_and_the_offsets() {
+fn a_record_with_vertex_offsets_lists_painted_bounds_and_correlated_evaluated_geometry() {
     let plain = listing(&masked_content()).unwrap();
-    let stored = plain.iter().find(|i| i["stableTarget"]["strokeId"] == "a" && i["role"] != "mask").unwrap().clone();
-    assert!(stored.get("vertexOffsets").is_none(), "{stored}");
-    let mut doc = masked_content();
+    let mut doc=masked_content();
     doc["propertyHolders"].as_array_mut().unwrap().push(json!({
         "target":{"contextId":"scene-root","layerUid":"L0","strokeId":"a"},
         "properties":[{"property":"vtx0","static":[40,30]}]}));
-    let items = listing(&doc).unwrap();
-    let posed = items.iter().find(|i| i["stableTarget"]["strokeId"] == "a" && i["role"] != "mask").unwrap();
-    let count = posed["count"].as_u64().unwrap() as usize;
-    let offsets = posed["vertexOffsets"].as_array().unwrap_or_else(|| panic!("offsets are listed: {posed}"));
-    assert_eq!(offsets.len(), count);
-    assert_eq!(offsets[0], json!([40.0, 30.0]));
-    assert!(offsets[1..].iter().all(|o| *o == json!([0.0, 0.0])));
-    // The first anchor moved by (40, 30): the box can only have grown towards it.
-    let (before, after) = (stored["bounds"].as_array().unwrap(), posed["bounds"].as_array().unwrap());
-    assert!(after[2].as_f64().unwrap() >= before[2].as_f64().unwrap() && after[3].as_f64().unwrap() >= before[3].as_f64().unwrap());
-    assert_ne!(before, after, "the bounds follow the moved vertex");
-    // A sibling without vertex Motion is listed exactly as before.
-    assert!(items.iter().filter(|i| i["role"] == "mask").all(|m| m.get("vertexOffsets").is_none()));
+    let items=listing(&doc).unwrap();
+    let posed=items.iter().find(|i|i["stableTarget"]["strokeId"]=="a"&&i["role"]!="mask").unwrap();
+    assert_eq!(posed["count"],3);
+    // Source [0,0] + offset [40,30], with relative handleOut [3,4]:
+    // the conservative painted control bounds end at [43,34].
+    assert_eq!(posed["bounds"],json!([0.,0.,43.,34.]));
+    assert_eq!(posed["matrix"],json!([1.,0.,0.,1.,7.,-3.]));
+    // Legacy callers still combine this with an unframed source geometry
+    // page; the frame-aware caller consumes evaluated geometry and ignores it.
+    assert_eq!(posed["vertexOffsets"],json!([[40.,30.],[0.,0.],[0.,0.]]));
+    assert_eq!(items.iter().filter(|i|i["role"]=="mask").collect::<Vec<_>>(),plain.iter().filter(|i|i["role"]=="mask").collect::<Vec<_>>(),"mask siblings remain unchanged");
+    let o=owner(&doc);let snapshot=o.acquire_snapshot(0).unwrap();
+    let mut request=json!({"apiVersion":2,"requestId":"evaluated-mask-neighbor","instanceId":snapshot.instance_id(),"documentId":snapshot.document_id(),"operation":"query.document.object",
+        "payload":{"atRevision":snapshot.content_revision(),"documentSnapshotId":snapshot.snapshot_id(),"stableTarget":posed["stableTarget"],"subselect":{"cursor":0,"limit":16,"hitTest":true,"atFrame":7}}});
+    let read=|q:&Value|serde_json::to_value(snapshot.dispatch(serde_json::from_value(q.clone()).unwrap()).unwrap()).unwrap();
+    let response=read(&request);assert_eq!(response["ok"],true,"{response}");let page=&response["result"]["subselect"];
+    assert_eq!(page["atFrame"],7);assert_eq!(page["stableTarget"],posed["stableTarget"]);assert_eq!(page["total"],posed["count"]);
+    assert_eq!(page["segments"][0],json!({"point":[40.,30.],"handleIn":[0.,0.],"handleOut":[3.,4.]}));
+    assert_eq!(page["segments"][1],json!({"point":[10.,0.],"handleIn":[-2.,1.],"handleOut":[0.,0.]}));
+    assert_eq!(page["segments"][2]["point"],json!([0.,10.]));
+    let mut legacy=request.clone();legacy["payload"]["subselect"].as_object_mut().unwrap().remove("atFrame");
+    let old=read(&legacy);assert_eq!(old["ok"],true);
+    for (i,source) in old["result"]["subselect"]["segments"].as_array().unwrap().iter().enumerate() {
+        for j in 0..2 {assert_eq!(source["point"][j].as_f64().unwrap()+posed["vertexOffsets"][i][j].as_f64().unwrap(),page["segments"][i]["point"][j].as_f64().unwrap());}
+        assert_eq!(source["handleIn"],page["segments"][i]["handleIn"]);assert_eq!(source["handleOut"],page["segments"][i]["handleOut"]);
+    }
+    request["payload"]["documentSnapshotId"]=json!("stale");assert_eq!(read(&request)["error"]["code"],"stale_revision");
+    let plan=prepare_object_paint_plan(&scene(&snapshot),&pins(&snapshot,7)).unwrap();
+    let painted=plan.commands().find(|c|c.source().record().target().stroke_id()=="a"&&c.source().record().target().layer_uid()=="L0").unwrap();
+    assert_eq!(painted.path().elements()[0],PathEl::MoveTo(Point::new(47.,27.)));
+    assert_eq!(painted.path().elements()[1],PathEl::CurveTo(Point::new(50.,31.),Point::new(15.,-2.),Point::new(17.,-3.)));
 }
 
 #[test]
@@ -204,4 +220,38 @@ fn the_listing_reads_back_the_stored_select_pivot_of_a_vector_record() {
     let plain = listing(&masked_content()).unwrap();
     let item = plain.iter().find(|i| i["stableTarget"]["strokeId"] == "a").unwrap();
     assert!(item.get("xformAnchorKey").is_none() && item.get("xformAnchorCustom").is_none(), "{item}");
+}
+
+#[test]
+fn path_effect_contours_use_framed_geometry_without_legacy_source_offsets() {
+    let mut doc=masked_content();
+    doc["layers"].as_array_mut().unwrap().iter_mut().find(|l|l["layerUid"]=="L0").unwrap()["pathFx"]=json!([{"type":"zigzag","enabled":true,"p1":10.,"p2":2.,"p3":0.}]);
+    doc["propertyHolders"].as_array_mut().unwrap().push(json!({"target":{"contextId":"scene-root","layerUid":"L0","strokeId":"a"},"properties":[{"property":"vtx0","static":[4,3]}]}));
+    let items=listing(&doc).unwrap();
+    let painted=items.iter().find(|r|r["stableTarget"]["strokeId"]=="a"&&r["role"]!="mask").unwrap();
+    assert_eq!(painted["count"],12);
+    assert!(painted.get("vertexOffsets").is_none(),"effect topology cannot be represented by offsets on three source anchors");
+    let o=owner(&doc);let s=o.acquire_snapshot(0).unwrap();
+    let q=json!({"apiVersion":2,"requestId":"fx-hit","instanceId":s.instance_id(),"documentId":s.document_id(),"operation":"query.document.object",
+        "payload":{"atRevision":s.content_revision(),"documentSnapshotId":s.snapshot_id(),"stableTarget":painted["stableTarget"],"subselect":{"cursor":0,"limit":16,"hitTest":true,"atFrame":7}}});
+    let response=serde_json::to_value(s.dispatch(serde_json::from_value(q).unwrap()).unwrap()).unwrap();
+    assert_eq!(response["ok"],true,"{response}");let page=&response["result"]["subselect"];
+    assert_eq!(page["atFrame"],7);assert_eq!(page["total"],painted["count"]);// Frozen path-fx.js@1065e9d8 starts this closed zigzag at [-8,6]
+    // (normal to the [3,4] tangent), then the vertex offset adds [4,3].
+    assert_eq!(page["segments"][0]["point"],json!([-4.,9.]));
+}
+
+#[test]
+fn a_masks_vertex_motion_uses_the_same_evaluated_hit_bounds_and_legacy_source_offsets() {
+    let mut doc=masked_content();
+    doc["propertyHolders"].as_array_mut().unwrap().push(json!({"target":{"contextId":"scene-root","layerUid":"L0","strokeId":"b"},"properties":[{"property":"vtx0","static":[5,-2]}]}));
+    let items=listing(&doc).unwrap();let mask=items.iter().find(|i|i["role"]=="mask"&&i["stableTarget"]["strokeId"]=="b").unwrap();
+    assert_eq!(mask["bounds"],json!([0.,-2.,10.,10.]));assert_eq!(mask["count"],3);
+    assert_eq!(mask["vertexOffsets"],json!([[5.,-2.],[0.,0.],[0.,0.]]));
+    let o=owner(&doc);let s=o.acquire_snapshot(0).unwrap();
+    let request=json!({"apiVersion":2,"requestId":"mask-vertex-frame","instanceId":s.instance_id(),"documentId":s.document_id(),"operation":"query.document.object",
+        "payload":{"atRevision":s.content_revision(),"documentSnapshotId":s.snapshot_id(),"stableTarget":mask["stableTarget"],"subselect":{"cursor":0,"limit":16,"hitTest":true,"atFrame":7}}});
+    let response=serde_json::to_value(s.dispatch(serde_json::from_value(request).unwrap()).unwrap()).unwrap();
+    assert_eq!(response["ok"],true,"{response}");assert_eq!(response["result"]["subselect"]["atFrame"],7);
+    assert_eq!(response["result"]["subselect"]["segments"][0]["point"],json!([5.,-2.]));
 }

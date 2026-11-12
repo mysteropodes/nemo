@@ -80,20 +80,26 @@ impl ObjectCompositionWitness {
         };
         let feather = masks.iter().filter_map(|s| s.record().mask_feather()).filter(|f| f.is_finite() && *f > 0.0).fold(0.0, f64::max);
         let faded = |source: &crate::object_frame_packet::ObjectFrameRecord<'_>| hit_test && subselect::has_path_fx(packet, source.record());
-        let mut flush = |items: &mut Vec<SubselectReadItem>, before: usize| {
+        let mut flush = |items: &mut Vec<SubselectReadItem>, before: usize| -> Result<(), &'static str> {
             while masks.front().is_some_and(|m| m.source_object_index() < before) {
                 let source = masks.pop_front().unwrap();
                 if faded(&source) {
                     continue;
                 }
                 let Some(matrix) = matrices.get(&source.source_object_index()).copied() else { continue };
-                items.push(mask_item(source.record(), matrix, feather));
+                let painted=crate::evaluation::object_vector_kernels::render_vector_eval::painted_record(
+                    packet.snapshot(),source.record(),&packet.source_layers()[index],packet.frame(),
+                ).map_err(|e|e.message())?;
+                let mut item=mask_item(&painted,matrix,feather);
+                item.vertex_offsets=subselect::legacy_vertex_offsets(packet,source.record(),&painted)?;
+                items.push(item);
             }
+            Ok(())
         };
         for entry in ordered {
             let command = match entry {
                 PaintEntry::Contour(command) if command.source().source_layer_index() == index => {
-                    flush(&mut items, command.source().source_object_index());
+                    flush(&mut items, command.source().source_object_index())?;
                     command
                 }
                 PaintEntry::Raster(at) => {
@@ -127,7 +133,12 @@ impl ObjectCompositionWitness {
                     packet.snapshot(), r, &packet.source_layers()[index], packet.frame(),
                 ).map_err(|e| e.message())?)
             } else { None };
+            let source_record=r;
             let r = posed.as_ref().unwrap_or(r);
+            let vertex_offsets=if hit_test {
+                subselect::legacy_vertex_offsets(packet,source_record,r)?
+            } else {None};
+            if hit_test && r.geometry.segments.is_empty() { continue; }
             let count = if hit_test {
                 r.geometry.segments.len()
             } else {
@@ -188,10 +199,10 @@ impl ObjectCompositionWitness {
                 style: if hit_test { record::style::listed(r) } else { None },
                 param_shape: if hit_test { record::param_shape(r) } else { None },
                 group_path: None,
-                vertex_offsets: None,
+                vertex_offsets,
             });
         }
-        flush(&mut items, usize::MAX);
+        flush(&mut items, usize::MAX)?;
         // A layer whose every contour is non-editable keeps the whole-layer refusal (nothing there can be vertex-edited).
         if !hit_test && uneditable > 0 && items.is_empty() {
             return Err("Subselect target geometry is unavailable");

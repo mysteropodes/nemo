@@ -462,7 +462,7 @@ fn vertex_sampling_failure_is_a_hit_projection_refusal_and_brush_indices_never_d
         {"point":{"x":20,"y":70},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":4},
         {"point":{"x":40,"y":70},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":4}]}});
     let s=snap(&v);
-    assert_eq!(evaluate_vector(&s,0,0),Err(VectorEvalError::BrushVertexUnavailable));
+    assert_eq!(evaluate_vector(&s,0,0),Err(VectorEvalError::PressureWidthBaselineDefect));
     v["propertyHolders"]=json!([]);
     let s=snap(&v);
     assert!(evaluate_vector(&s,0,0).is_ok(),"unanimated ribbon stays byte-identical");

@@ -117,6 +117,13 @@ fn bounds_contour(bounds: [f64; 4], reach: f64) -> Result<ClosedCubicPath, &'sta
 }
 
 impl VectorShape {
+    /// Successfully evaluated empty paint (e.g. a collapsed pressure Trim).
+    /// The conservative contour is provenance/culling metadata only; the
+    /// explicit empty drawn path is the sole paint/export geometry.
+    pub(crate) fn empty_draw() -> Result<Self, &'static str> {
+        Ok(Self { contour: bounds_contour([0.,0.,0.,0.],1.)?, envelope:[-1.,-1.,1.,1.], path:BezPath::new() })
+    }
+
     /// `reach` is the stroke reach (`stroke_reach`); `None` means the item has no stroke.
     pub(crate) fn new(
         segments: &[CubicSegment],

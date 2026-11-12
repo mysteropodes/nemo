@@ -306,6 +306,8 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
                     property.property(),
                     "position" | "anchor" | "rotation" | "scale"
                 )
+                || (record.vector_ext.value().and_then(|e|e.pressure.value()).and_then(|p|p.center_segments.value()).is_some_and(|c|c.len()>=2)
+                    && matches!(property.property(),"brushSize"|"trimStart"|"trimEnd"|"trimOffset"))
                 // `vtxN` offsets are added to the anchor points by the element Motion join.
                 || PropertyHolder::vertex_index(property.property()).is_some())
                 && !property.expression.value().is_some_and(|code| code.enabled)

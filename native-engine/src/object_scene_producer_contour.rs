@@ -260,7 +260,9 @@ fn compile_vector(
             handle_out: segment.handle_out,
         })
         .collect::<Vec<_>>();
-    let shape = VectorShape::new(&segments, evaluated.closed, stroke_reach(&style))?;
+    let shape = if segments.is_empty() && source.record().is_pressure_ribbon() {
+        VectorShape::empty_draw()?
+    } else { VectorShape::new(&segments, evaluated.closed, stroke_reach(&style))? };
     let solid = primary_solid(&style).map_err(|error| error.message())?;
     Ok(CompiledContour {
         contour: shape.contour,

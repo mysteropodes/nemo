@@ -176,8 +176,9 @@ pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, Obj
                 Some(projectors) => three_d::project(&segments, &projectors[copy_index]),
                 None => segments,
             };
-            let shape =
-                VectorShape::new(&segments, closed, stroke_reach(&style)).map_err(invalid)?;
+            let shape = if segments.is_empty() && record.is_pressure_ribbon() {
+                VectorShape::empty_draw().map_err(invalid)?
+            } else { VectorShape::new(&segments, closed, stroke_reach(&style)).map_err(invalid)? };
             let prepared = prepare_item(&style).map_err(|e| invalid(e.message()))?;
             let svg_rgba = if closed && style.stroke.is_none() {
                 style.fill.solid().and_then(|solid| {

@@ -83,6 +83,8 @@ pub(crate) enum VectorEvalError {
     LayerMotionUnavailable,
     RigCompositionUnavailable,
     BrushVertexUnavailable,
+    PressureWidthBaselineDefect,
+    PressureCrossingUnavailable,
     ExpressionUnavailable {
         property: &'static str,
     },
@@ -100,7 +102,9 @@ impl VectorEvalError {
             Self::PathFx(_) => "path effect exceeds the native sample budget",
             Self::Rebuild(_) => "parametric rebuild refused its input",
             Self::Sample { .. } => "animated shape parameter could not be sampled",
-            Self::BrushVertexUnavailable => "vertex Motion on a vector-brush centerline is unavailable",
+            Self::PressureCrossingUnavailable => "pressure Motion zero-spine side loops await native degenerate crossing parity",
+            Self::PressureWidthBaselineDefect => "frozen profileless brush vertex Motion loses anchor widths and produces nonfinite paint",
+            Self::BrushVertexUnavailable => "pressure Motion centerline, texture or outline consumer is unavailable",
             Self::RigCompositionUnavailable => {
                 "rig pose with path effects, animated shape rebuild or brush mirrors is unavailable"
             }
@@ -357,7 +361,8 @@ pub(crate) fn duplicator_geometry(
     if layer.three_d.value() != Some(&true) {
         segments = motion::apply_duplicator_layer_position(packet, record, layer_index, segments)?;
     }
-    Ok((segments, record.geometry.closed))
+    let closed=record.geometry.closed && !segments.is_empty();
+    Ok((segments, closed))
 }
 
 /// Stage 2, `hasParamShapeMotionFor` + `applyParamShapeFor`: the rebuilt anchors, or `None` when the record has no
@@ -438,7 +443,7 @@ fn evaluate_stored_rest(
     let segments = vertex_then_param(snapshot, stored.record, anchors, frame)?;
     Ok(EvaluatedVector {
         source_object_index: object_index,
-        closed: after_effects.closed,
+        closed: after_effects.closed && !segments.is_empty(),
         segments: motion::apply_element_pose(snapshot, stored.record, frame, segments)?,
     })
 }
