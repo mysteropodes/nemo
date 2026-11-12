@@ -55,6 +55,21 @@ a small independent fixture, so legitimate contract evolution does not require a
 central digest edit. The addition fixture proves schema registration only; the
 issue's complete handler/runtime fresh-agent acceptance remains separate.
 
+## Tauri raw-client allowlist
+
+A descriptor flags an operation `rawClient: { "<op>": { "revisionDelta": 0|1 } }`.
+The same `--write`/`--check` entry points generate
+[`../native-raw-client.json`](../native-raw-client.json) from those flags (sorted by
+operation; a query declares delta 0, a command 1). `src-tauri/src/native_object_client.rs`
+embeds it with `include_str!` and keeps no operation list of its own, and the
+`native-raw-client-allowlist` drift gate fails if it regrows one. Adding a raw-client
+capability is therefore its descriptor, its fragment and its handler; the allowlist,
+the aggregate and the MCP request validators follow from `--write` with no edit to
+central Rust. `tests/native-transport-fragments.test.cjs` adds one end to end. The
+client keeps only the semantics of the three operations it special-cases (the object
+read shape, the pinned serialize host operation and the visibility probe); its
+envelope checks use the shared `NativeApplicationRequest::validate_envelope`.
+
 The existing v2 declaration schema requires at least one operation even when a
 capability is temporarily unavailable. Availability does not suppress its request
 variants; the generator preserves this discovery and refusal contract.
