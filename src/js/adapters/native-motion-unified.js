@@ -63,10 +63,10 @@
         return current() ? { value: value } : null;
       } catch (_) { return current() ? { blocked: 'Unified Motion path unavailable: native Position data could not be read.' } : null; }
     };
-    var seen = {}, targets = [];
+    var seen = new Set(), targets = [];
     for (var i = 0; i < sel.length; i++) {
       var t = sel[i].data.nativeStableTarget, id = t.strokeId;
-      if (seen[id]) continue; seen[id] = true;
+      if (seen.has(id)) continue; seen.add(id);
       var target = { contextId: proof.selector.contextId, layerUid: t.layerUid, strokeId: id }, keys = [];
       var complete = false;
       for (var offset = 0, n = 0; n < MAX_KEY_PAGES; n++) {

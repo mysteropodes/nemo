@@ -14,13 +14,13 @@ function harness(options = {}) {
   const listeners = {}, toasts = [], batches = [], reads = [], shows = [];
   const pin = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 1, documentSnapshotId: 's1', canvasW: 400, canvasH: 400 };
   const presentation = { frame: 2 };
-  const keys = { A: [key(0, [0, 0]), key(10, [100, 0])], B: [key(0, [0, 0]), key(5, [10, 10])], ...options.keys };
+  const keys = new Map([['A', [key(0, [0, 0]), key(10, [100, 0])]], ['B', [key(0, [0, 0]), key(5, [10, 10])]], ...Object.entries(options.keys || {})]);
   const sampled = { 'A@5': [50, 0], 'B@10': [20, 20], 'B@0': [0, 0], ...options.sampled };
   const path = (id, cx, cy) => ({ bounds: { center: { x: cx, y: cy } }, data: { strokeId: id, nativeLayerIndex: 0, nativeStableTarget: { contextId: 'scene-root', layerUid: 'L', strokeId: id } } });
   const sel = options.single ? [path('A', 100, 100)] : options.selection || [path('A', 100, 100), path('B', 200, 300)];
   const session = {
     readProperty: async (selector) => { const v = selector.view; reads.push(v); if (options.readGate) await options.readGate;
-      if (v.kind === 'authoredKeys') { const all = keys[v.target.strokeId] || [], items = all.slice(v.offset, v.offset + v.limit); return { kind: 'authoredKeys', items, nextOffset: options.badNextOffset && v.offset + items.length < all.length ? v.offset : v.offset + items.length < all.length ? v.offset + items.length : null, trackPresent: true }; }
+      if (v.kind === 'authoredKeys') { const all = keys.get(v.target.strokeId) || [], items = all.slice(v.offset, v.offset + v.limit); return { kind: 'authoredKeys', items, nextOffset: options.badNextOffset && v.offset + items.length < all.length ? v.offset : v.offset + items.length < all.length ? v.offset + items.length : null, trackPresent: true }; }
       return { kind: 'rawSample', value: sampled[v.target.strokeId + '@' + v.frame] || [v.frame, v.frame], frame: v.frame }; },
     editPropertyBatch: async (payload) => { batches.push(payload); return options.refuse ? { ok: true, result: { applied: false } } : { ok: true, result: { applied: true } }; } };
   const win = { state: { appMode: 'motion', playing: false, tool: 'select', activeLayerIdx: 0, selectedStrokeIndices: [] }, selectedPaths: sel, showToast: (t) => toasts.push(t),
@@ -110,6 +110,21 @@ test('many unkeyed selected elements still contribute to the baseline centroid',
   assert.equal(h.paint().children.length, 4);
   assert.equal(h.paint().children.find((n) => n.tag === 'polyline').attrs.points, '2.9411764705882355,2.9411764705882355 32.94117647058823,7.9411764705882355 62.94117647058823,12.941176470588236', 'centroid includes all 102 selected elements');
   assert.equal(h.reads.filter((v) => v.kind === 'authoredKeys').length, 102);
+  assert.deepEqual(h.toasts, []);
+});
+
+test('opaque stroke IDs that collide with Object.prototype still participate in unified reads', async () => {
+  const selection = ['constructor', '__proto__'].map((id, i) => ({
+    bounds: { center: { x: 100 + i * 100, y: 100 } },
+    data: { strokeId: id, nativeLayerIndex: 0, nativeStableTarget: { contextId: 'scene-root', layerUid: 'L', strokeId: id } }
+  }));
+  const keys = Object.create(null);
+  keys.constructor = [key(0, [0, 0]), key(10, [100, 0])];
+  keys['__proto__'] = [key(0, [0, 0]), key(5, [10, 10])];
+  const h = harness({ selection, keys });
+  h.paint(); await settle();
+  assert.equal(h.paint().children.length, 4, 'both opaque IDs produce the three-frame unified path');
+  assert.deepEqual(new Set(h.reads.filter((v) => v.kind === 'authoredKeys').map((v) => v.target.strokeId)), new Set(['constructor', '__proto__']));
   assert.deepEqual(h.toasts, []);
 });
 
