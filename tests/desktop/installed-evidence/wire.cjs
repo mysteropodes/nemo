@@ -95,7 +95,10 @@ function createWire({ client, expect, now = () => Date.now(), sink = () => {} })
     if (reply.apiVersion !== version || reply.requestId !== request.requestId) throw new EvidenceError('malformed', 'reply does not answer this request');
     if (reply.instanceId !== request.instanceId) throw new EvidenceError('foreign', 'reply is from another instance');
     const projectEntry = version === 1 && (request.operation === 'project.new' || request.operation === 'project.open');
-    if (!projectEntry && request.documentId !== undefined && reply.documentId !== request.documentId) throw new EvidenceError('foreign', 'reply is from another document');
+    // A refusal that names no document at all ("No native project is open.", documentId "") says no project is open: it is the app
+    // answering for the document that was released, not another document answering.
+    const noProject = reply.ok === false && reply.documentId === '' && plain(reply.error) && reply.error.code === 'unavailable' && reply.error.message === 'No native project is open.';
+    if (!projectEntry && !noProject && request.documentId !== undefined && reply.documentId !== request.documentId) throw new EvidenceError('foreign', 'reply is from another document');
     const revision = version === 2 ? reply.contentRevision : reply.revision;
     if (!safeInt(revision)) throw new EvidenceError('malformed', 'reply carries no revision');
     if (reply.ok === true) {

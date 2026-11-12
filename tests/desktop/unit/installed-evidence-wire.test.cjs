@@ -164,6 +164,14 @@ test('png probes measure ink, colours, differences and coverage on decoded pixel
   assert.equal(probe.differing(image, probe.decodeExport(K.solidPng(10, 10, [0, 0, 0, 255]))), Infinity);
   assert.deepEqual(probe.over(half, 1, 1), [227, 127, 127]);
   assert.ok(Math.abs(probe.coverageRatio(image, half, [0, 0, 19, 9]) - 0.5) < 0.05);
+  // The real export is opaque over the #ffffff canvas background: ink is distance from it, and a paint's opacity is recovered from its composite.
+  const blank = probe.decodeExport(K.solidPng(8, 8, [255, 255, 255, 255]));
+  assert.equal(probe.inkBounds(blank), null);
+  assert.equal(probe.distanceAt(blank, 3, 3), 0);
+  const composite = probe.decodeExport(K.solidPng(4, 4, [140, 204, 153, 255]));
+  assert.equal(probe.distanceAt(composite, 1, 1), 115);
+  assert.ok(Math.abs(probe.paintAlphaAt(composite, 1, 1, [26, 153, 51]) - 128) <= 2);
+  assert.throws(() => probe.coverageRatio({ image }, { image }, [0, 0, 3, 3]), /decoded image/, 'an export record is not an image');
   assert.throws(() => probe.decodeExport(Buffer.from('nope')), /not a PNG/);
 });
 

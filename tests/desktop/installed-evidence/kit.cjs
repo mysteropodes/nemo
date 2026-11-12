@@ -24,9 +24,11 @@ const short = value => { const text = canonical(value) ?? 'undefined'; return te
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const KINDS = new Set(['reply', 'read', 'pixel', 'file']);
 
+// One counter for the whole run: every row writes into the same work directory, and the app refuses to save over an existing file
+// (a second row's `scratch-1.json` was refused as "publication-response-unavailable"), so file names must never repeat across rows.
+let counter = 0;
 function createContext({ wire, work, rowId }) {
   const assertions = [];
-  let counter = 0;
   function record(kind, id, observed, expected, pass, note, bookkeeping) {
     if (!KINDS.has(kind)) throw new Error('unknown assertion kind ' + kind);
     assertions.push({ id: rowId + ': ' + id, kind, ...(bookkeeping ? { bookkeeping: true } : {}), observed: short(observed), expected: short(expected), verdict: pass ? 'pass' : 'fail', ...(note ? { note } : {}) });
@@ -58,8 +60,14 @@ function createContext({ wire, work, rowId }) {
 }
 
 // ---- observations -------------------------------------------------------------------------------------------------
+// The pin of the current revision. An object project answers `query.document.snapshot.acquire` with "Unsupported object read
+// operation" (that op, query.document.serialize and query.document.evaluate belong to the opacity document, authority
+// native-engine::history::NativeOpacityHistory in engineering/application/capabilities-v2/native-opacity.json); the public pin of an
+// object project is the {atRevision, documentSnapshotId} the object query's presentation view returns
+// (tests/desktop/native-image-mesh.test.cjs presentation bootstrap; native-engine/src/object_snapshot.rs presentation read).
 async function pinNow(ctx) {
-  const pin = await ctx.wire.query(P.snapshotAcquire().operation, P.snapshotAcquire().payload);
+  const at = await ctx.wire.discover();
+  const b = P.presentationRead(at.contentRevision), pin = await ctx.wire.query(b.operation, b.payload);
   ctx.book.ok('reply', 'snapshot pin acquired', pin.ok && typeof pin.result.documentSnapshotId === 'string', pin.ok ? { atRevision: pin.result.atRevision } : pin.error);
   return { revision: pin.result.atRevision, pin: pin.result.documentSnapshotId };
 }
@@ -92,9 +100,11 @@ async function apply(ctx, label, built, opts = {}) {
   const before = await ctx.wire.discover(), h0 = await history(ctx);
   if (typeof built === 'function') built = await built();
   const res = await ctx.wire.command(built.operation, built.payload, opts.send || {});
+  // A refused command is reported as that refusal before any follow-up read: after a command whose consumer synchronization was
+  // indeterminate the app answers no further reads, and the failure must name the command, not the read.
+  if (!opts.refused) ctx.book.ok('reply', label + ': accepted', res.ok === true, res.ok ? 'ok' : res.error);
   const after = await ctx.wire.discover(), h1 = await history(ctx);
   if (opts.refused) { refusal(ctx, label, res, before, after, h0, h1, opts); return { res, before, after }; }
-  ctx.book.ok('reply', label + ': accepted', res.ok === true, res.ok ? 'ok' : res.error);
   if (opts.noop) {
     ctx.book.eq('reply', label + ': no-op receipt', [res.result.applied, res.result.historyEntriesAdded], [false, 0]);
     ctx.book.eq('read', label + ': no-op keeps revision', after.contentRevision, before.contentRevision);
@@ -115,9 +125,11 @@ async function resource(ctx, label, built, opts = {}) {
   const before = await ctx.wire.discover(), h0 = await history(ctx);
   if (typeof built === 'function') built = await built();
   const res = await ctx.wire.command(built.operation, built.payload, opts.send || {});
+  // A refused command is reported as that refusal before any follow-up read: after a command whose consumer synchronization was
+  // indeterminate the app answers no further reads, and the failure must name the command, not the read.
+  if (!opts.refused) ctx.book.ok('reply', label + ': accepted', res.ok === true, res.ok ? 'ok' : res.error);
   const after = await ctx.wire.discover(), h1 = await history(ctx);
   if (opts.refused) { refusal(ctx, label, res, before, after, h0, h1, opts); return { res, before, after }; }
-  ctx.book.ok('reply', label + ': accepted', res.ok === true, res.ok ? 'ok' : res.error);
   if (opts.applied !== undefined) ctx.eq('reply', label + ': receipt applied', res.result.applied, opts.applied);
   ctx.eq('read', label + ': publishing is not an edit: no revision', after.contentRevision, before.contentRevision);
   ctx.eq('reply', label + ': reply names the unchanged revision', res.revision, before.contentRevision);
@@ -167,7 +179,7 @@ function exportIntact(ctx, id, exported) {
 async function saveAs(ctx, tag) {
   const file = path.join(ctx.work, 'save-' + tag + '-' + ctx.next() + '.json');
   const before = await ctx.wire.discover();
-  const res = await ctx.wire.v1('project.saveAs', { path: file });
+  const res = await saveRetrying(ctx, 'save ' + tag, file);
   ctx.book.ok('reply', 'save ' + tag + ': accepted', res.ok === true, res.ok ? 'ok' : res.error);
   const after = await ctx.wire.discover();
   ctx.book.eq('read', 'save ' + tag + ': saving is not an edit', after.contentRevision, before.contentRevision);
@@ -192,14 +204,39 @@ async function reopen(ctx, file) {
   return res.result;
 }
 
+// project.saveAs on the installed app is refused with a typed `unavailable` ("pin-changed-before-picker" or
+// "publication-response-unavailable") when it follows a change closely; an immediate second request is accepted. The refused attempts
+// are recorded, never hidden, and the save must still be accepted within a few attempts. Any other refusal is returned as it is.
+const SAVE_RACE = /pin-changed-before-picker|publication-response-unavailable/;
+async function saveRetrying(ctx, label, file) {
+  let res;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    res = await ctx.wire.v1('project.saveAs', { path: file });
+    const race = !res.ok && res.error && res.error.code === 'unavailable' && SAVE_RACE.test(String(res.error.message));
+    if (!race) return res;
+    ctx.book.ok('reply', label + ': save attempt ' + attempt + ' refused as unavailable (' + (String(res.error.message).match(SAVE_RACE) || [''])[0] + ')', true, 'refused, retried');
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return res;
+}
+
 // New 640x360 project; a dirty open project is first saved to a scratch file, because project.new refuses unsaved changes.
 async function fresh(ctx, { w = 640, h = 360, fps = 24 } = {}) {
   const was = await ctx.wire.discover();
   if (was.documentId) {
-    const scratch = await ctx.wire.v1('project.saveAs', { path: path.join(ctx.work, 'scratch-' + ctx.next() + '.json') });
-    ctx.book.ok('reply', 'setup: previous project saved aside', scratch.ok === true, scratch.ok ? 'ok' : scratch.error);
+    const scratch = await saveRetrying(ctx, 'setup', path.join(ctx.work, 'scratch-' + ctx.next() + '.json'));
+    // After a failed row the app may have released the project (observed after a layer.reorder whose consumer synchronization was
+    // indeterminate): "No native project is open." means there is nothing to save aside; any other refusal still fails the setup.
+    const released = scratch.ok === false && scratch.error && scratch.error.code === 'unavailable' && scratch.error.message === 'No native project is open.';
+    ctx.book.ok('reply', released ? 'setup: no project open, nothing to save aside' : 'setup: previous project saved aside', scratch.ok === true || released, scratch.ok ? 'ok' : scratch.error);
   }
   const res = await ctx.wire.v1('project.new', { canvasW: w, canvasH: h, fps });
+  // After a command whose consumer synchronization stayed indeterminate the app refuses every new project until it is reopened
+  // (observed: "Native project state is unconfirmed. Reopen Nemo before continuing."). The row can not run: it is unrun with that reason,
+  // not failed for something it did; the row that caused it carries the failure.
+  if (res.ok === false && res.error && res.error.code === 'unavailable' && /Native project state is unconfirmed/.test(String(res.error.message))) {
+    throw new EvidenceError('unavailable', 'blocked: the app asks to be reopened after an earlier row left its project state unconfirmed');
+  }
   ctx.book.ok('reply', 'setup: project.new accepted', res.ok === true, res.ok ? 'ok' : res.error);
   const layers = res.result.layers;
   ctx.book.ok('read', 'setup: new project has a layer', Array.isArray(layers) && layers.length >= 1 && typeof layers[0].layerUid === 'string', layers);
@@ -214,12 +251,13 @@ async function readObject(ctx, stableTarget) {
   const res = await ctx.wire.query(b.operation, b.payload);
   return res.ok ? { ok: true, object: res.result.object } : { ok: false, error: res.error };
 }
+// The document's layer order, read from the saved project (drawing.layers is the document order). An object project offers no
+// public serialize query: query.document.serialize is an opacity-document operation and the object owner refuses it.
 async function layerOrder(ctx) {
-  const { revision } = await pinNow(ctx);
-  const b = P.serialize(revision);
-  const res = await ctx.wire.query(b.operation, b.payload);
-  ctx.book.ok('reply', 'serialize read', res.ok && Array.isArray(res.result.document && res.result.document.layers), res.ok ? 'ok' : res.error);
-  return res.result.document.layers.map(layer => layer.layerUid);
+  const saved = await saveAs(ctx, 'order');
+  const layers = saved.document && saved.document.drawing && saved.document.drawing.layers;
+  ctx.book.ok('file', 'layer order read from the saved project', Array.isArray(layers), Array.isArray(layers) ? layers.length : 'no drawing.layers');
+  return layers.map(layer => layer.layerUid);
 }
 
 // The image mesh of the raster on `layerUid`, read through the object query's imageMesh view (the mesh id is never part of a

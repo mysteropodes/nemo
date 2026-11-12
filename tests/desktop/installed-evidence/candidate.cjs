@@ -16,10 +16,13 @@ const { readRegistration, listenerPids } = require('../cs7-read.cjs');
 const ROOT = path.resolve(__dirname, '../../..');
 
 // Package proof against the clean checkout and the very bytes that will run. Pure: every input is a value.
-function verifyPackage({ proof, source, executableSha256, mcpSha256 }) {
+// `source` is this checkout (clean, committed); `candidateHead` is the source the package was built from. They are the same commit
+// unless the runner itself changed after the build, which harnessOnlyDelta admits only for files under tests/desktop.
+function verifyPackage({ proof, source, candidateHead = source.head, executableSha256, mcpSha256 }) {
   check(proof && proof.status === 'pass' && proof.details && proof.details.source, 'package proof must be a passing standard build proof');
   check(!source.dirty && /^[0-9a-f]{40}$/.test(source.head || ''), 'clean committed source required');
-  check(proof.details.source.head === source.head && proof.details.source.dirty === false, 'package proof is for another source head');
+  check(/^[0-9a-f]{40}$/.test(candidateHead), 'candidate source head required');
+  check(proof.details.source.head === candidateHead && proof.details.source.dirty === false, 'package proof is for another source head');
   check(proof.details.cleanup && proof.details.cleanup.stopped === true && proof.details.cleanup.released === true, 'package proof lacks a completed build cleanup');
   const artifacts = Array.isArray(proof.artifacts) ? proof.artifacts : [];
   const listed = suffix => artifacts.find(a => a && typeof a.path === 'string' && a.path.endsWith(suffix));
@@ -42,6 +45,19 @@ function verifyBinding({ record, discovered, listeners, identity }) {
   return { instanceId: record.instanceId, buildId: record.buildId, port: record.port, pid: identity.pid };
 }
 
+// The checkout may be ahead of the candidate by harness-only commits: the candidate must be an ancestor of this checkout and
+// every file changed since it must live under tests/desktop/. Anything else is product code the package was not built from.
+function harnessOnlyDelta(candidateHead, head, git = args => require('node:child_process').execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' })) {
+  if (candidateHead === head) return [];
+  let ancestor = true;
+  try { git(['merge-base', '--is-ancestor', candidateHead, head]); } catch { ancestor = false; }
+  check(ancestor, 'the candidate source is not an ancestor of the harness checkout');
+  const changed = git(['diff', '--name-only', candidateHead, head]).split('\n').filter(Boolean);
+  const foreign = changed.filter(file => !file.startsWith('tests/desktop/'));
+  check(foreign.length === 0, 'the checkout differs from the candidate source outside tests/desktop: ' + foreign.slice(0, 5).join(', '));
+  return changed;
+}
+
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
 async function openCandidate(config, deps = {}) {
@@ -51,7 +67,8 @@ async function openCandidate(config, deps = {}) {
   const McpClient = deps.McpClient || require('../../mcp-parity/mcp-client.cjs').McpClient;
   const source = identityLib.sourceIdentity(), build = identityLib.buildIdentity();
   check(!source.dirty, 'clean committed source required');
-  check(config.sourceSha === undefined || config.sourceSha === source.head, 'source head differs from the frozen source');
+  const candidateHead = config.sourceSha === undefined ? source.head : config.sourceSha;
+  const harnessDelta = harnessOnlyDelta(candidateHead, source.head, deps.git);
   const app = harness.packagedApp(config.app, runtime);
   const mcpBinary = path.join(app.bundle, 'Contents', 'MacOS', 'nemo-mcp');
   const mcpStat = fs.lstatSync(mcpBinary);
@@ -59,7 +76,7 @@ async function openCandidate(config, deps = {}) {
   const proofBytes = fs.readFileSync(config.buildProof);
   const proof = JSON.parse(proofBytes.toString('utf8'));
   const mcpSha = hash(mcpBinary);
-  verifyPackage({ proof, source, executableSha256: app.executableSha256, mcpSha256: mcpSha });
+  verifyPackage({ proof, source, candidateHead, executableSha256: app.executableSha256, mcpSha256: mcpSha });
   requireMcpPinned(proof, mcpBinary);
   const taskId = config.taskId || 'installed-evidence-' + Date.now().toString(36) + '-' + crypto.randomBytes(3).toString('hex');
   check(!fs.existsSync(isolation.taskRoot(taskId)), 'a fresh isolated data directory is required: this task id already has one');
@@ -83,12 +100,17 @@ async function openCandidate(config, deps = {}) {
     harness.validateSnapshot(status.value, instance, { isolation, runtime, source, build, app });
     const snapshot = status.value, pid = snapshot.app.pid;
     const registry = path.join(snapshot.runtime.roots.tauriDataDir, 'mcp');
-    check(fs.existsSync(registry), 'the candidate has not registered its MCP endpoint');
+    // The app registers its endpoint when its main window calls nemo_mcp_ready (src-tauri/src/application_mcp.rs), which is after the
+    // launcher already reports the process up: wait for the one record the app writes, bounded, and refuse when it never comes.
+    const deadline = Date.now() + (config.registryWaitMs === undefined ? 90_000 : config.registryWaitMs);
+    const registered = () => { try { return fs.readdirSync(registry).length > 0; } catch { return false; } };
+    while (!registered() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 250));
+    check(registered(), 'the candidate has not registered its MCP endpoint');
     client = new McpClient(mcpBinary, [], { NEMO_MCP_REGISTRY: registry });
     const init = await client.initialize();
     check(init && init.result && init.result.protocolVersion, 'bundled nemo-mcp did not initialize');
     const { structured } = require('../cs7-read.cjs');
-    const identity = { pid, sourceHead: source.head, appVersion: snapshot.app.appVersion };
+    const identity = { pid, sourceHead: candidateHead, appVersion: snapshot.app.appVersion };
     async function bind() {
       const record = readRegistration(fs.realpathSync(registry));
       const found = structured(await client.callTool('nemo_discover', {}));
@@ -110,7 +132,7 @@ async function openCandidate(config, deps = {}) {
         check(now.instanceId === bound.instanceId && now.buildId === bound.buildId, 'candidate instance changed during the run');
         return now;
       },
-      identity: { sourceHead: source.head, tree: tree(), appVersion: snapshot.app.appVersion, buildId: bound.buildId, instanceId: bound.instanceId, pid, taskId,
+      identity: { sourceHead: candidateHead, harnessHead: source.head, harnessFiles: harnessDelta, tree: tree(), appVersion: snapshot.app.appVersion, buildId: bound.buildId, instanceId: bound.instanceId, pid, taskId,
         executableSha256: app.executableSha256, mcpSha256: mcpSha, proofSha256: sha256(proofBytes), app: path.basename(app.bundle) },
     };
   } catch (error) {
@@ -122,4 +144,4 @@ function tree() {
   try { return require('node:child_process').execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { return null; }
 }
 
-module.exports = { verifyPackage, verifyBinding, openCandidate };
+module.exports = { verifyPackage, verifyBinding, harnessOnlyDelta, openCandidate };

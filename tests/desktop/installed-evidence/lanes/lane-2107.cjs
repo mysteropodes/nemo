@@ -5,6 +5,10 @@ const K = require('../kit.cjs');
 const probe = require('../png-probe.cjs');
 
 const RED = [0.9, 0.2, 0.2, 1], BLUE = [0, 0.27, 0.8, 1], GREEN_HALF = [0.1, 0.6, 0.2, 0.5];
+// A locked Drawing layer and a layer with an active path effect are refused with the owner's `unavailable` code, by contract:
+// native-engine/src/object_vector_edit.rs check_drawing_layer returns DispatchErrorCode::Unavailable for both, and
+// capabilities-v2/native-object-vector.json lists unavailable in commonErrorCodes and names both cases as typed refusals.
+const LAYER_REFUSAL = ['unavailable'];
 const pts = object => object.geometry.segments.map(s => [s.point.x, s.point.y]);
 const around = (ctx, kind, id, bounds, expected, tol) => ctx.near(kind, id, bounds && bounds.box, expected, tol);
 
@@ -40,8 +44,8 @@ const rows = [
       ctx.near('pixel', 'rectangle interior is the fill colour', probe.over(scene.image, 90, 80), [230, 51, 51], 8);
       ctx.near('pixel', 'open path centre is the stroke colour', probe.over(scene.image, 310, 110), [0, 69, 204], 14);
       ctx.near('pixel', 'half-alpha fill composites to half coverage', probe.over(scene.image, 525, 90), [140, 204, 153], 12);
-      ctx.near('pixel', 'half-alpha fill alpha', probe.alphaAt(scene.image, 525, 90), 128, 6);
-      ctx.eq('pixel', 'outside the artwork is transparent', [probe.alphaAt(scene.image, 5, 5), probe.alphaAt(scene.image, 300, 300)], [0, 0]);
+      ctx.near('pixel', 'half-alpha fill alpha, recovered from the composite over the background', probe.paintAlphaAt(scene.image, 525, 90, [26, 153, 51]), 128, 6);
+      ctx.eq('pixel', 'outside the artwork is the canvas background', [probe.distanceAt(scene.image, 5, 5), probe.distanceAt(scene.image, 300, 300)], [0, 0]);
       const trip = await K.roundTrip(ctx, 'vector', scene);
       const saved = K.objectStrokeIds(trip.first.document);
       ctx.ok('file', 'saved project holds every created stroke', [a, b, c].every(id => saved.includes(id)), saved, [a, b, c]);
@@ -74,7 +78,7 @@ const rows = [
       ctx.near('pixel', 'stroke-first: the fill paints over the inner half of the stroke', probe.over(scene.image, 46, 90), [26, 179, 77], 14);
       ctx.near('pixel', 'fill-first: the stroke paints over the fill edge', probe.over(scene.image, 266, 90), [0, 69, 204], 14);
       let inked = 0, total = 0;
-      for (let x = 60; x < 280; x++) { total++; if (probe.alphaAt(scene.image, x, 190) > 128) inked++; }
+      for (let x = 60; x < 280; x++) { total++; if (probe.distanceAt(scene.image, x, 190) > 128) inked++; }
       ctx.within('pixel', 'the dash pattern 12 on / 8 off leaves about 60% of the line inked', inked / total, 0.45, 0.75);
       const top = box => probe.inkBounds(scene.image, { box }).box[1];
       ctx.ok('pixel', 'a miter join reaches farther than a bevel join at the same corner', top([0, 230, 180, 359]) < top([180, 230, 340, 359]) - 4, [top([0, 230, 180, 359]), top([180, 230, 340, 359])]);
@@ -123,7 +127,7 @@ const rows = [
       const now = await ctx.wire.discover();
       await K.apply(ctx, 'delete with a stale expected revision', P.vectorDelete(tgt), { refused: true, codes: ['stale_revision'], send: { expectedRevision: now.contentRevision - 1 } });
       await K.apply(ctx, 'lock the layer', P.layerPolicy(layerUid, 'locked', true));
-      await K.apply(ctx, 'create on a locked layer', P.vectorCreate(P.vectorRecord({ layerUid, segments: P.rectSegments(300, 200, 360, 260), fill: RED })), { refused: true });
+      await K.apply(ctx, 'create on a locked layer', P.vectorCreate(P.vectorRecord({ layerUid, segments: P.rectSegments(300, 200, 360, 260), fill: RED })), { refused: true, codes: LAYER_REFUSAL });
       const e6 = await K.exportPng(ctx, 'after-refusals');
       ctx.eq('pixel', 'refusals leave the export untouched', e6.digest, e1.digest);
     } },
@@ -151,8 +155,8 @@ const rows = [
       const r3 = await K.readObject(ctx, tgt), e3 = await K.exportPng(ctx, 'p3');
       ctx.eq('read', 'corner radius is stored', [r3.object.vectorExt.paramShape.tl, r3.object.vectorExt.paramShape.br], [20, 20]);
       ctx.ok('read', 'rounded outline has more anchors than the rectangle', r3.object.geometry.segments.length > 4, r3.object.geometry.segments.length, '>4');
-      ctx.ok('pixel', 'the corner pixel is no longer inked', probe.alphaAt(e3.image, 141, 131) < 40, probe.alphaAt(e3.image, 141, 131), '<40');
-      ctx.ok('pixel', 'the middle edge is still inked', probe.alphaAt(e3.image, 340, 131) > 200, probe.alphaAt(e3.image, 340, 131), '>200');
+      ctx.ok('pixel', 'the corner pixel is no longer inked', probe.distanceAt(e3.image, 141, 131) < 40, probe.distanceAt(e3.image, 141, 131), '<40');
+      ctx.ok('pixel', 'the middle edge is still inked', probe.distanceAt(e3.image, 340, 131) > 64, probe.distanceAt(e3.image, 340, 131), '>64');
       around(ctx, 'pixel', 'rounded shape keeps its bounds', probe.inkBounds(e3.image), [140, 130, 540, 180], 2);
       await K.step(ctx, 'undo the radius', 'undo');
       const r4 = await K.readObject(ctx, tgt), e4 = await K.exportPng(ctx, 'p4');
@@ -190,7 +194,7 @@ const rows = [
       const e4 = await K.exportPng(ctx, 'x4');
       ctx.eq('pixel', 'a disabled effect contributes nothing: equals the zigzag-only export', e4.digest, e1.digest);
       await K.apply(ctx, 'set the same stack again', P.pathEffects(layerUid, [zig, { ...rough, enabled: false }]), { noop: true });
-      await K.apply(ctx, 'vector create on a layer with an active effect', P.vectorCreate(P.vectorRecord({ layerUid, segments: P.rectSegments(10, 10, 40, 40), fill: RED })), { refused: true });
+      await K.apply(ctx, 'vector create on a layer with an active effect', P.vectorCreate(P.vectorRecord({ layerUid, segments: P.rectSegments(10, 10, 40, 40), fill: RED })), { refused: true, codes: LAYER_REFUSAL });
       const trip = await K.roundTrip(ctx, 'effects', e4);
       ctx.ok('file', 'saved project keeps the ordered stack', JSON.stringify(trip.first.document).includes('"roughen"') && JSON.stringify(trip.first.document).includes('"zigzag"'), 'pathFx present');
       await K.apply(ctx, 'remove all effects', P.pathEffects(layerUid, []));

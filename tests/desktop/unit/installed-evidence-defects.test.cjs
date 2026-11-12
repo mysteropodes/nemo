@@ -147,7 +147,7 @@ test('an oversize control is a valid PNG past the size cap (a header with no pix
   const ctx = K.createContext({ wire, work, rowId: 'x' });
   await K.fresh(ctx);
   const attach = (file, opts) => K.apply(ctx, 'attach', () => K.pinned(ctx, ({ pin, lifecycleGeneration }) => P.assetAttach({ pin, name: 'n', path: file, lifecycleGeneration })), opts);
-  await attach(K.stage(ctx, 'big.png', K.oversizePng()), { refused: true });
+  await attach(K.stage(ctx, 'big.png', K.oversizePng()), { refused: true, codes: ['unavailable'] });
   await attach(K.stage(ctx, 'ok.png', K.solidPng(8192, 1, [1, 2, 3, 255])));
   await attach(path.join(work, 'missing.png'), { refused: true, codes: ['unavailable'], details: e => e.details.disposition === 'notDispatched' && /image source/.test(e.message) });
   await assert.rejects(attach(path.join(work, 'missing.png'), { refused: true }), /typed owner refusal/, 'the default owner codes do not accept an unavailable source');
@@ -235,4 +235,61 @@ test('flatten is judged on the saved project: members and group id consumed, a r
   assert.equal(noop.verdict, 'fail');
   assert.match(noop.reason, /flatten consumed the members/);
   assert.ok(noop.assertions.some(a => /flatten the group: exactly one history entry/.test(a.id) && a.verdict === 'pass'), 'the revision and history bump alone looked fine');
+});
+
+// ---- the pin and the layer order on an object project (real reply shapes seen on the packaged candidate) -------------------------
+test('an object project refuses the opacity-document queries: the pin comes from the presentation view and the layer order from the saved project', async t => {
+  const { wire, work, app } = setup(t);
+  const ctx = K.createContext({ wire, work, rowId: 'x' });
+  await K.fresh(ctx);
+  for (const operation of ['query.document.snapshot.acquire', 'query.document.serialize', 'query.document.evaluate']) {
+    const refused = await wire.query(operation, { atRevision: 0 });
+    assert.equal(refused.ok, false);
+    assert.deepEqual([refused.error.code, refused.error.message], ['invalid_request', 'Unsupported object read operation.'], operation);
+  }
+  const { revision, pin } = await K.pinNow(ctx);
+  assert.equal(revision, 0);
+  assert.equal(typeof pin, 'string');
+  assert.deepEqual(await K.layerOrder(ctx), ['L1']);
+  assert.ok(app);
+});
+
+test('a save refused once as unavailable right after a change is retried and the refusal stays on record', async t => {
+  const { wire, work } = setup(t, { saveRace: true });
+  const ctx = K.createContext({ wire, work, rowId: 'x' });
+  const { layerUid } = await K.fresh(ctx);
+  await K.apply(ctx, 'create', rect(layerUid, 0, 0, 10, 10));
+  const saved = await K.saveAs(ctx, 'race');
+  assert.ok(saved.document, 'the retried save wrote the file');
+  const refused = ctx.assertions.filter(a => /save attempt 1 refused as unavailable \(pin-changed-before-picker\)/.test(a.id));
+  assert.equal(refused.length, 1);
+});
+
+test('file names never repeat across rows: two contexts of one run do not share a counter', () => {
+  const a = K.createContext({ wire: null, work: '/w', rowId: 'a' }), b = K.createContext({ wire: null, work: '/w', rowId: 'b' });
+  const seen = new Set([a.next(), a.next(), b.next(), b.next()]);
+  assert.equal(seen.size, 4);
+});
+
+test('a released project answers "No native project is open." with no document id: a typed refusal, not a foreign reply', async t => {
+  const { wire, work } = setup(t, { released: true });
+  await wire.discover();
+  const released = await wire.v1('project.saveAs', { path: path.join(work, 'x.json') });
+  assert.equal(released.ok, false);
+  assert.equal(released.error.message, 'No native project is open.');
+});
+
+test('a row marked last runs after every other selected row', async t => {
+  const { session } = setup(t, {});
+  const order = [];
+  const row = (id, last) => ({ ...mini(id, async ctx => { order.push(id); ctx.ok('read', 'x', true, true); }), ...(last ? { last: true } : {}) });
+  const results = await runRows({ rows: [row('first-last', true), row('second'), row('third')], session });
+  assert.deepEqual(order, ['second', 'third', 'first-last']);
+  assert.deepEqual(results.map(r => r.id), order);
+});
+
+test('an app that asks to be reopened leaves the row unrun with that reason, not failed', async t => {
+  const result = await verdict(t, { unconfirmed: true }, mini('blocked', async ctx => { await K.fresh(ctx); }));
+  assert.equal(result.verdict, 'unrun');
+  assert.match(result.reason, /blocked: the app asks to be reopened/);
 });

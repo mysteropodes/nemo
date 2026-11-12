@@ -63,6 +63,7 @@ const assetAttach = ({ pin, name, path, lifecycleGeneration, placement = { kind:
   operation: OBJ + 'asset.attach', payload: { documentSnapshotId: pin, name, mediaType: 'image/png', source: { kind: 'file', path }, lifecycleGeneration, placement } });
 const assetRemove = (pin, assetId) => ({ operation: OBJ + 'asset.remove', payload: { documentSnapshotId: pin, assetId } });
 const ITEM = OBJ + 'item.edit';
+const rasterDelete = stableTarget => ({ operation: ITEM, payload: { command: 'object.raster.delete', stableTarget } });
 const rasterMove = (stableTarget, x, y) => ({ operation: ITEM, payload: { command: 'object.raster.move', stableTarget, x, y } });
 const rasterResize = (stableTarget, width, height) => ({ operation: ITEM, payload: { command: 'object.raster.resize', stableTarget, width, height } });
 const rasterRotate = (stableTarget, rotation) => ({ operation: ITEM, payload: { command: 'object.raster.rotate', stableTarget, rotation } });
@@ -99,13 +100,13 @@ const presentationRead = revision => ({ operation: QOBJ, payload: { atRevision: 
 const meshQuery = (revision, pin, { contextId, layerUid, frame, workId, viewGeneration, page }) => ({ operation: QOBJ,
   payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'imageMesh', contextId, layerUid, frame, workId, viewGeneration, page } } });
 const propertyMetadata = (revision, pin, layerUid) => ({ operation: 'query.document.object.property.metadata', payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'properties', target: { contextId: ROOT, layerUid }, offset: 0, limit: 8 } } });
-const snapshotAcquire = () => ({ operation: 'query.document.snapshot.acquire', payload: {} });
 const historyRead = (revision, pin) => ({ operation: QOBJ + '.history', payload: { atRevision: revision, documentSnapshotId: pin } });
-const evaluate = (revision, frame = 0) => ({ operation: 'query.document.evaluate', payload: { atRevision: revision, contextId: ROOT, frame } });
-const serialize = revision => ({ operation: 'query.document.serialize', payload: { atRevision: revision } });
+// The layer's own sample of a property (rawSample view of query.document.object.property.read) at a frame, pinned.
+const propertyRead = (revision, pin, layerUid, property, frame = 0) => ({ operation: 'query.document.object.property.read',
+  payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'rawSample', target: { contextId: ROOT, layerUid }, property, frame } } });
 
 module.exports = { OBJ, ROOT, target, seg, rectSegments, solid, vectorRecord, vectorCreate, vectorReplace, vectorDelete, parametricSet, parametricTranslate, parametricScale,
   pathEffects, layerPolicy, undo, redo, groupCreate, groupUngroup, groupCombine, groupMode, groupRename, groupMemberRemove, booleanApply, booleanErase, booleanFlatten,
   layerCreate, layerDuplicate, layerRename, layerReorder, layerDelete, layerVisibility, layerSplit, selectionDelete, selectionDuplicate, clipboardCopy, clipboardCut, clipboardPaste,
-  assetAttach, assetRemove, rasterMove, rasterResize, rasterRotate, rasterOpacity, textBlock, textCreate, textEdit, textDelete, textTargets, textInspect, textBody,
-  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, propertyMetadata, meshAttach, meshSetOffset, presentationRead, meshQuery, snapshotAcquire, historyRead, evaluate, serialize };
+  assetAttach, assetRemove, rasterDelete, rasterMove, rasterResize, rasterRotate, rasterOpacity, textBlock, textCreate, textEdit, textDelete, textTargets, textInspect, textBody,
+  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, propertyMetadata, meshAttach, meshSetOffset, presentationRead, meshQuery, historyRead, propertyRead };

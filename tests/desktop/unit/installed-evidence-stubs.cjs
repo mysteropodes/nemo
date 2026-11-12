@@ -79,10 +79,15 @@ function createStubApp(options = {}) {
     return mesh ? mesh.outline.map(([x, y], i) => [x + mesh.offsets[i][0], y + mesh.offsets[i][1]]) : null;
   }
   function render(doc) {
-    const image = png.canvas(doc.w, doc.h, [0, 0, 0, 0]);
+    // The real export is opaque: the canvas background (#ffffff) is painted under everything and fills composite over it.
+    const image = png.canvas(doc.w, doc.h, [255, 255, 255, 255]);
     for (const s of doc.strokes) {
       const { x0, y0, x1, y1 } = bounds(s.record.geometry.segments), fill = s.record.fill;
-      if (fill) png.fillRect(image, x0, y0, x1 - x0, y1 - y0, [Math.round(fill.r * 255), Math.round(fill.g * 255), Math.round(fill.b * 255), Math.round(fill.a * 255)]);
+      if (!fill) continue;
+      const c = [fill.r, fill.g, fill.b].map(v => Math.round(v * 255)), a = fill.a;
+      for (let y = Math.max(0, Math.round(y0)); y < Math.min(doc.h, Math.round(y1)); y++) for (let x = Math.max(0, Math.round(x0)); x < Math.min(doc.w, Math.round(x1)); x++) {
+        png.fillRect(image, x, y, 1, 1, c.map(v => Math.round(v * a + 255 * (1 - a))));
+      }
     }
     for (const r of doc.rasters) {
       const asset = doc.assets.find(a => a.id === r.assetId), polygon = flags.meshNeverBound ? null : meshPolygon(doc, r);
@@ -95,16 +100,16 @@ function createStubApp(options = {}) {
     return png.encodeRGBA(doc.w, doc.h, image.rgba);
   }
   const fileOf = doc => ({ format: 'stub', w: doc.w, h: doc.h, layers: doc.layers,
-    drawing: { objects: doc.strokes.map(s => ({ target: { strokeId: s.id }, layerUid: s.layerUid, ...(s.groupId ? { groupId: s.groupId } : {}), record: s.record })),
+    drawing: { layers: doc.layers.map(l => ({ layerUid: l.layerUid, name: l.name })), objects: doc.strokes.map(s => ({ target: { strokeId: s.id }, layerUid: s.layerUid, ...(s.groupId ? { groupId: s.groupId } : {}), record: s.record })),
       items: { raster: doc.rasters.map(r => ({ target: { strokeId: r.id }, item: { layerUid: r.layerUid, x: r.x, y: r.y, width: r.width, height: r.height, assetId: r.assetId, ...(r.meshId ? { meshId: r.meshId } : {}) } })) } },
     assets: doc.assets, meshes: doc.meshes });
 
   function decodePng(bytes) {
+    // Corrupt bytes are a decode failure whatever their header says; only a PNG that decodes can be too large.
     try {
-      const header = bytes.length >= 24 && bytes.subarray(1, 4).toString('latin1') === 'PNG' ? { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) } : null;
-      if (!header) return { error: 'corrupt' };
-      if (header.width > MAX_DIMENSION || header.height > MAX_DIMENSION) return { error: 'too large', ...header };
       const image = png.decode(bytes);
+      const header = { width: image.width, height: image.height };
+      if (header.width > MAX_DIMENSION || header.height > MAX_DIMENSION) return { error: 'too large', ...header };
       const at = (u, v) => png.pixelAt(image, Math.floor(image.width * u), Math.floor(image.height * v));
       return { ...header, colors: [at(0.25, 0.25), at(0.75, 0.25), at(0.25, 0.75), at(0.75, 0.75)] };
     } catch { return { error: 'corrupt' }; }
@@ -112,13 +117,18 @@ function createStubApp(options = {}) {
 
   function v1(request) {
     const p = request.payload;
+    if (request.operation === 'project.new' && flags.unconfirmed) return refuse(1, request, 'unavailable', 'The new project was not created. App notice: Native project state is unconfirmed. Reopen Nemo before continuing.');
     if (request.operation === 'project.new') {
       if (state.dirty) return refuse(1, request, 'unsaved_changes', 'The open project has unsaved changes; save it first.');
       state.doc = newDoc(p.canvasW, p.canvasH); state.dirty = false; state.generation++; state.brushes = {};
       return ok(1, request, { documentId: state.doc.id, contentRevision: 0, layers: state.doc.layers.map(l => ({ ...l })) });
     }
+    // Real reply seen on the installed app once a failed command had left the project released.
+    if (flags.released) return { apiVersion: 1, requestId: request.requestId, instanceId: request.instanceId, documentId: '', ok: false, revision: 0, error: { code: 'unavailable', message: 'No native project is open.' } };
     if (!state.doc || request.documentId !== state.doc.id || request.expectedRevision !== state.doc.rev) return refuse(1, request, 'stale_revision', 'Read a current snapshot.');
     if (request.operation === 'project.saveAs') {
+      // Observed on the installed app: the first save after a change is refused as unavailable, the next one is accepted.
+      if (flags.saveRace && state.raceRev !== state.doc.rev) { state.raceRev = state.doc.rev; return refuse(1, request, 'unavailable', 'The project was not saved (refused: pin-changed-before-picker). App notice: Save cancelled or unavailable. Choose a new file path.'); }
       fs.writeFileSync(p.path, JSON.stringify(fileOf(state.doc)));
       state.dirty = false; return ok(1, request, { path: p.path });
     }
@@ -148,11 +158,12 @@ function createStubApp(options = {}) {
     if (!doc || request.documentId !== doc.id) return refuse(2, request, 'wrong_document', 'wrong document');
     if (op.startsWith('command.') && request.expectedRevision !== doc.rev) return refuse(2, request, 'stale_revision', 'stale');
     switch (op) {
-      case 'query.document.snapshot.acquire': return ok(2, request, { atRevision: doc.rev, documentSnapshotId: snapshotId() });
+      // Real reply of the installed object owner (observed on the packaged candidate): the opacity-document queries are refused.
+      case 'query.document.snapshot.acquire': case 'query.document.serialize': case 'query.document.evaluate':
+        return { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId, documentId: doc.id, contentRevision: doc.rev, ok: false, error: { code: 'invalid_request', message: 'Unsupported object read operation.' } };
       case 'query.document.object.history':
         if (p.documentSnapshotId !== snapshotId()) return ownerRefusal(request, 'invalid_request', 'pin-changed');
         return ok(2, request, { atRevision: doc.rev, documentSnapshotId: snapshotId(), undoDepth: doc.undo.length, redoDepth: doc.redo.length, offset: 0, entries: [] });
-      case 'query.document.serialize': return ok(2, request, { atRevision: doc.rev, document: { layers: doc.layers.map(l => ({ layerUid: l.layerUid })) } });
       case 'query.document.object': return objectQuery(request, doc, p);
       case 'command.document.object.vector.edit': return vectorEdit(request, doc, p);
       case 'command.document.object.undo': case 'command.document.object.redo': {
@@ -187,6 +198,13 @@ function createStubApp(options = {}) {
         if (!doc.layers.some(l => l.layerUid === uid)) return ownerRefusal(request, 'not_found', 'unknown layer');
         commit(doc, 'layer delete', () => { doc.layers = doc.layers.filter(l => l.layerUid !== uid); doc.rasters = doc.rasters.filter(r => r.layerUid !== uid); doc.strokes = doc.strokes.filter(s => s.layerUid !== uid); });
         return ok(2, request, receipt());
+      }
+      case 'command.document.object.item.edit': {
+        if (p.command !== 'object.raster.delete') return refuse(2, request, 'invalid_request', 'unsupported item edit');
+        const id = p.stableTarget.strokeId;
+        if (!doc.rasters.some(r => r.id === id)) return ownerRefusal(request, 'not_found', 'unknown raster');
+        commit(doc, 'raster delete', () => { doc.rasters = doc.rasters.filter(r => r.id !== id); });
+        return ok(2, request, receipt({ operation: 'raster.delete', strokeId: id }));
       }
       case 'command.document.object.asset.attach': return assetAttach(request, doc, p);
       case 'command.document.object.asset.remove': {
@@ -251,7 +269,8 @@ function createStubApp(options = {}) {
       return refuse(2, request, 'unavailable', 'native image source unavailable', { disposition: 'notDispatched', committed: false, retryExecution: true });
     }
     const decoded = decodePng(bytes);
-    if (decoded.error) return ownerRefusal(request, 'invalid_request', 'image refused: ' + decoded.error);
+    // Observed on the installed app: a corrupt PNG is invalid_request, a decodable PNG past the size cap is unavailable (image_too_large).
+    if (decoded.error) return ownerRefusal(request, decoded.error === 'too large' ? 'unavailable' : 'invalid_request', 'Native image import refused.');
     const sha = require('node:crypto').createHash('sha256').update(bytes).digest('hex');
     let asset = doc.assets.find(a => a.sha === sha);
     let result;

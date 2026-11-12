@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { verifyPackage, verifyBinding } = require('../installed-evidence/candidate.cjs');
+const { verifyPackage, verifyBinding, harnessOnlyDelta } = require('../installed-evidence/candidate.cjs');
 const { main, cli, parse, refusalReason } = require('../installed-evidence/run.cjs');
 const K = require('../installed-evidence/kit.cjs');
 const P = require('../installed-evidence/payloads.cjs');
@@ -152,4 +152,21 @@ test('running one row of a larger catalog exits 5 (subset-pass) and says so on s
   assert.deepEqual([line.verdict, line.selection.rows, line.selection.omitted, line.selection.catalogRows], ['subset-pass', 1, 1, { 9001: 2 }]);
   const whole = fixture(t, { rows: catalog });
   assert.deepEqual([(await main(whole.config, whole.deps)).exit], [0]);
+});
+
+test('harness-only delta: a checkout ahead of the candidate is admitted only for tests/desktop files and only as a descendant', () => {
+  const A = 'a'.repeat(40), B = 'b'.repeat(40);
+  const git = (files, ancestor = true) => args => {
+    if (args[0] === 'merge-base') { if (!ancestor) throw new Error('not an ancestor'); return ''; }
+    return files.join('\n') + '\n';
+  };
+  assert.deepEqual(harnessOnlyDelta(A, A, () => { throw new Error('no git call when equal'); }), []);
+  assert.deepEqual(harnessOnlyDelta(A, B, git(['tests/desktop/installed-evidence/candidate.cjs', 'tests/desktop/unit/x.test.cjs'])), ['tests/desktop/installed-evidence/candidate.cjs', 'tests/desktop/unit/x.test.cjs']);
+  refuses(() => harnessOnlyDelta(A, B, git(['tests/desktop/a.cjs', 'src/js/app.js'])), /outside tests\/desktop: src\/js\/app.js/);
+  refuses(() => harnessOnlyDelta(A, B, git([], false)), /not an ancestor/);
+  // a prefix look-alike is not under tests/desktop/
+  refuses(() => harnessOnlyDelta(A, B, git(['tests/desktop-extra/a.cjs'])), /outside tests\/desktop/);
+  // the package proof is for the CANDIDATE head, not for this checkout
+  assert.deepEqual(verifyPackage({ proof: proof(), source: source({ head: B }), candidateHead: HEAD, executableSha256: EXE, mcpSha256: MCP }), { executableSha256: EXE, mcpSha256: MCP });
+  refuses(() => verifyPackage({ proof: proof(), source: source({ head: B }), candidateHead: B, executableSha256: EXE, mcpSha256: MCP }), /another source head/);
 });

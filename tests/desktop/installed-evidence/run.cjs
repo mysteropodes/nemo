@@ -70,7 +70,7 @@ async function main(config, deps = {}) {
   write('installed-client-evidence.json', JSON.stringify(receipt, null, 2) + '\n');
   write('transcript.jsonl', transcript.map(entry => JSON.stringify(entry)).join('\n') + (transcript.length ? '\n' : ''));
   const exit = exitStatus(receipt.verdict);
-  (deps.stdout || process.stdout).write(JSON.stringify({ verdict: receipt.verdict, selection: { lanes: sel.lanes, rows: sel.rows.length, omitted: sel.omitted.length, catalogRows: sel.catalogRows }, totals: receipt.totals, uncoveredIds: Object.fromEntries(Object.entries(receipt.coverage).map(([lane, c]) => [lane, c.uncoveredIds])), cleanup, candidate: { sourceHead: receipt.candidate.sourceHead, buildId: receipt.candidate.buildId } }) + '\n');
+  (deps.stdout || process.stdout).write(JSON.stringify({ verdict: receipt.verdict, selection: { lanes: sel.lanes, rows: sel.rows.length, omitted: sel.omitted.length, catalogRows: sel.catalogRows }, totals: receipt.totals, uncoveredIds: Object.fromEntries(Object.entries(receipt.coverage).map(([lane, c]) => [lane, c.uncoveredIds])), cleanup, candidate: { sourceHead: receipt.candidate.sourceHead, harnessHead: receipt.candidate.harnessHead, buildId: receipt.candidate.buildId } }) + '\n');
   return { exit, receipt };
 }
 

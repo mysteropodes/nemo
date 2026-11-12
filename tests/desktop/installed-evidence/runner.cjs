@@ -46,7 +46,8 @@ const brief = error => String((error && error.message) || error).replace(/\s+/g,
 async function runRows({ rows, session, now = () => Date.now() }) {
   const results = [];
   let aborted = null;
-  for (const row of rows) {
+  // A row marked `last` can leave the app unusable (see its limitations): it runs after every other selected row.
+  for (const row of [...rows.filter(r => !r.last), ...rows.filter(r => r.last)]) {
     const base = { id: row.id, lane: row.lane, issue: row.issue, title: row.title, tasks: row.tasks || [], limitations: row.limitations || [] };
     if (aborted) { results.push({ ...base, verdict: 'unrun', reason: 'run aborted: ' + aborted, operations: [], assertions: [], ms: 0 }); continue; }
     const ctx = K.createContext({ wire: session.wire, work: session.work, rowId: row.id });
