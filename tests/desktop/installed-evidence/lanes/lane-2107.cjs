@@ -5,6 +5,10 @@ const K = require('../kit.cjs');
 const probe = require('../png-probe.cjs');
 
 const RED = [0.9, 0.2, 0.2, 1], BLUE = [0, 0.27, 0.8, 1], GREEN_HALF = [0.1, 0.6, 0.2, 0.5];
+// A locked Drawing layer and a layer with an active path effect are refused with the owner's `unavailable` code, by contract:
+// native-engine/src/object_vector_edit.rs check_drawing_layer returns DispatchErrorCode::Unavailable for both, and
+// capabilities-v2/native-object-vector.json lists unavailable in commonErrorCodes and names both cases as typed refusals.
+const LAYER_REFUSAL = ['unavailable'];
 const pts = object => object.geometry.segments.map(s => [s.point.x, s.point.y]);
 const around = (ctx, kind, id, bounds, expected, tol) => ctx.near(kind, id, bounds && bounds.box, expected, tol);
 
@@ -123,7 +127,7 @@ const rows = [
       const now = await ctx.wire.discover();
       await K.apply(ctx, 'delete with a stale expected revision', P.vectorDelete(tgt), { refused: true, codes: ['stale_revision'], send: { expectedRevision: now.contentRevision - 1 } });
       await K.apply(ctx, 'lock the layer', P.layerPolicy(layerUid, 'locked', true));
-      await K.apply(ctx, 'create on a locked layer', P.vectorCreate(P.vectorRecord({ layerUid, segments: P.rectSegments(300, 200, 360, 260), fill: RED })), { refused: true });
+      await K.apply(ctx, 'create on a locked layer', P.vectorCreate(P.vectorRecord({ layerUid, segments: P.rectSegments(300, 200, 360, 260), fill: RED })), { refused: true, codes: LAYER_REFUSAL });
       const e6 = await K.exportPng(ctx, 'after-refusals');
       ctx.eq('pixel', 'refusals leave the export untouched', e6.digest, e1.digest);
     } },
@@ -190,7 +194,7 @@ const rows = [
       const e4 = await K.exportPng(ctx, 'x4');
       ctx.eq('pixel', 'a disabled effect contributes nothing: equals the zigzag-only export', e4.digest, e1.digest);
       await K.apply(ctx, 'set the same stack again', P.pathEffects(layerUid, [zig, { ...rough, enabled: false }]), { noop: true });
-      await K.apply(ctx, 'vector create on a layer with an active effect', P.vectorCreate(P.vectorRecord({ layerUid, segments: P.rectSegments(10, 10, 40, 40), fill: RED })), { refused: true });
+      await K.apply(ctx, 'vector create on a layer with an active effect', P.vectorCreate(P.vectorRecord({ layerUid, segments: P.rectSegments(10, 10, 40, 40), fill: RED })), { refused: true, codes: LAYER_REFUSAL });
       const trip = await K.roundTrip(ctx, 'effects', e4);
       ctx.ok('file', 'saved project keeps the ordered stack', JSON.stringify(trip.first.document).includes('"roughen"') && JSON.stringify(trip.first.document).includes('"zigzag"'), 'pathFx present');
       await K.apply(ctx, 'remove all effects', P.pathEffects(layerUid, []));
