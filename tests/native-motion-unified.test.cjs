@@ -17,18 +17,18 @@ function harness(options = {}) {
   const keys = { A: [key(0, [0, 0]), key(10, [100, 0])], B: [key(0, [0, 0]), key(5, [10, 10])], ...options.keys };
   const sampled = { 'A@5': [50, 0], 'B@10': [20, 20], 'B@0': [0, 0], ...options.sampled };
   const path = (id, cx, cy) => ({ bounds: { center: { x: cx, y: cy } }, data: { strokeId: id, nativeLayerIndex: 0, nativeStableTarget: { contextId: 'scene-root', layerUid: 'L', strokeId: id } } });
-  const sel = options.single ? [path('A', 100, 100)] : [path('A', 100, 100), path('B', 200, 300)];
+  const sel = options.single ? [path('A', 100, 100)] : options.selection || [path('A', 100, 100), path('B', 200, 300)];
   const session = {
-    readProperty: async (selector) => { const v = selector.view; reads.push(v);
-      if (v.kind === 'authoredKeys') return { kind: 'authoredKeys', items: keys[v.target.strokeId] || [], nextOffset: null, trackPresent: true };
-      return { kind: 'rawSample', value: sampled[v.target.strokeId + '@' + v.frame], frame: v.frame }; },
+    readProperty: async (selector) => { const v = selector.view; reads.push(v); if (options.readGate) await options.readGate;
+      if (v.kind === 'authoredKeys') { const all = keys[v.target.strokeId] || [], items = all.slice(v.offset, v.offset + v.limit); return { kind: 'authoredKeys', items, nextOffset: v.offset + items.length < all.length ? v.offset + items.length : null, trackPresent: true }; }
+      return { kind: 'rawSample', value: sampled[v.target.strokeId + '@' + v.frame] || [v.frame, v.frame], frame: v.frame }; },
     editPropertyBatch: async (payload) => { batches.push(payload); return options.refuse ? { ok: true, result: { applied: false } } : { ok: true, result: { applied: true } }; } };
   const win = { state: { appMode: 'motion', playing: false, tool: 'select', activeLayerIdx: 0, selectedStrokeIndices: [] }, selectedPaths: sel, showToast: (t) => toasts.push(t),
     document: { getElementById: () => ({ contains: () => true }), createElementNS: (_n, tag) => el(tag), addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); } },
     NemoNativeSelectOverlay: { show: () => shows.push(1) },
     NemoSelectCanvasIntent: { presentedState: () => ({ pin, presentation }), pickContext: () => 'ctx', heldId: () => 'scene-root', worldPoint: (_w, x, y) => ({ x, y, perPixel: 1 }),
       reread: async (_w, paths) => ({ complete: true, paths }) },
-    NemoNativeObjectWidgetUI: { session: () => session, proofNow: () => ({ session, info: pin, selector: { contextId: 'scene-root', frame: 2 }, current: () => true }) },
+      NemoNativeObjectWidgetUI: { session: () => session, proofNow: () => ({ session, info: pin, selector: { contextId: 'scene-root', frame: 2 }, current: () => options.proofCurrent ? options.proofCurrent.value : true }) },
     NemoNativePresentationWait: { until: async () => true },
     NemoNativeMotionElement: { localDelta: async (_w, _i, _p, _f, world) => world.slice() } };
   Unified.install(win);
@@ -81,4 +81,51 @@ test('a press away from the dots, a click, Escape and a refused batch write noth
   const r = harness({ refuse: true }); r.paint(); await settle();
   r.fire('pointerdown', r.ev(150, 200)); r.fire('pointermove', r.ev(170, 200)); r.fire('pointerup', r.ev(170, 200)); await settle();
   assert.equal(r.batches.length, 1); assert.deepEqual(r.toasts, []);
+});
+
+test('selection above the bounded target cap is explicitly unavailable, without drawing or writing', async () => {
+  const selection = Array.from({ length: 17 }, (_, i) => ({
+    bounds: { center: { x: i, y: i } },
+    data: { strokeId: `S${i}`, nativeLayerIndex: 0, nativeStableTarget: { contextId: 'scene-root', layerUid: 'L', strokeId: `S${i}` } }
+  }));
+  const h = harness({ selection });
+  h.paint(); await settle();
+  assert.deepEqual(h.toasts, ['Unified Motion path unavailable: select 16 or fewer elements.']);
+  assert.equal(h.paint().children.length, 0);
+  assert.equal(h.batches.length, 0);
+  assert.equal(h.reads.length, 0, 'the oversized selection is rejected before native reads');
+});
+
+test('an element whose authored Position keys exceed the bounded read pages is explicitly unavailable', async () => {
+  const tooMany = Array.from({ length: 33 }, (_, frame) => key(frame, [frame, 0]));
+  const h = harness({ keys: { A: tooMany } });
+  h.paint(); await settle();
+  assert.deepEqual(h.toasts, ['Unified Motion path unavailable: an element has more than 32 Position keys.']);
+  assert.equal(h.paint().children.length, 0);
+  assert.equal(h.batches.length, 0);
+  assert.equal(h.reads.filter((v) => v.kind === 'authoredKeys' && v.target.strokeId === 'A').length, 4, 'reads stop at the configured page bound');
+});
+
+test('a complete bounded read that exceeds the unified frame cap is explicitly unavailable', async () => {
+  const keys = {
+    A: Array.from({ length: 31 }, (_, frame) => key(frame, [frame, 0])),
+    B: Array.from({ length: 30 }, (_, frame) => key(frame + 31, [frame, 0]))
+  };
+  const h = harness({ keys });
+  h.paint(); await settle();
+  assert.deepEqual(h.toasts, ['Unified Motion path unavailable: this selection has more than 60 Position key frames.']);
+  assert.equal(h.paint().children.length, 0);
+  assert.equal(h.batches.length, 0);
+});
+
+test('a read that loses its presented owner never installs stale unified data or writes', async () => {
+  let release;
+  const proofCurrent = { value: true }, readGate = new Promise((resolve) => { release = resolve; });
+  const h = harness({ proofCurrent, readGate });
+  h.paint(); await tick();
+  proofCurrent.value = false;
+  release(); await settle();
+  assert.equal(h.paint().children.length, 0);
+  assert.deepEqual(h.toasts, []);
+  assert.equal(h.batches.length, 0);
 });

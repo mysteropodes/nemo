@@ -20,7 +20,7 @@
   var GONE = 'The document changed during the drag — nothing was changed.';
   var round = function (v) { return Math.round(v * 1e6) / 1e6; };
   var states = new WeakMap();
-  function st(win) { if (!states.has(win)) states.set(win, { key: '', data: null, loading: null, drag: null }); return states.get(win); }
+  function st(win) { if (!states.has(win)) states.set(win, { key: '', data: null, loading: null, drag: null, noticeKey: '' }); return states.get(win); }
   function notice(win, text) { if (typeof win.showToast === 'function') try { win.showToast(text, 'warn'); } catch (_) { /* presentation only */ } }
   function redraw(win) { var O = win.NemoNativeSelectOverlay; if (O && typeof O.show === 'function') try { O.show(win); } catch (_) { /* presentation only */ } }
   // The selected elements of ONE layer (two or more), in Motion with the Select tool; otherwise null.
@@ -37,29 +37,39 @@
   async function load(win, sel, shown) {
     var W = win.NemoNativeObjectWidgetUI, held = win.NemoSelectCanvasIntent.heldId(win), proof = W.proofNow(win, 'readProperty', held === 'scene-root' ? undefined : held);
     if (!proof || !proof.current(true) || PINS.some(function (k) { return proof.info[k] !== shown.pin[k]; })) return null;
+    if (sel.length > MAX_ELEMENTS) return { blocked: 'Unified Motion path unavailable: select 16 or fewer elements.' };
+    var current = function () { return proof.current(true) && PINS.every(function (k) { return proof.info[k] === shown.pin[k]; }); };
     var frame = proof.selector.frame, one = function (view) { return proof.session.readProperty({ instanceId: proof.info.instanceId, documentId: proof.info.documentId, atRevision: proof.info.contentRevision, documentSnapshotId: proof.info.documentSnapshotId, view: view }); };
     var seen = {}, targets = [];
     for (var i = 0; i < sel.length && targets.length < MAX_ELEMENTS; i++) {
       var t = sel[i].data.nativeStableTarget, id = t.strokeId;
       if (seen[id]) continue; seen[id] = true;
       var target = { contextId: proof.selector.contextId, layerUid: t.layerUid, strokeId: id }, keys = [];
+      var complete = false;
       for (var offset = 0, n = 0; n < MAX_PAGES; n++) {
         var page = await one({ kind: 'authoredKeys', target: target, property: 'position', offset: offset, limit: 8 });
+        if (!current()) return null;
         page.items.forEach(function (k) { keys.push(k); });
-        if (page.nextOffset === null || page.nextOffset === undefined) break;
+        if (page.nextOffset === null || page.nextOffset === undefined) { complete = true; break; }
         offset = page.nextOffset;
       }
+      if (!complete) return { blocked: 'Unified Motion path unavailable: an element has more than 32 Position keys.' };
       if (keys.length) targets.push({ target: target, keys: keys, idx: sel[i].data.nativeLayerIndex });
     }
     if (targets.length < 2) return null;
     var set = {}; targets.forEach(function (x) { x.keys.forEach(function (k) { set[k.frame] = true; }); });
     var frames = Object.keys(set).map(Number).sort(function (a, b) { return a - b; });
-    if (frames.length > MAX_FRAMES) return null;
+    if (frames.length > MAX_FRAMES) return { blocked: 'Unified Motion path unavailable: this selection has more than 60 Position key frames.' };
     for (var j = 0; j < targets.length; j++) {
       var x = targets[j]; x.values = {};
       for (var f = 0; f < frames.length; f++) {
         var own = x.keys.find(function (k) { return k.frame === frames[f]; });
-        x.values[frames[f]] = own ? { v: own.v.slice(), keyed: true } : { v: (await one({ kind: 'rawSample', target: x.target, property: 'position', frame: frames[f] })).value.slice(), keyed: false };
+        if (own) x.values[frames[f]] = { v: own.v.slice(), keyed: true };
+        else {
+          var sample = await one({ kind: 'rawSample', target: x.target, property: 'position', frame: frames[f] });
+          if (!current()) return null;
+          x.values[frames[f]] = { v: sample.value.slice(), keyed: false };
+        }
       }
     }
     var cx = 0, cy = 0; sel.forEach(function (p) { var c = p.bounds.center; cx += c.x; cy += c.y; }); cx /= sel.length; cy /= sel.length;
@@ -73,7 +83,11 @@
     var key = keyOf(win, sel, shown);
     if (key === s.key) return s.data;
     s.key = key; s.data = null;
-    var mine = s.loading = load(win, sel, shown).then(function (d) { if (s.loading === mine && s.key === key) { s.data = d; redraw(win); } }, function () { /* nothing to draw */ });
+    var mine = s.loading = load(win, sel, shown).then(function (d) { if (s.loading === mine && s.key === key) {
+      if (d && d.blocked) { if (s.noticeKey !== key) { s.noticeKey = key; notice(win, d.blocked); } s.data = null; }
+      else s.data = d;
+      redraw(win);
+    } }, function () { /* nothing to draw */ });
     return null;
   }
   function pointsOf(win, d) {
