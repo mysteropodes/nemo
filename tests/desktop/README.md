@@ -403,8 +403,13 @@ The identification rule is in `engineering/remediation/reference/03_TESTING_AND_
 
 ```sh
 lockf -k /tmp/nemo-heavy-job.lock node tests/desktop/installed-evidence/f03-clients.cjs \
-  --app /abs/Nemo.app --build-proof /abs/build-proof.json --report-dir /abs/empty-dir [--client codex,claude] [--timeout-min 20] [--task ID]
+  --app /abs/Nemo.app --build-proof /abs/build-proof.json --report-dir /abs/empty-dir [--client codex,claude] [--timeout-min 20] [--task ID] \
+  [--claude-model sonnet] [--codex-model NAME]
 ```
+
+**The model is pinned, not whatever the client defaults to.** `claude -p` is always run with an explicit `--model` (default `sonnet`,
+override with `--claude-model`); `codex exec` gets `--model` only when `--codex-model` is given. The receipt records the requested model next to
+the client version (`clients[].requestedModel`: the Claude model, or the Codex model / `client default`), and the recorded command line shows the flag.
 
 The prompt names goals and file paths only (no tool or operation names), so the client derives requests from the advertised schema.
 The harness stages the fixed fixture (`tests/animation/fixtures/curve-workflow.json`, pinned by hash, as the static and keyed shells of

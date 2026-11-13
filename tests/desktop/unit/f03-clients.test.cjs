@@ -173,3 +173,54 @@ test('running a client: bounded output, a time limit, and ENOENT becomes unavail
     '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__nemo__nemo_discover"}]}}', 'not json'].join('\n') }, null);
   assert.deepEqual(t.toolCalls, { nemo_command: 1, nemo_discover: 1 }); assert.deepEqual(t.errorCodesSeen, { stale_revision: 1 });
 });
+
+// ---- the model each client is asked to use ------------------------------------------------------------------------------------------
+test('Claude Code is always given an explicit --model (default sonnet, overridable); Codex only when the runner sets one', () => {
+  const base = { command: '/bin/x', mcpCommand: '/pkg/MacOS/nemo-mcp', mcpRegistry: '/iso/mcp', prompt: 'p', cwd: '/w/cwd', reportDir: '/r' };
+  const after = (args, flag) => args[args.indexOf(flag) + 1];
+  const claude = C.invocation('claude', base);
+  assert.equal(claude.args.filter(a => a === '--model').length, 1);
+  assert.equal(after(claude.args, '--model'), 'sonnet'); assert.equal(claude.model, 'sonnet');
+  assert.equal(claude.args.indexOf('-p'), 0, '-p stays first');
+  assert.equal(after(C.invocation('claude', { ...base, model: 'claude-sonnet-5-5' }).args, '--model'), 'claude-sonnet-5-5');
+  const codex = C.invocation('codex', base);
+  assert.ok(!codex.args.includes('--model') && !codex.args.includes('-m'), 'no model flag unless the runner sets one'); assert.equal(codex.model, 'client default');
+  const set = C.invocation('codex', { ...base, model: 'gpt-5-codex' });
+  assert.equal(after(set.args, '--model'), 'gpt-5-codex'); assert.equal(set.model, 'gpt-5-codex'); assert.equal(set.args.at(-1), '-');
+  assert.deepEqual([C.requestedModel('claude', {}), C.requestedModel('claude', { claudeModel: 'opus' }), C.requestedModel('codex', {}), C.requestedModel('codex', { codexModel: 'm1' })], ['sonnet', 'opus', 'client default', 'm1']);
+  for (const bad of ['', 'two words', '--flag', 'a;b', 7]) assert.equal(C.validModel(bad), false, String(bad));
+  for (const good of ['sonnet', 'claude-sonnet-5-5', 'opus[1m]', 'gpt-5.1-codex']) assert.equal(C.validModel(good), true, good);
+});
+
+test('the receipt records the requested model next to the client version, and the command line the clients were run with carries it', async () => {
+  const h = harness();
+  let out = await main(h.config, h.deps);
+  assert.equal(out.exit, 0);
+  const byName = Object.fromEntries(out.receipt.clients.map(c => [c.name, c]));
+  assert.deepEqual([byName.claude.version, byName.claude.requestedModel, byName.codex.version, byName.codex.requestedModel], ['9.9.9', 'sonnet', '9.9.9', 'client default']);
+  assert.deepEqual(byName.claude.argv.slice(0, 3), ['claude', '-p', '--model']); assert.equal(byName.claude.argv[3], 'sonnet');
+  assert.ok(!byName.codex.argv.includes('--model'));
+  const set = harness();
+  out = await main({ ...set.config, claudeModel: 'claude-sonnet-5-5', codexModel: 'gpt-5-codex' }, set.deps);
+  const named = Object.fromEntries(out.receipt.clients.map(c => [c.name, c]));
+  assert.deepEqual([named.claude.requestedModel, named.codex.requestedModel], ['claude-sonnet-5-5', 'gpt-5-codex']);
+  assert.equal(named.claude.argv[3], 'claude-sonnet-5-5'); assert.equal(named.codex.argv[named.codex.argv.indexOf('--model') + 1], 'gpt-5-codex');
+  assert.deepEqual(set.invoked.map(s => s.model), ['gpt-5-codex', 'claude-sonnet-5-5']);
+  // a client that is not there still records what it would have been asked to use
+  const missing = harness({ probe: { claude: { name: 'claude', available: false, reason: 'claude is not installed (not on PATH)' } } });
+  out = await main({ ...missing.config, claudeModel: 'opus' }, missing.deps);
+  assert.equal(out.receipt.clients.find(c => c.name === 'claude').requestedModel, 'opus');
+  // an invalid model refuses before anything starts
+  const fresh = harness();
+  for (const over of [{ claudeModel: 'not a model' }, { codexModel: '--oops' }]) {
+    const refused = await main({ ...fresh.config, ...over }, fresh.deps);
+    assert.deepEqual([refused.exit, refused.refused], [2, Object.keys(over)[0] + ' must be a model name']);
+  }
+  assert.equal(fresh.opened.length, 0, 'nothing was started');
+});
+
+test('the command line accepts --claude-model and --codex-model', () => {
+  assert.deepEqual(parse(['--app', '/a.app', '--build-proof', '/p', '--report-dir', '/r', '--claude-model', 'opus', '--codex-model', 'm1']), { app: '/a.app', buildProof: '/p', reportDir: '/r', claudeModel: 'opus', codexModel: 'm1' });
+  assert.throws(() => parse(['--claude-model']), /needs a value/);
+  assert.throws(() => parse(['--codex-model', '--client']), /needs a value/);
+});

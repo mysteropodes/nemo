@@ -11,6 +11,16 @@ const crypto = require('node:crypto');
 const { spawn, spawnSync } = require('node:child_process');
 
 const NAMES = Object.freeze(['codex', 'claude']);
+// The model each half is asked to use. Claude Code is always given an explicit `--model` (default `sonnet`, so the evidence does not depend on whatever the
+// installed client's own default is this month); the runner overrides it with the `claudeModel` option (`--claude-model`). Codex gets `--model` only when the runner
+// sets `codexModel` (`--codex-model`); otherwise it runs on its own configuration and the receipt says 'client default'.
+const DEFAULT_CLAUDE_MODEL = 'sonnet', CLIENT_DEFAULT = 'client default';
+const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:\/\[\]-]{0,63}$/;
+const validModel = value => typeof value === 'string' && MODEL.test(value);
+function requestedModel(name, config = {}) {
+  if (name === 'claude') return config.claudeModel === undefined ? DEFAULT_CLAUDE_MODEL : config.claudeModel;
+  return config.codexModel === undefined ? CLIENT_DEFAULT : config.codexModel;
+}
 const LIMIT = 8 * 1024 * 1024;
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const scrubbedEnv = (env = process.env) => Object.fromEntries(Object.entries(env).filter(([k, v]) => !/^NEMO_/.test(k) && typeof v === 'string'));
@@ -38,11 +48,13 @@ function probeClient(name, { env = process.env, run = spawnSync } = {}) {
 }
 
 // The command line, the standard input (the exact prompt) and the private files for one invocation. Pure.
-function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, reportDir, maxTurns = 80 }) {
+function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, reportDir, maxTurns = 80, model }) {
+  const asked = model === undefined ? requestedModel(name) : model;
   if (name === 'codex') {
     const lastMessage = path.join(reportDir, 'codex.last-message.txt');
     const set = (key, value) => ['-c', key + '=' + value];
-    return { command, input: prompt, cwd, lastMessage, files: {}, args: ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--cd', cwd,
+    return { command, input: prompt, cwd, lastMessage, model: asked, files: {}, args: ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--cd', cwd,
+      ...(asked === CLIENT_DEFAULT ? [] : ['--model', asked]),
       ...set('approval_policy', '"never"'),
       ...set('mcp_servers.nemo.command', JSON.stringify(mcpCommand)), ...set('mcp_servers.nemo.args', '[]'),
       ...set('mcp_servers.nemo.env.NEMO_MCP_REGISTRY', JSON.stringify(mcpRegistry)),
@@ -50,9 +62,9 @@ function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, repor
       '--output-last-message', lastMessage, '-'] };
   }
   const config = path.join(reportDir, 'claude.mcp-config.json');
-  return { command, input: prompt, cwd, lastMessage: null,
+  return { command, input: prompt, cwd, lastMessage: null, model: asked,
     files: { [config]: JSON.stringify({ mcpServers: { nemo: { command: mcpCommand, args: [], env: { NEMO_MCP_REGISTRY: mcpRegistry } } } }, null, 2) + '\n' },
-    args: ['-p', '--mcp-config', config, '--strict-mcp-config', '--tools', '', '--allowedTools', 'mcp__nemo__nemo_discover', 'mcp__nemo__nemo_command',
+    args: ['-p', '--model', asked, '--mcp-config', config, '--strict-mcp-config', '--tools', '', '--allowedTools', 'mcp__nemo__nemo_discover', 'mcp__nemo__nemo_command',
       '--output-format', 'stream-json', '--verbose', '--max-turns', String(maxTurns), '--no-session-persistence'] };
 }
 
@@ -117,4 +129,4 @@ function trace(result, lastMessageFile) {
   return { informational: true, toolCalls: calls, errorCodesSeen: codes, lastMessage: last === null ? null : String(last).slice(0, 4000) };
 }
 
-module.exports = { NAMES, scrubbedEnv, onPath, probeClient, invocation, runClient, classify, trace, digest };
+module.exports = { NAMES, DEFAULT_CLAUDE_MODEL, CLIENT_DEFAULT, validModel, requestedModel, scrubbedEnv, onPath, probeClient, invocation, runClient, classify, trace, digest };
