@@ -7,7 +7,8 @@
 //   apiVersion 2: query.document.object (view presentation, the snapshot pin), query.document.object.property.read (rawSample),
 //     query.document.object.history, command.document.object.property.edit (setValue), command.document.object.undo; the opacity-document
 //     operations (query.document.opacity, query.document.evaluate, query.document.snapshot.acquire, command.document.apply) are
-//     `invalid_request` "Unsupported object read operation." followed by the operation to use instead.
+//     `invalid_request` "Unsupported object read operation." followed by the operation to use instead. Redo (command.document.object.redo) moves the
+//     last undone entry back, one revision, history +1 / -1.
 // It can be made to misbehave. `scriptedClient` plays the part of an agent client by sending raw requests. Nothing here starts a process.
 const fs = require('node:fs');
 
@@ -76,6 +77,11 @@ function createApp(flags = {}) {
         if (req.expectedRevision !== doc.rev && !flags.acceptStale) return no(2, req, 'stale_revision', 'Property edit request refused.');
         doc.undo.push(doc.value); doc.redo = []; doc.value = p.action.values[0]; doc.keys = undefined; doc.rev += 1;
         return ok(2, req, { applied: true, historyEntriesAdded: 1 });
+      case 'command.document.object.redo': {
+        if (!doc.redo.length) return no(2, req, 'unavailable');
+        if (flags.redoIgnored) return ok(2, req, { applied: true, historyEntriesAdded: 0 }); // a product that says it redid and did nothing
+        doc.undo.push(doc.value); doc.value = doc.redo.pop(); doc.rev += 1; return ok(2, req, { applied: true, historyEntriesAdded: 0 });
+      }
       case 'command.document.object.undo': { if (!doc.undo.length) return no(2, req, 'unavailable'); doc.redo.push(doc.value); doc.value = doc.undo.pop(); doc.rev += 1; return ok(2, req, { applied: true, historyEntriesAdded: 0 }); }
       case 'query.document.opacity': case 'query.document.evaluate': case 'query.document.snapshot.acquire': case 'command.document.apply':
         return no(2, req, 'invalid_request', 'Unsupported object read operation. ' + req.operation + ' applies to opacity documents only; this is an object document. Use ' + INSTEAD[req.operation] + ' instead.');
@@ -99,25 +105,47 @@ function createApp(flags = {}) {
   };
 }
 
-// An agent, as raw requests: the workflow of the prompt, in the order of the prompt (the saved file is reopened after the keyed project
-// replaced it). `skip` plays a client that does nothing; `stop` ends it after that many steps.
-async function scriptedClient(app, files, { skip = false, stop = 99 } = {}) {
-  if (skip) return;
+// An agent session, as raw requests, written to a stream in the shape the real clients write (`format` 'claude': assistant tool_use blocks and user
+// tool_result blocks; 'codex': completed mcp_tool_call items). Session 1 works (set 40, set 60, save a copy, undo, redo, an out-of-date write) and leaves
+// the project open; session 2 continues from that state (undo, save, replace the project by the keyed one, a write against the replaced project, open the
+// saved file again); the identification session only reads. Only the first discovery is a call of the client; the others are the script's own plumbing.
+// `skip` plays a client that does nothing; `stop` ends it after that many steps; `skipRedo` leaves out the redo.
+async function scriptedClient(app, files, { session = 1, format = 'claude', skip = false, stop = 99, skipRedo = false, writeInIdentify = false } = {}) {
+  const lines = [], put = (tool, args, reply) => {
+    const text = JSON.stringify(reply);
+    if (format === 'codex') lines.push(JSON.stringify({ type: 'item.completed', item: { type: 'mcp_tool_call', server: 'nemo', tool, arguments: args, result: { content: [{ type: 'text', text }] } } }));
+    else { lines.push(JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'mcp__nemo__' + tool, input: args }] } })); lines.push(JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', content: text }] } })); }
+  };
+  const result = () => ({ stdout: lines.join('\n') + (lines.length ? '\n' : '') });
+  if (format === 'claude') lines.push(JSON.stringify({ type: 'system', subtype: 'init', model: 'claude-test-1' }));
+  if (skip) return result();
   let n = 0;
-  const status = async () => (await app.callTool('nemo_discover', {})).result.structuredContent.instances[0].nativeHostStatus;
+  const raw = async () => (await app.callTool('nemo_discover', {})).result.structuredContent;
+  const status = async () => (await raw()).instances[0].nativeHostStatus;
+  put('nemo_discover', {}, await raw());
   const send = async (v, operation, payload, extra = {}) => {
     const s = await status();
-    return (await app.callTool('nemo_command', { apiVersion: v, requestId: 'c' + (++n), instanceId: INSTANCE, documentId: s.documentId, expectedRevision: s.contentRevision, operation, payload, ...extra })).result.structuredContent;
+    const args = { apiVersion: v, requestId: 'c' + (++n), instanceId: INSTANCE, documentId: s.documentId, expectedRevision: s.contentRevision, operation, payload, ...extra };
+    const reply = (await app.callTool('nemo_command', args)).result.structuredContent;
+    put('nemo_command', args, reply);
+    return reply;
   };
   const set = (value, extra) => send(2, 'command.document.object.property.edit', { command: 'object.property.edit', target: { contextId: ROOT, layerUid: UID }, property: 'opacity', action: { kind: 'setValue', frame: 0, values: [value] } }, extra);
-  let before;
-  const steps = [
-    () => set(40), () => set(60), () => send(1, 'project.saveAs', { path: files.saved60 }), () => send(2, 'command.document.object.undo', { command: 'object.undo' }),
-    () => set(99, { expectedRevision: 0 }), () => send(1, 'project.saveAs', { path: files.saved }),
-    async () => { before = (await status()).documentId; await send(1, 'project.open', { path: files.keyed }); },
-    () => set(99, { documentId: before }), () => send(1, 'project.open', { path: files.saved }),
-  ];
+  const undo = () => send(2, 'command.document.object.undo', { command: 'object.undo' });
+  const redo = () => send(2, 'command.document.object.redo', { command: 'object.redo' });
+  let steps;
+  if (session === 'identify') steps = writeInIdentify ? [() => set(11)] : [];
+  else if (session === 1) {
+    const noted = (await status()).contentRevision;
+    steps = [() => set(40), () => set(60), () => send(1, 'project.saveAs', { path: files.saved60 }), undo, ...(skipRedo ? [] : [redo]), () => set(99, { expectedRevision: noted })];
+  } else {
+    let before;
+    steps = [undo, () => send(1, 'project.saveAs', { path: files.saved }),
+      async () => { before = (await status()).documentId; await send(1, 'project.open', { path: files.keyed }); },
+      () => set(99, { documentId: before }), () => send(1, 'project.open', { path: files.saved })];
+  }
   for (let i = 0; i < steps.length && i < stop; i++) await steps[i]();
+  return result();
 }
 
 module.exports = { createApp, scriptedClient, INSTANCE, BUILD, UID };

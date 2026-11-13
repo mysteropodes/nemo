@@ -48,10 +48,12 @@ function probeClient(name, { env = process.env, run = spawnSync } = {}) {
 }
 
 // The command line, the standard input (the exact prompt) and the private files for one invocation. Pure.
-function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, reportDir, maxTurns = 80, model }) {
+// `tag` names one invocation of several in the same report directory (a session of the workflow, the identification session); without it the
+// private files keep their plain names.
+function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, reportDir, maxTurns = 80, model, tag }) {
   const asked = model === undefined ? requestedModel(name) : model;
   if (name === 'codex') {
-    const lastMessage = path.join(reportDir, 'codex.last-message.txt');
+    const lastMessage = path.join(reportDir, tag ? 'codex.' + tag + '.last-message.txt' : 'codex.last-message.txt');
     const set = (key, value) => ['-c', key + '=' + value];
     return { command, input: prompt, cwd, lastMessage, model: asked, files: {}, args: ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--cd', cwd,
       ...(asked === CLIENT_DEFAULT ? [] : ['--model', asked]),
@@ -61,7 +63,7 @@ function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, repor
       ...set('mcp_servers.nemo.default_tools_approval_mode', '"approve"'), ...set('mcp_servers.nemo.startup_timeout_sec', '60'), ...set('mcp_servers.nemo.tool_timeout_sec', '300'),
       '--output-last-message', lastMessage, '-'] };
   }
-  const config = path.join(reportDir, 'claude.mcp-config.json');
+  const config = path.join(reportDir, tag ? 'claude.' + tag + '.mcp-config.json' : 'claude.mcp-config.json');
   return { command, input: prompt, cwd, lastMessage: null, model: asked,
     files: { [config]: JSON.stringify({ mcpServers: { nemo: { command: mcpCommand, args: [], env: { NEMO_MCP_REGISTRY: mcpRegistry } } } }, null, 2) + '\n' },
     args: ['-p', '--model', asked, '--mcp-config', config, '--strict-mcp-config', '--tools', '', '--allowedTools', 'mcp__nemo__nemo_discover', 'mcp__nemo__nemo_query', 'mcp__nemo__nemo_command',
@@ -106,27 +108,108 @@ function classify(result) {
 
 // Informational only: tool calls and application error codes the client's own event stream shows, and its last message.
 const CODES = ['stale_revision', 'wrong_document', 'wrong_instance', 'invalid_request', 'unavailable', 'unsupported_capability'];
-function trace(result, lastMessageFile) {
-  const calls = {}, codes = {};
-  let last = null;
-  const walk = value => {
-    if (Array.isArray(value)) return value.forEach(walk);
-    if (!value || typeof value !== 'object') return;
-    for (const key of ['name', 'tool']) {
-      const hit = typeof value[key] === 'string' ? value[key].match(/(nemo_(?:discover|query|command))$/) : null;
-      if (hit) calls[hit[1]] = (calls[hit[1]] || 0) + 1;
+const eventsOf = stdout => {
+  const out = [];
+  for (const line of String(stdout).split('\n')) {
+    if (!line.startsWith('{')) continue;
+    try { out.push(JSON.parse(line)); } catch { /* not an event */ }
+  }
+  return out;
+};
+const callOf = (tool, input) => {
+  const args = input && typeof input === 'object' ? input : {}, payload = args.payload && typeof args.payload === 'object' ? args.payload : {};
+  return { tool: 'nemo_' + tool, operation: typeof args.operation === 'string' ? args.operation : null, path: typeof payload.path === 'string' ? payload.path : null };
+};
+// The client's own MCP calls to the nemo server, in order, one entry per call, from its stream. Claude Code streams `tool_use` blocks in assistant
+// messages (tool `mcp__nemo__nemo_command`); Codex streams `mcp_tool_call` items (tool `nemo_command`), once started and once completed: only the
+// completed item counts. Calls to any other server or tool are not counted.
+function mcpCalls(stdout) {
+  const calls = [];
+  for (const e of eventsOf(stdout)) {
+    if (e.type === 'assistant' && e.message && Array.isArray(e.message.content)) {
+      for (const block of e.message.content) {
+        const hit = block && block.type === 'tool_use' && typeof block.name === 'string' ? block.name.match(/(?:^|__)nemo_(discover|query|command)$/) : null;
+        if (hit) calls.push(callOf(hit[1], block.input));
+      }
+    } else if (e.type === 'item.completed' && e.item && e.item.type === 'mcp_tool_call') {
+      const hit = typeof e.item.tool === 'string' && (e.item.server === undefined || e.item.server === 'nemo') ? e.item.tool.match(/^nemo_(discover|query|command)$/) : null;
+      if (hit) calls.push(callOf(hit[1], e.item.arguments));
     }
-    if (value.type === 'result' && typeof value.result === 'string') last = value.result;
-    Object.values(value).forEach(walk);
-  };
+  }
+  return calls;
+}
+// Calls per step. `steps` is [{n, label, match(call)}]: step 1 starts the session (no marker); each later step starts at the first call its `match`
+// accepts AFTER the previous step started, strictly in order, and owns every call until the next step starts. A client that skips or reorders a step
+// leaves its calls on the earlier step, so the totals are always right and the split is only as good as the client's order (informational).
+function stepCounts(calls, steps) {
+  const out = steps.map(step => ({ step: step.n, label: step.label, calls: 0, byTool: {} }));
+  let current = 0;
+  for (const call of calls) {
+    if (current + 1 < steps.length && steps[current + 1].match(call)) current++;
+    out[current].calls++; out[current].byTool[call.tool] = (out[current].byTool[call.tool] || 0) + 1;
+  }
+  return out;
+}
+// What the application told the client when it asked what is running: each `nemo_discover` answer in the stream, reduced to the open document.
+function discoverReplies(stdout) {
+  const texts = [];
+  for (const e of eventsOf(stdout)) {
+    if (e.type === 'user' && e.message && Array.isArray(e.message.content)) {
+      for (const block of e.message.content) {
+        if (!block || block.type !== 'tool_result') continue;
+        if (typeof block.content === 'string') texts.push(block.content);
+        else if (Array.isArray(block.content)) for (const part of block.content) if (part && typeof part.text === 'string') texts.push(part.text);
+      }
+    } else if (e.type === 'item.completed' && e.item && e.item.type === 'mcp_tool_call' && e.item.result && Array.isArray(e.item.result.content)) {
+      for (const part of e.item.result.content) if (part && typeof part.text === 'string') texts.push(part.text);
+    }
+  }
+  const out = [];
+  for (const text of texts) {
+    if (!text.includes('"instances"')) continue;
+    let reply; try { reply = JSON.parse(text); } catch { continue; }
+    const [instance] = Array.isArray(reply && reply.instances) ? reply.instances : [];
+    if (!instance || typeof instance !== 'object') continue;
+    const native = instance.nativeHostStatus && typeof instance.nativeHostStatus === 'object' ? instance.nativeHostStatus : {};
+    out.push({ instanceId: instance.instanceId ?? null, buildId: instance.buildId ?? null, documentId: native.documentId ?? instance.documentId ?? null,
+      revision: Number.isSafeInteger(native.contentRevision) ? native.contentRevision : (Number.isSafeInteger(instance.revision) ? instance.revision : null) });
+  }
+  return out;
+}
+// The model the client really used: Claude reports it in its `init` event; Codex's stream carries none, so its configuration names it (only the top-level
+// `model` and `model_reasoning_effort` keys are read, nothing else of the file is kept). `requested` is what the harness asked for ('client default' = nothing).
+function modelUsed(name, stdout, { requested, env = process.env, readFile = fs.readFileSync, home = require('node:os').homedir() } = {}) {
+  for (const e of eventsOf(stdout)) {
+    const field = name === 'claude' ? (e.type === 'system' && e.subtype === 'init' ? e.model : undefined) : (e.model || (e.item && e.item.model) || (e.turn && e.turn.model));
+    if (typeof field === 'string' && field) return { value: field, source: 'the client\'s own stream' + (name === 'claude' ? ' (init event)' : '') };
+  }
+  if (name === 'codex' && requested && requested !== CLIENT_DEFAULT) return { value: requested, source: 'requested with --model (not echoed in the stream)' };
+  if (name === 'codex') {
+    const file = path.join(env.CODEX_HOME || path.join(home, '.codex'), 'config.toml');
+    try {
+      const keys = {};
+      for (const line of String(readFile(file, 'utf8')).split('\n')) {
+        if (/^\s*\[/.test(line)) break;
+        const hit = line.match(/^\s*(model|model_reasoning_effort)\s*=\s*"([^"\n]{1,80})"/);
+        if (hit) keys[hit[1]] = hit[2];
+      }
+      if (keys.model) return { value: keys.model, ...(keys.model_reasoning_effort ? { reasoningEffort: keys.model_reasoning_effort } : {}), source: 'the Codex configuration file (' + file.replace(home, '~') + ', top-level model key; the stream does not name it)' };
+    } catch { /* no readable configuration */ }
+  }
+  return { value: null, source: null };
+}
+function trace(result, lastMessageFile, steps) {
+  const codes = {}, calls = mcpCalls(result.stdout), byTool = {};
+  for (const call of calls) byTool[call.tool] = (byTool[call.tool] || 0) + 1;
+  let last = null;
+  for (const event of eventsOf(result.stdout)) if (event.type === 'result' && typeof event.result === 'string') last = event.result;
   for (const line of result.stdout.split('\n')) {
     if (!line.startsWith('{')) continue;
-    let event; try { event = JSON.parse(line); } catch { continue; }
-    walk(event);
     for (const code of CODES) { const n = (line.match(new RegExp('\\\\?"code\\\\?":\\\\?"' + code + '\\\\?"', 'g')) || []).length; if (n) codes[code] = (codes[code] || 0) + n; }
   }
   if (lastMessageFile) { try { last = fs.readFileSync(lastMessageFile, 'utf8'); } catch { /* none written */ } }
-  return { informational: true, toolCalls: calls, errorCodesSeen: codes, lastMessage: last === null ? null : String(last).slice(0, 4000) };
+  return { informational: true, toolCalls: byTool, mcpCallCount: calls.length, ...(steps ? { stepCalls: stepCounts(calls, steps) } : {}), errorCodesSeen: codes,
+    lastMessage: last === null ? null : String(last).slice(0, 4000) };
 }
 
-module.exports = { NAMES, DEFAULT_CLAUDE_MODEL, CLIENT_DEFAULT, validModel, requestedModel, scrubbedEnv, onPath, probeClient, invocation, runClient, classify, trace, digest };
+module.exports = { mcpCalls, stepCounts, discoverReplies, modelUsed, eventsOf, NAMES, DEFAULT_CLAUDE_MODEL, CLIENT_DEFAULT, validModel, requestedModel, scrubbedEnv, onPath, probeClient, invocation, runClient, classify, trace, digest };
