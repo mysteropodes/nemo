@@ -109,7 +109,13 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
     assert!(payload["properties"]["value"].is_object());
     let examples = schema["examples"].as_array().unwrap();
     assert_eq!(examples.len(), 3);
-    let operations = ["command.document.apply", "history.undo", "history.redo"];
+    // Object-document requests: an opacity-only example would be refused on the document the
+    // app opens today.
+    let operations = [
+        "command.document.object.property.edit",
+        "command.document.object.undo",
+        "command.document.object.redo",
+    ];
     for (example, operation) in examples.iter().zip(operations) {
         assert_eq!(example["operation"], operation);
         let response = tool_response(&client, "nemo_command", arguments(example.clone())).await;
