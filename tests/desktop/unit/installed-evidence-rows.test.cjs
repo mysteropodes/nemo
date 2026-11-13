@@ -78,7 +78,11 @@ const samples = [
   P.assetAttach({ pin: 'snap-1', name: 'n', path: '/tmp/x.png', lifecycleGeneration: 1 }), P.assetRemove('snap-1', 'asset-1'),
   P.rasterMove(T, 1, 2), P.rasterDelete(T), P.rasterResize(T, 3, 4), P.rasterRotate(T, 90), P.rasterOpacity(T, 0.5), P.textCreate('L1', P.textBlock('HELLO', { size: 72 })), P.textEdit(T, { size: 36, letterSpacing: 10 }), P.textDelete(T),
   P.textCreate('L1', P.textBlock('X', { font: { kind: 'asset', assetId: 'a' } })), P.textTargets(0, 'p', 'L1'), P.textInspect(0, 'p', T), P.textBody(0, 'p', T),
-  P.brushPublish('snap-1', 'asset-1', 'b', 8, 8), P.brushInspect(0, 'snap-1', 'b'),
+  P.brushPublish('snap-1', 'asset-1', 'b', 8, 8), P.brushInspect(0, 'snap-1', 'b'), P.brushPublish('snap-1', 'asset-1', 'b', 4096, 4096),
+  P.canvasBackground('#00000000'), P.canvasBackground('#ffffff'), P.vectorOrder(T, 'front'), P.vectorOrder(T, 'back'), P.fillTrace('L1', [100, 100], '#2a9d3fff'), P.fillTrace('L1', [1, 2], '#2a9d3fff', 0.5, true),
+  P.elementValue('L1', 'native-stroke:1:0', 'position', [100, 0]), P.elementRead(0, 'snap-1', 'L1', 'native-stroke:1:0', 'position'),
+  P.hitTestRead(0, 'snap-1', { layerUid: 'L1', frame: 0, workId: 'native-work-1', viewGeneration: 1 }), P.hitTestRead(0, 'snap-1', { layerUid: 'L1', frame: 0, workId: 'native-work-1', viewGeneration: 3, cursor: 8, limit: 8 }),
+  P.subselectRead(0, 'snap-1', T), P.subselectRead(0, 'snap-1', T, 16, 16),
   P.brushStroke({ pin: 'snap-1', lifecycleGeneration: 1, layerUid: 'L1', groupId: 'bmb_1', path: '/tmp/b.png', companion: { x: 1, y: 2, width: 58, height: 18, opacity: 1 }, segments: [P.seg(1, 1), P.seg(9, 9)] }),
   P.compositingBlend('L1', 'multiply'), P.objectRead(0, T), P.propertyOpacity('L1', [50]), P.propertyMetadata(0, 'snap-1', 'L1'),
   P.meshAttach(T, { outline: [[0, 0], [1, 0], [1, 1]], verts: [[0, 0], [1, 0], [1, 1]], tris: [0, 1, 2], offsets: [[0, 0], [0, 0], [0, 0]], cols: 1, rows: 1 }), P.meshSetOffset('im_1', 2, 0.3, 0.25),
@@ -117,11 +121,13 @@ test('lane rows: the four lanes, unique ids, each row names tasks and issue, and
     assert.ok(row.id.startsWith(row.lane + '-') && typeof row.title === 'string' && row.title.length > 10 && Array.isArray(row.tasks) && row.tasks.length > 0 && typeof row.run === 'function' && row.issue === Number(row.lane), row.id);
   }
   // Rows build every request with the payload builders; a literal operation string in a lane file would bypass the schema test above.
-  for (const lane of LANES) {
-    const text = fs.readFileSync(path.join(__dirname, '../installed-evidence/lanes/lane-' + lane + '.cjs'), 'utf8');
-    assert.equal(/['"](command|query|job)\.document\./.test(text), false, 'lane ' + lane + ' contains a literal operation name');
-    assert.equal(/\bsetTimeout\b|\bsleep\b/.test(text), false, 'lane ' + lane + ' sleeps');
+  for (const file of fs.readdirSync(path.join(__dirname, '../installed-evidence/lanes')).filter(name => name.endsWith('.cjs'))) {
+    const text = fs.readFileSync(path.join(__dirname, '../installed-evidence/lanes', file), 'utf8');
+    assert.equal(/['"](command|query|job)\.document\./.test(text), false, file + ' contains a literal operation name');
+    assert.equal(/\bsetTimeout\b|\bsleep\b/.test(text), false, file + ' sleeps');
   }
+  for (const id of ['2107-canvas-alpha-and-opaque-export', '2107-parametric-ellipse-polygon-star', '2107-parametric-rotated-box', '2108-nested-group-structure', '2108-group-stack-reorder', '2108-nested-group-operand-flatten',
+    '2108-linked-fill-join', '2108-flatten-element-motion', '2112-text-layout-box', '2113-bitmap-brush-quota-and-cancel']) assert.ok(rows.some(r => r.id === id), id + ' is missing from the catalog');
   for (const [op, home] of Object.entries(SPECIAL)) assert.ok(home.schema.$defs[home.name], op);
 });
 
@@ -149,17 +155,23 @@ test('the mesh read requests are the ones the published transport schema declare
   assert.ok(errors(transport.$defs.ObjectImageMeshQueryPayload, P.meshQuery(3, 'p', { ...base, page: { kind: 'offsets', meshId: 'im_1', cursor: 0, limit: 99 } }).payload, transport.$defs).length > 0, 'a drifted page size is rejected');
 });
 
-test('coverage: every id a lane assigns is covered by a row or listed as not covered, every task a row names is assigned, and the receipt carries the table', () => {
-  const rows = allRows();
+test('coverage: every id a lane assigns is covered by a passing row or listed as not covered, every task a row names is assigned, and the receipt carries the table', () => {
+  const rows = allRows(), passed = rows.map(r => ({ ...r, verdict: 'pass' }));
   for (const lane of LANES) {
-    const c = laneCoverage(lane, rows), mine = rows.filter(r => r.lane === lane);
+    const c = laneCoverage(lane, passed), mine = rows.filter(r => r.lane === lane);
     for (const row of mine) for (const task of row.tasks) assert.ok(ASSIGNED[lane].includes(task), row.id + ' names ' + task + ' which lane ' + lane + ' does not assign');
     for (const id of ASSIGNED[lane]) assert.ok(c.coveredByRows[id].length > 0 || NOT_COVERED[lane].some(e => e.id === id), lane + ' assigns ' + id + ' with no row and no not-covered entry');
     for (const entry of NOT_COVERED[lane]) assert.ok(typeof entry.what === 'string' && entry.what.length > 15 && typeof entry.reason === 'string' && entry.reason.length > 15, lane);
     assert.equal(c.laneComplete, false, 'a lane with listed gaps is never reported complete');
+    // The same rows all FAILED: nothing is covered, every id is attempted-not-passed.
+    const failed = laneCoverage(lane, rows.map(r => ({ ...r, verdict: 'fail', reason: 'x' })));
+    assert.deepEqual(failed.coveredIds, [], lane + ': failing rows cover nothing');
+    for (const id of ASSIGNED[lane]) assert.equal(failed.status[id], mine.some(r => r.tasks.includes(id)) ? 'attempted-not-passed' : 'never-attempted', lane + ' ' + id);
   }
-  assert.deepEqual(laneCoverage('2112', rows).uncoveredIds, ['G38b']);
-  const receipt = buildReceipt({ rows: rows.map(r => ({ ...r, verdict: 'pass', operations: [], assertions: [] })), selection: { lanes: LANES, rows: rows.map(r => r.id), omitted: [], catalogRows: {} }, cleanup: { ok: true } });
+  // The G38b gap that remains is named with the read it needs: glyph identity.
+  assert.ok(NOT_COVERED['2112'].some(e => /glyph/i.test(e.what) && /layout/.test(e.reason)), 'the unobserved glyph identity names the read that would be needed');
+  assert.ok(NOT_COVERED['2113'].some(e => /query\.document\.evaluate/.test(e.reason) && /Needed:/.test(e.reason)), 'the unobserved document evaluate read names what would be needed');
+  const receipt = buildReceipt({ rows: passed.map(r => ({ ...r, operations: [], assertions: [] })), selection: { lanes: LANES, rows: rows.map(r => r.id), omitted: [], catalogRows: {} }, cleanup: { ok: true } });
   assert.deepEqual(Object.keys(receipt.coverage).sort(), LANES);
   assert.ok(receipt.coverage['2113'].notCovered.length > 0 && receipt.residualHandsOn.some(line => /coverage\.notCovered/.test(line)));
 });

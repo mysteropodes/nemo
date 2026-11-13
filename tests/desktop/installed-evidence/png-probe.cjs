@@ -9,7 +9,10 @@ function decodeExport(bytes) {
   if (!image || !(image.width > 0) || !(image.height > 0) || !image.rgba || image.rgba.length !== image.width * image.height * 4) throw new Error('export decoded to an invalid image');
   return image;
 }
-const pixels = image => crypto.createHash('sha256').update(image.rgba).digest('hex');
+// The digest of what an export SHOWS: the colour channels of a fully transparent pixel are not observable (a straight-alpha PNG of a transparent
+// canvas carries rounding residue such as 2,0,0,0 vs 4,1,1,0 for the same empty pixel), so they do not take part. Every other byte does.
+const visible = image => { const rgba = Buffer.from(image.rgba); for (let i = 0; i < rgba.length; i += 4) if (rgba[i + 3] === 0) { rgba[i] = 0; rgba[i + 1] = 0; rgba[i + 2] = 0; } return rgba; };
+const pixels = image => crypto.createHash('sha256').update(visible(image)).digest('hex');
 // Composite over white, so a straight and a premultiplied export compare the same way.
 // Every measurement takes a decoded image (export.image), never the export record: run 9 lost three rows to a record passed here.
 function over(image, x, y) {
@@ -63,7 +66,7 @@ function countColor(image, rgb, { box = null, tol = 24 } = {}) {
 function differing(a, b) {
   if (a.width !== b.width || a.height !== b.height) return Infinity;
   let n = 0;
-  for (let i = 0; i < a.rgba.length; i += 4) if (a.rgba[i] !== b.rgba[i] || a.rgba[i + 1] !== b.rgba[i + 1] || a.rgba[i + 2] !== b.rgba[i + 2] || a.rgba[i + 3] !== b.rgba[i + 3]) n++;
+  for (let i = 0; i < a.rgba.length; i += 4) if (a.rgba[i + 3] === 0 && b.rgba[i + 3] === 0) continue; else if (a.rgba[i] !== b.rgba[i] || a.rgba[i + 1] !== b.rgba[i + 1] || a.rgba[i + 2] !== b.rgba[i + 2] || a.rgba[i + 3] !== b.rgba[i + 3]) n++;
   return n;
 }
 // Median of (coverage after / coverage before) at the strongest-ink pixels of `before`; 0.5 means "applied once".

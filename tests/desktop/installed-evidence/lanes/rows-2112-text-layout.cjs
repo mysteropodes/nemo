@@ -1,7 +1,8 @@
 'use strict';
 // #2112 (G38b G27): the layout box of a retained text block, as far as a public read shows it. The hit-test listing carries one bounds box per text
 // block (role text, "the item's stored rect or glyph box in its own frame", matrix = the map to the painted box: native-object-subselect.json). It is
-// compared with the ink of the transparent export (alpha), follows size, spacing and rotation, and is identical after undo, redo and reopen.
+// compared with the ink of the transparent export (alpha), follows size, letter spacing, wrapping, line height and alignment, and is identical after
+// undo, redo and reopen.
 // What no public read returns: per-glyph identity and advances. Needed: a `layout` view of query.document.object.text (glyph ids, advances, line boxes).
 const P = require('../payloads.cjs');
 const K = require('../kit.cjs');
@@ -9,7 +10,7 @@ const probe = require('../png-probe.cjs');
 
 const BOX_TOL = 2;
 const rows = [
-  { id: '2112-text-layout-box', title: 'text layout box: the listed glyph box encloses the ink and follows the anchor, size, spacing and rotation; identical after undo, redo and reopen', tasks: ['G38b', 'G27'],
+  { id: '2112-text-layout-box', title: 'text layout box: the listed glyph box encloses the ink and follows the anchor, size, spacing, wrapping, line height and alignment; identical after undo, redo and reopen', tasks: ['G38b', 'G27'],
     limitations: ['One box per text block: no read returns glyph ids, advances or line boxes (needed: a layout view of query.document.object.text), so glyph identity is not observed.'],
     async run(ctx) {
       const { layerUid } = await K.fresh(ctx, { transparent: true });
@@ -37,15 +38,25 @@ const rows = [
       ctx.within('read', 'four gaps of 10 px widen the box by about 40', (it2.bounds[2] - it2.bounds[0]) - (x1 - x0), 30, 60);
       ctx.near('read', 'the height does not change with letter spacing', it2.bounds[3] - it2.bounds[1], y1 - y0, 1);
       ctx.near('pixel', 'the widened box still encloses the ink', [ink2.box[0] - it2.bounds[0], ink2.box[1] - it2.bounds[1], it2.bounds[2] - (ink2.box[2] + 1), it2.bounds[3] - (ink2.box[3] + 1)], [0, 0, 0, 0], BOX_TOL);
-      await K.apply(ctx, 'rotate the block by 90 degrees', P.textEdit(tgt, { rotation: 90 }));
+      // Wrapping: two words in a fixed width of 300 break into two lines, the box follows the wrapped text (a glyph box, not the frame).
+      const enclose = (box, ink) => [ink.box[0] - box[0], ink.box[1] - box[1], box[2] - (ink.box[2] + 1), box[3] - (ink.box[3] + 1)];
+      await K.apply(ctx, 'two words in a fixed width of 300', P.textEdit(tgt, { text: 'HELLO WORLD', letterSpacing: 0, fixedWidth: 300 }));
       const it3 = await boxOf(), e3 = await K.exportPng(ctx, 'box3'), ink3 = probe.inkBounds(e3.image);
-      ctx.eq('read', 'the box stays in the block\'s own frame (unchanged) while the map to the painted box is no longer the identity', [it3.bounds, JSON.stringify(it3.matrix) !== JSON.stringify([1, 0, 0, 1, 0, 0])], [it2.bounds, true]);
-      ctx.near('pixel', 'the ink has swapped extents: its width is the box height and its height the box width', [ink3.box[2] - ink3.box[0] + 1, ink3.box[3] - ink3.box[1] + 1], [it2.bounds[3] - it2.bounds[1], it2.bounds[2] - it2.bounds[0]], 3);
-      await K.apply(ctx, 'rotate back to 0', P.textEdit(tgt, { rotation: 0 }));
+      ctx.ok('read', 'the wrapped box is no wider than the fixed width', it3.bounds[2] - it3.bounds[0] <= 300 + BOX_TOL, it3.bounds[2] - it3.bounds[0], '<=302');
+      ctx.ok('read', 'and at least 1.8 times as high as one line', (it3.bounds[3] - it3.bounds[1]) >= 1.8 * (y1 - y0), [it3.bounds[3] - it3.bounds[1], y1 - y0], '>= 1.8 lines');
+      ctx.near('pixel', 'the wrapped box encloses the wrapped ink', enclose(it3.bounds, ink3), [0, 0, 0, 0], BOX_TOL);
+      await K.apply(ctx, 'line height times 2', P.textEdit(tgt, { lineHeightMult: 2 }));
+      const it4 = await boxOf(), ink4 = probe.inkBounds((await K.exportPng(ctx, 'box4a')).image);
+      ctx.ok('read', 'a taller line pitch makes the box higher and leaves its width', it4.bounds[3] - it4.bounds[1] > it3.bounds[3] - it3.bounds[1] + 20 && Math.abs(it4.bounds[2] - it4.bounds[0] - (it3.bounds[2] - it3.bounds[0])) < 1, [it3.bounds, it4.bounds]);
+      ctx.near('pixel', 'the taller box still encloses the ink', enclose(it4.bounds, ink4), [0, 0, 0, 0], BOX_TOL);
+      await K.apply(ctx, 'align right', P.textEdit(tgt, { align: 'right' }));
+      const it5 = await boxOf(), ink5 = probe.inkBounds((await K.exportPng(ctx, 'box5a')).image);
+      ctx.ok('read', 'right alignment moves the box right, to within 8 px of the right edge of the frame (20 + 300)', it5.bounds[0] > it4.bounds[0] + 20 && Math.abs(it5.bounds[2] - 320) <= 8, [it4.bounds, it5.bounds]);
+      ctx.near('pixel', 'the right aligned box encloses the ink', enclose(it5.bounds, ink5), [0, 0, 0, 0], BOX_TOL);
       const e4 = await K.exportPng(ctx, 'box4');
       await K.roundTrip(ctx, 'text-box', e4, async () => {
         const again = await boxOf();
-        ctx.eq('read', 'after save and reopen the listing gives the same box and role', [again && again.role, again && again.bounds], ['text', it2.bounds]);
+        ctx.eq('read', 'after save and reopen the listing gives the same box and role', [again && again.role, again && again.bounds], ['text', it5.bounds]);
       });
     } },
 ];

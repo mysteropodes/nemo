@@ -3,6 +3,9 @@
 // mesh and bitmap-brush contract for the kit, the runner and the lane rows to be exercised. Nothing here launches an app; every
 // behaviour that matters can be switched to misbehave with a flag, so a test can inject the fault a weak assertion would miss.
 //
+// Every reply a lane row READS follows the shape the packaged candidate answered, captured from a run (hit-test listing, anchor pages, element
+// property read, canvas background edit, brush cancellation and quota refusals): installed-evidence-reads.test.cjs holds literal copies of those
+// replies and compares the stub's shapes with them.
 // Reply shapes follow the published contract (nemo-mcp request/result validators and the capability declarations): for example
 // image.mesh.edit answers ONLY {applied, historyEntriesAdded}; the mesh id is read through the imageMesh query view.
 const fs = require('node:fs');
@@ -28,6 +31,10 @@ const FLAGS = {
   publishAddsHistory: false,
   // assets: removal ignores that a placement still uses the asset
   removeIgnoresUse: false,
+  // the hit-test listing is refused this many times as "Subselect presentation changed" (observed right after a command), then answers
+  listingRace: 0,
+  // the shared image quota in bytes for bitmap-brush publications (the installed app: 384 MiB); null = unlimited
+  quotaBytes: null,
 };
 
 const pointInPolygon = (poly, x, y) => {
@@ -47,7 +54,7 @@ function createStubApp(options = {}) {
   const state = { doc: null, dirty: false, docSeq: 0, generation: 0, brushes: {}, calls: [], ...options.initial };
   const flags = { ...FLAGS, ...options };
   const structured = value => ({ result: { structuredContent: value } });
-  const newDoc = (w, h, body = {}) => ({ id: 'doc-' + (++state.docSeq), rev: 0, w, h, strokes: [], rasters: [], assets: [], meshes: {}, layers: [{ layerUid: 'L1', name: 'Layer 1' }], undo: [], redo: [], seq: 0, ...body });
+  const newDoc = (w, h, body = {}) => ({ id: 'doc-' + (++state.docSeq), rev: 0, w, h, strokes: [], rasters: [], assets: [], meshes: {}, layers: [{ layerUid: 'L1', name: 'Layer 1' }], canvasBg: '#ffffff', motion: {}, undo: [], redo: [], seq: 0, ...body });
   const snapshotId = () => 'native-object:' + state.doc.id + ':' + state.doc.rev;
   const envelope = (version, request, extra) => {
     const base = { apiVersion: version, requestId: flags.wrongRequestId ? 'other' : request.requestId, instanceId: flags.foreignReply ? FOREIGN : INSTANCE,
@@ -63,7 +70,7 @@ function createStubApp(options = {}) {
   };
   const receipt = (extra = {}) => ({ applied: true, historyEntriesAdded: flags.noHistory ? 0 : 1, ...extra });
   const noop = () => ({ applied: false, historyEntriesAdded: 0 });
-  const snap = d => JSON.stringify({ strokes: d.strokes, rasters: d.rasters, assets: d.assets, meshes: d.meshes, layers: d.layers });
+  const snap = d => JSON.stringify({ strokes: d.strokes, rasters: d.rasters, assets: d.assets, meshes: d.meshes, layers: d.layers, canvasBg: d.canvasBg, motion: d.motion });
   const restore = (d, text) => Object.assign(d, JSON.parse(text));
   function commit(doc, label, mutate) {
     const before = snap(doc);
@@ -78,16 +85,22 @@ function createStubApp(options = {}) {
     // The outline is the stable vertex prefix: outline point i is vertex i, and a sculpt moves it.
     return mesh ? mesh.outline.map(([x, y], i) => [x + mesh.offsets[i][0], y + mesh.offsets[i][1]]) : null;
   }
+  // #rrggbb or #rrggbbaa -> [r, g, b, a] (0..255)
+  const parseColor = text => { const h = String(text).replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)).concat([h.length === 8 ? parseInt(h.slice(6, 8), 16) : 255]); };
+  // Straight-alpha source-over of one pixel, the way a transparent export carries paint: out alpha = a + ba (1 - a).
+  function over(image, x, y, rgb, a) {
+    const o = (y * image.width + x) * 4, ba = image.rgba[o + 3] / 255, oa = a + ba * (1 - a);
+    for (let i = 0; i < 3; i++) image.rgba[o + i] = oa === 0 ? 0 : Math.round((rgb[i] * a + image.rgba[o + i] * ba * (1 - a)) / oa);
+    image.rgba[o + 3] = Math.round(oa * 255);
+  }
   function render(doc) {
-    // The real export is opaque: the canvas background (#ffffff) is painted under everything and fills composite over it.
-    const image = png.canvas(doc.w, doc.h, [255, 255, 255, 255]);
+    // The export fills the project canvas background (new projects: #ffffff, opaque; #00000000 is a transparent export) and the paint composites over it.
+    const image = png.canvas(doc.w, doc.h, parseColor(doc.canvasBg));
     for (const s of doc.strokes) {
       const { x0, y0, x1, y1 } = bounds(s.record.geometry.segments), fill = s.record.fill;
       if (!fill) continue;
-      const c = [fill.r, fill.g, fill.b].map(v => Math.round(v * 255)), a = fill.a;
-      for (let y = Math.max(0, Math.round(y0)); y < Math.min(doc.h, Math.round(y1)); y++) for (let x = Math.max(0, Math.round(x0)); x < Math.min(doc.w, Math.round(x1)); x++) {
-        png.fillRect(image, x, y, 1, 1, c.map(v => Math.round(v * a + 255 * (1 - a))));
-      }
+      const c = [fill.r, fill.g, fill.b].map(v => Math.round(v * 255));
+      for (let y = Math.max(0, Math.round(y0)); y < Math.min(doc.h, Math.round(y1)); y++) for (let x = Math.max(0, Math.round(x0)); x < Math.min(doc.w, Math.round(x1)); x++) over(image, x, y, c, fill.a);
     }
     for (const r of doc.rasters) {
       const asset = doc.assets.find(a => a.id === r.assetId), polygon = flags.meshNeverBound ? null : meshPolygon(doc, r);
@@ -99,7 +112,7 @@ function createStubApp(options = {}) {
     }
     return png.encodeRGBA(doc.w, doc.h, image.rgba);
   }
-  const fileOf = doc => ({ format: 'stub', w: doc.w, h: doc.h, layers: doc.layers,
+  const fileOf = doc => ({ format: 'stub', w: doc.w, h: doc.h, layers: doc.layers, project: { canvasW: doc.w, canvasH: doc.h, canvasBg: doc.canvasBg }, motion: doc.motion,
     drawing: { layers: doc.layers.map(l => ({ layerUid: l.layerUid, name: l.name })), objects: doc.strokes.map(s => ({ target: { strokeId: s.id }, layerUid: s.layerUid, ...(s.groupId ? { groupId: s.groupId } : {}), record: s.record })),
       items: { raster: doc.rasters.map(r => ({ target: { strokeId: r.id }, item: { layerUid: r.layerUid, x: r.x, y: r.y, width: r.width, height: r.height, assetId: r.assetId, ...(r.meshId ? { meshId: r.meshId } : {}) } })) } },
     assets: doc.assets, meshes: doc.meshes });
@@ -128,7 +141,7 @@ function createStubApp(options = {}) {
     if (!state.doc || request.documentId !== state.doc.id || request.expectedRevision !== state.doc.rev) return refuse(1, request, 'stale_revision', 'Read a current snapshot.');
     if (request.operation === 'project.saveAs') {
       // Observed on the installed app: the first save after a change is refused as unavailable, the next one is accepted.
-      if (flags.saveRace && state.raceRev !== state.doc.rev) { state.raceRev = state.doc.rev; return refuse(1, request, 'unavailable', 'The project was not saved (refused: pin-changed-before-picker). App notice: Save cancelled or unavailable. Choose a new file path.'); }
+      if (flags.saveRace && (flags.saveRace === 'always' || state.raceRev !== state.doc.rev)) { state.raceRev = state.doc.rev; return refuse(1, request, 'unavailable', 'The project was not saved (refused: pin-changed-before-picker). App notice: Save cancelled or unavailable. Choose a new file path.'); }
       fs.writeFileSync(p.path, JSON.stringify(fileOf(state.doc)));
       state.dirty = false; return ok(1, request, { path: p.path });
     }
@@ -137,7 +150,7 @@ function createStubApp(options = {}) {
       if (!flags.keepsInMemory) {
         const strokes = file.drawing.objects.map(o => ({ id: o.target.strokeId, layerUid: o.layerUid, ...(o.groupId ? { groupId: o.groupId } : {}), record: o.record }));
         const rasters = file.drawing.items.raster.map(r => ({ id: r.target.strokeId, ...r.item }));
-        state.doc = newDoc(file.w, file.h, { strokes, rasters, assets: file.assets, meshes: file.meshes, layers: file.layers });
+        state.doc = newDoc(file.w, file.h, { strokes, rasters, assets: file.assets, meshes: file.meshes, layers: file.layers, canvasBg: file.project.canvasBg, motion: file.motion || {} });
         state.generation++; state.brushes = {};
       }
       state.dirty = false;
@@ -215,6 +228,24 @@ function createStubApp(options = {}) {
         return ok(2, request, receipt());
       }
       case 'command.document.object.image.mesh.edit': return meshEdit(request, doc, p);
+      // Real replies of the installed owner: the receipt only; the colour is stored as sent (#rrggbbaa admitted).
+      case 'command.document.object.project.settings.edit': {
+        if (p.action.kind !== 'setCanvasBackground') return refuse(2, request, 'invalid_request', 'unsupported setting');
+        if (doc.canvasBg === p.action.color) return ok(2, request, noop());
+        commit(doc, 'canvas background', () => { doc.canvasBg = p.action.color; });
+        return ok(2, request, receipt());
+      }
+      // An element (stroke-level) Motion value at frame 0: the raw sample of the property read is the value that was set, [0, 0] otherwise.
+      case 'command.document.object.property.edit': {
+        const id = p.target.strokeId;
+        if (!id || !doc.strokes.some(s => s.id === id)) return ownerRefusal(request, 'not_found', 'no such element');
+        commit(doc, 'element motion', () => { doc.motion[id] = { [p.property]: p.action.values }; });
+        return ok(2, request, receipt());
+      }
+      case 'query.document.object.property.read': {
+        const t = p.view.target, held = t.strokeId && doc.motion[t.strokeId] && doc.motion[t.strokeId][p.view.property];
+        return ok(2, request, { instanceId: request.instanceId, documentId: doc.id, atRevision: p.atRevision, documentSnapshotId: p.documentSnapshotId, kind: 'rawSample', target: t, property: p.view.property, dimension: 2, frame: p.view.frame, value: held || [0, 0] });
+      }
       case 'command.document.object.brush.bitmap.publish': return brushPublish(request, doc, p);
       case 'query.document.object.brush.bitmap': {
         const row = state.brushes[p.brushId];
@@ -241,6 +272,26 @@ function createStubApp(options = {}) {
       }
       return ok(2, request, { kind: 'imageMesh', atRevision: p.atRevision, documentSnapshotId: p.documentSnapshotId, contextId: v.contextId, layerUid: v.layerUid, frame: v.frame, workId: v.workId, viewGeneration: v.viewGeneration,
         target: target(raster.layerUid, raster.id), rect: { x: raster.x, y: raster.y, width: raster.width, height: raster.height, rotation: 0 }, mesh: counts, page });
+    }
+    if (p.view && p.view.kind === 'subselect' && p.view.hitTest) {
+      if (state.listingRaceLeft === undefined) state.listingRaceLeft = flags.listingRace;
+      if (state.listingRaceLeft > 0) { state.listingRaceLeft--; return refuse(2, request, 'unavailable', 'Subselect presentation changed'); }
+      const v = p.view, hex = fill => '#' + [fill.r, fill.g, fill.b].map(c => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
+      const listed = doc.strokes.filter(s => s.layerUid === v.layerUid).map(s => { const b = bounds(s.record.geometry.segments), f = s.record.fill;
+        return { stableTarget: target(s.layerUid, s.id), closed: s.record.geometry.closed, count: s.record.geometry.segments.length, matrix: [1, 0, 0, 1, 0, 0], bounds: [b.x0, b.y0, b.x1, b.y1], role: 'plain', filled: !!f, strokeWidth: 0,
+          ...(s.groupId ? { groupPath: [{ id: s.groupId, mode: 'none', name: 'G' }] } : {}), style: { cap: 'round', join: 'round', opacity: 1, strokeStyle: 'solid', width: 4, ...(f ? { fill: hex(f) } : {}) } }; })
+        // `initial.listingExtra`: listed items the stub does not model (a text block, a dynamic shape) served exactly as the candidate answered them.
+        .concat((state.listingExtra || []).map(i => ({ ...i, stableTarget: { ...i.stableTarget, layerUid: v.layerUid } })));
+      const items = listed.slice(v.cursor, v.cursor + v.limit), end = v.cursor + items.length;
+      return ok(2, request, { atRevision: p.atRevision, documentSnapshotId: p.documentSnapshotId, kind: 'subselect', contextId: ROOT, layerUid: v.layerUid, frame: v.frame, workId: v.workId, viewGeneration: v.viewGeneration,
+        cursor: v.cursor, total: listed.length, nextCursor: end === listed.length ? null : end, preview: false, hitTest: true, layerMatrix: [1, 0, 0, 1, 0, 0], items });
+    }
+    if (p.subselect && p.stableTarget && !p.view) {
+      const found = doc.strokes.find(s => s.id === p.stableTarget.strokeId);
+      if (!found) return ownerRefusal(request, 'not_found', 'no such stroke');
+      const segs = found.record.geometry.segments, c = p.subselect.cursor, page = segs.slice(c, c + p.subselect.limit), end = c + page.length;
+      return ok(2, request, { atRevision: p.atRevision, documentSnapshotId: p.documentSnapshotId, subselect: { stableTarget: p.stableTarget, closed: found.record.geometry.closed, total: segs.length, cursor: c, nextCursor: end === segs.length ? null : end, preview: false,
+        segments: page.map(g => ({ point: [g.point.x, g.point.y], handleIn: [0, 0], handleOut: [0, 0] })) } });
     }
     const found = doc.strokes.find(s => s.id === p.stableTarget.strokeId);
     return found ? ok(2, request, { atRevision: doc.rev, documentSnapshotId: snapshotId(), object: found.record }) : ownerRefusal(request, 'not_found', 'no such stroke');
@@ -304,11 +355,17 @@ function createStubApp(options = {}) {
   }
 
   function brushPublish(request, doc, p) {
+    // Real replies seen on the installed app: a publication cancelled before dispatch, and one past the shared quota.
+    if (request.cancelledBeforeDispatch) return refuse(2, request, 'cancelled_before_dispatch', 'Native brush resource request refused.', { reason: 'cancelled' });
     if (p.documentSnapshotId !== snapshotId()) return ownerRefusal(request, 'invalid_request', 'stale pin');
     const asset = doc.assets.find(a => a.id === p.assetId);
     if (!asset) return ownerRefusal(request, 'not_found', 'no such asset');
     if (asset.width !== p.width || asset.height !== p.height) return ownerRefusal(request, 'invalid_request', 'wrong-size asset');
     const held = state.brushes[p.brushId], same = held && held.assetId === asset.id;
+    if (!same && flags.quotaBytes !== null) {
+      const others = Object.entries(state.brushes).filter(([id]) => id !== p.brushId).reduce((n, [, b]) => n + b.bytes, 0);
+      if (others + p.width * p.height * 4 + 128 > flags.quotaBytes) return refuse(2, request, 'unavailable', 'Native brush resource request refused.', { reason: 'over-quota' });
+    }
     if (!same) state.brushes[p.brushId] = { assetId: asset.id, version: (held ? held.version : 0) + 1, width: p.width, height: p.height, bytes: p.width * p.height * 4 + 128 };
     const row = state.brushes[p.brushId];
     if (flags.publishAddsHistory) commit(doc, 'publish', () => {});

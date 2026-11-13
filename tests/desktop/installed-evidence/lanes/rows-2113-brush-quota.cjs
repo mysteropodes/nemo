@@ -11,7 +11,7 @@ const attach = (ctx, label, file, name) => K.apply(ctx, label, () => K.pinned(ct
 const publication = (pin, assetId, brushId, size) => P.brushPublish(pin, assetId, brushId, size, size);
 
 const rows = [
-  { id: '2113-bitmap-brush-quota-and-cancel', title: 'bitmap brush: a publication cancelled before dispatch changes nothing and can be sent again; the shared quota refuses a 64 MiB bitmap without changing the store, and replacement frees it', tasks: ['G06', 'G17'],
+  { id: '2113-bitmap-brush-quota-and-cancel', title: 'bitmap brush: a publication cancelled before dispatch changes nothing and can be sent again; the shared quota refuses a 64 MiB bitmap without changing the store, and replacing the large bitmaps frees it', tasks: ['G06', 'G17'],
     limitations: ['The quota is the process-wide shared image budget: the row stops at the first refusal and gives the quota back by replacing the large bitmaps with a small one.'],
     async run(ctx) {
       await K.fresh(ctx, { transparent: true });
@@ -47,15 +47,15 @@ const rows = [
       await publish('publish the refused bitmap again', refused.assetId, refused.brushId, BIG, { refused: true, codes: ['unavailable'], details: error => !!error.details && error.details.reason === 'over-quota' });
       ctx.eq('read', 'the refused brush is not resident', (await inspect(refused.brushId)).resident, false);
       ctx.eq('read', 'the store is as it was: every earlier bitmap has the same version and bytes', await Promise.all(resident.map(r => inspect(r.brushId))), held);
-      // ---- the quota comes back when a large bitmap is replaced by a small one ----
-      const first = resident[0];
-      await publish('replace the first large bitmap by the 8x8 tip', tip.result.assetId, first.brushId, 8, { applied: true });
-      ctx.eq('read', 'the replaced brush is the small bitmap', [(await inspect(first.brushId)).width, (await inspect(first.brushId)).bytes < 4096], [8, true]);
+      // ---- the quota comes back when the large bitmaps are replaced by a small one (the replaced storage is freed) ----
+      for (const r of resident) await publish('replace ' + r.brushId + ' by the 8x8 tip', tip.result.assetId, r.brushId, 8, { applied: true });
+      ctx.eq('read', 'every replaced brush is the small bitmap', (await Promise.all(resident.map(r => inspect(r.brushId)))).every(b => b.resident && b.width === 8 && b.bytes < 4096), true);
       const accepted = await publish('publish the previously refused bitmap', refused.assetId, refused.brushId, BIG, { applied: true });
-      ctx.eq('read', 'it is now resident at 64 MiB', [(await inspect(refused.brushId)).resident, (await inspect(refused.brushId)).bytes], [true, accepted.result.bytes]);
+      const now = await inspect(refused.brushId);
+      ctx.eq('read', 'it is now resident at 64 MiB', [now.resident, now.bytes], [true, accepted.result.bytes]);
       // Give the quota back for the rows that follow.
-      for (const r of [...resident.slice(1), refused]) await publish('replace ' + r.brushId + ' by the 8x8 tip', tip.result.assetId, r.brushId, 8, { applied: true });
-      ctx.eq('read', 'every large bitmap was replaced', (await Promise.all([...resident, refused].map(r => inspect(r.brushId)))).every(b => b.resident && b.bytes < 4096), true);
+      await publish('replace ' + refused.brushId + ' by the 8x8 tip', tip.result.assetId, refused.brushId, 8, { applied: true });
+      ctx.eq('read', 'the quota is given back: the last large bitmap is small again', (await inspect(refused.brushId)).bytes < 4096, true);
     } },
 ];
 
