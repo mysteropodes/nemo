@@ -74,7 +74,7 @@ pub(crate) mod raster_scene;
 #[path = "object_media_scene_join.rs"]
 pub(crate) mod media_scene;
 pub(crate) use paint::raster::{
-    folder_ranks, layered_entries, ordered_entries, ordered_entries_ranked, PaintEntry, PaintIndex,
+    folder_ranks, layered_entries, listed_entries, ordered_entries, ordered_entries_ranked, PaintEntry, PaintIndex,
 };
 pub(crate) use raster_scene::declared_versions as object_raster_resource_versions;
 #[path = "object_mask_inputs.rs"]

@@ -54,6 +54,7 @@ impl ObjectPaintPlan {
                 .collect(),
             mixed: self.mixed.iter().copied().filter(|i| keeps(i)).collect(),
             dabs: self.dabs.clone(),
+            listed: self.listed.as_ref().map(|listed| listed.iter().copied().filter(|i| keeps(i)).collect()),
         })
     }
 }

@@ -145,6 +145,15 @@ fn entry_of<'a>(plan: &'a ObjectPaintPlan, index: &PaintIndex) -> PaintEntry<'a>
 pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = PaintEntry<'_>> + '_ {
     plan.mixed.iter().map(|index| entry_of(plan, index))
 }
+/// The entries a hit test reads: the paint order with every member of a combined group still present (a combined shape
+/// stays independently selectable) and without the combined islands.
+pub(crate) fn listed_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = PaintEntry<'_>> + '_ {
+    plan.listed
+        .as_deref()
+        .unwrap_or(&plan.mixed)
+        .iter()
+        .map(|index| entry_of(plan, index))
+}
 /// Every entry with the source layer it belongs to, in authored order (the layered path paints one layer at a time).
 pub(crate) fn layered_entries(
     plan: &ObjectPaintPlan,

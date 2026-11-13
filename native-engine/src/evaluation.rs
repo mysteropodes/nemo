@@ -101,6 +101,9 @@ pub(crate) use crate::object_document::object_raster_asset_kernels::object_item_
 #[path = "object_scene_style_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_scene_style_kernels;
+// #2108 (evidence defect 1): the fold of a layer's combining groups over the shapes the scene draws.
+#[path = "object_group_combine_fold.rs"]
+pub(crate) mod object_group_combine_fold;
 // L05-F/L05-H (#2133, #2134): lane-5 frame/exposure/clipboard family aggregator.
 #[path = "object_frame_edit_kernels.rs"]
 #[allow(dead_code)]

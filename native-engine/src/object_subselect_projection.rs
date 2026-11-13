@@ -1,7 +1,7 @@
 //! Selection identities and affine maps borrowed from the actual retained native paint plan.
 use crate::object_frame_packet::subselect_record as record;
 use crate::object_render_scene::{
-    object_scene_producer_contour::batch::subselect, ordered_entries, ObjectCompositionWitness,
+    object_scene_producer_contour::batch::subselect, listed_entries, ObjectCompositionWitness,
     PaintEntry,
 };
 use crate::object_snapshot::{SubselectReadItem, SubselectReadProjection};
@@ -62,7 +62,7 @@ impl ObjectCompositionWitness {
         // and a text block take their place in the stack.
         let plan = self.plan();
         let ordered: Vec<PaintEntry<'_>> = if hit_test {
-            ordered_entries(plan).collect()
+            listed_entries(plan).collect()
         } else {
             plan.commands().map(PaintEntry::Contour).collect()
         };
