@@ -983,6 +983,11 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "#1049: new test file entry only; every prior entry, floor, exclusion and aggregate is preserved."
+    },
+    "nemo-mcp/src/discovery_live_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#1049: new test file entry only; every prior entry, floor, exclusion and aggregate is preserved."
     }
   }
 }

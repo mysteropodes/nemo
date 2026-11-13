@@ -1,11 +1,7 @@
 //! The opacity counterpart of `native_discovery_availability_tests.rs`: discovery's report
 //! for an opacity document, held against the real opacity owner (#1049).
 use super::{fixture, ApplicationMcp, NativeApplicationRequest};
-use nemo_mcp::{
-    contract::NativeStatusRequest,
-    discovery::{start_here, Instance},
-    discovery_catalog::{self as catalog, Applicability},
-};
+use nemo_mcp::discovery_catalog::{self as catalog, Applicability};
 use serde_json::{json, Value};
 
 const FOREIGN: &str = "native object operation has no active object owner";
@@ -19,25 +15,6 @@ fn send(state: &ApplicationMcp, request: Value) -> Result<Value, String> {
         .map(|r| serde_json::to_value(r).unwrap())
 }
 
-fn live_instance(state: &ApplicationMcp) -> Instance {
-    let status = state
-        .native_status(NativeStatusRequest {
-            api_version: 2,
-            request_id: "status-opacity".into(),
-            instance_id: state.instance_id().into(),
-        })
-        .unwrap();
-    assert_eq!(status.document_kind.as_deref(), Some("opacity"));
-    Instance {
-        full: json!({"instanceId": state.instance_id()}),
-        instance_id: state.instance_id().into(),
-        document_id: status.document_id.clone(),
-        revision: status.content_revision,
-        v1_operations: None,
-        status: Some(status),
-    }
-}
-
 fn revision(response: &Value) -> u64 {
     response["contentRevision"]
         .as_u64()
@@ -46,18 +23,19 @@ fn revision(response: &Value) -> u64 {
 
 #[test]
 fn the_opacity_guide_steps_run_on_an_opacity_document() {
-    let (state, _) = fixture();
-    let guide = start_here(Some(&live_instance(&state)));
+    let (state, document) = fixture();
+    let steps = catalog::guide()["kinds"]["opacity"]["steps"]
+        .as_array()
+        .unwrap();
     let mut current = 0;
     let mut ran = 0;
-    for step in guide["steps"].as_array().unwrap() {
-        let mut request = step["request"].clone();
-        if request["apiVersion"] != 2 {
-            continue; // project.* is the app's lifecycle, covered elsewhere
-        }
-        let text = request.to_string().replace("<layerUid>", LAYER);
-        request = serde_json::from_str(&text).unwrap();
-        if request.get("expectedRevision").is_some() {
+    for step in steps.iter().filter(|step| step["apiVersion"] == 2) {
+        // project.* is the app's lifecycle and covered elsewhere; these are native steps.
+        let payload = step["payload"].to_string().replace("<layerUid>", LAYER);
+        let mut request = json!({"apiVersion": 2, "requestId": format!("guide-{}", step["id"].as_str().unwrap()),
+            "instanceId": state.instance_id(), "documentId": document,
+            "operation": step["operation"], "payload": serde_json::from_str::<Value>(&payload).unwrap()});
+        if step["expectedRevision"] == true {
             request["expectedRevision"] = json!(current);
         }
         let response = send(&state, request).unwrap_or_else(|e| panic!("{}: {e}", step["id"]));
