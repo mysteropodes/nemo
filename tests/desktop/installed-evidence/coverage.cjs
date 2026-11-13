@@ -4,6 +4,7 @@
 //   covered              at least one row naming the id PASSED (the rows are listed);
 //   attemptedNotPassed   rows naming the id ran, none passed (failed rows are listed with their verdict);
 //   neverAttempted       no row naming the id ran: it has no row, its rows were left out of the selection, or they were unrun.
+// `alsoNotPassed` lists the failing rows of an id that is covered by other rows, so a lane is never read as covered while one of its rows fails.
 // `ASSIGNED` is the ids each lane issue lists; a row names the ids it exercises in `tasks`; `NOT_COVERED` names what no row observes
 // yet (an id with no row at all, or a behaviour of a covered id that the lane text requires) and, for each, the read operation that
 // would be needed when the gap is a missing read. The receipt carries this table, and a unit test fails when a lane assigns an id that
@@ -21,7 +22,6 @@ const NOT_COVERED = Object.freeze({
     { what: 'Preview (viewport) rendering of records, effects and parametric shapes: only the PNG export is observed', reason: 'no preview read is reachable through nemo-mcp' },
   ],
   2108: [
-    { what: 'Flatten of a group that contains a nested group, and the export of a combined group before it is flattened', reason: 'observed by rows that fail on the installed candidate (group.combine is ignored by the export; flatten refuses a nested group): see the row verdicts, not a gap in the runner' },
     { what: 'Clipboard remap of rig, component and mesh references (group and stroke ids are remapped and observed)', reason: 'no row builds a rig, a component or a mesh-bound raster on the copied layer' },
     { what: 'Layer lifecycle on component and folder layers', reason: 'only plain drawing layers are exercised' },
   ],
@@ -40,18 +40,21 @@ const rank = verdict => (verdict === 'pass' ? 2 : verdict === 'fail' ? 1 : 0);
 function laneCoverage(lane, rows) {
   const assigned = ASSIGNED[lane] || [], mine = rows.filter(r => String(r.lane) === String(lane));
   const entries = NOT_COVERED[lane] || [];
-  const coveredByRows = {}, attemptedNotPassed = {}, neverAttempted = [], status = {};
+  const coveredByRows = {}, attemptedNotPassed = {}, alsoNotPassed = {}, neverAttempted = [], status = {};
   for (const id of assigned) {
     const named = mine.filter(r => (r.tasks || []).includes(id));
     coveredByRows[id] = named.filter(r => r.verdict === 'pass').map(r => r.id);
     const failed = named.filter(r => r.verdict === 'fail');
     if (coveredByRows[id].length === 0 && failed.length > 0) attemptedNotPassed[id] = failed.map(r => ({ row: r.id, verdict: r.verdict, reason: r.reason || null }));
+    // A covered id can still have a failing row (a behaviour of the id that does not hold): it is listed, never averaged away.
+    const unpassed = named.filter(r => r.verdict !== 'pass' && r.verdict !== 'unrun');
+    if (coveredByRows[id].length > 0 && unpassed.length > 0) alsoNotPassed[id] = unpassed.map(r => ({ row: r.id, verdict: r.verdict, reason: r.reason || null }));
     status[id] = coveredByRows[id].length > 0 ? 'covered' : failed.length > 0 ? 'attempted-not-passed' : 'never-attempted';
     if (status[id] === 'never-attempted') neverAttempted.push(id);
   }
   const listed = new Set(entries.filter(e => e.id).map(e => e.id));
   const uncoveredIds = assigned.filter(id => status[id] !== 'covered' || listed.has(id));
-  return { assignedIds: assigned, status, coveredByRows, attemptedNotPassed, neverAttempted,
+  return { assignedIds: assigned, status, coveredByRows, attemptedNotPassed, alsoNotPassed, neverAttempted,
     coveredIds: assigned.filter(id => status[id] === 'covered' && !listed.has(id)), uncoveredIds, notCovered: entries,
     laneComplete: uncoveredIds.length === 0 && entries.length === 0 };
 }

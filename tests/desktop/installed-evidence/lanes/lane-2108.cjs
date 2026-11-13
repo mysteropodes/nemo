@@ -216,4 +216,4 @@ const rows = [
     } },
 ];
 
-module.exports = { lane: '2108', issue: 2108, rows, helpers: { flattenGroup } };
+module.exports = { lane: '2108', issue: 2108, rows: [...rows, ...require('./rows-2108-groups.cjs').rows], helpers: { flattenGroup } };

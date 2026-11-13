@@ -265,6 +265,19 @@ async function hitTest(ctx, layerUid) {
 const itemOf = (items, strokeId) => items.find(i => i.stableTarget && i.stableTarget.strokeId === strokeId);
 const groupIds = item => (item && item.groupPath ? item.groupPath.map(g => g.id) : []);
 
+// Every anchor of a record, paged: [[x, y], ...] (the whole-object read refuses records past its 4096-byte limit).
+async function anchors(ctx, stableTarget) {
+  const out = [];
+  let cursor = 0;
+  for (let turn = 0; cursor !== null && turn < 64; turn++) {
+    const { revision, pin } = await pinNow(ctx), b = P.subselectRead(revision, pin, stableTarget, cursor), res = await ctx.wire.query(b.operation, b.payload);
+    ctx.book.ok('reply', 'anchors: page answered', res.ok === true, res.ok ? 'ok' : res.error);
+    out.push(...res.result.subselect.segments.map(seg => [...seg.point]));
+    cursor = res.result.subselect.nextCursor;
+  }
+  return out;
+}
+
 // New 640x360 project; a dirty open project is first saved to a scratch file, because project.new refuses unsaved changes.
 async function fresh(ctx, { w = 640, h = 360, fps = 24, transparent = false } = {}) {
   const was = await ctx.wire.discover();
@@ -399,5 +412,5 @@ function stage(ctx, name, bytes) {
 const savedObjects = document => (document && document.drawing && Array.isArray(document.drawing.objects) ? document.drawing.objects : []);
 const objectStrokeIds = document => savedObjects(document).map(object => object && object.target && object.target.strokeId).filter(Boolean);
 
-module.exports = { hitTest, itemOf, groupIds, transparentCanvas, OWNER_REFUSALS, OVERSIZE_WIDTH, solidPng, quadrantPng, oversizePng, corruptPng, stage, AssertionFailure, createContext, pinNow, pinned, history, apply, resource, step, exportPng, exportIntact, saveAs, reopen,
+module.exports = { anchors, hitTest, itemOf, groupIds, transparentCanvas, OWNER_REFUSALS, OVERSIZE_WIDTH, solidPng, quadrantPng, oversizePng, corruptPng, stage, AssertionFailure, createContext, pinNow, pinned, history, apply, resource, step, exportPng, exportIntact, saveAs, reopen,
   fresh, readObject, layerOrder, meshState, roundTrip, savedObjects, objectStrokeIds, sha, EvidenceError };

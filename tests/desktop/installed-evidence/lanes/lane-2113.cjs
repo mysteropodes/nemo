@@ -191,25 +191,27 @@ const rows = [
       await K.roundTrip(ctx, 'brush', e2);
     } },
 
-  { id: '2113-evaluate-vs-export-pin', title: 'the evaluated layer value agrees with the export; an edit after a pin cannot change what the pinned revision reports', tasks: ['D32', 'I16a'],
-    limitations: ['The document evaluate query is an opacity-document operation (authority NativeOpacityHistory) that the object owner refuses; the evaluated value is the layer opacity sample of the object property read (rawSample view).'],
+  { id: '2113-evaluate-vs-export-pin', title: 'the evaluated output (export alpha on a transparent canvas) agrees with the authored layer value; an edit after a pin cannot change what the pinned revision reports', tasks: ['D32', 'I16a'],
+    limitations: ['The document evaluate read (query.document.evaluate) is refused on an object project ("Unsupported object read operation."): the evaluated output is observed as the alpha of the export, the authored value as the object property read (rawSample). Needed for the evaluate read itself: an object-project evaluate query (see coverage.notCovered).'],
     async run(ctx) {
       const { layerUid } = await K.fresh(ctx, { transparent: true });
       await K.apply(ctx, 'create a rectangle', P.vectorCreate(P.vectorRecord({ layerUid, segments: P.rectSegments(40, 40, 200, 160), fill: RED })));
       const e0 = await K.exportPng(ctx, 'full');
+      ctx.eq('pixel', 'evaluated output at full opacity: the rectangle is alpha 255 and the empty canvas alpha 0', [probe.alphaAt(e0.image, 120, 100), probe.alphaAt(e0.image, 400, 300)], [255, 0]);
       const valueAt = async (revision, pin) => {
         const b = P.propertyRead(revision, pin, layerUid, 'opacity'), res = await ctx.wire.query(b.operation, b.payload);
         return res.ok ? { ok: true, value: res.result.value[0] } : { ok: false, error: res.error, frontDoor: res.frontDoor === true };
       };
       const valueNow = async () => { const { revision, pin } = await K.pinNow(ctx); return valueAt(revision, pin); };
       const ev0 = await valueNow();
-      ctx.eq('read', 'evaluate reports full opacity for the layer', [ev0.ok, ev0.value], [true, 100]);
+      ctx.eq('read', 'the authored opacity of the layer is full (the property read, rawSample)', [ev0.ok, ev0.value], [true, 100]);
       await K.apply(ctx, 'layer opacity to half', () => opacityBuilder(ctx, layerUid, 0.5));
       const e1 = await K.exportPng(ctx, 'half');
       const ev1 = await valueNow();
-      ctx.near('read', 'evaluate reports half opacity', ev1.value, 50, 0.5);
+      ctx.near('read', 'the authored opacity after the edit is half', ev1.value, 50, 0.5);
       const ratio = probe.coverageRatio(e0.image, e1.image, probe.inkBounds(e0.image).box);
-      ctx.near('pixel', 'the export coverage agrees with the evaluated value', ratio, ev1.value / 100, 0.08);
+      ctx.near('pixel', 'the export coverage agrees with the authored value', ratio, ev1.value / 100, 0.08);
+      ctx.near('pixel', 'the evaluated output: export alpha is the authored opacity (50 of 100) of 255', probe.alphaAt(e1.image, 120, 100), (ev1.value / 100) * 255, 3);
       const { revision: r1, pin: p1 } = await K.pinNow(ctx);
       await K.apply(ctx, 'edit after the pin: opacity to a quarter', () => opacityBuilder(ctx, layerUid, 0.25));
       const e2 = await K.exportPng(ctx, 'quarter');
@@ -221,10 +223,11 @@ const rows = [
       ctx.ok('reply', 'a history read with the pre-edit pin is a typed stale refusal from the owner', typed(staleRead, STALE), staleRead.ok ? 'accepted' : { code: staleRead.error.code, frontDoor: staleRead.frontDoor === true }, STALE);
       const ev2 = await valueNow();
       ctx.near('read', 'the current revision evaluates to a quarter', ev2.value, 25, 0.5);
+      ctx.near('pixel', 'the evaluated output at the current revision: export alpha is a quarter of 255', probe.alphaAt(e2.image, 120, 100), (ev2.value / 100) * 255, 3);
       await K.step(ctx, 'undo the edit', 'undo');
       ctx.eq('pixel', 'undo returns the export to the pinned state', (await K.exportPng(ctx, 'back')).digest, e1.digest);
       await K.roundTrip(ctx, 'evaluate', e1);
     } },
 ];
 
-module.exports = { lane: '2113', issue: 2113, rows };
+module.exports = { lane: '2113', issue: 2113, rows: [...rows, ...require('./rows-2113-brush-quota.cjs').rows] };

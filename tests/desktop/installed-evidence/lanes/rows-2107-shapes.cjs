@@ -64,7 +64,7 @@ const rows = [
       const again = await K.exportPng(ctx, 'transparent-again');
       ctx.eq('pixel', 'redo restores the transparent export exactly', again.digest, clear.digest);
       const trip = await K.roundTrip(ctx, 'canvas', again);
-      ctx.eq('file', 'the saved project keeps the transparent canvas background', trip.first.document.canvasBg, '#00000000');
+      ctx.eq('file', 'the saved project keeps the transparent canvas background', trip.first.document.project.canvasBg, '#00000000');
       ctx.eq('pixel', 'after reopen the corner is still alpha 0 and the white rectangle alpha 255', [probe.alphaAt(trip.exported.image, 5, 5), probe.alphaAt(trip.exported.image, 250, 60)], [0, 255]);
     } },
 
@@ -85,13 +85,17 @@ const rows = [
       ctx.eq('pixel', 'inside the quarter is painted, left of the centre and above it are not', [alpha(ePie, 190, 130), alpha(ePie, 90, 130), alpha(ePie, 190, 80)], [255, 0, 0]);
       ctx.near('pixel', 'the pie ink bounds are the quarter of the box', probe.inkBounds(ePie.image, { box: [0, 0, 300, 359] }).box, [140, 110, 239, 159], 2);
       await K.apply(ctx, 'ellipse donut: inner radius 0.5 over almost a full turn', P.parametricSet(te, { kind: 'ellipse', startAngle: 0, sweep: 359.9, innerRadius: 0.5 }));
-      const donut = await K.readObject(ctx, te);
-      ctx.near('read', 'the donut anchors are the baseline outer arc followed by the inner arc walked back', flat(pts(donut.object)), flat(arcAnchors(140, 110, 100, 50, 0, 359.9, 0.5)), 1e-6);
+      // 90 steps: 91 outer and 91 inner anchors, more than the whole-object read can answer, so the anchors are paged.
+      const donut = await K.anchors(ctx, te);
+      ctx.eq('read', 'the donut has 182 anchors', donut.length, 182);
+      ctx.near('read', 'the donut anchors are the baseline outer arc followed by the inner arc walked back', flat(donut), flat(arcAnchors(140, 110, 100, 50, 0, 359.9, 0.5)), 1e-6);
+      ctx.eq('read', 'the stored intent is the donut: inner radius 0.5, sweep 359.9', K.itemOf(await K.hitTest(ctx, layerUid), ell).paramShape, { innerRadius: 0.5, kind: 'ellipse', startAngle: 0, sweep: 359.9 });
       const eDonut = await K.exportPng(ctx, 'donut');
       ctx.eq('pixel', 'the donut hole and the area outside are clear, the ring is painted', [alpha(eDonut, 140, 110), alpha(eDonut, 140, 120), alpha(eDonut, 140, 150), alpha(eDonut, 140, 165)], [0, 0, 255, 0]);
       await K.step(ctx, 'undo the donut', 'undo');
       ctx.eq('read', 'undo restores the pie record exactly', (await K.readObject(ctx, te)).object, pie.object);
       await K.step(ctx, 'redo the donut', 'redo');
+      ctx.eq('read', 'redo restores the donut anchors', await K.anchors(ctx, te), donut);
       // Star box (340,40)-(540,160): outer radius min(w,h)/2 = 60 about (440, 100).
       await K.apply(ctx, 'polygon: six points, inner ratio 1', P.parametricSet(ts, { kind: 'star', pointCount: 6, innerRatio: 1 }));
       const hex = await K.readObject(ctx, ts);
@@ -111,8 +115,8 @@ const rows = [
       await K.apply(ctx, 'the same star again', P.parametricSet(ts, { kind: 'star', pointCount: 5, innerRatio: 0.5 }), { noop: true });
       await K.apply(ctx, 'parameters of a stale target', P.parametricSet(P.target(layerUid, 'native-stroke:99999:9'), { kind: 'star', pointCount: 5, innerRatio: 0.5 }), { refused: true });
       await K.roundTrip(ctx, 'shapes', eStar, async () => {
-        const [again, star2] = [await K.readObject(ctx, te), await K.readObject(ctx, ts)];
-        ctx.eq('read', 'the donut and the star survive save and reopen with their intent and anchors', [again.ok && again.object, star2.ok && star2.object], [donut.object, five.object]);
+        const star2 = await K.readObject(ctx, ts);
+        ctx.eq('read', 'the donut anchors and the star record survive save and reopen', [await K.anchors(ctx, te), star2.ok && star2.object], [donut, five.object]);
       });
     } },
 

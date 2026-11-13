@@ -176,4 +176,4 @@ const rows = [
     } },
 ];
 
-module.exports = { lane: '2112', issue: 2112, rows };
+module.exports = { lane: '2112', issue: 2112, rows: [...rows, ...require('./rows-2112-text-layout.cjs').rows] };
