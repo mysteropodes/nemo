@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.text": "Read the text of a text object."
+  },
   "operations": [
     "query.document.object.text"
   ],

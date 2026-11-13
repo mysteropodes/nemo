@@ -14,7 +14,8 @@ function app(options = {}) {
     saveAs: async (path) => { calls.push(['saveAs', path]); return options.saveResult || { status: 'saved', acknowledged: true }; } };
   const tabs = {
     held: () => held,
-    openPath: async (path) => { calls.push(['tabs.openPath', path]); held = { name: 'prepared' }; return { status: 'prepared', meta: held }; },
+    openPath: async (path) => { calls.push(['tabs.openPath', path]); if (options.alreadyOpen) return { status: 'already-open' };
+      held = { name: 'prepared' }; return { status: 'prepared', meta: held }; },
     activateClick: async (meta) => { calls.push(['activate', meta.name]); doc++; held = { name: 'previous' }; return { status: 'activated', meta: held }; },
     close: async (meta) => { calls.push(['close', meta.name]); held = null; return options.closeResult || { status: 'closed' }; },
   };
@@ -163,4 +164,14 @@ test('a refused or stuck Open answers with the app notice instead of waiting out
     [false, 'unavailable', 'The project could not be opened. App notice: Could not open native project: scope']);
   const stuck = await app({ active: false, openHangs: true, timeoutMs: 20 }).lifecycle.handle(request('project.open', { path: '/tmp/A.json' }));
   assert.deepEqual([stuck.ok, stuck.error.code, stuck.error.message], [false, 'indeterminate', 'The Open did not settle.']);
+});
+
+test('opening the file that is already open says so and how to continue, with the code unchanged', async () => {
+  const { calls, lifecycle } = app({ alreadyOpen: true });
+  const response = await lifecycle.handle(request('project.open', { path: '/tmp/A.json' }));
+  assert.equal(response.ok, false);
+  assert.equal(response.error.code, 'unavailable');
+  assert.match(response.error.message, /already the open document/);
+  assert.match(response.error.message, /snapshot/);
+  assert.deepEqual(calls, [['tabs.openPath', '/tmp/A.json']], 'nothing was activated or closed');
 });

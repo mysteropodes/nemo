@@ -207,10 +207,11 @@
         "contract::NativeStatusRequest",
         "contract::NATIVE_API_VERSION",
         "contract::Operation",
+        "discovery_catalog",
         "registry",
         "wire"
       ],
-      "note": "The versioned nemo-mcp transport port (rust.mcp.transport, nemo-mcp/src/lib.rs publicApi) consumed by application_mcp.rs, native host contract/commands, and focused tests. Host-release TESTS alone also use the existing registry/wire items to prove the real owner over authenticated TCP; production modules gain no edge. This legacy form shares one item list across its named modules; a declared item covers itself and deeper paths (for example, registry covers registry::Endpoint). Every other module is denied, and an undeclared nemo_mcp path is a private-port-access violation."
+      "note": "The versioned nemo-mcp transport port (rust.mcp.transport, nemo-mcp/src/lib.rs publicApi) consumed by application_mcp.rs, native host contract/commands, and focused tests. Host-release TESTS alone also use the existing registry/wire items to prove the real owner over authenticated TCP, and discovery_catalog (the read-only capability declaration view) to hold the owner to what discovery reports available (#1049); production modules gain no edge. This legacy form shares one item list across its named modules; a declared item covers itself and deeper paths (for example, registry covers registry::Endpoint). Every other module is denied, and an undeclared nemo_mcp path is a private-port-access violation."
     },
     "native_engine": {
       "moduleItems": {

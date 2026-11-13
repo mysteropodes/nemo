@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.project.camera.read": "Read the project camera."
+  },
   "operations": [
     "query.document.object.project.camera.read"
   ],

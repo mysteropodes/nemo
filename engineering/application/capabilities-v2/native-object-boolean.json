@@ -9,6 +9,12 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.boolean.apply": "Combine shapes with a boolean operation (union, subtract, intersect).",
+    "command.document.object.boolean.erase": "Erase part of a shape with a boolean cut.",
+    "command.document.object.boolean.flatten": "Flatten a group of shapes into one result."
+  },
   "operations": [
     "command.document.object.boolean.apply",
     "command.document.object.boolean.erase",

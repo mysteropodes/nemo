@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.property.metadata": "Read the property list of a layer with units and ranges."
+  },
   "operations": [
     "query.document.object.property.metadata"
   ],

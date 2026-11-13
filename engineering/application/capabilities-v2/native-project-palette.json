@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.project.palette.read": "Read the project color palette.",
+    "command.document.object.project.palette.edit": "Edit the project color palette."
+  },
   "operations": [
     "query.document.object.project.palette.read",
     "command.document.object.project.palette.edit"

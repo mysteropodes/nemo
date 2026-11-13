@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.layer.timing": "Read the timing of a layer: keys, holds and range."
+  },
   "operations": [
     "query.document.object.layer.timing"
   ],

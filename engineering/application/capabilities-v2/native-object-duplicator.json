@@ -9,6 +9,13 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.duplicator.set": "Create or update a duplicator.",
+    "command.document.object.duplicator.objects": "Set the objects a duplicator repeats.",
+    "command.document.object.duplicator.path": "Set the path a duplicator follows.",
+    "command.document.object.duplicator.config": "Configure a duplicator."
+  },
   "operations": [
     "command.document.object.duplicator.set",
     "command.document.object.duplicator.objects",

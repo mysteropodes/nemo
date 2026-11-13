@@ -9,6 +9,13 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.tween.generate": "Generate in-between frames.",
+    "command.document.object.tween.regenerate": "Regenerate in-between frames.",
+    "command.document.object.tween.split": "Split a tween.",
+    "command.document.object.tween.reassign": "Reassign tween matches."
+  },
   "operations": [
     "command.document.object.tween.generate",
     "command.document.object.tween.regenerate",

@@ -331,7 +331,7 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     tools.sort();
     assert_eq!(tools, ["nemo_command", "nemo_discover", "nemo_query"]);
     let discover = client
-        .call_tool(CallToolRequestParams::new("nemo_discover"))
+        .call_tool(CallToolRequestParams::new("nemo_discover").with_arguments(json!({"detail": "full"}).as_object().unwrap().clone()))
         .await
         .unwrap();
     assert_eq!(

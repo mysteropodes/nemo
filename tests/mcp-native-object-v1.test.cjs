@@ -27,10 +27,13 @@ test('a v1 snapshot on a native object project answers the owner layer state', (
 
 test('other v1 requests on a native object project answer a typed refusal with the project identity', () => {
   const { ops, handled } = operations(project);
-  for (const operation of ['property.get', 'property.set', 'history.undo']) {
+  const base = 'Native object projects answer only capabilities, snapshot and native operations (apiVersion 2).';
+  const instead = { 'property.get': 'query.document.object.property.read', 'property.set': 'command.document.object.property.edit',
+    'history.undo': 'command.document.object.undo', 'diagnostics.trace': null };
+  for (const operation of Object.keys(instead)) {
     assert.deepEqual(ops.handleV1({ apiVersion: 1, requestId: 'r-' + operation, operation, payload: {} }),
       Object.assign(envelope(operation), { ok: false, error: { code: 'unavailable',
-        message: 'Native object projects answer only capabilities, snapshot and native operations (apiVersion 2).' } }));
+        message: base + (instead[operation] ? ' Use ' + instead[operation] + ' instead.' : '') } }));
   }
   assert.deepEqual(handled, [], 'the v1 opacity handler never sees an object-project request');
 });
@@ -79,4 +82,12 @@ test('capabilities answer what a native project serves, with or without an open 
     { apiVersion: 1, requestId: 'r-boot', instanceId: 'instance-A', documentId: '', revision: 0, ok: true, result });
   assert.deepEqual(handled, []);
   assert.deepEqual(booting.handled, []);
+});
+
+test('the v1 refusal hints are the declared useInstead pairs of the opacity capability', () => {
+  const declared = require('../engineering/application/capabilities-v2/native-opacity.json').useInstead.object;
+  const { ops } = operations(project);
+  for (const [operation, other] of Object.entries(ops.objectUseInstead)) assert.equal(declared[operation], other, operation);
+  for (const operation of ['property.get', 'property.set', 'property.key.set', 'property.key.remove', 'property.animation.set',
+    'history.undo', 'history.redo']) assert.ok(ops.objectUseInstead[operation], operation + ' has a replacement');
 });

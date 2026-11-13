@@ -3,6 +3,36 @@ use crate::object_snapshot::{ObjectSnapshot, ReadAdmission, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{
     DispatchError, DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
 };
+/// Opacity-document operations, each with the object operation to use instead. An
+/// object document names the replacement when it refuses one of these. The capability
+/// declarations carry the same pairs (`useInstead` in native-opacity.json); the desktop
+/// discovery test checks the message for every declared pair.
+const OPACITY_DOCUMENT_ALTERNATIVES: &[(&str, &str)] = &[
+    ("command.document.apply", "command.document.object.property.edit"),
+    ("query.document.opacity", "query.document.object.property.read"),
+    ("query.document.revision", "query.document.object"),
+    ("query.document.snapshot.acquire", "query.document.object"),
+    ("query.document.serialize", "project.saveAs"),
+    ("query.document.evaluate", "query.document.object.property.read"),
+    ("transaction.begin", "command.document.object.property.edit"),
+    ("transaction.update", "command.document.object.property.edit"),
+    ("transaction.commit", "command.document.object.property.edit"),
+    ("transaction.cancel", "command.document.object.undo"),
+    ("transaction.status", "query.document.object.history"),
+    ("history.undo", "command.document.object.undo"),
+    ("history.redo", "command.document.object.redo"),
+    ("job.export.png.begin", "project.export"),
+    ("job.export.png.status", "project.export"),
+    ("job.export.png.cancel", "project.export"),
+];
+
+fn opacity_document_refusal(operation: &str) -> Option<String> {
+    let (_, other) = OPACITY_DOCUMENT_ALTERNATIVES.iter().find(|(op, _)| *op == operation)?;
+    Some(format!(
+        "Unsupported object read operation. {operation} applies to opacity documents only; this is an object document. Use {other} instead."
+    ))
+}
+
 pub(super) fn envelope_identifier(value: &str) -> bool {
     let bytes = value.as_bytes();
     !bytes.is_empty()
@@ -58,6 +88,9 @@ impl ObjectSnapshot {
                 DispatchErrorCode::WrongDocument,
                 "Object read targets a different document.",
             );
+        }
+        if let Some(message) = opacity_document_refusal(&request.operation) {
+            return failure(DispatchErrorCode::InvalidRequest, &message);
         }
         if request.cancelled_before_dispatch {
             return failure(

@@ -6,6 +6,10 @@
   "status": "active",
   "availability": { "state": "available", "reason": null },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["opacity"],
+  "purposes": {
+    "query.diagnostics.recent": "Read the bounded recent request trace of the application."
+  },
   "operations": ["query.diagnostics.recent"],
   "handlerKey": "native-engine::application::NativeApplication::dispatch",
   "effects": {

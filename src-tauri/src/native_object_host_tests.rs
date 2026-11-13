@@ -459,3 +459,6 @@ fn pinned_complete_opaque_data_and_fallible_library_reads_survive_real_owner_dro
         ))
         .is_err());
 }
+
+#[path = "native_discovery_availability_tests.rs"]
+mod discovery_availability_tests;

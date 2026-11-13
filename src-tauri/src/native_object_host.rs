@@ -365,6 +365,7 @@ impl NativeDispatch for NativeObjectHost {
     fn object_client_available(&self) -> bool {
         self.released.is_none()
     }
+    fn document_kind(&self) -> &'static str { "object" }
     fn dispatch(&mut self, request: OpacityRequest) -> Result<ResponseEnvelope, String> {
         if self.released.is_some() {
             return Err("native object host was released".into());

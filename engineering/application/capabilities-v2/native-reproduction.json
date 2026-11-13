@@ -6,6 +6,14 @@
   "status": "active",
   "availability": { "state": "available", "reason": null },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["opacity"],
+  "purposes": {
+    "command.reproduction.opt_in": "Opt the session into reproduction recording.",
+    "query.reproduction.status": "Read the reproduction recording status.",
+    "query.reproduction.export": "Export the recorded reproduction.",
+    "query.reproduction.report": "Read the reproduction report.",
+    "query.reproduction.replay": "Replay a recorded reproduction."
+  },
   "operations": [
     "command.reproduction.opt_in",
     "query.reproduction.status",

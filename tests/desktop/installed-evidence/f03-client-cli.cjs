@@ -64,7 +64,7 @@ function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, repor
   const config = path.join(reportDir, 'claude.mcp-config.json');
   return { command, input: prompt, cwd, lastMessage: null, model: asked,
     files: { [config]: JSON.stringify({ mcpServers: { nemo: { command: mcpCommand, args: [], env: { NEMO_MCP_REGISTRY: mcpRegistry } } } }, null, 2) + '\n' },
-    args: ['-p', '--model', asked, '--mcp-config', config, '--strict-mcp-config', '--tools', 'Read,Grep', '--allowedTools', 'mcp__nemo__nemo_discover', 'mcp__nemo__nemo_query', 'mcp__nemo__nemo_command', 'Read', 'Grep',
+    args: ['-p', '--model', asked, '--mcp-config', config, '--strict-mcp-config', '--tools', '', '--allowedTools', 'mcp__nemo__nemo_discover', 'mcp__nemo__nemo_query', 'mcp__nemo__nemo_command',
       '--output-format', 'stream-json', '--verbose', '--max-turns', String(maxTurns), '--no-session-persistence'] };
 }
 

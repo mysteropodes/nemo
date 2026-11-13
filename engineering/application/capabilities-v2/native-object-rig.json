@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.rig.edit": "Edit a rig: bones, bindings and controls.",
+    "command.document.object.rig.pose": "Set a rig pose."
+  },
   "operations": [
     "command.document.object.rig.edit",
     "command.document.object.rig.pose"

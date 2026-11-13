@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.audio.track.edit": "Edit an audio track: add, move, trim, mute or remove it."
+  },
   "operations": [
     "command.document.object.audio.track.edit"
   ],

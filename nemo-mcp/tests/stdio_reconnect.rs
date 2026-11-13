@@ -167,7 +167,7 @@ async fn executable_rediscovers_replaced_registration_without_restarting() {
         let transport = TokioChildProcess::new(command).unwrap();
         let client = bounded(().serve(transport)).await.unwrap();
 
-        let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
+        let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover").with_arguments(json!({"detail": "full"}).as_object().unwrap().clone())))
             .await
             .unwrap();
         let mut discovery = discovery.structured_content.unwrap();
@@ -209,7 +209,7 @@ async fn executable_rediscovers_replaced_registration_without_restarting() {
             unavailable.structured_content.unwrap()["error"]["code"],
             "unavailable"
         );
-        let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
+        let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover").with_arguments(json!({"detail": "full"}).as_object().unwrap().clone())))
             .await
             .unwrap();
         let mut discovery = discovery.structured_content.unwrap();
@@ -223,7 +223,7 @@ async fn executable_rediscovers_replaced_registration_without_restarting() {
 
         let _replacement_registration =
             Registration::create(registry.path(), &replacement).unwrap();
-        let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
+        let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover").with_arguments(json!({"detail": "full"}).as_object().unwrap().clone())))
             .await
             .unwrap();
         let mut discovery = discovery.structured_content.unwrap();
@@ -363,7 +363,7 @@ async fn native_only_discovery(legacy_silent: bool, native_reply: &'static str) 
     let client = bounded(().serve(TokioChildProcess::new(command).unwrap()))
         .await
         .unwrap();
-    let result = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
+    let result = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover").with_arguments(json!({"detail": "full"}).as_object().unwrap().clone())))
         .await
         .unwrap();
     assert_ne!(result.is_error, Some(true));

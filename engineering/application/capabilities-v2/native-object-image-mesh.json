@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.image.mesh.edit": "Edit the mesh of an imported image."
+  },
   "operations": [
     "command.document.object.image.mesh.edit"
   ],

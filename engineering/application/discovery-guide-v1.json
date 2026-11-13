@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 1,
+  "description": "Start-here guide served by the default nemo_discover answer, one list of steps per document kind. Each step names one operation with the smallest request that is valid for it. Tokens: payload value \"$revision\" is replaced by the open document's current revision, \"<documentSnapshotId>\" and \"<layerUid>\" stay for the client to fill from an earlier step. `expectedRevision: true` adds the current revision to the request envelope (commands carry it, reads never do). Every example is validated against the request schema by a test, and every operation must be declared by a registered capability.",
+  "notes": [
+    "Reads carry atRevision (the current revision) and, after the pin step, documentSnapshotId; they never carry expectedRevision.",
+    "Commands carry expectedRevision (the revision returned by your previous command or read) and a requestId that is new for each command.",
+    "A refusal names the operation to use instead when the one you called does not apply to the open document."
+  ],
+  "kinds": {
+    "object": {
+      "title": "Object document (the project kind the app opens today)",
+      "steps": [
+        {
+          "id": "snapshot",
+          "tool": "nemo_query",
+          "apiVersion": 1,
+          "operation": "snapshot",
+          "purpose": "Orient: documentId, revision, current frame, totalFrames, canvas size and the layer list (layer id is the layerUid).",
+          "payload": {}
+        },
+        {
+          "id": "pin",
+          "tool": "nemo_command",
+          "apiVersion": 2,
+          "operation": "query.document.object",
+          "purpose": "Take the snapshot pin: result.documentSnapshotId, plus the presented contextId and frame. Property and history reads need it.",
+          "payload": { "atRevision": "$revision", "view": { "kind": "presentation" } }
+        },
+        {
+          "id": "targets",
+          "tool": "nemo_command",
+          "apiVersion": 2,
+          "operation": "query.document.object.property.metadata",
+          "purpose": "List the objects and properties that can be read, a page at a time (offset, limit).",
+          "payload": {
+            "atRevision": "$revision",
+            "documentSnapshotId": "<documentSnapshotId>",
+            "view": { "kind": "targets", "offset": 0, "limit": 8 }
+          }
+        },
+        {
+          "id": "read-property",
+          "tool": "nemo_command",
+          "apiVersion": 2,
+          "operation": "query.document.object.property.read",
+          "purpose": "Read a property at a frame (opacity is on a 0..100 scale): result.value. Other views: authoredKeys, expressionSource.",
+          "payload": {
+            "atRevision": "$revision",
+            "documentSnapshotId": "<documentSnapshotId>",
+            "view": {
+              "kind": "rawSample",
+              "target": { "contextId": "scene-root", "layerUid": "<layerUid>" },
+              "property": "opacity",
+              "frame": 0
+            }
+          }
+        },
+        {
+          "id": "edit-property",
+          "tool": "nemo_command",
+          "apiVersion": 2,
+          "operation": "command.document.object.property.edit",
+          "purpose": "Edit a property: setValue, setKey, setAnimated, setExpression. One history entry, revision +1.",
+          "expectedRevision": true,
+          "payload": {
+            "command": "object.property.edit",
+            "target": { "contextId": "scene-root", "layerUid": "<layerUid>" },
+            "property": "opacity",
+            "action": { "kind": "setValue", "frame": 0, "values": [40] }
+          }
+        },
+        {
+          "id": "undo",
+          "tool": "nemo_command",
+          "apiVersion": 2,
+          "operation": "command.document.object.undo",
+          "purpose": "Undo the last history entry (payload steps: N jumps back N entries). Revision +1.",
+          "expectedRevision": true,
+          "payload": { "command": "object.undo" }
+        },
+        {
+          "id": "redo",
+          "tool": "nemo_command",
+          "apiVersion": 2,
+          "operation": "command.document.object.redo",
+          "purpose": "Redo the last undone entry. Revision +1.",
+          "expectedRevision": true,
+          "payload": { "command": "object.redo" }
+        },
+        {
+          "id": "history",
+          "tool": "nemo_command",
+          "apiVersion": 2,
+          "operation": "query.document.object.history",
+          "purpose": "Read undoDepth and redoDepth of the open document.",
+          "payload": { "atRevision": "$revision", "documentSnapshotId": "<documentSnapshotId>" }
+        },
+        {
+          "id": "save",
+          "tool": "nemo_command",
+          "apiVersion": 1,
+          "operation": "project.saveAs",
+          "purpose": "Save the open document to an absolute path.",
+          "expectedRevision": true,
+          "payload": { "path": "/absolute/path/project.json" }
+        },
+        {
+          "id": "open",
+          "tool": "nemo_command",
+          "apiVersion": 1,
+          "operation": "project.open",
+          "purpose": "Open another project file (refused when it is the file already open, and while the open project has unsaved changes).",
+          "expectedRevision": true,
+          "payload": { "path": "/absolute/path/other-project.json" }
+        },
+        {
+          "id": "export",
+          "tool": "nemo_command",
+          "apiVersion": 1,
+          "operation": "project.export",
+          "purpose": "Export frames as png, svg or lottie into an absolute destination.",
+          "expectedRevision": true,
+          "payload": { "format": "png", "destination": "/absolute/path/export", "start": 0, "end": 0 }
+        }
+      ]
+    },
+    "opacity": {
+      "title": "Opacity document (single-property native document)",
+      "steps": [
+        {
+          "id": "snapshot",
+          "tool": "nemo_query",
+          "apiVersion": 1,
+          "operation": "snapshot",
+          "purpose": "Orient: documentId, revision, frame and the layer list.",
+          "payload": {}
+        },
+        {
+          "id": "read-opacity",
+          "tool": "nemo_command",
+          "apiVersion": 2,
+          "operation": "query.document.opacity",
+          "purpose": "Read the static opacity of a layer (0..100): result.value.",
+          "payload": { "stableTarget": { "layerUid": "<layerUid>" } }
+        },
+        {
+          "id": "set-opacity",
+          "tool": "nemo_command",
+          "apiVersion": 2,
+          "operation": "command.document.apply",
+          "purpose": "Set the static opacity (0..100) of a layer. Revision +1.",
+          "expectedRevision": true,
+          "payload": { "command": "layer.opacity.set", "stableTarget": { "layerUid": "<layerUid>" }, "value": 40 }
+        },
+        {
+          "id": "undo",
+          "tool": "nemo_command",
+          "apiVersion": 2,
+          "operation": "history.undo",
+          "purpose": "Undo the last edit.",
+          "expectedRevision": true,
+          "payload": {}
+        },
+        {
+          "id": "redo",
+          "tool": "nemo_command",
+          "apiVersion": 2,
+          "operation": "history.redo",
+          "purpose": "Redo the last undone edit.",
+          "expectedRevision": true,
+          "payload": {}
+        },
+        {
+          "id": "save",
+          "tool": "nemo_command",
+          "apiVersion": 1,
+          "operation": "project.saveAs",
+          "purpose": "Save the open document to an absolute path.",
+          "expectedRevision": true,
+          "payload": { "path": "/absolute/path/project.json" }
+        },
+        {
+          "id": "open",
+          "tool": "nemo_command",
+          "apiVersion": 1,
+          "operation": "project.open",
+          "purpose": "Open another project file.",
+          "expectedRevision": true,
+          "payload": { "path": "/absolute/path/other-project.json" }
+        },
+        {
+          "id": "export",
+          "tool": "nemo_command",
+          "apiVersion": 1,
+          "operation": "project.export",
+          "purpose": "Export frames as png, svg or lottie into an absolute destination.",
+          "expectedRevision": true,
+          "payload": { "format": "png", "destination": "/absolute/path/export", "start": 0, "end": 0 }
+        }
+      ]
+    },
+    "none": {
+      "title": "No native document is open",
+      "steps": [
+        {
+          "id": "open",
+          "tool": "nemo_command",
+          "apiVersion": 1,
+          "operation": "project.open",
+          "purpose": "Open a project file; then call nemo_discover again.",
+          "payload": { "path": "/absolute/path/project.json" }
+        },
+        {
+          "id": "new",
+          "tool": "nemo_command",
+          "apiVersion": 1,
+          "operation": "project.new",
+          "purpose": "Create a new blank project; then call nemo_discover again.",
+          "payload": { "canvasW": 1920, "canvasH": 1080, "fps": 24 }
+        }
+      ]
+    }
+  },
+  "legacyOperations": {
+    "capabilities": { "family": "document", "purpose": "Read the operations the open document answers on the apiVersion 1 route." },
+    "snapshot": { "family": "document", "purpose": "Read documentId, revision, frame, size and layers of the open document." },
+    "property.get": { "family": "property", "purpose": "Read a registered property (apiVersion 1; opacity documents only)." },
+    "property.set": { "family": "property", "purpose": "Set a registered property (apiVersion 1; opacity documents only)." },
+    "property.key.set": { "family": "property", "purpose": "Set a key of a registered property (apiVersion 1; opacity documents only)." },
+    "property.key.remove": { "family": "property", "purpose": "Remove a key of a registered property (apiVersion 1; opacity documents only)." },
+    "property.animation.set": { "family": "property", "purpose": "Turn a registered property animation on or off (apiVersion 1; opacity documents only)." },
+    "history.undo": { "family": "history", "purpose": "Undo the last edit (apiVersion 1; opacity documents only)." },
+    "history.redo": { "family": "history", "purpose": "Redo the last undone edit (apiVersion 1; opacity documents only)." },
+    "diagnostics.trace": { "family": "diagnostics", "purpose": "Read the bounded request trace (apiVersion 1)." },
+    "diagnostics.replay": { "family": "diagnostics", "purpose": "Replay a recorded request (apiVersion 1)." },
+    "project.open": { "family": "project", "purpose": "Open a project file by absolute path (any document kind)." },
+    "project.new": { "family": "project", "purpose": "Create a blank project of a given size and frame rate (any document kind)." },
+    "project.saveAs": { "family": "project", "purpose": "Save the open project to an absolute path (any document kind)." },
+    "project.export": { "family": "project", "purpose": "Export frames as png, svg or lottie (any document kind)." }
+  }
+}

@@ -9,6 +9,17 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.labs.speedLines": "Labs: generate speed lines.",
+    "command.document.object.labs.boil": "Labs: add a line boil effect.",
+    "command.document.object.labs.followPath": "Labs: make shapes follow a path.",
+    "command.document.object.labs.referenceFill": "Labs: fill from a reference layer.",
+    "command.document.object.labs.pingpong": "Labs: make frames play forward then backward.",
+    "command.document.object.labs.retime": "Labs: retime frames.",
+    "command.document.object.labs.interval": "Labs: set an interval between keys.",
+    "command.document.object.labs.moveToLayer": "Labs: move shapes to another layer."
+  },
   "operations": [
     "command.document.object.labs.speedLines",
     "command.document.object.labs.boil",

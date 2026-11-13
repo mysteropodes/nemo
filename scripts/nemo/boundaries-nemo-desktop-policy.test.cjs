@@ -77,7 +77,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'contract::NativeApplicationError', 'contract::NativeApplicationRequest',
       'contract::NativeApplicationResponse', 'contract::NativeHostStatus',
       'contract::NativeStatusRequest', 'contract::NATIVE_API_VERSION', 'contract::Operation',
-      'registry', 'wire'].sort());
+      'discovery_catalog', 'registry', 'wire'].sort());
   assert.deepEqual(policy.externalCratePorts.nemo_mcp.allowedModules.slice().sort(), [
     'rust.desktop.mcp.adapter', 'rust.desktop.native.application.commands',
     'rust.desktop.native.application.contract', 'rust.desktop.native.application.tests',

@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.project.customBrushPreset.read": "Read custom brush presets.",
+    "command.document.object.project.customBrushPreset.edit": "Edit custom brush presets."
+  },
   "operations": [
     "query.document.object.project.customBrushPreset.read",
     "command.document.object.project.customBrushPreset.edit"

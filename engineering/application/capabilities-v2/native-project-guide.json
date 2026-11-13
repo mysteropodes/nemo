@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.project.guide.read": "Read the project guides.",
+    "command.document.object.project.guide.edit": "Edit the project guides."
+  },
   "operations": [
     "query.document.object.project.guide.read",
     "command.document.object.project.guide.edit"

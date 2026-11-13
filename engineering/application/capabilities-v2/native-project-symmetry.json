@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.project.symmetry.read": "Read the symmetry settings.",
+    "command.document.object.project.symmetry.edit": "Edit the symmetry settings."
+  },
   "operations": [
     "query.document.object.project.symmetry.read",
     "command.document.object.project.symmetry.edit"

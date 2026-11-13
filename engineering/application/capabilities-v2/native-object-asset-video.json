@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.asset.video.link": "Link a video file as a document asset."
+  },
   "operations": [
     "command.document.object.asset.video.link"
   ],

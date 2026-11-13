@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.asset.attach": "Attach an image asset to the open document."
+  },
   "operations": [
     "command.document.object.asset.attach"
   ],

@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.project.placement.edit": "Edit the placement of the project on the canvas."
+  },
   "operations": [
     "command.document.object.project.placement.edit"
   ],

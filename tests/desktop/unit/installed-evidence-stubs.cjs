@@ -237,7 +237,7 @@ function createStubApp(options = {}) {
     switch (op) {
       // Real reply of the installed object owner (observed on the packaged candidate): the opacity-document queries are refused.
       case 'query.document.snapshot.acquire': case 'query.document.serialize': case 'query.document.evaluate':
-        return { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId, documentId: doc.id, contentRevision: doc.rev, ok: false, error: { code: 'invalid_request', message: 'Unsupported object read operation.' } };
+        return { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId, documentId: doc.id, contentRevision: doc.rev, ok: false, error: { code: 'invalid_request', message: 'Unsupported object read operation. ' + op + ' applies to opacity documents only; this is an object document. Use ' + ({ 'query.document.snapshot.acquire': 'query.document.object', 'query.document.serialize': 'project.saveAs', 'query.document.evaluate': 'query.document.object.property.read' })[op] + ' instead.' } };
       case 'query.document.object.history':
         if (p.documentSnapshotId !== snapshotId()) return ownerRefusal(request, 'invalid_request', 'pin-changed');
         return ok(2, request, { atRevision: doc.rev, documentSnapshotId: snapshotId(), undoDepth: doc.undo.length, redoDepth: doc.redo.length, offset: 0, entries: [] });

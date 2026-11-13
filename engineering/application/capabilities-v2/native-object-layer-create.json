@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.layer.create": "Create a layer."
+  },
   "operations": [
     "command.document.object.layer.create"
   ],

@@ -105,6 +105,10 @@
     // to a returned response, so a throw here left every v1 read waiting out the host's 30 s timeout (#2510).
     // snapshot answers the owner's own layer state, so a client can verify a native edit; other v1 reads refuse.
     // project.* belongs to the bootstrap's lifecycle: null hands the request back to the published original (#2510).
+    // Where a refused apiVersion 1 operation lives on an object project: `useInstead.object` of native-opacity.json (a test compares).
+    var OBJECT_USE_INSTEAD = {'property.get':'query.document.object.property.read','property.set':'command.document.object.property.edit',
+      'property.key.set':'command.document.object.property.edit','property.key.remove':'command.document.object.property.edit',
+      'property.animation.set':'command.document.object.property.edit','history.undo':'command.document.object.undo','history.redo':'command.document.object.redo'};
     var handleV1 = function(request){if(request&&typeof request.operation==='string'&&request.operation.indexOf('project.')===0)return null;
       var p=objectProject();if(!p)return v1.handle(request);var current=p.isActive()&&p.info();
       var out={apiVersion:1,requestId:request&&typeof request.requestId==='string'?request.requestId:''};
@@ -118,7 +122,8 @@
       if(request&&request.operation==='snapshot')return Object.assign(out,{ok:true,result:{frame:ports.currentFrame(),
         totalFrames:current.totalFrames,canvasW:current.canvasW,canvasH:current.canvasH,fps:current.fps,
         layers:(current.layers||[]).map(function(layer){return {id:layer.layerUid,name:layer.name,visible:layer.visible!==false,locked:layer.locked===true,shy:layer.shy===true};})}});
-      return Object.assign(out,{ok:false,error:{code:'unavailable',message:'Native object projects answer only capabilities, snapshot and native operations (apiVersion 2).'}});};
+      var alt=request&&OBJECT_USE_INSTEAD[request.operation];
+      return Object.assign(out,{ok:false,error:{code:'unavailable',message:'Native object projects answer only capabilities, snapshot and native operations (apiVersion 2).'+(alt?' Use '+alt+' instead.':'')}});};
 
     function reenterLegacy() { return false; }
     function disposeSession(session) {
@@ -313,7 +318,7 @@
       },
       history: function (action, requestId) { return history(action, requestId, 'direct'); },
       historyFromUi: function (action, requestId) { return history(action, requestId, 'ui'); },
-      legacyIntent: legacyIntent, handleV1: handleV1,
+      legacyIntent: legacyIntent, handleV1: handleV1, objectUseInstead: OBJECT_USE_INSTEAD,
       reenterLegacy: reenterLegacy, disposeSession: disposeSession,
       afterChange: afterChange, install: install
     });

@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.property.track.edit": "Edit the keys of a property track in bulk."
+  },
   "operations": [
     "command.document.object.property.track.edit"
   ],

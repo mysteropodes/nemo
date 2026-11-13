@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.property.edit": "Edit a layer property: set a value, key it, animate it, add an expression."
+  },
   "operations": [
     "command.document.object.property.edit"
   ],

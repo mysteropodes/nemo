@@ -847,9 +847,10 @@
       "note": "The compiled nemo-mcp-schema binary is executed by the Rust integration suite; parsed stdout must equal the committed transport schema, and embedded descriptors must equal the canonical capability JSON. P07/#1009 closes the original T04/#1053 zero-coverage execution gap."
     },
     "nemo-mcp/src/server.rs": {
-      "lines": 97.6,
-      "regions": 98.88,
-      "functions": 100
+      "lines": 97.02,
+      "regions": 98.6,
+      "functions": 100,
+      "note": "#1049: the discovery probe moved to discovery.rs, so the unchanged uncovered lines are a larger share of a smaller file; floors re-measured with cargo-llvm-cov 0.9.1, no covered line was removed from a test."
     },
     "nemo-mcp/src/server_command_projection.rs": {
       "lines": 96.66,
@@ -959,6 +960,29 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "#2368: unchanged layer-policy tests moved to the repository sibling-test convention; measured with pinned cargo-llvm-cov 0.9.1. Both test names and all assertions preserved; all existing production floors and aggregate floors remain unchanged."
+    },
+    "nemo-mcp/src/discovery.rs": {
+      "lines": 96.66,
+      "regions": 97.25,
+      "functions": 95.23,
+      "note": "#1049: measured with cargo-llvm-cov 0.9.1 on the complete unfiltered nemo-mcp suite; additive entry for the new compact-discovery module. Floors are floorPct of the measurement; every other entry, exclusion and aggregate is unchanged. Not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/discovery_catalog.rs": {
+      "lines": 98.32,
+      "regions": 97.26,
+      "functions": 97.43,
+      "note": "#1049: measured with cargo-llvm-cov 0.9.1 on the complete unfiltered nemo-mcp suite; additive entry for the new compact-discovery module. Floors are floorPct of the measurement; every other entry, exclusion and aggregate is unchanged. Not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/discovery_contract.rs": {
+      "lines": 95.65,
+      "regions": 95.47,
+      "functions": 100,
+      "note": "#1049: measured with cargo-llvm-cov 0.9.1 on the complete unfiltered nemo-mcp suite; additive entry for the new compact-discovery module. Floors are floorPct of the measurement; every other entry, exclusion and aggregate is unchanged. Not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/discovery_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#1049: new test file entry only; every prior entry, floor, exclusion and aggregate is preserved."
     }
   }
 }

@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.property.read": "Read a layer property at a frame: raw sample, authored keys or expression state."
+  },
   "operations": [
     "query.document.object.property.read"
   ],

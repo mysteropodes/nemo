@@ -137,6 +137,8 @@ test('the prompt is goals and paths only, and the invocations carry a per-invoca
   const paths = { static: '/w/s.json', keyed: '/w/k.json', saved60: '/w/60.json', saved: '/w/40.json' };
   const prompt = W.promptFor(paths);
   for (const word of ['nemo_command', 'nemo_discover', 'nemo_query', 'command.document', 'query.document', 'property.edit', 'property.read', 'rawSample', 'presentation', 'documentSnapshotId', 'layer.opacity', 'stableTarget', 'expectedRevision', 'history.undo', 'object.undo']) assert.ok(!prompt.includes(word), word);
+  // The prompt no longer says where anything is hidden: no project kind, no snapshot or view talk, no route advice.
+  for (const hint of ['object project', 'native', 'apiVersion', 'snapshot', 'views', 'declares', 'route', 'schema', 'offers on it']) assert.ok(!prompt.includes(hint), hint);
   for (const p of Object.values(paths).filter(p => p !== paths.static)) assert.ok(prompt.includes(p));
   const base = { command: '/bin/x', mcpCommand: '/pkg/MacOS/nemo-mcp', mcpRegistry: '/iso/mcp', prompt, cwd: '/w/cwd', reportDir: '/r' };
   const codex = C.invocation('codex', base);
@@ -150,8 +152,8 @@ test('the prompt is goals and paths only, and the invocations carry a per-invoca
   assert.ok(claude.args.includes('--strict-mcp-config') && claude.args[claude.args.indexOf('--mcp-config') + 1] === file);
   assert.equal(claude.args.indexOf('-p'), 0); assert.equal(claude.input, prompt);
   const tools = claude.args[claude.args.indexOf('--tools') + 1], allowed = claude.args.slice(claude.args.indexOf('--allowedTools') + 1, claude.args.indexOf('--output-format'));
-  assert.equal(tools, 'Read,Grep', 'only read-only built-in tools, for the discovery answer the client spills to a file');
-  assert.deepEqual(allowed, ['mcp__nemo__nemo_discover', 'mcp__nemo__nemo_query', 'mcp__nemo__nemo_command', 'Read', 'Grep']);
+  assert.equal(tools, '', 'no built-in tools: the compact discovery answer needs no file reader');
+  assert.deepEqual(allowed, ['mcp__nemo__nemo_discover', 'mcp__nemo__nemo_query', 'mcp__nemo__nemo_command']);
   assert.deepEqual(Object.keys(C.scrubbedEnv({ NEMO_MCP_REGISTRY: 'x', NEMO_TASK_ID: 'y', HOME: '/h' })), ['HOME']);
 });
 

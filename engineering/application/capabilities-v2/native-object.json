@@ -9,6 +9,14 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object": "Read the open document: a presentation view (gives the snapshot pin) or one object.",
+    "command.document.object.layer.visibility.set": "Show or hide a layer.",
+    "command.document.object.undo": "Undo one or several history entries.",
+    "command.document.object.redo": "Redo one history entry.",
+    "query.document.object.serialize": "Serialize the drawing (host only)."
+  },
   "operations": [
     "query.document.object",
     "command.document.object.layer.visibility.set",
