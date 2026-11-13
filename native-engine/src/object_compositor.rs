@@ -478,6 +478,10 @@ mod render_vector_pixels;
 #[cfg(test)]
 #[path = "../tests/object_brush_dab_pixels.rs"]
 mod object_brush_dab_pixels;
+// #2108 (evidence defect 1): a combined group paints its boolean result, not its members.
+#[cfg(test)]
+#[path = "../tests/object_group_combine_render.rs"]
+mod object_group_combine_render;
 #[cfg(test)]
 #[path = "../tests/object_compositor.rs"]
 mod tests;

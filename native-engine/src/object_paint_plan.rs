@@ -86,6 +86,9 @@ pub struct ObjectPaintPlan {
     indices: Arc<[usize]>,
     mixed: Arc<[PaintIndex]>,
     dabs: Arc<[dab_paint::DabPaint]>,
+    /// The sequence BEFORE combined groups were folded (every member still present): the hit-test listing reads it so a
+    /// combined shape stays independently selectable. `None` when no group combines (the listing is `mixed`).
+    listed: Option<Arc<[PaintIndex]>>,
 }
 impl ObjectPaintPlan {
     pub fn packet(&self) -> &ObjectFramePacket {
@@ -112,6 +115,9 @@ mod solo;
 // G16 option C (#2361): the dabs seeded brush-texture anchors paint, right after each anchor.
 #[path = "object_brush_dab_paint.rs"]
 pub(crate) mod dab_paint;
+// #2108 (evidence defect 1): a combining group paints its boolean result, not its members.
+#[path = "object_group_combine_paint.rs"]
+pub(crate) mod combine_paint;
 
 type LayerSequence = Vec<(usize, Vec<usize>)>;
 
@@ -143,12 +149,21 @@ pub fn prepare_object_paint_plan(
     masks.exclude_mask_paint(scene, &mut indices, &mut mixed);
     let mixed = crate::object_render_scene::media_scene::insert_slots(scene, mixed)?;
     let (mixed, dabs) = dab_paint::expand(scene, mixed)?;
+    let (mixed, dabs, listed) = match combine_paint::expand(scene, &mixed, &dabs)? {
+        Some((combined, extra)) => {
+            let mut all = dabs;
+            all.extend(extra);
+            (combined, all, Some(Arc::from(mixed)))
+        }
+        None => (mixed, dabs, None),
+    };
     Ok(ObjectPaintPlan {
         scene: Arc::new(scene.clone()),
         masks,
         indices: indices.into(),
         mixed: mixed.into(),
         dabs: dabs.into(),
+        listed,
     })
 }
 
