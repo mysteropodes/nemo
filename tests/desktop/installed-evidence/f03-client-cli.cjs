@@ -58,7 +58,7 @@ function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, repor
       ...set('approval_policy', '"never"'),
       ...set('mcp_servers.nemo.command', JSON.stringify(mcpCommand)), ...set('mcp_servers.nemo.args', '[]'),
       ...set('mcp_servers.nemo.env.NEMO_MCP_REGISTRY', JSON.stringify(mcpRegistry)),
-      ...set('mcp_servers.nemo.startup_timeout_sec', '60'), ...set('mcp_servers.nemo.tool_timeout_sec', '300'),
+      ...set('mcp_servers.nemo.default_tools_approval_mode', '"approve"'), ...set('mcp_servers.nemo.startup_timeout_sec', '60'), ...set('mcp_servers.nemo.tool_timeout_sec', '300'),
       '--output-last-message', lastMessage, '-'] };
   }
   const config = path.join(reportDir, 'claude.mcp-config.json');
