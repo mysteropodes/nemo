@@ -234,6 +234,37 @@ async function saveRetrying(ctx, label, file) {
   return res;
 }
 
+// The hit-test listing of a layer, every page: [{stableTarget, role, bounds, groupPath, paramShape, boxAngle, style, ...}] in paint order.
+// The listing is pinned to a presentation (workId, viewGeneration) that can change between the presentation read and the listing read
+// ("Subselect presentation changed", `unavailable`, observed on the installed app right after a command): that refusal is retried with a
+// fresh presentation and every retry is recorded in ctx.retries like any other.
+const LISTING_RACE = /Subselect presentation changed/;
+async function hitTest(ctx, layerUid) {
+  const items = [];
+  let cursor = 0;
+  for (let turn = 0; cursor !== null && turn < 64; turn++) {
+    let res, refusals = [], sent = 0;
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      sent = attempt;
+      const { revision, pin } = await pinNow(ctx), view = P.presentationRead(revision), shown = await ctx.wire.query(view.operation, view.payload);
+      ctx.book.ok('reply', 'listing: presentation answered', shown.ok === true, shown.ok ? 'ok' : shown.error);
+      const b = P.hitTestRead(revision, pin, { layerUid, frame: shown.result.frame, workId: shown.result.workId, viewGeneration: shown.result.viewGeneration, cursor });
+      res = await ctx.wire.query(b.operation, b.payload);
+      const race = !res.ok && res.error && res.error.code === 'unavailable' && LISTING_RACE.test(String(res.error.message));
+      if (!race) break;
+      refusals.push({ attempt, code: res.error.code, message: String(res.error.message).slice(0, 160) });
+      ctx.book.ok('reply', 'listing: attempt ' + attempt + ' refused as unavailable (' + res.error.message + ')', true, 'refused, retried');
+    }
+    if (refusals.length) ctx.retries.push({ operation: 'query.document.object subselect hit-test', label: 'listing of ' + layerUid, attempts: sent, refused: refusals.length, accepted: res.ok === true, refusals });
+    ctx.book.ok('reply', 'listing: page answered', res.ok === true, res.ok ? 'ok' : res.error);
+    items.push(...res.result.items);
+    cursor = res.result.nextCursor;
+  }
+  return items;
+}
+const itemOf = (items, strokeId) => items.find(i => i.stableTarget && i.stableTarget.strokeId === strokeId);
+const groupIds = item => (item && item.groupPath ? item.groupPath.map(g => g.id) : []);
+
 // New 640x360 project; a dirty open project is first saved to a scratch file, because project.new refuses unsaved changes.
 async function fresh(ctx, { w = 640, h = 360, fps = 24, transparent = false } = {}) {
   const was = await ctx.wire.discover();
@@ -368,5 +399,5 @@ function stage(ctx, name, bytes) {
 const savedObjects = document => (document && document.drawing && Array.isArray(document.drawing.objects) ? document.drawing.objects : []);
 const objectStrokeIds = document => savedObjects(document).map(object => object && object.target && object.target.strokeId).filter(Boolean);
 
-module.exports = { transparentCanvas, OWNER_REFUSALS, OVERSIZE_WIDTH, solidPng, quadrantPng, oversizePng, corruptPng, stage, AssertionFailure, createContext, pinNow, pinned, history, apply, resource, step, exportPng, exportIntact, saveAs, reopen,
+module.exports = { hitTest, itemOf, groupIds, transparentCanvas, OWNER_REFUSALS, OVERSIZE_WIDTH, solidPng, quadrantPng, oversizePng, corruptPng, stage, AssertionFailure, createContext, pinNow, pinned, history, apply, resource, step, exportPng, exportIntact, saveAs, reopen,
   fresh, readObject, layerOrder, meshState, roundTrip, savedObjects, objectStrokeIds, sha, EvidenceError };
