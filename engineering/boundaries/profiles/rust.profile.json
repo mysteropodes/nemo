@@ -697,6 +697,7 @@
         "object_scene_producer_component_join.rs",
         "object_scene_producer_rig.rs",
         "object_montage_layer.rs",
+        "object_group_combine_fold.rs",
         "object_shot_context.rs",
         "render_vector_stroke.rs",
         "object_scene_style_item.rs",
