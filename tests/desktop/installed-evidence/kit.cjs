@@ -28,7 +28,7 @@ const KINDS = new Set(['reply', 'read', 'pixel', 'file']);
 // (a second row's `scratch-1.json` was refused as "publication-response-unavailable"), so file names must never repeat across rows.
 let counter = 0;
 function createContext({ wire, work, rowId }) {
-  const assertions = [];
+  const assertions = [], retries = [];
   function record(kind, id, observed, expected, pass, note, bookkeeping) {
     if (!KINDS.has(kind)) throw new Error('unknown assertion kind ' + kind);
     assertions.push({ id: rowId + ': ' + id, kind, ...(bookkeeping ? { bookkeeping: true } : {}), observed: short(observed), expected: short(expected), verdict: pass ? 'pass' : 'fail', ...(note ? { note } : {}) });
@@ -45,6 +45,9 @@ function createContext({ wire, work, rowId }) {
   });
   return {
     wire, work, rowId, assertions,
+    // Every retried operation of the row, recorded as data (see saveRetrying) and reported by the receipt; `canvas` is what the row's exports
+    // are measured against ('opaque': the default canvas, ink is colour distance; 'transparent': a #00000000 canvas, ink is alpha).
+    retries, canvas: 'opaque',
     next: () => ++counter,
     ...make(false),
     book: make(true),
@@ -168,6 +171,7 @@ async function exportPng(ctx, tag) {
   const bytes = fs.readFileSync(files[0]);
   let image;
   try { image = probe.decodeExport(bytes); } catch (error) { ctx.book.ok('pixel', 'export ' + tag + ': decodes', false, String(error.message).slice(0, 120)); }
+  image.inkMode = ctx.canvas === 'transparent' ? 'alpha' : 'background';
   return { image, digest: probe.pixels(image), file: files[0], fileSha: sha(bytes), width: image.width, height: image.height };
 }
 // An export already written is evidence on disk: it must still be there, byte for byte, after later edits and exports.
@@ -205,23 +209,33 @@ async function reopen(ctx, file) {
 }
 
 // project.saveAs on the installed app is refused with a typed `unavailable` ("pin-changed-before-picker" or
-// "publication-response-unavailable") when it follows a change closely; an immediate second request is accepted. The refused attempts
-// are recorded, never hidden, and the save must still be accepted within a few attempts. Any other refusal is returned as it is.
+// "publication-response-unavailable") when it follows a change closely; an immediate second request is accepted. This is a product
+// defect, not a harness detail, so nothing about it is hidden: every refused attempt is recorded in `ctx.retries` as data (operation,
+// label, attempt number, the refusal's code and message, and how the operation ended), the runner copies that onto the row result
+// (`retried`, `retries`, a note) and the receipt totals count it. The save must still be accepted within a few attempts; any other refusal
+// is returned as it is.
 const SAVE_RACE = /pin-changed-before-picker|publication-response-unavailable/;
+const SAVE_ATTEMPTS = 4;
 async function saveRetrying(ctx, label, file) {
-  let res;
-  for (let attempt = 1; attempt <= 4; attempt++) {
+  let res, sent = 0;
+  const refusals = [];
+  for (let attempt = 1; attempt <= SAVE_ATTEMPTS; attempt++) {
+    sent = attempt;
     res = await ctx.wire.v1('project.saveAs', { path: file });
     const race = !res.ok && res.error && res.error.code === 'unavailable' && SAVE_RACE.test(String(res.error.message));
-    if (!race) return res;
+    if (!race) break;
+    refusals.push({ attempt, code: res.error.code, message: String(res.error.message).replace(/\s+/g, ' ').slice(0, 160) });
     ctx.book.ok('reply', label + ': save attempt ' + attempt + ' refused as unavailable (' + (String(res.error.message).match(SAVE_RACE) || [''])[0] + ')', true, 'refused, retried');
-    await new Promise(resolve => setTimeout(resolve, 250));
+    if (attempt < SAVE_ATTEMPTS) await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  if (refusals.length) {
+    ctx.retries.push({ operation: 'project.saveAs', label, attempts: sent, refused: refusals.length, accepted: res.ok === true, refusals });
   }
   return res;
 }
 
 // New 640x360 project; a dirty open project is first saved to a scratch file, because project.new refuses unsaved changes.
-async function fresh(ctx, { w = 640, h = 360, fps = 24 } = {}) {
+async function fresh(ctx, { w = 640, h = 360, fps = 24, transparent = false } = {}) {
   const was = await ctx.wire.discover();
   if (was.documentId) {
     const scratch = await saveRetrying(ctx, 'setup', path.join(ctx.work, 'scratch-' + ctx.next() + '.json'));
@@ -242,7 +256,18 @@ async function fresh(ctx, { w = 640, h = 360, fps = 24 } = {}) {
   ctx.book.ok('read', 'setup: new project has a layer', Array.isArray(layers) && layers.length >= 1 && typeof layers[0].layerUid === 'string', layers);
   const now = await ctx.wire.discover();
   ctx.book.ok('read', 'setup: a different document is open', typeof now.documentId === 'string' && now.documentId !== was.documentId, { documentId: now.documentId });
+  ctx.canvas = 'opaque';
+  if (transparent) await transparentCanvas(ctx);
   return { layerUid: layers[0].layerUid, documentId: now.documentId };
+}
+// A transparent canvas for the rest of the row: the export then carries the paint as alpha (see png-probe.cjs). It is one project
+// settings edit: one revision (checked here), one history entry (the row's own history checks are all relative to their start).
+async function transparentCanvas(ctx) {
+  const b = P.canvasBackground('#00000000'), before = await ctx.wire.discover(), res = await ctx.wire.command(b.operation, b.payload);
+  ctx.book.ok('reply', 'setup: transparent canvas accepted', res.ok === true, res.ok ? 'ok' : res.error);
+  const after = await ctx.wire.discover();
+  ctx.book.eq('read', 'setup: the canvas background is one revision', after.contentRevision, before.contentRevision + 1);
+  ctx.canvas = 'transparent';
 }
 
 async function readObject(ctx, stableTarget) {
@@ -343,5 +368,5 @@ function stage(ctx, name, bytes) {
 const savedObjects = document => (document && document.drawing && Array.isArray(document.drawing.objects) ? document.drawing.objects : []);
 const objectStrokeIds = document => savedObjects(document).map(object => object && object.target && object.target.strokeId).filter(Boolean);
 
-module.exports = { OWNER_REFUSALS, OVERSIZE_WIDTH, solidPng, quadrantPng, oversizePng, corruptPng, stage, AssertionFailure, createContext, pinNow, pinned, history, apply, resource, step, exportPng, exportIntact, saveAs, reopen,
+module.exports = { transparentCanvas, OWNER_REFUSALS, OVERSIZE_WIDTH, solidPng, quadrantPng, oversizePng, corruptPng, stage, AssertionFailure, createContext, pinNow, pinned, history, apply, resource, step, exportPng, exportIntact, saveAs, reopen,
   fresh, readObject, layerOrder, meshState, roundTrip, savedObjects, objectStrokeIds, sha, EvidenceError };

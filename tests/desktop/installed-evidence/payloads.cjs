@@ -100,6 +100,7 @@ const presentationRead = revision => ({ operation: QOBJ, payload: { atRevision: 
 const meshQuery = (revision, pin, { contextId, layerUid, frame, workId, viewGeneration, page }) => ({ operation: QOBJ,
   payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'imageMesh', contextId, layerUid, frame, workId, viewGeneration, page } } });
 const propertyMetadata = (revision, pin, layerUid) => ({ operation: 'query.document.object.property.metadata', payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'properties', target: { contextId: ROOT, layerUid }, offset: 0, limit: 8 } } });
+const canvasBackground = color => ({ operation: OBJ + 'project.settings.edit', payload: { command: 'object.project.settings.edit', action: { kind: 'setCanvasBackground', color } } });
 const historyRead = (revision, pin) => ({ operation: QOBJ + '.history', payload: { atRevision: revision, documentSnapshotId: pin } });
 // The layer's own sample of a property (rawSample view of query.document.object.property.read) at a frame, pinned.
 const propertyRead = (revision, pin, layerUid, property, frame = 0) => ({ operation: 'query.document.object.property.read',
@@ -109,4 +110,4 @@ module.exports = { OBJ, ROOT, target, seg, rectSegments, solid, vectorRecord, ve
   pathEffects, layerPolicy, undo, redo, groupCreate, groupUngroup, groupCombine, groupMode, groupRename, groupMemberRemove, booleanApply, booleanErase, booleanFlatten,
   layerCreate, layerDuplicate, layerRename, layerReorder, layerDelete, layerVisibility, layerSplit, selectionDelete, selectionDuplicate, clipboardCopy, clipboardCut, clipboardPaste,
   assetAttach, assetRemove, rasterDelete, rasterMove, rasterResize, rasterRotate, rasterOpacity, textBlock, textCreate, textEdit, textDelete, textTargets, textInspect, textBody,
-  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, propertyMetadata, meshAttach, meshSetOffset, presentationRead, meshQuery, historyRead, propertyRead };
+  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, propertyMetadata, meshAttach, meshSetOffset, presentationRead, meshQuery, historyRead, propertyRead, canvasBackground };

@@ -66,7 +66,9 @@ async function runRows({ rows, session, now = () => Date.now() }) {
       else if (error instanceof EvidenceError) { verdict = 'fail'; reason = error.kind + ': ' + brief(error); }
       else { verdict = 'fail'; reason = 'row error (' + (error && error.name) + '): ' + brief(error); }
     }
-    results.push({ ...base, verdict, reason, operations: session.wire.since(mark), assertions: ctx.assertions, ms: now() - started });
+    // A row that needed an operation retried says so on its own record: `retried` and the data of every retry (see kit.saveRetrying).
+    const retries = ctx.retries.map(r => ({ ...r, refusals: r.refusals.map(x => ({ ...x })) }));
+    results.push({ ...base, verdict, reason, retried: retries.length > 0, retries, operations: session.wire.since(mark), assertions: ctx.assertions, ms: now() - started });
   }
   return results;
 }
