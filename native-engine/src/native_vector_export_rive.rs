@@ -34,7 +34,7 @@ pub(crate) mod driver;
 #[path = "native_vector_export_rive_shapes.rs"]
 pub(crate) mod shapes;
 use shapes::{
-    apply_wobble, cubic_vertices, float, geometry, hash_seed, paints, point_command, rgba,
+    apply_wobble, cubic_vertices, filled, float, geometry, hash_seed, paints, point_command, rgba,
     straight, translation, wobble_params,
 };
 pub(crate) use shapes::{color_hex, num};
@@ -125,21 +125,8 @@ macro_rules! stroke_of {
                         reason: "a legacy fill record without a solid fill has no Rive representation",
                     });
                 };
-                let (v, i, o, closed) = geometry(path, index)?;
-                break 'stroke Ok(Some(Stroke {
-                    id: record.target.stroke_id.clone(),
-                    v,
-                    i,
-                    o,
-                    closed,
-                    fill: Some(rgba(&p.r, &p.g, &p.b, &p.a)?),
-                    stroke: None,
-                    width: 1.0,
-                    real: false,
-                    opacity: 1.0,
-                    texture: None,
-                    pre_texture_opacity: None,
-                }));
+                let fill = rgba(&p.r, &p.g, &p.b, &p.a)?;
+                break 'stroke Ok(Some(filled(&record.target.stroke_id, geometry(path, index)?, fill, 1.0)));
             }
             if record.family != VECTOR_FAMILY {
                 break 'stroke Err(RiveExportError::Unsupported {
@@ -255,34 +242,18 @@ fn strokes_by_layer(
                 continue;
             }
             // `!sd.isBrushTextureCopy`: the dabs stay out; the anchor is written with its own wobble.
-            // A combined group's result island is a filled shape and is written like one.
+            // A combined group's result island is a filled shape; a brush dab stays out (its anchor is written).
             PaintEntry::Dab(dab) => {
                 let Some(tag) = &dab.combine else { continue };
                 let Some(fill) = dab.svg_rgba else {
-                    return refuse(
-                        dab.source_index,
-                        "a combined group result styled with a stroke or gradient has no admitted Rive representation",
-                    );
+                    let reason = "a combined group result styled with a stroke or gradient has no admitted Rive representation";
+                    return refuse(dab.source_index, reason);
                 };
-                if dab.opacity == 0.0 {
-                    continue;
+                if dab.opacity != 0.0 {
+                    let id = format!("{}#combine{}", tag.stroke_id, tag.island);
+                    let shape = geometry(&dab.path, dab.source_index)?;
+                    push(&mut out, dab.layer_index, filled(&id, shape, fill, dab.opacity))?;
                 }
-                let (v, i, o, closed) = geometry(&dab.path, dab.source_index)?;
-                let stroke = Stroke {
-                    id: format!("{}#combine{}", tag.stroke_id, tag.island),
-                    v,
-                    i,
-                    o,
-                    closed,
-                    fill: Some(fill),
-                    stroke: None,
-                    width: 1.0,
-                    real: false,
-                    opacity: dab.opacity,
-                    texture: None,
-                    pre_texture_opacity: None,
-                };
-                push(&mut out, dab.layer_index, stroke)?;
                 continue;
             }
             // A video frame is never a stroke dict, so `exportRive` writes nothing for it.
