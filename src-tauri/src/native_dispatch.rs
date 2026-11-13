@@ -391,6 +391,8 @@ pub(crate) trait NativeDispatch: Send {
     fn instance_id(&self) -> &str;
     fn document_id(&self) -> &str;
     fn content_revision(&self) -> u64;
+    /// Kind of the open document as discovery names it: `object` or `opacity`.
+    fn document_kind(&self) -> &'static str { "opacity" }
     /// Only an active owner implementing the bounded raw object client opts in.
     fn object_client_available(&self) -> bool {
         false

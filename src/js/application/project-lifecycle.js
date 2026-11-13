@@ -80,6 +80,9 @@
       }
       var tabs = ports.tabs();
       var prepared = await tabs.openPath(path);
+      // The file is the open document: the app only focuses it. Say so and how to continue; the code stays `unavailable`.
+      if (prepared && prepared.status === 'already-open') return fail(request, 'unavailable',
+        'That project file is already the open document, so nothing was opened. Continue with it (read it with a snapshot) or open a different file.');
       if (!prepared || prepared.status !== 'prepared') return fail(request, 'unavailable', 'The project was not prepared (' + (prepared && prepared.status) + ').');
       var activated = await tabs.activateClick(tabs.held());
       if (!activated || activated.status !== 'activated') return fail(request, 'unavailable', 'The prepared project was not activated (' + (activated && activated.status) + ').');

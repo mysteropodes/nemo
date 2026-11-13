@@ -50,8 +50,7 @@
       "property.set": "command.document.object.property.edit",
       "property.key.set": "command.document.object.property.edit",
       "property.key.remove": "command.document.object.property.edit",
-      "property.animation.set": "command.document.object.property.edit",
-      "diagnostics.trace": "query.diagnostics.recent"
+      "property.animation.set": "command.document.object.property.edit"
     }
   },
   "operations": [

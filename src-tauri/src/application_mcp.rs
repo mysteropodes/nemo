@@ -318,13 +318,13 @@ fn native_status(
         })
     });
     Ok(NativeHostStatus {
-        api_version: NATIVE_API_VERSION,
-        request_id: request.request_id,
+        api_version: NATIVE_API_VERSION, request_id: request.request_id,
         instance_id: instance_id.to_owned(),
         available: reason.is_none(),
         document_id: current.map(|(_, application)| application.document_id().into()),
         content_revision: current.map(|(_, application)| application.content_revision()),
         lifecycle_generation: current.map(|(generation, _)| generation),
+        document_kind: current.map(|(_, a)| a.document_kind().to_owned()), pid: Some(std::process::id()),
         reason: reason.map(str::to_owned),
     })
 }

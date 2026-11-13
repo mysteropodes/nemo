@@ -6,7 +6,7 @@
   "status": "active",
   "availability": { "state": "available", "reason": null },
   "transportSchema": "../native-transport-v2.schema.json",
-  "documentKinds": ["object"],
+  "documentKinds": ["opacity"],
   "purposes": {
     "command.reproduction.opt_in": "Opt the session into reproduction recording.",
     "query.reproduction.status": "Read the reproduction recording status.",
