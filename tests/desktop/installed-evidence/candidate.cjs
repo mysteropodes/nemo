@@ -45,16 +45,18 @@ function verifyBinding({ record, discovered, listeners, identity }) {
   return { instanceId: record.instanceId, buildId: record.buildId, port: record.port, pid: identity.pid };
 }
 
-// The checkout may be ahead of the candidate by harness-only commits: the candidate must be an ancestor of this checkout and
-// every file changed since it must live under tests/desktop/. Anything else is product code the package was not built from.
+// The checkout may be ahead of the candidate by commits that cannot be in the package: the candidate must be an ancestor of this
+// checkout and every file changed since must be harness, CI profile/inventory output or repository documentation (HARNESS_ONLY).
+// Product roots (src, src-tauri, native-engine, nemo-mcp, engineering/application, scripts ...) refuse. The full list is in the receipt.
+const HARNESS_ONLY = Object.freeze([/^tests\/desktop\//, /^engineering\/boundaries\/profiles\//, /^engineering\/inventory\//, /^engineering\/remediation\//, /^(AGENTS|CLAUDE|README)\.md$/]);
 function harnessOnlyDelta(candidateHead, head, git = args => require('node:child_process').execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' })) {
   if (candidateHead === head) return [];
   let ancestor = true;
   try { git(['merge-base', '--is-ancestor', candidateHead, head]); } catch { ancestor = false; }
   check(ancestor, 'the candidate source is not an ancestor of the harness checkout');
   const changed = git(['diff', '--name-only', candidateHead, head]).split('\n').filter(Boolean);
-  const foreign = changed.filter(file => !file.startsWith('tests/desktop/'));
-  check(foreign.length === 0, 'the checkout differs from the candidate source outside tests/desktop: ' + foreign.slice(0, 5).join(', '));
+  const foreign = changed.filter(file => !HARNESS_ONLY.some(rule => rule.test(file)));
+  check(foreign.length === 0, 'the checkout differs from the candidate source outside the harness and documentation paths: ' + foreign.length + ' files');
   return changed;
 }
 

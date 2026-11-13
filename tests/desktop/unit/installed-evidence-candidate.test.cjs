@@ -162,10 +162,15 @@ test('harness-only delta: a checkout ahead of the candidate is admitted only for
   };
   assert.deepEqual(harnessOnlyDelta(A, A, () => { throw new Error('no git call when equal'); }), []);
   assert.deepEqual(harnessOnlyDelta(A, B, git(['tests/desktop/installed-evidence/candidate.cjs', 'tests/desktop/unit/x.test.cjs'])), ['tests/desktop/installed-evidence/candidate.cjs', 'tests/desktop/unit/x.test.cjs']);
-  refuses(() => harnessOnlyDelta(A, B, git(['tests/desktop/a.cjs', 'src/js/app.js'])), /outside tests\/desktop: src\/js\/app.js/);
+  refuses(() => harnessOnlyDelta(A, B, git(['tests/desktop/a.cjs', 'src/js/app.js'])), /outside the harness and documentation paths: 1 files/);
+  // CI profile and inventory output and repository documentation can not be in the package; product roots can.
+  assert.deepEqual(harnessOnlyDelta(A, B, git(['AGENTS.md', 'engineering/boundaries/profiles/app-js.coverage.json', 'engineering/inventory/surfaces.json', 'engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md'])).length, 4);
+  for (const product of ['native-engine/src/lib.rs', 'src-tauri/src/lib.rs', 'nemo-mcp/src/lib.rs', 'engineering/application/capabilities-v2/native-opacity.json', 'src/index.html', 'scripts/nemo/native.cjs', 'package.json']) {
+    refuses(() => harnessOnlyDelta(A, B, git([product])), /outside the harness and documentation paths/, product);
+  }
   refuses(() => harnessOnlyDelta(A, B, git([], false)), /not an ancestor/);
   // a prefix look-alike is not under tests/desktop/
-  refuses(() => harnessOnlyDelta(A, B, git(['tests/desktop-extra/a.cjs'])), /outside tests\/desktop/);
+  refuses(() => harnessOnlyDelta(A, B, git(['tests/desktop-extra/a.cjs'])), /outside the harness and documentation paths/);
   // the package proof is for the CANDIDATE head, not for this checkout
   assert.deepEqual(verifyPackage({ proof: proof(), source: source({ head: B }), candidateHead: HEAD, executableSha256: EXE, mcpSha256: MCP }), { executableSha256: EXE, mcpSha256: MCP });
   refuses(() => verifyPackage({ proof: proof(), source: source({ head: B }), candidateHead: B, executableSha256: EXE, mcpSha256: MCP }), /another source head/);
