@@ -62,7 +62,9 @@ function promptFor(paths) {
   return [
     'You control a running Nemo desktop application through the MCP server named "nemo" and through nothing else. Do not guess',
     'request formats: discover what the server offers and follow the schema it advertises. Never invent a revision or a document',
-    'identity; use only what the application reported to you. A refusal is a valid answer: report it and do not retry it.',
+    'identity; use only what the application reported to you. Steps 5 and 7 expect the application to refuse a request: report that',
+    'refusal and do not retry it. Any other refusal means you asked in a way this project does not offer: read what the application',
+    'answered and what the server advertises, and use the route it does offer before you give up on a step.',
     '',
     'The project that is open has one layer, "R08 rectangle". Its opacity is a property of that layer. Do these steps in order:',
     '1. Discover the running instance and the open project. Note the document revision, and read the layer\'s current opacity at frame 0.',
