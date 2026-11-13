@@ -1113,6 +1113,7 @@
         "object_history_dispatch.rs",
         "object_frame_packet.rs",
         "object_exposure.rs",
+        "object_read_admission_declarations.rs",
         "object_order_evaluation.rs",
         "object_render_scene.rs",
         "object_component_convert_images.rs",
