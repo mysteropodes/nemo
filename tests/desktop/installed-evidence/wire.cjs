@@ -70,6 +70,9 @@ function createWire({ client, expect, now = () => Date.now(), sink = () => {} })
     const write = options.write === true;
     if (state.documentId && !options.noDocument) request.documentId = state.documentId;
     if (write && state.documentId && !options.noDocument) request.expectedRevision = options.expectedRevision ?? state.contentRevision;
+    // The request-level cancellation of the v2 envelope (nemo-mcp contract.rs NativeApplicationRequest.cancelled_before_dispatch): the
+    // owner must answer a typed `cancelled_before_dispatch` refusal and publish nothing.
+    if (options.cancelledBeforeDispatch === true) request.cancelledBeforeDispatch = true;
     const started = now();
     const reply = replyOf(await call('nemo_command', request));
     const entry = { seq: ++sequence, version, operation, requestDigest: digest(request), replyDigest: digest(reply),
