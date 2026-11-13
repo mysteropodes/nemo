@@ -169,7 +169,7 @@ test('coverage: every id a lane assigns is covered by a passing row or listed as
     for (const id of ASSIGNED[lane]) assert.equal(failed.status[id], mine.some(r => r.tasks.includes(id)) ? 'attempted-not-passed' : 'never-attempted', lane + ' ' + id);
   }
   // The G38b gap that remains is named with the read it needs: glyph identity.
-  assert.ok(NOT_COVERED['2112'].some(e => /glyph/i.test(e.what) && /layout/.test(e.reason)), 'the unobserved glyph identity names the read that would be needed');
+  assert.ok(NOT_COVERED['2112'].some(e => e.id === 'G38b' && /glyph/i.test(e.what) && /layout/.test(e.reason)), 'the unobserved glyph identity names the read that would be needed');
   assert.ok(NOT_COVERED['2113'].some(e => /query\.document\.evaluate/.test(e.reason) && /Needed:/.test(e.reason)), 'the unobserved document evaluate read names what would be needed');
   const receipt = buildReceipt({ rows: passed.map(r => ({ ...r, operations: [], assertions: [] })), selection: { lanes: LANES, rows: rows.map(r => r.id), omitted: [], catalogRows: {} }, cleanup: { ok: true } });
   assert.deepEqual(Object.keys(receipt.coverage).sort(), LANES);

@@ -16,7 +16,8 @@ const ASSIGNED = Object.freeze({
   2113: ['D32', 'F16', 'G03a', 'I16a', 'G06', 'G17'],
 });
 
-// `id` is set when the whole id is unobserved whatever its rows do; otherwise the entry is a behaviour of an id that has a row.
+// `id` is set when part of that id is unobserved whatever its rows do (the id is then `partial` even when a row passes: its rows observe the rest);
+// otherwise the entry is a behaviour of an id that has a row.
 const NOT_COVERED = Object.freeze({
   2107: [
     { what: 'Preview (viewport) rendering of records, effects and parametric shapes: only the PNG export is observed', reason: 'no preview read is reachable through nemo-mcp' },
@@ -26,12 +27,12 @@ const NOT_COVERED = Object.freeze({
     { what: 'Layer lifecycle on component and folder layers', reason: 'only plain drawing layers are exercised' },
   ],
   2112: [
-    { what: 'Glyph identity (per-glyph ids and advances) of a retained text block', reason: 'no public read returns glyphs: the hit-test listing carries one bounds box per text block, never per glyph. Needed: a text read view of kind `layout` (glyph ids, advances and line boxes) on query.document.object.text' },
+    { id: 'G38b', what: 'Glyph identity (per-glyph ids and advances) of a retained text block', reason: 'no public read returns glyphs: the hit-test listing carries one bounds box per text block, never per glyph. Needed: a text read view of kind `layout` (glyph ids, advances and line boxes) on query.document.object.text' },
     { what: 'Media and text assets other than PNG, and fonts supplied as project assets', reason: 'only PNG assets and the bundled font are exercised; other codecs are unavailable by contract' },
   ],
   2113: [
     { what: 'Component evaluated-shape producers and rig producers in the pinned scene (D32, F16, I16a)', reason: 'no row builds a component or a rig; the mixed scene joins vector, gradient, text and raster producers only' },
-    { what: 'The document evaluate read (the pinned evaluated layer values) of an object project', reason: 'query.document.evaluate answers "Unsupported object read operation." on an object project (it is an opacity-document operation); evaluated output is observed as export alpha on a transparent canvas and as the authored sample of the property read. Needed: an object-project evaluate query returning evaluated layer values at a pinned revision, context and frame' },
+    { id: 'I16a', what: 'The document evaluate read (the pinned evaluated layer values) of an object project', reason: 'query.document.evaluate answers "Unsupported object read operation." on an object project (it is an opacity-document operation); evaluated output is observed as export alpha on a transparent canvas and as the authored sample of the property read. Needed: an object-project evaluate query returning evaluated layer values at a pinned revision, context and frame' },
   ],
 });
 
@@ -55,7 +56,7 @@ function laneCoverage(lane, rows) {
   const listed = new Set(entries.filter(e => e.id).map(e => e.id));
   const uncoveredIds = assigned.filter(id => status[id] !== 'covered' || listed.has(id));
   return { assignedIds: assigned, status, coveredByRows, attemptedNotPassed, alsoNotPassed, neverAttempted,
-    coveredIds: assigned.filter(id => status[id] === 'covered' && !listed.has(id)), uncoveredIds, notCovered: entries,
+    coveredIds: assigned.filter(id => status[id] === 'covered' && !listed.has(id)), partialIds: assigned.filter(id => status[id] === 'covered' && listed.has(id)), uncoveredIds, notCovered: entries,
     laneComplete: uncoveredIds.length === 0 && entries.length === 0 };
 }
 function coverageTable(rows, lanes = Object.keys(ASSIGNED)) {

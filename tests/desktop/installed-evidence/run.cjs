@@ -72,7 +72,7 @@ async function main(config, deps = {}) {
   const exit = exitStatus(receipt.verdict);
   (deps.stdout || process.stdout).write(JSON.stringify({ verdict: receipt.verdict, selection: { lanes: sel.lanes, rows: sel.rows.length, omitted: sel.omitted.length, catalogRows: sel.catalogRows }, totals: receipt.totals, uncoveredIds: Object.fromEntries(Object.entries(receipt.coverage).map(([lane, c]) => [lane, c.uncoveredIds])),
     // covered (a passing row), attempted-not-passed (only failing rows) and never attempted, separately; and every retry.
-    coverage: Object.fromEntries(Object.entries(receipt.coverage).map(([lane, c]) => [lane, { covered: c.coveredIds, attemptedNotPassed: Object.keys(c.attemptedNotPassed), neverAttempted: c.neverAttempted, coveredWithFailingRows: Object.keys(c.alsoNotPassed) }])),
+    coverage: Object.fromEntries(Object.entries(receipt.coverage).map(([lane, c]) => [lane, { covered: c.coveredIds, partial: c.partialIds, attemptedNotPassed: Object.keys(c.attemptedNotPassed), neverAttempted: c.neverAttempted, coveredWithFailingRows: Object.keys(c.alsoNotPassed) }])),
     retries: receipt.totals.overall.retries, retriedRows: receipt.rows.filter(r => r.retried).map(r => r.id), cleanup, candidate: { sourceHead: receipt.candidate.sourceHead, harnessHead: receipt.candidate.harnessHead, buildId: receipt.candidate.buildId } }) + '\n');
   return { exit, receipt };
 }

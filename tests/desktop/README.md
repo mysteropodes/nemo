@@ -344,7 +344,7 @@ reason) or **never attempted** (no row for it ran, or only unrun ones); a covere
 `coverage.notCovered` lists what no row observes with the read that would be needed: glyph identity (a `layout` view of
 `query.document.object.text`), the object-project evaluate read (`query.document.evaluate` is refused on an object project; the evaluated
 output is observed as export alpha and the authored value as the property read), component and rig producers, component and folder layers.
-A unit test fails when an assigned id is neither covered by a row nor listed. Select by
+An id with an unobserved part (G38b glyph identity, I16a the document evaluate read) is `partial` even when its rows pass. A unit test fails when an assigned id is neither covered by a row nor listed. Select by
 lane (`--lane`) or row (`--row`); an unknown lane or row refuses before anything starts. A row whose operation the package does not
 offer (a front-door `unsupported_capability` or `unavailable` from `nemo-mcp`, or a host that reports no lifecycle generation) is
 `unrun` with the reason, never `pass`; a refusal by the application itself is an observation the row judges. Request payloads are built by

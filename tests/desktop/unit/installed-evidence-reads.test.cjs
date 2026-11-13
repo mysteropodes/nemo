@@ -226,6 +226,17 @@ test('coverage: an id is covered only by a passing row; failing rows are attempt
   assert.equal(c.laneComplete, false);
 });
 
+test('coverage: an id with an unobserved part is partial even when its rows pass, and failing rows never make it covered', () => {
+  const rows = [row('t1', '2112', ['G38b'], 'pass'), row('t2', '2112', ['G01'], 'pass')];
+  const c = laneCoverage('2112', rows);
+  assert.equal(c.status.G38b, 'covered');
+  assert.deepEqual(c.partialIds, ['G38b']);
+  assert.ok(c.coveredIds.includes('G01') && !c.coveredIds.includes('G38b') && c.uncoveredIds.includes('G38b'));
+  const failed = laneCoverage('2112', [row('t1', '2112', ['G38b'], 'fail', 'x')]);
+  assert.equal(failed.status.G38b, 'attempted-not-passed');
+  assert.deepEqual(failed.partialIds, []);
+});
+
 test('coverage: the receipt shows covered, attempted-not-passed and never-attempted ids separately, per lane, and the failing rows never count as covering', () => {
   const rows = [row('f07-fail', '2108', ['F07'], 'fail', 'reorder'), row('d32-pass', '2108', ['G24'], 'pass')];
   const receipt = buildReceipt({ rows: rows.map(r => ({ ...r, operations: [], assertions: [], retries: [] })), selection: { lanes: ['2108'], rows: rows.map(r => r.id), omitted: ['other'], catalogRows: { 2108: 3 } }, cleanup: { ok: true } });
