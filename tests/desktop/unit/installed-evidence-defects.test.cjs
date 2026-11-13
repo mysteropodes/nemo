@@ -246,7 +246,8 @@ test('an object project refuses the opacity-document queries: the pin comes from
   for (const operation of ['query.document.snapshot.acquire', 'query.document.serialize', 'query.document.evaluate']) {
     const refused = await wire.query(operation, { atRevision: 0 });
     assert.equal(refused.ok, false);
-    assert.deepEqual([refused.error.code, refused.error.message], ['invalid_request', 'Unsupported object read operation.'], operation);
+    assert.equal(refused.error.code, 'invalid_request', operation);
+    assert.match(refused.error.message, /^Unsupported object read operation\. \S+ applies to opacity documents only; .* Use \S+ instead\.$/, operation);
   }
   const { revision, pin } = await K.pinNow(ctx);
   assert.equal(revision, 0);

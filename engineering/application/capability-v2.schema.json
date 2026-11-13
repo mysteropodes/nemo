@@ -4,7 +4,7 @@
   "title": "Native capability declaration v2 (descriptor-owned host metadata)",
   "description": "Constrains the host-facing fields of engineering/application/capabilities-v2/*.json that the drift checker derives code from. Every other descriptor field stays feature-owned and is advertised verbatim by discovery (additionalProperties is open on purpose). Source of truth for the Tauri raw object client allowlist (src-tauri/src/native_object_client.rs OPERATIONS) and the per-operation revision advance.",
   "type": "object",
-  "required": ["schemaVersion", "apiVersion", "id", "operations"],
+  "required": ["schemaVersion", "apiVersion", "id", "operations", "documentKinds", "purposes"],
   "properties": {
     "schemaVersion": { "const": 2 },
     "apiVersion": { "const": 2 },
@@ -15,6 +15,23 @@
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/OperationName" }
+    },
+    "documentKinds": {
+      "description": "Document kinds this capability's operations apply to: `object` (the project kind the application opens today) and/or `opacity` (the single-property native document). Discovery reports an operation available only for a listed kind, and the host refuses an operation declared for another kind. A desktop test sends every operation available for `object` to the real owner and requires that none is refused as unsupported.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "enum": ["object", "opacity"] }
+    },
+    "purposes": {
+      "description": "One line (at most 110 characters) per operation and host operation of this descriptor, shown by compact discovery's operation list.",
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 110 }
+    },
+    "useInstead": {
+      "description": "Per document kind, the operation to use instead of an operation that does not apply to it (native or apiVersion 1 operation name to the replacement). Refusals and discovery name the replacement.",
+      "type": "object",
+      "additionalProperties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/OperationName" } }
     },
     "rawClient": {
       "description": "Operations admitted by the Tauri raw object client. A key is the operation name, present means the raw-client flag is set; it must name an operation of `operations` or `hostOperations` of this same descriptor. The set of keys across all descriptors must equal the OPERATIONS allowlist in native_object_client.rs.",

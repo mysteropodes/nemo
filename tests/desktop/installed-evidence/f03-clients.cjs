@@ -31,7 +31,7 @@ const STATEMENT = 'Agent evidence for #1049: the original opacity workflow drive
   'CS7 batched installed session and it does not record the acceptance disposition of #1049, which belongs to the project owners.';
 const LIMITATIONS = Object.freeze([
   'The fixture opens as an object project: the opacity-document reads (query.document.opacity, query.document.evaluate) and the apiVersion 1 property operations are not offered on it, so the workflow runs on the native object property read (rawSample, which ignores expressions) and edit, undo and project.open/saveAs; the evaluated read of the issue is the rawSample read.',
-  'The application refuses to open the project file that is already the open project (already-open), so the saved file is reopened after the keyed project replaced it, not before.',
+  'The application refuses to open the project file that is already the open project (it says so and how to continue), so the saved file is reopened after the keyed project replaced it, not before.',
   'Whether the client itself attempted the stale-revision and wrong-document writes is visible only in its event stream (informational); the harness proves the application refuses them, not that the client sent them.',
   'Undo is evidenced by saved-60.json (60) followed by saved.json (40) and the refused out-of-date write, and by the harness undoing its own write at the end; not by the history depth at the moment the client undid.',
   'The keyed frame 0 and frame 20 reads by the client are evidenced by the harness reading the keyed fixture itself (20, 50, 80 at frames 0, 10, 20) and by the project the client left (saved.json open, untouched, reading 40); the values the client read are in its stream, informational.',

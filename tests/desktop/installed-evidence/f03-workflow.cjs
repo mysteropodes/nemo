@@ -14,8 +14,8 @@
 //   undo   command.document.object.undo ; depth read query.document.object.history                                         native-object-history.json
 //   files  project.open / project.saveAs (apiVersion 1; a saved project is a nemo.native-project-document)
 // The opacity-document operations (query.document.opacity, query.document.evaluate, command.document.apply) are refused on it
-// ("Unsupported object read operation."), and the apiVersion 1 property.* operations are `unavailable` ("Native object projects
-// answer only capabilities, snapshot and native operations (apiVersion 2).").
+// ("Unsupported object read operation.") and the apiVersion 1 property.* operations are `unavailable`; both refusals name the
+// operation to use instead, and nemo_discover lists only what the open document answers.
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -54,22 +54,19 @@ function stageFixtures(dir, shells = loadShells()) {
   return { paths, staged };
 }
 
-// What the client is told. Goals and absolute paths only: no tool name, operation name or payload, so what it sends is derived
-// from what the server advertises. The order differs from the issue's list in one place: the application refuses to open a project
-// file that is already the open project ("The project was not prepared (already-open)."), so the saved file is opened again after
-// the keyed project has replaced it, which is also the only moment a reopen reads the file rather than the open document.
+// What the client is told. Goals and absolute paths only: no tool name, operation name, payload or hint about where anything is
+// offered; compact discovery (nemo_discover) is how it learns the route, and the Claude half has no file tools to work around it.
+// The order differs from the issue's list in one place: the application refuses to open a project file that is already the open
+// project (it says so and how to continue), so the saved file is opened again after the keyed project has replaced it, which is
+// also the only moment a reopen reads the file rather than the open document.
 function promptFor(paths) {
   return [
-    'You control a running Nemo desktop application through the MCP server named "nemo" and through nothing else. Do not guess',
-    'request formats: discover what the server offers and follow the schema it advertises. Never invent a revision or a document',
-    'identity; use only what the application reported to you. Steps 5 and 7 expect the application to refuse a request: report that',
-    'refusal and do not retry it. Any other refusal means you asked in a way this project does not offer: read what the application',
-    'answered and what the server advertises, and use the route it does offer before you give up on a step.',
+    'You control a running Nemo desktop application through the MCP server named "nemo" and through nothing else. Start by asking the',
+    'server what it offers. Never invent a revision or a document identity; use only what the application reported to you. Steps 5 and',
+    '7 expect the application to refuse a request: report that refusal and do not retry it.',
     '',
-    'The project that is open is a native object project with one layer, "R08 rectangle"; its opacity is a property of that layer, on a',
-    '0 to 100 scale (40 means 40). Such a project answers the native operations (apiVersion 2) and opening, saving and creating projects;',
-    'the other reads and edits are not offered on it. A read of a property is pinned to a snapshot of the document that the application',
-    'hands out through its object query: look at the views that query declares. Do these steps in order:',
+    'The project that is open has one layer, "R08 rectangle"; its opacity is a property of that layer, on a 0 to 100 scale (40 means',
+    '40). Do these steps in order:',
     '1. Discover the running instance and the open project. Note the document revision, and read the layer\'s current opacity at frame 0.',
     '2. Set the layer opacity to 40, then set it to 60 (frame 0), and read it back each time.',
     '3. Save a copy of the project as ' + paths.saved60 + ' (the file must not exist yet).',

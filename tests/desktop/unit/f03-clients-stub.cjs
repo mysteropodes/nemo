@@ -3,14 +3,17 @@
 // reply shapes are the ones observed from the installed candidate 0.7.0-alpha.4 (7d1cb6fc), see engineering/application/capabilities-v2:
 //   apiVersion 1 through nemo_command: project.open, project.saveAs (a saved project is a nemo.native-project-document); reads and
 //     property.* are refused (front door "Use nemo_query for reads", or `unavailable` "Native object projects answer only ...");
-//     opening the project file that is already open is `unavailable` "The project was not prepared (already-open).".
+//     opening the project file that is already open is `unavailable` and says it is already the open document and how to continue.
 //   apiVersion 2: query.document.object (view presentation, the snapshot pin), query.document.object.property.read (rawSample),
 //     query.document.object.history, command.document.object.property.edit (setValue), command.document.object.undo; the opacity-document
 //     operations (query.document.opacity, query.document.evaluate, query.document.snapshot.acquire, command.document.apply) are
-//     `invalid_request` "Unsupported object read operation.".
+//     `invalid_request` "Unsupported object read operation." followed by the operation to use instead.
 // It can be made to misbehave. `scriptedClient` plays the part of an agent client by sending raw requests. Nothing here starts a process.
 const fs = require('node:fs');
 
+const INSTEAD = { 'property.get': 'query.document.object.property.read', 'property.set': 'command.document.object.property.edit', 'history.undo': 'command.document.object.undo',
+  'query.document.opacity': 'query.document.object.property.read', 'query.document.evaluate': 'query.document.object.property.read',
+  'query.document.snapshot.acquire': 'query.document.object', 'command.document.apply': 'command.document.object.property.edit' };
 const INSTANCE = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', BUILD = '1.2.3:' + 'a'.repeat(40), UID = 'r08_curve_layer', ROOT = 'scene-root';
 
 function createApp(flags = {}) {
@@ -40,7 +43,7 @@ function createApp(flags = {}) {
     const p = req.payload;
     if (['property.get', 'snapshot', 'capabilities', 'diagnostics.trace'].includes(req.operation)) return frontDoor('invalid_request', 'Use nemo_query for reads');
     if (req.operation === 'project.open') {
-      if (state.doc && state.doc.path === p.path) return no(1, req, 'unavailable', 'The project was not prepared (already-open).');
+      if (state.doc && state.doc.path === p.path) return no(1, req, 'unavailable', 'That project file is already the open document, so nothing was opened. Continue with it (read it with a snapshot) or open a different file.');
       const loaded = load(p.path);
       state.gen += 1;
       state.doc = { id: 'doc-' + (++state.seq), rev: 0, path: p.path, value: loaded.value, keys: loaded.keys, undo: [], redo: [] };
@@ -54,7 +57,7 @@ function createApp(flags = {}) {
       state.doc.path = p.path;
       return ok(1, req, { ...summary(state.doc), path: p.path });
     }
-    return no(1, req, 'unavailable', 'Native object projects answer only capabilities, snapshot and native operations (apiVersion 2).');
+    return no(1, req, 'unavailable', 'Native object projects answer only capabilities, snapshot and native operations (apiVersion 2).' + (INSTEAD[req.operation] ? ' Use ' + INSTEAD[req.operation] + ' instead.' : ''));
   }
   const pin = doc => 'native-object:' + doc.id + ':' + doc.rev;
   function v2(req) {
@@ -75,7 +78,7 @@ function createApp(flags = {}) {
         return ok(2, req, { applied: true, historyEntriesAdded: 1 });
       case 'command.document.object.undo': { if (!doc.undo.length) return no(2, req, 'unavailable'); doc.redo.push(doc.value); doc.value = doc.undo.pop(); doc.rev += 1; return ok(2, req, { applied: true, historyEntriesAdded: 0 }); }
       case 'query.document.opacity': case 'query.document.evaluate': case 'query.document.snapshot.acquire': case 'command.document.apply':
-        return no(2, req, 'invalid_request', 'Unsupported object read operation.');
+        return no(2, req, 'invalid_request', 'Unsupported object read operation. ' + req.operation + ' applies to opacity documents only; this is an object document. Use ' + INSTEAD[req.operation] + ' instead.');
       default: return no(2, req, 'invalid_request');
     }
   }
@@ -85,8 +88,9 @@ function createApp(flags = {}) {
       state.calls.push(name === 'nemo_command' ? args.operation : name);
       const wrap = value => ({ result: { structuredContent: value } });
       if (name === 'nemo_discover') {
-        return wrap({ instances: [{ instanceId: INSTANCE, buildId: BUILD, nativeHostStatus: { instanceId: INSTANCE, available: !!state.doc,
-          ...(state.doc ? { documentId: state.doc.id, contentRevision: state.doc.rev, lifecycleGeneration: state.gen } : {}) } }] });
+        return wrap({ detail: 'guide', instances: [{ instanceId: INSTANCE, buildId: BUILD, pid: 4242, documentId: state.doc ? state.doc.id : null,
+          documentKind: state.doc ? 'object' : null, revision: state.doc ? state.doc.rev : null, nativeHostStatus: { instanceId: INSTANCE, available: !!state.doc,
+          ...(state.doc ? { documentId: state.doc.id, contentRevision: state.doc.rev, lifecycleGeneration: state.gen, documentKind: 'object', pid: 4242 } : {}) } }] });
       }
       if (name === 'nemo_query') return wrap(args.operation === 'snapshot' && state.doc ? { apiVersion: 1, documentId: state.doc.id, instanceId: INSTANCE, ok: true, requestId: 'q', revision: state.doc.rev, result: { canvasH: 180, canvasW: 320, fps: 24, frame: 0, layers: [{ id: UID, locked: false, name: 'R08 rectangle', shy: false, visible: true }], totalFrames: 21 } } : frontDoor('invalid_request', 'unsupported'));
       return wrap(args.apiVersion === 1 ? v1(args) : v2(args));

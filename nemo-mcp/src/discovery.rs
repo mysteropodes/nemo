@@ -45,7 +45,7 @@ pub struct DiscoverArgs {
     #[serde(default)]
     pub api_version: Option<u32>,
     /// Instance whose open document the answer describes; the first with a document by default.
-    #[serde(default)]
+    #[serde(default, alias = "instance_id")]
     pub instance_id: Option<String>,
 }
 

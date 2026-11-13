@@ -30,6 +30,32 @@ data under `com.strokemotion.app/mcp`. To validate an isolated candidate, set
 Do not share its connection records; they contain local attachment secrets.
 Queries return instance/build/document/revision identity without those secrets.
 
+### What `nemo_discover` answers
+
+The default answer is compact (at most 12,000 characters for one instance with one open
+document): the running instances (`instanceId`, `pid`, `buildId`, open `documentId`,
+`documentKind`, `revision`) and a `startHere` guide for the open document's kind, with one
+request to copy for each step: take the snapshot pin, read the document, objects and
+properties, edit a property, undo and redo, history, save, open and export. Detail is
+requested through arguments of the same tool, all additive:
+
+| Arguments | Answer |
+|---|---|
+| `{}` | instances and the start-here guide |
+| `{"operation": "<name>"}` (plus `apiVersion` for `history.undo`/`history.redo`, which exist on both routes) | that operation's full contract: request schema, example with the live identity, result shape, refusal codes, availability for the open document |
+| `{"detail": "operations", "family": "<family>", "page": <n>}` | operation names with a one-line purpose and availability for the open document, 60 per page, optionally by family |
+| `{"detail": "full"}` | every registered declaration verbatim (about 280,000 characters) |
+| `{"instanceId": "<id>"}` | the same, for another running instance |
+
+Availability is truthful for the open document's kind. Each native capability declares the
+kinds it applies to (`documentKinds`), a one-line `purposes` per operation and, for operations
+that exist on another kind only, `useInstead`; the desktop host reports the kind of the open
+document in its native status and an operation declared for another kind is refused by the
+owner with the operation to use instead. The apiVersion 1 list comes from the instance's own
+`capabilities` answer plus the `project.*` operations, which every kind accepts. A desktop
+test sends every operation reported available for an object document through the shared
+application route and requires that none is refused as unsupported.
+
 Validation of the builder and its controlled fixtures only proves target naming,
 locked Cargo invocation, stale-artifact cleanup, and Tauri wiring. A future
 acceptance pass must launch a freshly installed package and exercise both

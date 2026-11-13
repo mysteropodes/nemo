@@ -129,8 +129,8 @@ but read-only `query.*` operations (a `command.*` or any other name is refused b
 The route is the one any MCP client uses: the `nemo-mcp` binary bundled in the package under test
 (`Contents/MacOS/nemo-mcp`, which must match the package proof when the proof lists it) started with
 `NEMO_MCP_REGISTRY` set to the candidate's own task-scoped registry (`<tauriDataDir>/mcp`), calling
-`nemo_discover` and `nemo_command` (native v2 `query.document.object*`). The route reports no pid or
-executable hash, so a reply is bound to the candidate like this (`cs7-read.cjs`), and the batch fails closed
+`nemo_discover` and `nemo_command` (native v2 `query.document.object*`). The route reports the process id (`pid`) but no
+executable hash, and only the instance's own report of it, so a reply is bound to the candidate like this (`cs7-read.cjs`), and the batch fails closed
 (no pass) if any step differs:
 
 1. the owner identity (pid, source sha, tree, driver sha, executable sha256) is read before and after every
@@ -424,8 +424,8 @@ The harness stages the fixtures, opens the static shell itself, runs the client,
 unchanged, the open project is a different document at revision 0 with no history reading 40, the keyed fixture opened by the harness evaluates
 20, 50, 80 at frames 0, 10, 20, reopening `saved.json` reads 40, and the harness itself shows that a write naming the previous revision
 is refused (`stale_revision`) and one naming the replaced project is refused (`wrong_document`), then undoes its own write.
-Claude Code is given the read-only `Read` and `Grep` tools next to the three `nemo_*` tools, because the discovery answer is about
-280000 characters and the client spills it to a file; Codex is given `default_tools_approval_mode="approve"` for the `nemo` server,
+Claude Code is given no built-in tools, only the three `nemo_*` tools: the default `nemo_discover` answer is a compact guide (at most 12000
+characters) that the client reads inline, and the prompt no longer says where anything is offered. Codex is given `default_tools_approval_mode="approve"` for the `nemo` server,
 because under approval policy `never` every MCP call is otherwise refused.
 A client that is not installed, not authenticated, over quota or that rejects the command line leaves its half `unrun` with the
 reason; the client's last message and tool trace are in the receipt as information and never decide a verdict. The receipt

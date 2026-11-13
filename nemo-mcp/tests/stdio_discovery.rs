@@ -78,6 +78,11 @@ async fn default_answer_is_compact_and_the_rest_is_on_demand() {
     for tool in &tools {
         let description = tool.description.as_deref().unwrap_or_default();
         if tool.name == "nemo_discover" {
+            let properties = tool.input_schema.get("properties").and_then(Value::as_object).expect("discover arguments are declared");
+            for argument in ["detail", "operation", "family", "page", "apiVersion", "instanceId"] {
+                assert!(properties.contains_key(argument), "{argument}");
+            }
+            assert!(tool.input_schema.get("required").is_none(), "every discover argument is optional");
             assert!(description.starts_with("Start here") && description.contains("start-here guide"));
         }
         if tool.name == "nemo_command" {
