@@ -382,7 +382,7 @@ canvas background edit, brush cancellation and quota refusals answered with lite
 only passing rows; every retry recorded). The stub follows the published reply shapes; it is not what is being proved. The first real runs
 (task evidence-1112, receipts kept outside the repository) found four product defects the rows keep reporting rather than work around:
 `group.combine` is ignored by the export, `layer.reorder` commits and then answers an indeterminate refusal that leaves the session unusable
-(those rows run last), `layer.delete` refuses a layer holding a raster placement, and flatten refuses a group that contains a nested group.
+(those rows run last), and `layer.delete` refuses a layer holding a raster placement. (An earlier reading, "flatten refuses a group that contains a nested group", was the row's mistake: flatten folds ALL leaves once with the outer mode, so Outer(intersect: big, Inner(unite: two disjoint bars)) has an empty fold and is refused `invalid_request` with the document unchanged, which is the native owner's deliberate, safer deviation from the baseline that silently deleted the members. `2108-nested-group-operand-flatten` observes the paint of a nested combining group as one operand, that refusal, and a case whose fold is non-empty flattening to exactly that fold.)
 
 ## Real client workflow, Codex and Claude Code (`installed-evidence/f03-clients.cjs`, #1049)
 
