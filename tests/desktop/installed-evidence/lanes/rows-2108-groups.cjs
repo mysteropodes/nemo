@@ -190,4 +190,4 @@ const rows = [
     } },
 ];
 
-module.exports = { rows };
+module.exports = { rows, REFIT_HULL, REFIT_INK };

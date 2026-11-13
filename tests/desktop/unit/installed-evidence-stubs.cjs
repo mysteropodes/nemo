@@ -28,6 +28,8 @@ const FLAGS = {
   // groups: the export ignores group.combine (a defect the first real runs found); flatten folds a nested combining group as ONE operand (the paint rule)
   // instead of folding every leaf once; a flatten whose fold is empty deletes the members instead of being refused (the baseline JS quirk)
   groupCombineIgnored: false, flattenNestedAsOperand: false, flattenEmptyDeletes: false,
+  // groups: flatten of a box result keeps the sharp box instead of the baseline's Paper.js simplify(2.5) refit; the combined paint takes the OUTERMOST member's style instead of the topmost; the result gets a new id instead of the style member's
+  flattenSharpBox: false, combineStyleFromFirst: false, flattenNewId: false,
   // image mesh: the attach is acknowledged but nothing is bound; a sculpt is acknowledged but changes nothing
   meshNeverBound: false, meshOffsetsIgnored: false,
   // bitmap brush: a publication is wrongly treated as an edit
@@ -53,6 +55,39 @@ const bounds = segments => {
   return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
 };
 
+// Paper.js simplify(2.5) of a closed box, in the corner order the engine's fold gives (left-bottom, left-top, right-top, right-bottom): what the baseline's flatten leaves behind.
+// Uses the shipped src/paper-full.min.js, so the stub's refit is Paper's own and never a number typed here.
+let paperCache = null;
+function refitPath(x0, y0, x1, y1) {
+  paperCache = paperCache || require('../../helpers/native-import-paper.cjs').load();
+  const path = new paperCache.Path({ insert: false });
+  [[x0, y1], [x0, y0], [x1, y0], [x1, y1]].forEach(([x, y]) => path.add(new paperCache.Point(x, y)));
+  path.closed = true;
+  path.simplify(2.5);
+  return path;
+}
+function refitBox(x0, y0, x1, y1) {
+  const path = refitPath(x0, y0, x1, y1);
+  const hull = path.segments.reduce((a, g) => {
+    const xs = [g.point.x, g.point.x + g.handleIn.x, g.point.x + g.handleOut.x], ys = [g.point.y, g.point.y + g.handleIn.y, g.point.y + g.handleOut.y];
+    return [Math.min(a[0], ...xs), Math.min(a[1], ...ys), Math.max(a[2], ...xs), Math.max(a[3], ...ys)];
+  }, [Infinity, Infinity, -Infinity, -Infinity]);
+  const b = path.bounds;
+  return { hull, box: [b.x, b.y, b.right, b.bottom], count: path.segments.length, refit: [x0, y0, x1, y1] };
+}
+// A stub document is cloned as JSON for undo, so a result shape is data: a refit box (Paper's path rebuilt on demand) or the exact rows an unrefit fold covered.
+const refitPaths = new Map();
+function shapeCovers(shape, x, y) {
+  if (shape.rows) return (shape.rows[y] || []).some(([a, b]) => x >= a && x < b);
+  const key = shape.refit.join(',');
+  if (!refitPaths.has(key)) refitPaths.set(key, refitPath(...shape.refit));
+  return refitPaths.get(key).contains(new paperCache.Point(x + 0.5, y + 0.5));
+}
+function coveredRows(pred, y0, y1, width) {
+  const rows = {};
+  for (let y = y0; y < y1; y++) { const spans = []; for (let x = 0; x < width; x++) if (pred(x, y)) { if (spans.length && spans[spans.length - 1][1] === x) spans[spans.length - 1][1] = x + 1; else spans.push([x, x + 1]); } rows[y] = spans; }
+  return rows;
+}
 function createStubApp(options = {}) {
   const state = { doc: null, dirty: false, docSeq: 0, generation: 0, brushes: {}, calls: [], ...options.initial };
   const flags = { ...FLAGS, ...options };
@@ -97,7 +132,7 @@ function createStubApp(options = {}) {
     image.rgba[o + 3] = Math.round(oa * 255);
   }
   // ---- groups: a stroke carries its group path (outermost first); a group has a name and a combine mode. Only axis-aligned boxes are modelled. ----
-  const coversPoint = (stroke, x, y) => { const b = bounds(stroke.record.geometry.segments); return x >= Math.round(b.x0) && x < Math.round(b.x1) && y >= Math.round(b.y0) && y < Math.round(b.y1); };
+  const coversPoint = (stroke, x, y) => { if (stroke.shape) return shapeCovers(stroke.shape, x, y); const b = bounds(stroke.record.geometry.segments); return x >= Math.round(b.x0) && x < Math.round(b.x1) && y >= Math.round(b.y0) && y < Math.round(b.y1); };
   const FOLDS = { unite: (a, b) => a || b, intersect: (a, b) => a && b, subtract: (a, b) => a && !b, exclude: (a, b) => a !== b };
   const fold = (mode, preds) => (x, y) => preds.slice(1).reduce((acc, pred) => FOLDS[mode](acc, pred(x, y)), preds[0](x, y));
   const groupsOf = (doc, stroke) => stroke.groupPath || [];
@@ -113,7 +148,7 @@ function createStubApp(options = {}) {
     }
     const mode = flags.groupCombineIgnored ? 'none' : doc.groups[gid].mode;
     if (mode === 'none' || operands.length < 2) return operands;
-    return [{ pred: fold(mode, operands.map(o => o.pred)), fill: operands[operands.length - 1].fill, ids: operands.flatMap(o => o.ids), folded: true }];
+    return [{ pred: fold(mode, operands.map(o => o.pred)), fill: operands[flags.combineStyleFromFirst ? 0 : operands.length - 1].fill, ids: operands.flatMap(o => o.ids), folded: true }];
   }
   function render(doc) {
     // The export fills the project canvas background (new projects: #ffffff, opaque; #00000000 is a transparent export) and the paint composites over it.
@@ -122,10 +157,10 @@ function createStubApp(options = {}) {
     for (const top of tops) folded.push(...emitOperands(doc, top).filter(o => o.folded));
     const suppressed = new Set(folded.flatMap(o => o.ids));
     for (const s of doc.strokes) {
-      const { x0, y0, x1, y1 } = bounds(s.record.geometry.segments), fill = s.record.fill;
+      const { x0, y0, x1, y1 } = s.shape ? { x0: s.shape.box[0], y0: s.shape.box[1], x1: s.shape.box[2], y1: s.shape.box[3] } : bounds(s.record.geometry.segments), fill = s.record.fill;
       if (!fill || suppressed.has(s.id)) continue;
       const c = [fill.r, fill.g, fill.b].map(v => Math.round(v * 255));
-      for (let y = Math.max(0, Math.round(y0)); y < Math.min(doc.h, Math.round(y1)); y++) for (let x = Math.max(0, Math.round(x0)); x < Math.min(doc.w, Math.round(x1)); x++) over(image, x, y, c, fill.a);
+      for (let y = Math.max(0, Math.floor(y0)); y < Math.min(doc.h, Math.ceil(y1)); y++) for (let x = Math.max(0, Math.floor(x0)); x < Math.min(doc.w, Math.ceil(x1)); x++) if (!s.shape || shapeCovers(s.shape, x, y)) over(image, x, y, c, fill.a);
     }
     for (const o of folded) {
       const c = [o.fill.r, o.fill.g, o.fill.b].map(v => Math.round(v * 255));
@@ -223,6 +258,17 @@ function createStubApp(options = {}) {
         commit(doc, 'group', () => { doc.groups[p.groupId] = { name: p.name, mode: 'none' }; for (const s of doc.strokes) if (p.strokeIds.includes(s.id)) s.groupPath = [p.groupId, ...groupsOf(doc, s)]; });
         return ok(2, request, receipt());
       }
+      case 'command.document.object.group.rename': {
+        if (!doc.groups[p.groupId]) return ownerRefusal(request, 'not_found', 'unknown group');
+        commit(doc, 'group rename', () => { doc.groups[p.groupId].name = p.name; });
+        return ok(2, request, receipt());
+      }
+      case 'command.document.object.group.ungroup': {
+        const members = doc.strokes.filter(s => p.strokeIds.includes(s.id) && groupsOf(doc, s).length);
+        if (!members.length) return ownerRefusal(request, 'not_found', 'no grouped stroke');
+        commit(doc, 'ungroup', () => { for (const s of members) { const gid = groupsOf(doc, s)[0]; for (const t of doc.strokes) if (groupsOf(doc, t).includes(gid)) t.groupPath = groupsOf(doc, t).slice(groupsOf(doc, t).indexOf(gid) + 1); delete doc.groups[gid]; } });
+        return ok(2, request, receipt());
+      }
       // Setting a mode on a group that exists (combine also creates the group from its members when it does not).
       case 'command.document.object.group.combine': case 'command.document.object.group.mode.set': {
         if (!doc.groups[p.groupId]) return ownerRefusal(request, 'not_found', 'unknown group');
@@ -242,15 +288,17 @@ function createStubApp(options = {}) {
         let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, count = 0;
         if (!flags.flattenNoop) for (let y = 0; y < doc.h; y++) for (let x = 0; x < doc.w; x++) if (pred(x, y)) { count++; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + 1); y1 = Math.max(y1, y + 1); }
         if (!flags.flattenNoop && count === 0 && !flags.flattenEmptyDeletes) return ownerRefusal(request, 'invalid_request', 'Boolean payload is invalid or target is absent.');
-        if (count > 0 && !flags.flattenNestedAsOperand && count !== (x1 - x0) * (y1 - y0)) throw new Error('the stub models boxes only: this fold is not a box');
         commit(doc, 'flatten', () => {
           if (flags.flattenNoop) return;
           const consumed = new Set(members.flatMap(s => groupsOf(doc, s).slice(groupsOf(doc, s).indexOf(p.groupId))));
           doc.strokes = doc.strokes.filter(s => !members.includes(s));
           for (const gid of consumed) delete doc.groups[gid];
           if (count === 0) return;
-          const id = 'native-stroke:' + (doc.rev + 1) + ':' + doc.seq++;
-          doc.strokes.push({ id, layerUid: p.layerUid, record: { ...members[0].record, target: target(p.layerUid, id), fill, geometry: { ...members[0].record.geometry, segments: [{ point: { x: x0, y: y0 } }, { point: { x: x1, y: y1 } }] } } });
+          // The baseline keeps the STYLE member's (the last one's) stroke id on the first result island (tools.js BOOL_KEEP_DATA_FIRST). A plain box fold (no hole) is refit with
+          // Paper.js simplify(2.5) like the baseline (a 2-3 anchor curve, not the sharp box); a fold with a hole keeps the exact outline (the slit blocks the refit).
+          const style = members[members.length - 1], id = flags.flattenNewId ? 'native-stroke:' + (doc.rev + 1) + ':' + doc.seq++ : style.id;
+          const isBox = count === (x1 - x0) * (y1 - y0), shape = isBox && !flags.flattenSharpBox ? refitBox(x0, y0, x1, y1) : { hull: [x0, y0, x1, y1], box: [x0, y0, x1, y1], count: 4, rows: coveredRows(pred, y0, y1, doc.w) };
+          doc.strokes.push({ id, layerUid: p.layerUid, shape, record: { ...style.record, target: target(p.layerUid, id), fill, geometry: { ...style.record.geometry, segments: [{ point: { x: x0, y: y0 } }, { point: { x: x1, y: y1 } }] } } });
         });
         return ok(2, request, receipt());
       }
@@ -325,8 +373,8 @@ function createStubApp(options = {}) {
       if (state.listingRaceLeft === undefined) state.listingRaceLeft = flags.listingRace;
       if (state.listingRaceLeft > 0) { state.listingRaceLeft--; return refuse(2, request, 'unavailable', 'Subselect presentation changed'); }
       const v = p.view, hex = fill => '#' + [fill.r, fill.g, fill.b].map(c => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
-      const listed = doc.strokes.filter(s => s.layerUid === v.layerUid).map(s => { const b = bounds(s.record.geometry.segments), f = s.record.fill;
-        return { stableTarget: target(s.layerUid, s.id), closed: s.record.geometry.closed, count: s.record.geometry.segments.length, matrix: [1, 0, 0, 1, 0, 0], bounds: [b.x0, b.y0, b.x1, b.y1], role: 'plain', filled: !!f, strokeWidth: 0,
+      const listed = doc.strokes.filter(s => s.layerUid === v.layerUid).map(s => { const b = s.shape ? { x0: s.shape.hull[0], y0: s.shape.hull[1], x1: s.shape.hull[2], y1: s.shape.hull[3] } : bounds(s.record.geometry.segments), f = s.record.fill;
+        return { stableTarget: target(s.layerUid, s.id), closed: s.record.geometry.closed, count: s.shape ? s.shape.count : s.record.geometry.segments.length, matrix: [1, 0, 0, 1, 0, 0], bounds: [b.x0, b.y0, b.x1, b.y1], role: 'plain', filled: !!f, strokeWidth: 0,
           ...(groupsOf(doc, s).length ? { groupPath: groupsOf(doc, s).map(id => ({ id, mode: doc.groups[id].mode, name: doc.groups[id].name })) } : {}), style: { cap: 'round', join: 'round', opacity: 1, strokeStyle: 'solid', width: 4, ...(f ? { fill: hex(f) } : {}) } }; })
         // `initial.listingExtra`: listed items the stub does not model (a text block, a dynamic shape) served exactly as the candidate answered them.
         .concat((state.listingExtra || []).map(i => ({ ...i, stableTarget: { ...i.stableTarget, layerUid: v.layerUid } })));
