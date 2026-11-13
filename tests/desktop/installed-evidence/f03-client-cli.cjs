@@ -64,7 +64,7 @@ function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, repor
   const config = path.join(reportDir, 'claude.mcp-config.json');
   return { command, input: prompt, cwd, lastMessage: null, model: asked,
     files: { [config]: JSON.stringify({ mcpServers: { nemo: { command: mcpCommand, args: [], env: { NEMO_MCP_REGISTRY: mcpRegistry } } } }, null, 2) + '\n' },
-    args: ['-p', '--model', asked, '--mcp-config', config, '--strict-mcp-config', '--tools', '', '--allowedTools', 'mcp__nemo__nemo_discover', 'mcp__nemo__nemo_command',
+    args: ['-p', '--model', asked, '--mcp-config', config, '--strict-mcp-config', '--tools', '', '--allowedTools', 'mcp__nemo__nemo_discover', 'mcp__nemo__nemo_query', 'mcp__nemo__nemo_command',
       '--output-format', 'stream-json', '--verbose', '--max-turns', String(maxTurns), '--no-session-persistence'] };
 }
 
@@ -113,7 +113,7 @@ function trace(result, lastMessageFile) {
     if (Array.isArray(value)) return value.forEach(walk);
     if (!value || typeof value !== 'object') return;
     for (const key of ['name', 'tool']) {
-      const hit = typeof value[key] === 'string' ? value[key].match(/(nemo_(?:discover|command))$/) : null;
+      const hit = typeof value[key] === 'string' ? value[key].match(/(nemo_(?:discover|query|command))$/) : null;
       if (hit) calls[hit[1]] = (calls[hit[1]] || 0) + 1;
     }
     if (value.type === 'result' && typeof value.result === 'string') last = value.result;

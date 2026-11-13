@@ -6,10 +6,21 @@
 // The judge only trusts: files the application wrote, and reads and probes this harness makes itself through the package's
 // nemo-mcp after the client has exited. Anything the client printed or any tool trace it produced is recorded elsewhere and
 // never decides a verdict.
+//
+// The fixture opens as an OBJECT project, which answers only the native operations (apiVersion 2) plus project.open/saveAs/new.
+// The operations used here, each declared in engineering/application/capabilities-v2 (cited per step in the change note):
+//   read   query.document.object (view presentation, the pin) then query.document.object.property.read (view rawSample)  native-property-read.json
+//   write  command.document.object.property.edit (setValue)                                                                native-property-edit.json
+//   undo   command.document.object.undo ; depth read query.document.object.history                                         native-object-history.json
+//   files  project.open / project.saveAs (apiVersion 1; a saved project is a nemo.native-project-document)
+// The opacity-document operations (query.document.opacity, query.document.evaluate, command.document.apply) are refused on it
+// ("Unsupported object read operation."), and the apiVersion 1 property.* operations are `unavailable` ("Native object projects
+// answer only capabilities, snapshot and native operations (apiVersion 2).").
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const K = require('./kit.cjs');
+const P = require('./payloads.cjs');
 const { structured } = require('../cs7-read.cjs');
 const ROOT = path.resolve(__dirname, '../../..');
 const FIXTURE = path.join(ROOT, 'tests/animation/fixtures/curve-workflow.json');
@@ -44,46 +55,49 @@ function stageFixtures(dir, shells = loadShells()) {
 }
 
 // What the client is told. Goals and absolute paths only: no tool name, operation name or payload, so what it sends is derived
-// from what the server advertises.
+// from what the server advertises. The order differs from the issue's list in one place: the application refuses to open a project
+// file that is already the open project ("The project was not prepared (already-open)."), so the saved file is opened again after
+// the keyed project has replaced it, which is also the only moment a reopen reads the file rather than the open document.
 function promptFor(paths) {
   return [
     'You control a running Nemo desktop application through the MCP server named "nemo" and through nothing else. Do not guess',
     'request formats: discover what the server offers and follow the schema it advertises. Never invent a revision or a document',
     'identity; use only what the application reported to you. A refusal is a valid answer: report it and do not retry it.',
     '',
-    'The project that is open has one layer, "R08 rectangle". Do these steps in order:',
-    '1. Discover the running instance and the open project. Read the layer\'s current opacity.',
-    '2. Set the layer opacity to 40, then set it to 60.',
+    'The project that is open has one layer, "R08 rectangle". Its opacity is a property of that layer. Do these steps in order:',
+    '1. Discover the running instance and the open project. Note the document revision, and read the layer\'s current opacity at frame 0.',
+    '2. Set the layer opacity to 40, then set it to 60 (frame 0), and read it back each time.',
     '3. Save a copy of the project as ' + paths.saved60 + ' (the file must not exist yet).',
     '4. Undo once, so the opacity is 40 again, and read it back.',
-    '5. Try to set the opacity to 99 while naming the document revision that was current before your edits. The application should',
+    '5. Try to set the opacity to 99 while naming the document revision you noted in step 1, before your edits. The application should',
     '   refuse it as out of date. Do not repeat it with a fresh revision.',
     '6. Save the project as ' + paths.saved + ' (the file must not exist yet).',
-    '7. Open ' + paths.saved + ' and read the opacity back.',
-    '8. Open ' + paths.keyed + '. It replaces the current project. Try to set the opacity to 99 while naming the project identity',
+    '7. Open ' + paths.keyed + '. It replaces the current project. Try to set the opacity to 99 while naming the document identity',
     '   you used before this replacement. The application should refuse it. Do not repeat it.',
-    '9. Read the evaluated opacity of the layer at frame 0 and at frame 20.',
-    'Stop with ' + paths.keyed + ' open and make no further change. Finish with a short report: each value you read, and each',
+    '8. In the keyed project, read the layer\'s opacity at frame 0 and at frame 20.',
+    '9. Open ' + paths.saved + ' again, which reloads the saved file as the open project, and read the opacity at frame 0.',
+    'Stop with ' + paths.saved + ' open and make no further change. Finish with a short report: each value you read, and each',
     'request the application refused, with its reason.',
   ].join('\n');
 }
 
-const layerOf = (document, uid = LAYER) => (document && Array.isArray(document.layers) ? document.layers.find(l => l && l.layerUid === uid) : undefined);
+const savedOpacity = document => {
+  const holders = document && document.drawing && Array.isArray(document.drawing.propertyHolders) ? document.drawing.propertyHolders : [];
+  const holder = holders.find(h => h && h.target && h.target.layerUid === LAYER && h.target.strokeId === undefined);
+  const prop = holder && Array.isArray(holder.properties) ? holder.properties.find(p => p && p.property === 'opacity') : undefined;
+  return prop ? prop.static : undefined;
+};
 const readJson = (ctx, id, file) => {
   ctx.ok('file', id + ': written by the application', fs.existsSync(file) && fs.statSync(file).size > 0, fs.existsSync(file));
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { ctx.ok('file', id + ': parses as JSON', false, 'not JSON'); return null; }
 };
-async function staticValue(ctx) {
-  const res = await ctx.wire.query('query.document.opacity', { stableTarget: TARGET });
-  ctx.ok('reply', 'opacity read accepted', res.ok === true, res.ok ? 'ok' : res.error);
-  return res.result.value;
-}
-async function evaluated(ctx, frame) {
-  const state = await ctx.wire.discover();
-  const res = await ctx.wire.query('query.document.evaluate', { atRevision: state.contentRevision, contextId: 'scene-root', frame });
-  ctx.ok('reply', 'evaluate frame ' + frame + ' accepted', res.ok === true, res.ok ? 'ok' : res.error);
-  const layer = (res.result.layers || []).find(l => l.layerUid === LAYER);
-  return layer ? layer.value : undefined;
+// The layer's own sample of opacity at a frame (rawSample view), pinned to the current revision; null when the read is refused.
+async function opacityAt(ctx, frame = 0) {
+  const { revision, pin } = await K.pinNow(ctx);
+  const b = P.propertyRead(revision, pin, LAYER, 'opacity', frame);
+  const res = await ctx.wire.query(b.operation, b.payload);
+  ctx.ok('reply', 'opacity read at frame ' + frame + ' accepted', res.ok === true, res.ok ? 'ok' : res.error);
+  return res.ok && Array.isArray(res.result.value) ? res.result.value[0] : null;
 }
 
 // Before the client runs: the harness opens the static fixture itself and reads the starting point.
@@ -93,48 +107,56 @@ async function arrange(ctx, { paths }) {
   const initial = await ctx.wire.discover();
   ctx.ok('read', 'setup: a native document is open', typeof initial.documentId === 'string' && initial.documentId.length > 0, initial.documentId);
   ctx.eq('read', 'setup: the document is at revision 0', initial.contentRevision, 0);
-  ctx.eq('read', 'setup: the static opacity is 25', await staticValue(ctx), 25);
+  ctx.eq('read', 'setup: the static opacity is 25', await opacityAt(ctx, 0), 25);
   return initial;
 }
 
 // After the client exited. `raw(request)` sends one request without the wire's own document binding (for the wrong-document probe).
 async function judge(ctx, { paths, staged, initial, raw }) {
   const doc60 = readJson(ctx, 'saved-60.json', paths.saved60);
-  ctx.eq('file', 'saved-60.json holds opacity 60', (layerOf(doc60) || {}).motionStatic && layerOf(doc60).motionStatic.opacity, [60]);
+  ctx.eq('file', 'saved-60.json holds opacity 60', savedOpacity(doc60), [60]);
   const doc40 = readJson(ctx, 'saved.json', paths.saved);
-  ctx.eq('file', 'saved.json holds opacity 40 (60, then undone, and the out-of-date 99 refused)', (layerOf(doc40) || {}).motionStatic && layerOf(doc40).motionStatic.opacity, [40]);
+  ctx.eq('file', 'saved.json holds opacity 40 (60, then undone, and the out-of-date 99 refused)', savedOpacity(doc40), [40]);
   ctx.eq('file', 'the static fixture was not overwritten', sha(fs.readFileSync(paths.static)), staged.static);
   ctx.eq('file', 'the keyed fixture was not overwritten', sha(fs.readFileSync(paths.keyed)), staged.keyed);
 
+  // The state the client left: saved.json open as a project of its own, never edited after it was opened.
   const final = await ctx.wire.discover();
   ctx.ok('read', 'the project the client started in was replaced', final.documentId !== initial.documentId, { was: initial.documentId, now: final.documentId });
   ctx.eq('read', 'the open project was opened and not edited afterwards (revision 0, so the wrong-document write changed nothing)', final.contentRevision, 0);
-  ctx.eq('read', 'the open project is the keyed fixture: frames 0, 10, 20 evaluate to 20, 50, 80',
-    [await evaluated(ctx, 0), await evaluated(ctx, 10), await evaluated(ctx, 20)], [20, 50, 80]);
+  const left = await K.history(ctx);
+  ctx.eq('read', 'the open project has no history (nothing was written after it was opened)', [left.undo, left.redo], [0, 0]);
+  ctx.eq('read', 'the project the client left reads opacity 40 at frame 0', await opacityAt(ctx, 0), 40);
+
+  // Independent keyed read: the harness opens the keyed fixture itself (this replaces saved.json) and reads frames 0, 10 and 20.
+  await K.reopen(ctx, paths.keyed);
+  ctx.eq('read', 'the keyed project evaluates 20, 50, 80 at frames 0, 10, 20',
+    [await opacityAt(ctx, 0), await opacityAt(ctx, 10), await opacityAt(ctx, 20)], [20, 50, 80]);
 
   // Save and reopen, independently: the harness opens the file the client saved and reads the value from the application.
-  const aside = await K.saveAs(ctx, 'f03-aside');
-  ctx.ok('file', 'the keyed project was kept aside before it was replaced', aside.sha.length === 64, aside.sha);
+  const keyedDoc = await ctx.wire.discover();
   await K.reopen(ctx, paths.saved);
   const reopened = await ctx.wire.discover();
-  ctx.ok('read', 'reopening saved.json gives another project', reopened.documentId !== final.documentId, reopened.documentId);
-  ctx.eq('read', 'the reopened project reads opacity 40', await staticValue(ctx), 40);
+  ctx.ok('read', 'reopening saved.json gives another project', reopened.documentId !== keyedDoc.documentId, reopened.documentId);
+  ctx.eq('read', 'the reopened project reads opacity 40', await opacityAt(ctx, 0), 40);
 
   // The refusals, produced here: a fresh valid write, then the same project with the revision it had before, then the identity of
   // the project the client started in.
-  const set = value => ({ command: 'layer.opacity.set', stableTarget: TARGET, value });
+  const set = value => P.propertyOpacity(LAYER, [value]);
   const rev = reopened.contentRevision;
-  const wrote = await ctx.wire.command('command.document.apply', set(77), { expectedRevision: rev });
+  const w = set(77), wrote = await ctx.wire.command(w.operation, w.payload, { expectedRevision: rev });
   ctx.ok('reply', 'a write that names the current revision is accepted', wrote.ok === true, wrote.ok ? 'ok' : wrote.error);
-  const stale = await ctx.wire.command('command.document.apply', set(11), { expectedRevision: rev });
+  const s11 = set(11), stale = await ctx.wire.command(s11.operation, s11.payload, { expectedRevision: rev });
   ctx.ok('reply', 'a write that names the previous revision is refused as stale_revision', stale.ok === false && stale.error.code === 'stale_revision', stale.ok ? 'accepted' : stale.error.code, 'stale_revision');
   const now = await ctx.wire.discover();
-  ctx.eq('read', 'the stale write changed neither value nor revision', [await staticValue(ctx), now.contentRevision], [77, rev + 1]);
-  const wrong = await raw({ apiVersion: 2, instanceId: now.instanceId, documentId: initial.documentId, operation: 'command.document.apply',
-    expectedRevision: now.contentRevision, payload: set(11) });
+  ctx.eq('read', 'the stale write changed neither value nor revision', [await opacityAt(ctx, 0), now.contentRevision], [77, rev + 1]);
+  const wrong = await raw({ apiVersion: 2, instanceId: now.instanceId, documentId: initial.documentId, operation: s11.operation,
+    expectedRevision: now.contentRevision, payload: s11.payload });
   ctx.ok('reply', 'a write that names the replaced project is refused as wrong_document', wrong.ok === false && wrong.error && wrong.error.code === 'wrong_document', wrong.ok ? 'accepted' : (wrong.error || {}).code, 'wrong_document');
   const after = await ctx.wire.discover();
-  ctx.eq('read', 'the wrong-document write changed neither value nor revision', [await staticValue(ctx), after.contentRevision], [77, rev + 1]);
+  ctx.eq('read', 'the wrong-document write changed neither value nor revision', [await opacityAt(ctx, 0), after.contentRevision], [77, rev + 1]);
+  await K.step(ctx, 'the harness undoes its own write', 'undo');
+  ctx.eq('read', 'undo returns the reopened project to 40', await opacityAt(ctx, 0), 40);
 }
 
 function makeRaw(client, uuid) {
