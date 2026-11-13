@@ -16,19 +16,23 @@ function collect(value, key, out = []) {
   else if (value && typeof value === 'object') for (const [k, v] of Object.entries(value)) { if (k === key && typeof v === 'string') out.push(v); collect(v, key, out); }
   return out;
 }
-// Flatten, observed: the saved project before and after. The members and the group id are consumed and at least one result
-// record replaces them, everything else is untouched. (A revision and a history entry alone do not show a flatten.)
+// Flatten, observed: the saved project before and after. The group id is consumed, every member except the STYLE member (the last, top-most one) is consumed and
+// the result replaces them, everything else is untouched. The baseline keeps the style member's stroke id on the first result island: flatten passes the style
+// source's data to insertBooleanResult, whose carryBooleanData copies BOOL_KEEP_DATA_FIRST = ['strokeId'] onto the first island (src/js/tools.js lines 6476-6480
+// and src/js/group-bridge.js line 432, both at 1065e9d8), and the engine does the same (object_boolean_ops_flatten.rs first_id = style_id). A revision and a
+// history entry alone do not show a flatten.
 async function flattenGroup(ctx, layerUid, groupId, members) {
   const before = await K.saveAs(ctx, 'pre-flatten'), idsBefore = K.objectStrokeIds(before.document);
+  const styleId = members[members.length - 1];
   ctx.ok('file', 'before the flatten the group and its members exist', members.every(id => idsBefore.includes(id)) && collect(before.document, 'groupId').includes(groupId), { idsBefore, groups: collect(before.document, 'groupId') });
   await K.apply(ctx, 'flatten the group', P.booleanFlatten(layerUid, groupId));
   const after = await K.saveAs(ctx, 'post-flatten'), idsAfter = K.objectStrokeIds(after.document);
-  ctx.eq('file', 'flatten consumed the members', members.filter(id => idsAfter.includes(id)), []);
+  ctx.eq('file', 'flatten consumed the members other than the style member', members.filter(id => id !== styleId && idsAfter.includes(id)), []);
   ctx.eq('file', 'flatten consumed the group id', collect(after.document, 'groupId').includes(groupId), false);
   const results = idsAfter.filter(id => !idsBefore.includes(id));
-  ctx.ok('file', 'at least one flattened result replaces the members', results.length >= 1, results, '>=1');
-  ctx.eq('file', 'no other record changed', idsAfter.filter(id => !results.includes(id)).sort(), idsBefore.filter(id => !members.includes(id)).sort());
-  return { results };
+  ctx.ok('file', 'the result is the style member\'s record (its id carried to the first island) plus any further islands', idsAfter.includes(styleId), { styleId, results }, 'style id present');
+  ctx.eq('file', 'no other record changed', idsAfter.filter(id => !results.includes(id) && id !== styleId).sort(), idsBefore.filter(id => !members.includes(id)).sort());
+  return { results, styleId };
 }
 // Ink is the alpha of the transparent canvas the rows run on (see png-probe.cjs): inked is clearly painted, clear is not painted at all.
 const inked = (image, x, y) => probe.inkAt(image, x, y) > 64;
@@ -52,7 +56,10 @@ const rows = [
       await K.apply(ctx, 'combine by subtract', P.groupCombine(layerUid, 'grp_evidence_a', 'subtract', [a, b]));
       const e1 = await K.exportPng(ctx, 'subtract');
       ctx.ok('pixel', 'the inner area is a hole', clear(e1.image, 200, 150), probe.inkAt(e1.image, 200, 150), '<16');
-      ctx.near('pixel', 'the ring keeps the outer colour', probe.over(e1.image, 120, 80), [230, 51, 51], 8);
+      // The combined result is painted with the style of the TOPMOST member, here the inner rectangle (blue), not the outer one: renderCombinesFromChildren
+      // takes `styleSource = leaves[leaves.length - 1]` (src/js/group-bridge.js line 552 at 1065e9d8) and paints the fill, stroke width and opacity of that member.
+      ctx.near('pixel', 'the ring takes the colour of the topmost member (the inner rectangle)', probe.over(e1.image, 120, 80), [0, 69, 204], 8);
+      ctx.ok('pixel', 'and not the outer rectangle\'s colour', probe.over(e1.image, 120, 80).join() !== [230, 51, 51].join(), probe.over(e1.image, 120, 80));
       ctx.ok('pixel', 'combine changes the export', e1.digest !== e0.digest, [e0.digest, e1.digest]);
       await K.apply(ctx, 'combine mode back to none', P.groupMode(layerUid, 'grp_evidence_a', 'none'));
       ctx.eq('pixel', 'mode none restores the plain export', (await K.exportPng(ctx, 'none')).digest, e0.digest);

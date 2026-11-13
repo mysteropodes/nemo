@@ -225,8 +225,9 @@ test('flatten is judged on the saved project: members and group id consumed, a r
     const { layerUid } = await K.fresh(ctx);
     const a = (await K.apply(ctx, 'a', rect(layerUid, 100, 60, 300, 240))).result.strokeId, b = (await K.apply(ctx, 'b', rect(layerUid, 160, 100, 240, 200))).result.strokeId;
     await K.apply(ctx, 'group', P.groupCreate(layerUid, 'grp_x', 'G', [a, b]));
-    const { results } = await lane2108.helpers.flattenGroup(ctx, layerUid, 'grp_x', [a, b]);
-    ctx.eq('file', 'one result', results.length, 1);
+    const { results, styleId } = await lane2108.helpers.flattenGroup(ctx, layerUid, 'grp_x', [a, b]);
+    // The baseline keeps the style member's (the last member's) id on the first island, so no NEW id appears for a one-island result.
+    ctx.eq('file', 'the style member is the result and no new id appeared', [styleId, results.length], [b, 0]);
     await K.step(ctx, 'undo', 'undo');
     ctx.eq('read', 'undo restores both records', (await Promise.all([a, b].map(id => K.readObject(ctx, P.target(layerUid, id))))).every(r => r.ok), true);
   });
@@ -301,7 +302,7 @@ test('2108-nested-group-operand-flatten passes against a stub that follows both 
   const good = await verdict(t, {}, row);
   assert.equal(good.verdict, 'pass', good.reason);
   const said = text => good.assertions.some(a => text.test(a.id) && a.verdict === 'pass');
-  assert.ok(said(/paint: both bars are inked/) && said(/flatten Outer, whose all-leaves fold is empty: refused/) && said(/refused flatten left every record/) && said(/the ink is exactly the all-leaves fold/), 'paint, refusal, unchanged document and the fold are each asserted');
+  assert.ok(said(/paint: both bars are inked/) && said(/flatten Outer, whose all-leaves fold is empty: refused/) && said(/refused flatten left every record/) && said(/the ink is the refit curve of the all-leaves fold/), 'paint, refusal, unchanged document and the fold are each asserted');
   // Flatten that collapses the nested group into one operand (the paint rule) yields the bars instead of refusing: the baseline rule says it must refuse.
   const operand = await verdict(t, { flattenNestedAsOperand: true }, row);
   assert.equal(operand.verdict, 'fail');
@@ -322,4 +323,51 @@ test('2108-nested-group-operand-flatten passes against a stub that follows both 
     const refused = await verdict(t, flags, row);
     assert.equal(refused.verdict, 'fail', JSON.stringify(flags));
   }
+});
+
+// ---- #2108 group combine and flatten, the two rules the first installed run showed the rows had wrong ----------------------------------------
+test('2108-group-combine-flatten passes against a stub that follows the baseline and fails when the combine styles from the wrong member or flatten leaves members behind', async t => {
+  const row = lane('2108-group-combine-flatten');
+  assert.ok(row);
+  const good = await verdict(t, {}, row);
+  assert.equal(good.verdict, 'pass', good.reason);
+  assert.ok(good.assertions.some(a => /the ring takes the colour of the topmost member/.test(a.id) && a.verdict === 'pass'));
+  // The first installed run: the ring was painted with the inner (topmost) member's blue. A paint that takes the first member's style (the old expectation) now fails.
+  const first = await verdict(t, { combineStyleFromFirst: true }, row);
+  assert.equal(first.verdict, 'fail');
+  assert.match(first.reason, /the ring takes the colour of the topmost member/);
+  // A flatten that mints a new id instead of keeping the style member's leaves the style member consumed: the result must be that very record.
+  const newId = await verdict(t, { flattenNewId: true }, row);
+  assert.equal(newId.verdict, 'fail');
+  const noop = await verdict(t, { flattenNoop: true }, row);
+  assert.equal(noop.verdict, 'fail');
+});
+
+// The expected refit constants of the nested row are Paper.js simplify(2.5) of the overlap rectangle, not numbers typed to match one app run.
+test('2108-nested-group-operand-flatten: the refit hull and ink constants are what the shipped Paper.js gives for the overlap rectangle', () => {
+  const paper = require('../../helpers/native-import-paper.cjs').load();
+  const path = new paper.Path({ insert: false });
+  [[200, 220], [200, 100], [250, 100], [250, 220]].forEach(([x, y]) => path.add(new paper.Point(x, y)));
+  path.closed = true;
+  path.simplify(2.5);
+  const hull = path.segments.reduce((a, g) => {
+    const xs = [g.point.x, g.point.x + g.handleIn.x, g.point.x + g.handleOut.x], ys = [g.point.y, g.point.y + g.handleIn.y, g.point.y + g.handleOut.y];
+    return [Math.min(a[0], ...xs), Math.min(a[1], ...ys), Math.max(a[2], ...xs), Math.max(a[3], ...ys)];
+  }, [Infinity, Infinity, -Infinity, -Infinity]);
+  const rows = require('../installed-evidence/lanes/rows-2108-groups.cjs');
+  assert.equal(path.segments.length, 2);
+  assert.ok(probe.near(hull, rows.REFIT_HULL, 0.01), JSON.stringify(hull));
+  assert.ok(probe.near([path.bounds.x, path.bounds.y, path.bounds.right - 1, path.bounds.bottom - 1], rows.REFIT_INK, 0.02), JSON.stringify(path.bounds));
+});
+
+test('2108-nested-group-operand-flatten fails a flatten that leaves the sharp overlap box, or a new id, instead of the baseline refit of the style member', async t => {
+  const row = lane('2108-nested-group-operand-flatten');
+  const good = await verdict(t, {}, row);
+  assert.equal(good.verdict, 'pass', good.reason);
+  assert.ok(good.assertions.some(a => /the result hull is the Paper.js simplify/.test(a.id) && a.verdict === 'pass'));
+  const sharp = await verdict(t, { flattenSharpBox: true }, row);
+  assert.equal(sharp.verdict, 'fail');
+  assert.match(sharp.reason, /two anchors/);
+  const newId = await verdict(t, { flattenNewId: true }, row);
+  assert.equal(newId.verdict, 'fail');
 });
