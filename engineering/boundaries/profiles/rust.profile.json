@@ -1113,6 +1113,7 @@
         "object_history_dispatch.rs",
         "object_frame_packet.rs",
         "object_exposure.rs",
+        "object_read_admission_declarations.rs",
         "object_order_evaluation.rs",
         "object_render_scene.rs",
         "object_component_convert_images.rs",
@@ -2245,6 +2246,7 @@
         "src/discovery_catalog.rs",
         "src/discovery_contract.rs",
         "src/discovery_tests.rs",
+        "src/discovery_live_tests.rs",
         "src/wire.rs",
         "src/native_project_settings_contract.rs",
         "src/native_project_settings_wire_tests.rs",
@@ -2710,7 +2712,8 @@
         "native_ghost_read_public_tests.rs",
         "native_rig_read_public_tests.rs",
         "native_object_legacy_import_tests.rs",
-        "native_discovery_availability_tests.rs"
+        "native_discovery_availability_tests.rs",
+        "native_discovery_opacity_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

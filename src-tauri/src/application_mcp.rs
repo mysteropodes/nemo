@@ -513,7 +513,7 @@ async fn serve_legacy(
 
 #[cfg(test)]
 #[path = "application_mcp_tests.rs"]
-mod tests;
+pub(crate) mod tests;
 
 #[cfg(test)]
 #[path = "native_object_client_tests.rs"]

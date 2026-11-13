@@ -268,3 +268,6 @@ fn every_operation_has_a_contract_with_schema_codes_and_availability() {
         "command.document.object.property.edit"
     );
 }
+
+#[path = "discovery_live_tests.rs"]
+mod live;

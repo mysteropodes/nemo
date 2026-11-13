@@ -1,7 +1,9 @@
 //! What the registered declarations say about each operation for the open document
 //! kind. One source: the capability descriptors (`documentKinds`, `purposes`,
-//! `useInstead`, availability). The desktop host's own refusal and its test read the
-//! same functions, so discovery cannot advertise what the product refuses.
+//! `useInstead`, availability). The native engine builds its object-document refusal
+//! from the same declarations, and the desktop tests hold the engine to this report
+//! operation by operation (code and message), so discovery cannot advertise what the
+//! product refuses.
 use crate::{capabilities::native_catalog, contract::Operation};
 use serde_json::{json, Value};
 use std::sync::OnceLock;
@@ -66,6 +68,22 @@ pub fn native_applicability(kind: &str, operation: &str) -> Applicability {
     }
 }
 
+/// Why no native operation is available while nothing is open.
+pub const NO_DOCUMENT: &str =
+    "no document is open; open or create a project first (project.open, project.new)";
+
+/// Availability for the open document, which is `None` while nothing is open: every
+/// native operation addresses a document, so none is available then.
+pub fn applicability_for(kind: Option<&str>, operation: &str) -> Applicability {
+    match kind {
+        Some(kind) => native_applicability(kind, operation),
+        None => match declared_applicability(operation) {
+            Applicability::Available => Applicability::Unavailable(NO_DOCUMENT.to_owned()),
+            other => other,
+        },
+    }
+}
+
 /// Availability the declaration alone gives, before any document kind is known.
 pub fn declared_applicability(operation: &str) -> Applicability {
     let Some(descriptor) = descriptor(operation) else {
@@ -115,8 +133,11 @@ pub fn v1_applicability(
     if project_operations().any(|op| op == operation) || listed.iter().any(|op| op == operation) {
         return Applicability::Available;
     }
-    Applicability::OtherKind {
-        use_instead: kind.and_then(|k| use_instead(k, operation)),
+    match kind {
+        Some(kind) => Applicability::OtherKind {
+            use_instead: use_instead(kind, operation),
+        },
+        None => Applicability::Unavailable(NO_DOCUMENT.to_owned()),
     }
 }
 
@@ -161,10 +182,10 @@ fn v1_entry(operation: &str) -> Option<&'static Value> {
 }
 
 fn applicability_of(operation: &str, api: u32, selected: &Selected) -> Applicability {
-    match (api, selected.kind) {
-        (1, kind) => v1_applicability(kind, selected.v1_operations, operation),
-        (_, Some(kind)) => native_applicability(kind, operation),
-        _ => declared_applicability(operation),
+    if api == 1 {
+        v1_applicability(selected.kind, selected.v1_operations, operation)
+    } else {
+        applicability_for(selected.kind, operation)
     }
 }
 

@@ -91,8 +91,9 @@ fn owner_probe(state: &ApplicationMcp, document: &str, operation: &str) -> Value
     let native = state.native_state();
     let mut authority = native.lock().unwrap();
     let generation = authority.active_generation().unwrap();
+    let payload = declared_payload(operation, document).unwrap_or_else(|| json!({}));
     let mut request = json!({"apiVersion": 2, "requestId": "owner-probe", "instanceId": state.instance_id(),
-        "documentId": document, "operation": operation, "payload": {}});
+        "documentId": document, "operation": operation, "payload": payload});
     if operation.starts_with("command.") {
         request["expectedRevision"] = json!(authority.active().unwrap().1.content_revision());
     }
@@ -126,7 +127,7 @@ async fn every_operation_discovery_reports_available_for_an_object_document_is_n
         "only {} operations reported",
         available.len()
     );
-    let (mut refused, mut owner_checked) = (Vec::new(), 0);
+    let (mut refused, mut undeclared, mut owner_checked) = (Vec::new(), Vec::new(), 0);
     for (index, operation) in available.iter().enumerate() {
         let response = match probe(&state, &document, index, operation).await {
             Ok(response) => response,
@@ -140,6 +141,19 @@ async fn every_operation_discovery_reports_available_for_an_object_document_is_n
         if refused_as_unsupported(&response) {
             refused.push(format!("{operation}: {}", response["error"]["message"]));
         }
+        // Whatever else the owner answers must be a refusal the declaration lists:
+        // never `unavailable` or another code the contract does not name.
+        if response["ok"] == false {
+            let code = response["error"]["code"].as_str().unwrap_or_default();
+            let declared: Vec<&str> = ["commonErrorCodes", "domainErrorCodes"]
+                .iter()
+                .flat_map(|key| catalog::descriptor(operation).unwrap()[*key].as_array().into_iter().flatten())
+                .filter_map(Value::as_str)
+                .collect();
+            if !declared.is_empty() && !declared.contains(&code) {
+                undeclared.push(format!("{operation}: {code}"));
+            }
+        }
     }
     eprintln!(
         "{} of {} operations were probed on the owner directly",
@@ -152,6 +166,11 @@ async fn every_operation_discovery_reports_available_for_an_object_document_is_n
         refused.join("\n")
     );
     assert!(
+        undeclared.is_empty(),
+        "refused with a code its declaration does not list:\n{}",
+        undeclared.join("\n")
+    );
+    assert!(
         owner_checked <= 12,
         "too many operations never reached the shared route: {owner_checked}"
     );
@@ -160,7 +179,7 @@ async fn every_operation_discovery_reports_available_for_an_object_document_is_n
 #[test]
 fn an_operation_declared_for_another_kind_is_refused_and_names_the_one_to_use() {
     let (state, document) = open_object_project();
-    let (mut checked, mut named) = (0, 0);
+    let (mut checked, mut named, mut expected_named) = (0, 0, 0);
     for operation in catalog::all_native_operations() {
         let Applicability::OtherKind { use_instead } =
             catalog::native_applicability("object", operation)
@@ -170,20 +189,28 @@ fn an_operation_declared_for_another_kind_is_refused_and_names_the_one_to_use() 
         let response = owner_probe(&state, &document, operation);
         assert!(refused_as_unsupported(&response), "{operation}: {response}");
         assert_eq!(response["error"]["code"], "invalid_request", "{operation}");
-        if let Some(other) = use_instead {
-            let message = response["error"]["message"].as_str().unwrap();
-            assert!(
-                message.contains(&format!("Use {other} instead.")),
-                "{operation}: {message}"
-            );
-            named += 1;
-        }
+        // The sentence the engine ends its refusal with is the one discovery reports.
+        let message = response["error"]["message"].as_str().unwrap();
+        let hint = match use_instead {
+            Some(other) => {
+                expected_named += 1;
+                format!("Use {other} instead.")
+            }
+            None => "No equivalent exists on this document.".to_owned(),
+        };
+        assert!(message.ends_with(&hint), "{operation}: {message}");
+        assert!(message.contains(operation), "{operation}: {message}");
+        assert_eq!(
+            catalog::inapplicable_message("object", operation).unwrap().ends_with(&hint),
+            true,
+            "{operation}"
+        );
+        named += usize::from(message.contains("Use "));
         checked += 1;
     }
-    assert!(
-        named >= 16 && checked > named,
-        "{named} named of {checked} checked"
-    );
+    // Every operation declared for opacity documents only, and each one's hint.
+    assert_eq!((checked, named), (22, expected_named));
+    assert!(expected_named >= 16, "{expected_named}");
 }
 
 #[test]

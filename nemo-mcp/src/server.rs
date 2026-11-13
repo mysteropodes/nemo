@@ -2,7 +2,6 @@
 #[path = "server_command_projection.rs"]
 mod command_projection;
 use crate::{
-    capabilities,
     contract::{ApplicationRequest, NativeApplicationRequest, Operation, NATIVE_API_VERSION},
     discovery::{self, DiscoverArgs},
     registry, wire,
@@ -125,28 +124,21 @@ impl JsonSchema for CommandRequest {
         properties["operation"] = json!({"type": "string", "description": "Native v2 operation shapes are selected by the versioned native request schema. Legacy v1 operations use their payload templates below."});
         properties["cancelledBeforeDispatch"] = json!({"type": "boolean"});
         properties["payload"] = command_projection::payload(&legacy, &native_transport);
-        let examples = ["command.document.apply", "history.undo", "history.redo"].map(|operation| json!({
-            "apiVersion": 2, "requestId": "unique-request-id", "instanceId": "discovered-instance-id",
-            "documentId": "snapshot-document-id", "expectedRevision": 0, "operation": operation,
-            "payload": if operation == "command.document.apply" {
-                json!({"command": "layer.opacity.set", "stableTarget": {"layerUid": "snapshot-layer-uid"}, "value": 25})
-            } else { json!({}) }
-        }));
+        let examples = crate::discovery_contract::command_schema_examples();
 
         json!({
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": properties,
             "required": ["apiVersion", "requestId", "operation", "payload"],
-            "description": "Use apiVersion 2 for native operations. The versioned native request schema and registered feature declarations constrain each operation; a declared staged capability can still refuse execution. Copy a root example, replace instanceId from discovery and documentId, expectedRevision and layerUid from the native snapshot when that operation requires them. command.document.apply changes static base opacity (0..100), not evaluated keyed frame opacity. Undo/redo require payload {} and the latest revision. Use a unique requestId for each new command; reuse the identical body only for retries. Legacy apiVersion 1 payload templates remain available below.",
+            "description": "Use apiVersion 2 for native operations. Which operations apply depends on the open document's kind (documentKind in nemo_discover): call nemo_discover first, it lists the steps and a request to copy for that kind, and {operation: name} gives one operation's exact schema, example and availability. A refusal names the operation to use instead where there is one. The examples below are for an object document; replace instanceId, documentId, expectedRevision and layerUid with the discovered values. Reads (query.*) carry atRevision in the payload and never expectedRevision; commands carry the current expectedRevision, which changes after each command. Use a unique requestId for each new command; reuse the identical body only for retries. Legacy apiVersion 1 payload templates remain available below.",
             "examples": examples,
             "$defs": {"legacy": legacy, "native": native, "nativeBitmapBrushResources": serde_json::from_str::<Value>(include_str!("../../engineering/application/native-bitmap-brush-resources-v1.schema.json")).expect("native bitmap brush resources schema is valid JSON"), "nativePropertyMetadata": native_metadata, "nativeFontAssets": native_fonts, "nativeObjectItem": native_items},
             "if": {"required": ["apiVersion"], "properties": {"apiVersion": {"const": 1}}},
             "then": {"$ref": "#/$defs/legacy"},
             "else": {"$ref": "#/$defs/native"},
             "x-nemo-nativeApiVersion": NATIVE_API_VERSION,
-            "x-nemo-nativeTransportV2": native_transport,
-            "x-nemo-registeredNativeCapabilities": capabilities::native_catalog().descriptors()
+            "x-nemo-discovery": "The native transport schema is $defs.native; per-operation declarations, examples and availability come from nemo_discover {operation: name} (or {detail: \"full\"} for every declaration), not from this schema."
         })
         .try_into()
         .expect("conditional command schema is an object")

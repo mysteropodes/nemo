@@ -3,33 +3,44 @@ use crate::object_snapshot::{ObjectSnapshot, ReadAdmission, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{
     DispatchError, DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
 };
-/// Opacity-document operations, each with the object operation to use instead. An
-/// object document names the replacement when it refuses one of these. The capability
-/// declarations carry the same pairs (`useInstead` in native-opacity.json); the desktop
-/// discovery test checks the message for every declared pair.
-const OPACITY_DOCUMENT_ALTERNATIVES: &[(&str, &str)] = &[
-    ("command.document.apply", "command.document.object.property.edit"),
-    ("query.document.opacity", "query.document.object.property.read"),
-    ("query.document.revision", "query.document.object"),
-    ("query.document.snapshot.acquire", "query.document.object"),
-    ("query.document.serialize", "project.saveAs"),
-    ("query.document.evaluate", "query.document.object.property.read"),
-    ("transaction.begin", "command.document.object.property.edit"),
-    ("transaction.update", "command.document.object.property.edit"),
-    ("transaction.commit", "command.document.object.property.edit"),
-    ("transaction.cancel", "command.document.object.undo"),
-    ("transaction.status", "query.document.object.history"),
-    ("history.undo", "command.document.object.undo"),
-    ("history.redo", "command.document.object.redo"),
-    ("job.export.png.begin", "project.export"),
-    ("job.export.png.status", "project.export"),
-    ("job.export.png.cancel", "project.export"),
+/// The capability declarations that name opacity-only operations. The refusal below is
+/// built from them, so it cannot drift from the `documentKinds` and `useInstead` that
+/// discovery reports; a test reads every declaration and checks both directions.
+const OPACITY_DECLARATIONS: [&str; 3] = [
+    include_str!("../../engineering/application/capabilities-v2/native-opacity.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-diagnostics.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-reproduction.json"),
 ];
 
+/// Operation -> the object operation to use instead, where the declaration names one.
+fn opacity_document_alternatives() -> &'static [(String, Option<String>)] {
+    static TABLE: std::sync::OnceLock<Vec<(String, Option<String>)>> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        let mut table = Vec::new();
+        for source in OPACITY_DECLARATIONS {
+            let declaration: serde_json::Value =
+                serde_json::from_str(source).expect("capability declaration is valid JSON");
+            if declaration["documentKinds"] != serde_json::json!(["opacity"]) {
+                continue;
+            }
+            for operation in declaration["operations"].as_array().into_iter().flatten() {
+                let Some(operation) = operation.as_str() else { continue };
+                let other = declaration["useInstead"]["object"][operation].as_str();
+                table.push((operation.to_owned(), other.map(str::to_owned)));
+            }
+        }
+        table
+    })
+}
+
 fn opacity_document_refusal(operation: &str) -> Option<String> {
-    let (_, other) = OPACITY_DOCUMENT_ALTERNATIVES.iter().find(|(op, _)| *op == operation)?;
+    let (_, other) = opacity_document_alternatives().iter().find(|(op, _)| op == operation)?;
+    let hint = other.as_ref().map_or_else(
+        || "No equivalent exists on this document.".to_owned(),
+        |other| format!("Use {other} instead."),
+    );
     Some(format!(
-        "Unsupported object read operation. {operation} applies to opacity documents only; this is an object document. Use {other} instead."
+        "Unsupported object read operation. {operation} applies to opacity documents only; this is an object document. {hint}"
     ))
 }
 
@@ -130,3 +141,7 @@ impl ObjectSnapshot {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/object_read_admission_declarations.rs"]
+mod declarations;
