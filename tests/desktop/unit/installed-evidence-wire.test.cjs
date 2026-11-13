@@ -14,6 +14,8 @@ const { runRows } = require('../installed-evidence/runner.cjs');
 const { buildReceipt, exitStatus, EXIT } = require('../installed-evidence/receipt.cjs');
 const { createStubApp, INSTANCE, FOREIGN, BUILD } = require('./installed-evidence-stubs.cjs');
 
+// A receipt reports retries next to the verdicts; a row that retried nothing contributes zeros.
+const NO_RETRIES = { retriedOperations: 0, refusedAttempts: 0, exhausted: 0, rows: 0, byOperation: {} };
 function setup(t, flags) {
   const work = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ie-wire-')));
   t.after(() => fs.rmSync(work, { recursive: true, force: true }));
@@ -47,7 +49,7 @@ test('a real pass: every assertion passes, kinds are mixed, operations carry req
   assert.ok(row.operations.length > 20 && row.operations.every(o => /^[0-9a-f]{64}$/.test(o.requestDigest) && /^[0-9a-f]{64}$/.test(o.replyDigest)));
   assert.ok(row.operations.some(o => o.operation === 'project.export') && row.operations.some(o => o.operation === 'command.document.object.undo'));
   const receipt = buildReceipt({ candidate: { sourceHead: 'x' }, selection: { lanes: ['9001'] }, rows: [row], cleanup: { ok: true } });
-  assert.deepEqual([receipt.verdict, receipt.totals.overall, receipt.totals.byLane['9001']], ['pass', { rows: 1, pass: 1, fail: 0, unrun: 0 }, { rows: 1, pass: 1, fail: 0, unrun: 0, catalogRows: null, complete: false }]);
+  assert.deepEqual([receipt.verdict, receipt.totals.overall, receipt.totals.byLane['9001']], ['pass', { rows: 1, pass: 1, fail: 0, unrun: 0, retries: NO_RETRIES }, { rows: 1, pass: 1, fail: 0, unrun: 0, retries: NO_RETRIES, catalogRows: null, complete: false }]);
   assert.equal(exitStatus(receipt.verdict), 0);
   assert.ok(receipt.statement.includes('not the CS7') && receipt.residualHandsOn.length > 0);
   assert.ok(app.state.calls.includes('nemo_discover'));
@@ -182,7 +184,7 @@ test('a subset run is never a full pass: selection and the expected row count ar
   assert.equal(subset.verdict, 'subset-pass');
   assert.equal(exitStatus(subset.verdict), EXIT['subset-pass']);
   assert.notEqual(EXIT['subset-pass'], EXIT.pass);
-  assert.deepEqual(subset.totals.byLane['2107'], { rows: 1, pass: 1, fail: 0, unrun: 0, catalogRows: 2, complete: false });
+  assert.deepEqual(subset.totals.byLane['2107'], { rows: 1, pass: 1, fail: 0, unrun: 0, retries: NO_RETRIES, catalogRows: 2, complete: false });
   assert.deepEqual(subset.selection.omitted, ['2107-b', '2108-a']);
   const full = buildReceipt({ rows: pass, selection: { lanes: ['2107'], rows: ['2107-a'], omitted: [], catalogRows: { 2107: 1 } }, cleanup: { ok: true } });
   assert.deepEqual([full.verdict, exitStatus(full.verdict), full.totals.byLane['2107'].complete], ['pass', 0, true]);

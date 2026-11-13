@@ -317,20 +317,46 @@ missing file, an asset still in use, an absent font, an unknown asset, a wrong-s
 the catalog does not hold is a no-op by contract (not a refusal). Resource publications (`brush.bitmap.publish`) are judged as
 resources: no revision, no history entry. There are no sleeps; every wait is the reply of the operation itself.
 
-**Rows.** `2107-vector-create-export-reopen`, `2107-stroke-style-pressure-fields`, `2107-vector-replace-delete-undo-redo`,
-`2107-parametric-set-translate-scale`, `2107-path-effects-stack`; `2108-group-combine-flatten`, `2108-boolean-apply-erase`,
-`2108-layer-lifecycle`, `2108-selection-clipboard-remap`; `2112-asset-attach-dedup-refusals`, `2112-asset-remove-lifetime`,
-`2112-raster-edit-save-reopen`, `2112-text-layout-edit-reopen`; `2113-mixed-scene-one-export`, `2113-image-mesh-sculpt`,
-`2113-bitmap-brush-resources`, `2113-evaluate-vs-export-pin`. The mesh id and offsets are read through the object query's `imageMesh`
-view (the `image.mesh.edit` reply is only its receipt). **A lane total counts the rows that ran, not the lane**: `coverage.cjs` lists
-the ids each lane assigns and the behaviours no row observes (`coverage.notCovered` in the receipt, for example component and rig
-producers, nested groups, Motion flatten, glyph and layout output for G38b), and a unit test fails when an assigned id is neither
-covered by a row nor listed. Select by
+**Rows.** #2107: `2107-vector-create-export-reopen`, `2107-stroke-style-pressure-fields`, `2107-vector-replace-delete-undo-redo`,
+`2107-parametric-set-translate-scale`, `2107-path-effects-stack`, `2107-canvas-alpha-and-opaque-export`,
+`2107-parametric-ellipse-polygon-star`, `2107-parametric-rotated-box`. #2108: `2108-group-combine-flatten`, `2108-boolean-apply-erase`,
+`2108-layer-lifecycle`, `2108-layer-reorder` (runs last), `2108-selection-clipboard-remap`, `2108-nested-group-structure`,
+`2108-group-stack-reorder`, `2108-nested-group-operand-flatten`, `2108-linked-fill-join`, `2108-flatten-element-motion`. #2112:
+`2112-asset-attach-dedup-refusals`, `2112-asset-remove-lifetime`, `2112-raster-layer-delete`, `2112-raster-edit-save-reopen`,
+`2112-text-layout-edit-reopen`, `2112-text-layout-box`. #2113: `2113-mixed-scene-one-export`, `2113-mixed-z-order-reorder` (runs last),
+`2113-image-mesh-sculpt`, `2113-bitmap-brush-resources`, `2113-evaluate-vs-export-pin`, `2113-bitmap-brush-quota-and-cancel`. The mesh id and
+offsets are read through the object query's `imageMesh` view (the `image.mesh.edit` reply is only its receipt); group paths and modes, text
+glyph boxes, dynamic-shape intent and fills are read through the hit-test listing (`query.document.object`, view `subselect` with `hitTest`:
+role, bounds, groupPath outermost first, paramShape, boxAngle); the anchors of a large record are paged (the whole-object read refuses past
+4096 bytes).
+
+**Ink is alpha or colour, never one standing in for the other** (`png-probe.cjs`). `project.export` has no alpha option and fills the project
+canvas background, so an opaque export can not tell a white-painted item from nothing (colour distance 0). Rows that assert clear, hole,
+no-ink or outside-the-shape therefore run on a transparent canvas (`K.fresh(ctx, { transparent: true })`: one
+`command.document.object.project.settings.edit` `setCanvasBackground` `#00000000`, capabilities-v2/native-project-settings.json) and measure
+ink as the alpha of the export; colour probes (`probe.over`) are kept for paint colour. `2107-canvas-alpha-and-opaque-export` observes both
+on one scene: an opaque default canvas, a transparent one, white paint as alpha 255 with colour distance 0, undo and reopen. The digest of an
+export ignores the colour channels of fully transparent pixels (rounding residue, not something an export shows).
+
+**What a lane covers.** A lane total counts the rows that ran, not the lane. `coverage.cjs` assigns ids per lane and the receipt states, per id,
+exactly one of **covered** (a passing row names it), **attempted-not-passed** (rows ran, none passed: failing rows are listed with their
+reason) or **never attempted** (no row for it ran, or only unrun ones); a covered id still lists its failing rows (`alsoNotPassed`), and
+`coverage.notCovered` lists what no row observes with the read that would be needed: glyph identity (a `layout` view of
+`query.document.object.text`), the object-project evaluate read (`query.document.evaluate` is refused on an object project; the evaluated
+output is observed as export alpha and the authored value as the property read), component and rig producers, component and folder layers.
+An id with an unobserved part (G38b glyph identity, I16a the document evaluate read) is `partial` even when its rows pass. A unit test fails when an assigned id is neither covered by a row nor listed. Select by
 lane (`--lane`) or row (`--row`); an unknown lane or row refuses before anything starts. A row whose operation the package does not
 offer (a front-door `unsupported_capability` or `unavailable` from `nemo-mcp`, or a host that reports no lifecycle generation) is
 `unrun` with the reason, never `pass`; a refusal by the application itself is an observation the row judges. Request payloads are built by
 `payloads.cjs` only, and a unit test validates every builder against `native-transport-v2.schema.json` and the item and bitmap-brush
 schemas.
+
+**Retries are data.** `project.saveAs` right after a change is refused intermittently by the candidate (`unavailable`, "pin-changed-before-picker" or
+"publication-response-unavailable") and the next request is accepted, and a hit-test listing right after a command can answer "Subselect
+presentation changed". The kit retries (at most four attempts) and records every retry on the row result: `retried`, and per retried operation
+`{operation, label, attempts, refused, accepted, refusals: [{attempt, code, message}]}`; `totals.retries` (overall and per lane) counts retried
+operations, refused attempts, rows touched, operations by name and `exhausted` retries, and the stdout line lists `retriedRows`. A retry
+never turns a failure into a pass: a save that is still refused after four attempts fails the row.
 
 **Receipt and exit status.** `installed-client-evidence.json` in the report directory (and `transcript.jsonl`, the requests and raw
 replies, private, mode 0600) records the candidate identity (source head, tree, app version, build id, instance id, pid, task id,
@@ -344,15 +370,19 @@ receipt states that it is not the CS7 batched session (#2348) and that it does n
 disposition; the rows that need real input (drawing-tool strokes, keyboard shortcuts, UI buttons, how text looks in the viewport,
 the export modal and video export) stay hands-on and are listed in `residualHandsOn`.
 
-Known limits, stated so nobody reads more into a pass: there is no public read of glyph or layout boxes, so text bounds are
-compared with ranges derived from the declared size; the CS7 read route and this runner both bind replies to the candidate through
+Known limits, stated so nobody reads more into a pass: the only public read of a text layout is one glyph box per block (the hit-test
+listing), compared with the ink of the export, so glyph identity and advances are not observed; the CS7 read route and this runner both bind replies to the candidate through
 the registry, `lsof` and the build id because `nemo-mcp` reports no pid of its own; rows cannot show that a UI caller reaches the
 owner, only that the owner honours the contract. Unit tests (`node --test tests/desktop/unit/installed-evidence-*.test.cjs`) run the kit, wire
 and runner against stub transports only: a real pass, a product failure, a foreign instance, malformed replies and an unavailable
 operation, plus one injected fault per kit guard (`installed-evidence-defects.test.cjs`: an unbound mesh, a front-door or wrong-code
 refusal, an edit disguised as a publication, a host that keeps the in-memory document on open, a flatten that only bumps the
-revision, an export file changed on disk). The stub follows the published reply shapes; it is not what is being proved. No
-installed run has been made with this runner.
+revision, an export file changed on disk) and `installed-evidence-reads.test.cjs` (the hit-test listing, anchor pages, element property read,
+canvas background edit, brush cancellation and quota refusals answered with literal copies of the candidate's replies; coverage that counts
+only passing rows; every retry recorded). The stub follows the published reply shapes; it is not what is being proved. The first real runs
+(task evidence-1112, receipts kept outside the repository) found four product defects the rows keep reporting rather than work around:
+`group.combine` is ignored by the export, `layer.reorder` commits and then answers an indeterminate refusal that leaves the session unusable
+(those rows run last), `layer.delete` refuses a layer holding a raster placement, and flatten refuses a group that contains a nested group.
 
 ## Real client workflow, Codex and Claude Code (`installed-evidence/f03-clients.cjs`, #1049)
 

@@ -18,7 +18,7 @@ async function savedRaster(ctx, tag) {
 const rows = [
   { id: '2112-asset-attach-dedup-refusals', title: 'PNG asset attach, stable identity, dedup, corrupt, oversize and missing sources refused without a revision', tasks: ['G01', 'G02'],
     async run(ctx) {
-      await K.fresh(ctx);
+      await K.fresh(ctx, { transparent: true });
       const file = K.stage(ctx, 'teal.png', K.solidPng(160, 100, [...TEAL, 255]));
       const first = await attach(ctx, 'attach a PNG as a new layer', file, 'evidence-image');
       const r = first.result;
@@ -49,7 +49,7 @@ const rows = [
 
   { id: '2112-asset-remove-lifetime', title: 'asset removal and resource lifetime: an asset in use is refused, an unreferenced one is removed in one revision, undo and redo restore it, an absent one is a no-op', tasks: ['G01'],
     async run(ctx) {
-      await K.fresh(ctx);
+      await K.fresh(ctx, { transparent: true });
       const file = K.stage(ctx, 'teal.png', K.solidPng(160, 100, [...TEAL, 255]));
       const made = await attach(ctx, 'attach a PNG as a new layer', file, 'evidence-image');
       const { assetId } = made.result, layer = made.result.target.layerUid;
@@ -79,7 +79,7 @@ const rows = [
   // invalid_request "Layer lifecycle payload is invalid or target is absent." for a layer holding a raster item, while a vector layer deletes.
   { id: '2112-raster-layer-delete', title: 'deleting the layer that holds a raster placement removes the placement and one undo restores it', tasks: ['G02'],
     async run(ctx) {
-      await K.fresh(ctx);
+      await K.fresh(ctx, { transparent: true });
       const file = K.stage(ctx, 'teal.png', K.solidPng(160, 100, [...TEAL, 255]));
       const made = await attach(ctx, 'attach a PNG as a new layer', file, 'evidence-image');
       const layer = made.result.target.layerUid;
@@ -93,7 +93,7 @@ const rows = [
 
   { id: '2112-raster-edit-save-reopen', title: 'raster move, resize, rotate, opacity measured in pixels; asset bytes survive save and reopen without the staging file', tasks: ['G02'],
     async run(ctx) {
-      await K.fresh(ctx);
+      await K.fresh(ctx, { transparent: true });
       const file = K.stage(ctx, 'teal.png', K.solidPng(160, 100, [...TEAL, 255]));
       const made = await attach(ctx, 'attach a PNG', file, 'evidence-image');
       const tgt = made.result.target;
@@ -128,7 +128,7 @@ const rows = [
   { id: '2112-text-layout-edit-reopen', title: 'retained text: stored block, text read, ink bounds, size and spacing, undo, delete, absent font refused, reopen', tasks: ['G27', 'G38a'],
     limitations: ['No public read returns glyph or layout boxes; ink bounds are compared with ranges derived from the declared size, not with a layout box.'],
     async run(ctx) {
-      const { layerUid } = await K.fresh(ctx, { w: 320, h: 180 });
+      const { layerUid } = await K.fresh(ctx, { w: 320, h: 180, transparent: true });
       const block = P.textBlock('HELLO', { size: 72, color: '#cc2200', anchorTopLeft: { x: 20, y: 30 } });
       const created = await K.apply(ctx, 'create a text block', P.textCreate(layerUid, block));
       const textTarget = P.target(layerUid, created.result.strokeId);
@@ -176,4 +176,4 @@ const rows = [
     } },
 ];
 
-module.exports = { lane: '2112', issue: 2112, rows };
+module.exports = { lane: '2112', issue: 2112, rows: [...rows, ...require('./rows-2112-text-layout.cjs').rows] };
