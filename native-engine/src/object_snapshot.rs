@@ -10,7 +10,6 @@ pub use crate::revision::ObjectSnapshot;
 #[path = "object_read_admission.rs"]
 mod admission;
 use admission::envelope_identifier;
-pub use admission::OPACITY_DOCUMENT_ALTERNATIVES;
 #[cfg(feature = "font_asset_admission")]
 #[path = "object_text_font_resources.rs"]
 pub(crate) mod object_text_font_resources;

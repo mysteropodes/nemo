@@ -5,9 +5,9 @@ use crate::request_receipts::{
 };
 /// Opacity-document operations, each with the object operation to use instead. An
 /// object document names the replacement when it refuses one of these. The capability
-/// declarations carry the same pairs (`useInstead` in native-opacity.json); a desktop
-/// test compares the two.
-pub const OPACITY_DOCUMENT_ALTERNATIVES: &[(&str, &str)] = &[
+/// declarations carry the same pairs (`useInstead` in native-opacity.json); the desktop
+/// discovery test checks the message for every declared pair.
+const OPACITY_DOCUMENT_ALTERNATIVES: &[(&str, &str)] = &[
     ("command.document.apply", "command.document.object.property.edit"),
     ("query.document.opacity", "query.document.object.property.read"),
     ("query.document.revision", "query.document.object"),

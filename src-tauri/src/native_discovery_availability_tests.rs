@@ -139,19 +139,6 @@ fn an_operation_declared_for_another_kind_is_refused_and_names_the_one_to_use() 
 }
 
 #[test]
-fn the_engine_replacement_table_equals_the_declared_one() {
-    let declared: std::collections::BTreeMap<String, String> = catalog::all_native_operations()
-        .into_iter()
-        .filter_map(|operation| catalog::use_instead("object", operation).map(|other| (operation.to_owned(), other)))
-        .collect();
-    let engine: std::collections::BTreeMap<String, String> = native_engine::object_snapshot::OPACITY_DOCUMENT_ALTERNATIVES
-        .iter()
-        .map(|(operation, other)| ((*operation).to_owned(), (*other).to_owned()))
-        .collect();
-    assert_eq!(engine, declared);
-}
-
-#[test]
 fn native_status_reports_the_document_kind_and_the_process() {
     let (state, document) = open_object_project();
     let request = NativeStatusRequest { api_version: 2, request_id: "status-kind".into(), instance_id: state.instance_id().into() };
