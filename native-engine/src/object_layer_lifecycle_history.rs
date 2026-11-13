@@ -153,6 +153,9 @@ mod object_layer_delete_items;
 #[path = "../tests/object_layer_delete_components.rs"]
 mod object_layer_delete_components;
 #[cfg(test)]
+#[path = "../tests/object_layer_delete_context_tables.rs"]
+mod object_layer_delete_context_tables;
+#[cfg(test)]
 #[path = "../tests/object_layer_color_set.rs"]
 mod object_layer_color_set;
 #[cfg(test)]

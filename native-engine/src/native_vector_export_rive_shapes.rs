@@ -5,6 +5,25 @@ use crate::export_job::native_vector_export::native_vector_export_rive::{RiveExp
 use kurbo::{BezPath, PathEl, Point};
 use serde_json::{json, Number, Value};
 
+/// A filled shape with no stroke: a v1 fill record, or an island of a combined group.
+pub(crate) fn filled(id: &str, (v, i, o, closed): Geometry, fill: [f64; 4], opacity: f64) -> Stroke {
+    Stroke {
+        id: id.to_string(),
+        v,
+        i,
+        o,
+        closed,
+        fill: Some(fill),
+        stroke: None,
+        width: 1.0,
+        real: false,
+        opacity,
+        texture: None,
+        pre_texture_opacity: None,
+    }
+}
+type Geometry = (Vec<[f64; 2]>, Vec<[f64; 2]>, Vec<[f64; 2]>, bool);
+
 pub(crate) fn float(n: &Number) -> Result<f64, RiveExportError> {
     n.as_f64()
         .filter(|v| v.is_finite())

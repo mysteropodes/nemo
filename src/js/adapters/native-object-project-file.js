@@ -249,22 +249,30 @@
         baseline=null;(ports.closeFailed||ports.failed)(error);ports.repaint();return false;
       }finally{opening=false;}
     }
-    // An application save (project.saveAs with a destination path, #2510) reads the presented session three times (pin, before
-    // the destination, before dispatch) and has no user gesture to protect. Each read is its own proof: a fresh capture awaits the
-    // owner's queue as of that moment and refuses a changed owner. A capture taken once at the start is superseded by ANY work
-    // entering the queue after it, and unrelated work (the preview presentation the UI renders after an edit or New Project)
-    // legitimately does, so the save of an unchanged document used to be refused ("pin-changed-before-picker") and accepted on
-    // retry. The workflow still compares the pinned identity (instance, document, revision, snapshot, generation) across the
-    // reads, which is exactly what a changed document breaks. A read that races queued work waits for it (bounded). The
-    // interactive picker flow keeps the single start capture: a newer queue before its picker is refused by contract.
-    var SETTLE_ATTEMPTS=12,SETTLE_MS=10;
+    // Every Save As (an application request's path, #2510, or the interactive picker) reads the presented session several times
+    // (pin, before the destination, before dispatch, after publish). Each read is its own proof: a fresh capture awaits the
+    // owner's queue as of that moment. A capture taken once at the start is superseded by ANY work entering the queue after it,
+    // and unrelated work (the preview presentation the UI renders after an edit or New Project) legitimately does, which used to
+    // refuse the save of an unchanged document ("pin-changed-before-picker"). The workflow still compares the pinned identity
+    // (instance, document, revision, snapshot, generation) across the reads, which is exactly what a changed document breaks.
+    // A read that cannot yet prove the presentation waits for the real condition: the owner's queue to drain and the preview of
+    // the CURRENT revision to land (an edit or New Project leaves it a render behind, and a large document or a cold GPU makes
+    // that render slow). Only a session that is gone, or the generous bound, ends the wait.
+    var SETTLE_TIMEOUT_MS=30000,SETTLE_MS=10;
+    var TRANSIENT={'queue-pending':true,'capture-superseded':true,'presentation-missing':true,'view-mismatch':true,
+      'owner-mismatch':true,synchronizing:true};
     async function presentedForSave(onRefusal){
-      for(var attempt=1;attempt<SETTLE_ATTEMPTS;attempt++){
-        var shown=await session.captureSaveSession()();
+      var deadline=Date.now()+SETTLE_TIMEOUT_MS,why;
+      for(;;){
+        why=undefined;
+        var shown=await session.captureSaveSession()(function(code){why=code;});
         if(shown)return shown;
+        if(!session.isActive()||(why!==undefined&&!TRANSIENT[why])||Date.now()>=deadline){
+          if(typeof onRefusal==='function'&&why!==undefined)try{onRefusal(why);}catch(_){}
+          return null;
+        }
         await new Promise(function(resolve){setTimeout(resolve,SETTLE_MS);});
       }
-      return session.captureSaveSession()(onRefusal);
     }
     // destination: an application request's path (#2510) in place of the picker; the same workflow otherwise.
     // replace: true is the in-place Save of a titled project (the host renames over the existing file); it never applies to a picker choice.
@@ -278,7 +286,7 @@
         if(mode&&mode.replace===true&&typeof destination==='string'&&destination)options.replace=true;
         var ticket=saved.begin({saveRequestId:options.requestId,serializerRequestId:options.pinRequestId}),serialization;
         options.isCurrent=function(){return saved.isCurrent(ticket);};
-        var written=await workflow.run({readPresentedObjectSession:requested?presentedForSave:session.captureSaveSession(),
+        var written=await workflow.run({readPresentedObjectSession:presentedForSave,
           acquirePin:async function(request){serialization=await session.acquirePin(request);return serialization;},
           pickDestination:pick,savePinned:session.savePinned},options);
         var result=await saved.acknowledge(ticket,{written:written,serialization:serialization},options);

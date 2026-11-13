@@ -29,6 +29,12 @@ fn square(x: f64, y: f64, size: f64, rgba: [f64; 4]) -> Value {
 fn grouped(mode: Option<&str>, members: usize) -> Value {
     let mut records = vec![square(8., 8., 48., RED), square(24., 24., 16., BLUE)];
     records.truncate(members);
+    grouped_of(records, mode)
+}
+
+/// The given members (grouped when `mode` is set) with the ungrouped green square above them.
+pub(crate) fn grouped_of(mut records: Vec<Value>, mode: Option<&str>) -> Value {
+    let members = records.len();
     // A third, ungrouped shape above both, covering the middle of the hole.
     records.push(square(28., 28., 8., GREEN));
     let mut value = scene_doc(&records);
@@ -110,4 +116,35 @@ fn the_members_leave_the_paint_order_but_stay_listed_for_selection() {
         ordered_entries(&plan).next(),
         Some(PaintEntry::Dab(_))
     ), "the result sits where the group's front-most member was, under the shape above it");
+}
+
+/// Every member of a group whose boolean result is EMPTY is gone: subtract where the second operand covers the first.
+fn empty_result(blend: Option<&str>) -> Value {
+    let mut value = grouped_of(vec![square(24., 24., 16., RED), square(8., 8., 48., BLUE)], Some("subtract"));
+    if let Some(blend) = blend {
+        value["layers"][0]["blendMode"] = json!(blend);
+    }
+    value
+}
+
+#[test]
+fn a_layered_layer_with_an_empty_combine_result_paints_no_member() {
+    use crate::compositor::scene_effect_scene_join_stack::{select_composition_path, PathSelection};
+    let mut gpu = Compositor::new().expect("the combine pixels need a real headless Metal adapter");
+    for blend in [None, Some("multiply")] {
+        let snapshot = snapshot(&empty_result(blend));
+        let plan = plan_of(&snapshot);
+        let prepared = prepare_object_composition(&plan, &selector(&snapshot, 0)).expect("witness");
+        let output = ObjectOutputSpec::new(64, 64, "white-srgb-normal-rgba8-area").expect("output");
+        let effects = prepared.scene_effects().expect("production joins").clone();
+        let (layered, result) = match select_composition_path(&effects, prepared.plan()).expect("path") {
+            PathSelection::Layered(stack) => (true, gpu.compose_object_layered(&prepared, output, &stack)),
+            PathSelection::Flat => (false, gpu.compose_object(&prepared, output)),
+        };
+        assert_eq!(layered, blend.is_some(), "{blend:?}: a blend mode makes the scene layered");
+        let bytes = gpu.readback_object_rgba8(&result.expect("compose")).expect("readback").bytes().to_vec();
+        assert!(close(pixel(&bytes, 12, 32), WHITE), "{blend:?}: the big member is not painted");
+        assert!(close(pixel(&bytes, 26, 30), WHITE), "{blend:?}: the small member is not painted");
+        assert!(close(pixel(&bytes, 32, 32), [0, 255, 0, 255]), "{blend:?}: the ungrouped shape is");
+    }
 }

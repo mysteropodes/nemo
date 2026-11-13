@@ -47,7 +47,8 @@ impl<'w> LayerContext<'w> {
             None => None,
         };
         let mut entries: BTreeMap<usize, Vec<PaintEntry<'w>>> = BTreeMap::new();
-        let mut non_contour = BTreeSet::new();
+        // A layer with a suppressed combine member has fills the compositor must not paint (the result is an entry).
+        let mut non_contour = witness.plan().combine_suppressed_layers();
         for (layer, entry) in layered_entries(witness.plan()) {
             if !matches!(entry, PaintEntry::Contour(_)) {
                 non_contour.insert(layer);

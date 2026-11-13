@@ -1083,3 +1083,50 @@ test('an application Save As still refuses when the document itself changed betw
   gate.resolve();await edit.catch(()=>{});
   assert.equal((await pending).acknowledged,false);assert.equal(h.copies.length,0);
 });
+// Evidence defect 4 follow-up: the interactive picker flow reads freshly too, and a Save As right after an open or an edit waits
+// for the preview of the current revision however long it takes (it used to give up after ~110 ms with unavailable).
+test('the interactive Save As is deterministic when unrelated owner work is queued between its reads',async()=>{
+  const h=host();let gate=null;
+  const slow=(command,args)=>gate&&command==='nemo_native_object_reference'&&JSON.parse(args.requestJson).action.kind==='inspect'
+    ?gate.promise.then(()=>h.invoke(command,args)):h.invoke(command,args);
+  const s=Project.create({invoke:slow,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
+    physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});
+  await s.openPath('/project.json');await s.presentPreview(0);
+  const f=files(s);
+  gate=deferred();
+  const pending=f.ui.saveAs();await turn();
+  const unrelated=s.presentPreview(0);
+  gate.resolve();await unrelated;
+  const result=await pending;
+  assert.equal(result.acknowledged,true,JSON.stringify(result));assert.equal(h.copies.length,1);
+  assert.equal(h.copies[0].destinationPath,'/new.json');
+});
+test('a Save As waits for the preview of the current revision to land, however long it takes',async()=>{
+  for(const requested of [true,false]){
+    const h=host();
+    const real=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
+      physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});
+    await real.openPath('/project.json');await real.presentPreview(0);
+    // The owner answers "presentation-missing" (the preview of the revision has not landed) until 400 ms after the save began,
+    // longer than the old fixed poll of ~110 ms.
+    let begun=0;
+    const slow=Object.assign({},real,{captureSaveSession:()=>async onRefusal=>{
+      if(!begun)begun=Date.now();
+      if(Date.now()-begun<400){if(typeof onRefusal==='function')onRefusal('presentation-missing');return null;}
+      return real.captureSaveSession()(onRefusal);}});
+    const f=files(slow);
+    const result=await(requested?f.ui.saveAs('/requested.json'):f.ui.saveAs());
+    assert.equal(result.acknowledged,true,JSON.stringify(result));assert.equal(h.copies.length,1);
+  }
+});
+test('a Save As does not wait out a refusal that is not about the presentation catching up',async()=>{
+  const h=host();
+  const real=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
+    physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});
+  await real.openPath('/project.json');await real.presentPreview(0);
+  const gone=Object.assign({},real,{captureSaveSession:()=>async onRefusal=>{
+    if(typeof onRefusal==='function')onRefusal('subscription-inactive');return null;}});
+  const started=Date.now();
+  const result=await files(gone).ui.saveAs('/requested.json');
+  assert.equal(result.acknowledged,false);assert.equal(h.copies.length,0);assert.ok(Date.now()-started<2000,'refused at once, not after the bound');
+});

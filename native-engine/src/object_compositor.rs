@@ -482,6 +482,10 @@ mod object_brush_dab_pixels;
 #[cfg(test)]
 #[path = "../tests/object_group_combine_render.rs"]
 mod object_group_combine_render;
+// #2108: the vector exporters write a combined group's result island.
+#[cfg(test)]
+#[path = "../tests/object_group_combine_export.rs"]
+mod object_group_combine_export;
 #[cfg(test)]
 #[path = "../tests/object_compositor.rs"]
 mod tests;

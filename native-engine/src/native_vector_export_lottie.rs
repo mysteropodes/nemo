@@ -285,7 +285,16 @@ fn shown_by_layer(
                 if dab.opacity == 0.0 {
                     continue;
                 }
-                let [r, g, b, _] = dab.svg_rgba.ok_or(LottieExportError::NonFinite)?;
+                let Some([r, g, b, _]) = dab.svg_rgba else {
+                    return Err(if dab.combine.is_some() {
+                        LottieExportError::Unsupported {
+                            source_object_index: dab.source_index,
+                            reason: "a combined group result styled with a stroke or gradient has no admitted Lottie representation",
+                        }
+                    } else {
+                        LottieExportError::NonFinite
+                    });
+                };
                 let hex = |c: f64| number((c.clamp(0.0, 1.0) * 255.0).round() / 255.0);
                 let shown = Shown {
                     shape: dab_shape(dab.svg_contour.as_ref(), dab.closed, dab.source_index, camera)?,
