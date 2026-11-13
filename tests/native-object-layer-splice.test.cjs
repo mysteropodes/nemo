@@ -44,9 +44,21 @@ test('head and tail insertion default names are based on native destination ordi
     next[at].layerUid='tampered';assert.equal(p.added.layerUid,'new');
   }
 });
-test('reorder noncontiguous duplicate and mismatched prior identities refuse without mutating inputs',()=>{
+test('a pure reorder plans a row permutation that follows the active row, the selection and the anchor by UID',()=>{
+  const f=fixture(),old=f.rows.slice(),before=JSON.stringify(f),selected=[0,2];
+  const next=[f.metadata[2],f.metadata[0],f.metadata[1]];
+  const p=Splice.plan(f.uids,f.rows,next,2,selected,0);
+  assert.ok(p);assert.equal(p.delta,0);assert.equal(p.removed,0);assert.deepEqual(p.addedRows,[]);
+  assert.deepEqual(p.order,[2,0,1]);assert.equal(p.active,0);assert.deepEqual(p.selection,[1,0]);assert.equal(p.anchor,1);
+  assert.equal(JSON.stringify(f),before,'planning is detached');assert.deepEqual(selected,[0,2]);
+  assert.deepEqual(p.order.map(i=>old[i].layerUid),['c','a','b']);
+  // an unchanged selection stays the same array, and an unset anchor stays unset
+  const q=Splice.plan(f.uids,f.rows,[f.metadata[1],f.metadata[0],f.metadata[2]],2,[2],null);
+  assert.deepEqual(q.order,[1,0,2]);assert.equal(q.active,2);assert.equal(q.anchor,null);assert.deepEqual(q.selection,[2]);
+});
+test('noncontiguous duplicate and mismatched prior identities refuse without mutating inputs',()=>{
   const f=fixture(),before=JSON.stringify(f);
-  for(const next of [[f.metadata[1],f.metadata[0],f.metadata[2]],
+  for(const next of [
     [{layerUid:'x'},f.metadata[0],f.metadata[2]],
     [{layerUid:'x'},f.metadata[0],{layerUid:'y'},...f.metadata.slice(1)],
     [f.metadata[1]], [f.metadata[0],{layerUid:'a'},f.metadata[2]],

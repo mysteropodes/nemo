@@ -1,4 +1,4 @@
-/* Contiguous native layer insertion/removal/replacement plan; the existing projection applies it. */
+/* Contiguous native layer insertion/removal/replacement plan, or a pure reorder of the same UIDs; the existing projection applies it. */
 (function(root,factory){
   var api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -20,6 +20,16 @@
       return Object.freeze({delta:0,at:at,removed:0,added:null,addedRows:[],active:active,selection:selection,anchor:anchor});
     // One contiguous run changes and surviving UIDs keep their order around it. Every UID the run adds is new: a merge
     // convert replaces its source layers with one minted instance (#2244); a reorder re-adds old UIDs and refuses.
+    // A pure reorder (layer.reorder and its undo/redo): the same UIDs in another order. The rows keep their identity and
+    // only move; the active row, the selection and the anchor follow their UID.
+    if(delta===0&&incoming.every(function(uid){return previous.indexOf(uid)>=0;})){
+      var order=incoming.map(function(uid){return previous.indexOf(uid);});
+      var follow=function(index){return Number.isInteger(index)&&index>=0&&index<previous.length?incoming.indexOf(previous[index]):index;};
+      var moved=Array.isArray(selection)?selection.map(follow):selection;
+      var same=Array.isArray(selection)&&moved.every(function(index,j){return index===selection[j];});
+      return Object.freeze({delta:0,at:at,removed:0,added:null,addedRows:[],order:order,active:follow(active),
+        selection:same?selection:moved,anchor:follow(anchor)});
+    }
     var tail=0;
     while(tail<Math.min(previous.length,incoming.length)-at&&previous[previous.length-1-tail]===incoming[incoming.length-1-tail])tail++;
     var removed=previous.length-at-tail,count=incoming.length-at-tail;

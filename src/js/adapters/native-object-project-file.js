@@ -106,10 +106,12 @@
       (parentValue(l)!==pin.layerParents[i]||['locked','shy'].some(function(k){return rows[i][k]!== (l[k]===true);}));}))return false;
     if(!Splice||typeof Splice.plan!=='function')return false;
     var splice=Splice.plan(pin.layerUids,rows,next,s.activeLayerIdx,root._layerSel,root._layerSelAnchor);
-    var changed=!!splice&&(splice.removed>0||splice.addedRows.length>0);
+    var reordered=!!splice&&Array.isArray(splice.order);
+    var changed=!!splice&&(reordered||splice.removed>0||splice.addedRows.length>0);
     if(!splice||changed&&info.contentRevision===pin.contentRevision)return false;
-    // Prepare the detached UID plan before changing this read-side table.
-    if(changed)rows.splice.apply(rows,[splice.at,splice.removed].concat(splice.addedRows));
+    // Prepare the detached UID plan before changing this read-side table. A reorder moves the existing row objects.
+    if(reordered){var held=rows.slice();splice.order.forEach(function(from,to){rows[to]=held[from];});}
+    else if(changed)rows.splice.apply(rows,[splice.at,splice.removed].concat(splice.addedRows));
     next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;projectFields(rows[i],layer);});
     if(changed){s.activeLayerIdx=splice.active;root._layerSel=splice.selection;root._layerSelAnchor=splice.anchor;}
     projectSettings(root,info,pin);
