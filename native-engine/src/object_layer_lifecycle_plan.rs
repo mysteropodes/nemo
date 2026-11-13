@@ -27,7 +27,7 @@ mod fields;
 mod order;
 
 #[allow(unused_imports)]
-pub(crate) use delete::plan_delete;
+pub(crate) use delete::{plan_delete, release_context_tables};
 #[allow(unused_imports)]
 pub(crate) use duplicate::{plan_duplicate, unique_layer_name};
 #[allow(unused_imports)]

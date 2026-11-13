@@ -12,6 +12,7 @@
 use crate::object_document::object_component_record_kernels::object_component_records::{
     ComponentRecord, SCENE_CONTEXT,
 };
+use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::release_context_tables;
 use crate::object_document::tween::TweenStore;
 use crate::object_document::{
     AuthoredOrder, FrameScope, FrameScopeKind, ItemRecords, ObjectDocument, ObjectRecord,
@@ -272,6 +273,19 @@ pub(crate) fn embed(
                 .find(|record| record.symbol_id == context)
         })
         .ok_or(DispatchErrorCode::NotFound)?;
+    // The layers a lifecycle kernel removed from the component: their placement, duplicator and effector rows (which the
+    // view did not carry) go with them, and the references to them leave the rows that stay.
+    let kept: std::collections::HashSet<&str> = edited
+        .layers
+        .iter()
+        .map(|layer| layer.layer_uid.as_str())
+        .collect();
+    let gone: Vec<String> = record
+        .layers
+        .iter()
+        .filter(|layer| !kept.contains(layer.layer_uid.as_str()))
+        .map(|layer| layer.layer_uid.clone())
+        .collect();
     record.total_frames = edited.total_frames;
     record.layers = edited.layers.clone();
     record.objects = edited
@@ -283,6 +297,10 @@ pub(crate) fn embed(
     next.composition_order = embed_order(&original.composition_order, context, &edited)?;
     next.items = embed_items(&original.items, context, &edited);
     next.tweens = embed_tweens(original, view, &edited);
+    if !gone.is_empty() {
+        let gone: std::collections::HashSet<&str> = gone.iter().map(String::as_str).collect();
+        release_context_tables(&mut next, &gone, context);
+    }
     ObjectSnapshot::validate_drawing(&next).map_err(|_| DispatchErrorCode::InvalidRequest)?;
     Ok(next)
 }

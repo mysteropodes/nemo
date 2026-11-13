@@ -381,6 +381,9 @@ fn convert_merge(
     // Root-layer deletion cannot identify a same-UID holder in another context.
     // Restore the complete scoped transform of the retained origin after deletion.
     removed.document.property_holders = holders::merged(document, &gone, &symbol_id, &instance_uid);
+    // The merged layers keep their uids inside the component, and the tween store is keyed by layer uid alone (a component's
+    // inner layer is served by it): the source layers' spans are now the inner layers' spans, not rows of deleted scene layers.
+    removed.document.tweens = placed.document.tweens.clone();
     items::declare(&mut removed.document, order);
     Ok(SetupPlan {
         document: removed.document,
@@ -400,6 +403,9 @@ mod fixture;
 #[cfg(test)]
 #[path = "../tests/object_component_convert.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "../tests/object_component_convert_tweens.rs"]
+mod tweens_tests;
 #[cfg(test)]
 #[path = "../tests/object_component_convert_verify.rs"]
 mod verify;

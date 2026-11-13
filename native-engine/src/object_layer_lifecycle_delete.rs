@@ -135,21 +135,35 @@ pub(crate) fn plan_delete(
 /// dropped). The component a deleted instance placed stays in the document: it is a library entry the undo, and every other
 /// instance, still use.
 fn release_layer_tables(candidate: &mut ObjectDocument, gone: &HashSet<&str>) {
-    const SCENE: &str = "scene-root";
+    release_context_tables(candidate, gone, "scene-root");
+    if let Presence::Present(store) = &mut candidate.tweens {
+        store
+            .layers
+            .retain(|tweens| !gone.contains(tweens.layer_uid.as_str()));
+    }
+}
+
+/// The placement, duplicator and effector rows of the layers `gone` of ONE context (the scene, or a declared component
+/// whose own layers a lifecycle edit removed), and the references to those layers that other rows of that context keep.
+pub(crate) fn release_context_tables(
+    candidate: &mut ObjectDocument,
+    gone: &HashSet<&str>,
+    context: &str,
+) {
     if let Presence::Present(tables) = &mut candidate.component_tables {
         if let Presence::Present(set) = &mut tables.components {
             set.instances.retain(|instance| {
-                instance.context_id != SCENE || !gone.contains(instance.layer_uid.as_str())
+                instance.context_id != context || !gone.contains(instance.layer_uid.as_str())
             });
         }
         if let Presence::Present(set) = &mut tables.duplicators {
-            let ours = |context: &str, layer: &str| context == SCENE && gone.contains(layer);
+            let ours = |row: &str, layer: &str| row == context && gone.contains(layer);
             set.duplicators
                 .retain(|record| !ours(&record.context_id, &record.layer_uid));
             set.effector_layers
                 .retain(|record| !ours(&record.context_id, &record.layer_uid));
             for record in &mut set.duplicators {
-                if record.context_id != SCENE {
+                if record.context_id != context {
                     continue;
                 }
                 let duplicator = &mut record.duplicator;
@@ -164,10 +178,5 @@ fn release_layer_tables(candidate: &mut ObjectDocument, gone: &HashSet<&str>) {
                 }
             }
         }
-    }
-    if let Presence::Present(store) = &mut candidate.tweens {
-        store
-            .layers
-            .retain(|tweens| !gone.contains(tweens.layer_uid.as_str()));
     }
 }
