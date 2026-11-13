@@ -30,15 +30,15 @@ async function flattenGroup(ctx, layerUid, groupId, members) {
   ctx.eq('file', 'no other record changed', idsAfter.filter(id => !results.includes(id)).sort(), idsBefore.filter(id => !members.includes(id)).sort());
   return { results };
 }
-// Ink is distance from the opaque canvas background (see png-probe.cjs): inked is clearly off-background, clear is background.
-const inked = (image, x, y) => probe.distanceAt(image, x, y) > 64;
-const clear = (image, x, y) => probe.distanceAt(image, x, y) < 16;
+// Ink is the alpha of the transparent canvas the rows run on (see png-probe.cjs): inked is clearly painted, clear is not painted at all.
+const inked = (image, x, y) => probe.inkAt(image, x, y) > 64;
+const clear = (image, x, y) => probe.inkAt(image, x, y) < 16;
 
 const rows = [
   { id: '2108-group-combine-flatten', title: 'group, combine mode, rename, flatten consumes the group with one undo, ungroup', tasks: ['G24'],
     limitations: ['One flat group on Animation 2D records: nested groups, group reorder and Motion flatten are listed under coverage.notCovered.'],
     async run(ctx) {
-      const { layerUid } = await K.fresh(ctx);
+      const { layerUid } = await K.fresh(ctx, { transparent: true });
       const a = await stroke(ctx, 'create outer rectangle', rect(layerUid, 100, 60, 300, 240, RED));
       const b = await stroke(ctx, 'create inner rectangle', rect(layerUid, 160, 100, 240, 200, BLUE));
       const ra = await K.readObject(ctx, P.target(layerUid, a)), rb = await K.readObject(ctx, P.target(layerUid, b));
@@ -51,7 +51,7 @@ const rows = [
       ctx.ok('file', 'saved project carries the new group name', JSON.stringify((await K.saveAs(ctx, 'renamed')).document).includes('Frame renamed'), 'name present');
       await K.apply(ctx, 'combine by subtract', P.groupCombine(layerUid, 'grp_evidence_a', 'subtract', [a, b]));
       const e1 = await K.exportPng(ctx, 'subtract');
-      ctx.ok('pixel', 'the inner area is a hole', clear(e1.image, 200, 150), probe.distanceAt(e1.image, 200, 150), '<16');
+      ctx.ok('pixel', 'the inner area is a hole', clear(e1.image, 200, 150), probe.inkAt(e1.image, 200, 150), '<16');
       ctx.near('pixel', 'the ring keeps the outer colour', probe.over(e1.image, 120, 80), [230, 51, 51], 8);
       ctx.ok('pixel', 'combine changes the export', e1.digest !== e0.digest, [e0.digest, e1.digest]);
       await K.apply(ctx, 'combine mode back to none', P.groupMode(layerUid, 'grp_evidence_a', 'none'));
@@ -73,13 +73,13 @@ const rows = [
 
   { id: '2108-boolean-apply-erase', title: 'boolean subtract keeps hole and every disjoint island; eraser splits a shape; undo restores', tasks: ['G18', 'G19'],
     async run(ctx) {
-      const { layerUid } = await K.fresh(ctx);
+      const { layerUid } = await K.fresh(ctx, { transparent: true });
       const a = await stroke(ctx, 'create outer rectangle', rect(layerUid, 100, 60, 300, 240, RED));
       const b = await stroke(ctx, 'create inner rectangle', rect(layerUid, 160, 100, 240, 200, BLUE));
       const e0 = await K.exportPng(ctx, 'before');
       await K.apply(ctx, 'subtract inner from outer', P.booleanApply(layerUid, 'subtract', [a, b]));
       const e1 = await K.exportPng(ctx, 'hole');
-      ctx.ok('pixel', 'the hole is empty', clear(e1.image, 200, 150), probe.distanceAt(e1.image, 200, 150), '<16');
+      ctx.ok('pixel', 'the hole is empty', clear(e1.image, 200, 150), probe.inkAt(e1.image, 200, 150), '<16');
       ctx.ok('pixel', 'the ring is inked on all four sides', [[130, 150], [270, 150], [200, 80], [200, 220]].every(([x, y]) => inked(e1.image, x, y)), 'four probes');
       ctx.near('pixel', 'outer bounds unchanged', probe.inkBounds(e1.image).box, [100, 60, 300, 240], 2);
       await K.step(ctx, 'one undo restores both operands', 'undo');
@@ -90,18 +90,18 @@ const rows = [
       // Eraser: a footprint across the middle of a stroke splits it in two.
       await K.apply(ctx, 'erase a vertical band', P.booleanErase(layerUid, a, [[190, 40], [210, 40], [210, 260], [190, 260]]));
       const e3 = await K.exportPng(ctx, 'erased');
-      ctx.ok('pixel', 'both halves survive the erase', inked(e3.image, 130, 150) && inked(e3.image, 270, 150), [probe.distanceAt(e3.image, 130, 150), probe.distanceAt(e3.image, 270, 150)], '>64');
-      ctx.ok('pixel', 'the erased band is empty where only the erased shape was', clear(e3.image, 200, 80), probe.distanceAt(e3.image, 200, 80), '<16');
+      ctx.ok('pixel', 'both halves survive the erase', inked(e3.image, 130, 150) && inked(e3.image, 270, 150), [probe.inkAt(e3.image, 130, 150), probe.inkAt(e3.image, 270, 150)], '>64');
+      ctx.ok('pixel', 'the erased band is empty where only the erased shape was', clear(e3.image, 200, 80), probe.inkAt(e3.image, 200, 80), '<16');
       await K.step(ctx, 'undo the erase', 'undo');
       const e4 = await K.exportPng(ctx, 'erase-undone');
-      ctx.ok('pixel', 'undo of the erase restores the band', inked(e4.image, 200, 80), probe.distanceAt(e4.image, 200, 80), '>64');
+      ctx.ok('pixel', 'undo of the erase restores the band', inked(e4.image, 200, 80), probe.inkAt(e4.image, 200, 80), '>64');
       // Disjoint islands: a bar crossing the whole rectangle leaves two pieces, both must survive.
       const bar = await stroke(ctx, 'create a crossing bar', rect(layerUid, 180, 30, 220, 270, GREEN));
       await K.apply(ctx, 'subtract the bar', P.booleanApply(layerUid, 'subtract', [a, bar]));
       const e2 = await K.exportPng(ctx, 'islands');
-      ctx.ok('pixel', 'left island kept', inked(e2.image, 130, 150), probe.distanceAt(e2.image, 130, 150), '>64');
-      ctx.ok('pixel', 'right island kept', inked(e2.image, 270, 150), probe.distanceAt(e2.image, 270, 150), '>64');
-      ctx.ok('pixel', 'the cut is empty above the inner rectangle', clear(e2.image, 200, 80), probe.distanceAt(e2.image, 200, 80), '<16');
+      ctx.ok('pixel', 'left island kept', inked(e2.image, 130, 150), probe.inkAt(e2.image, 130, 150), '>64');
+      ctx.ok('pixel', 'right island kept', inked(e2.image, 270, 150), probe.inkAt(e2.image, 270, 150), '>64');
+      ctx.ok('pixel', 'the cut is empty above the inner rectangle', clear(e2.image, 200, 80), probe.inkAt(e2.image, 200, 80), '<16');
       await K.step(ctx, 'undo the island cut', 'undo');
       await K.apply(ctx, 'boolean on a stale operand', P.booleanApply(layerUid, 'unite', [a, 'native-stroke:99999:9']), { refused: true });
       await K.apply(ctx, 'erase a stale stroke', P.booleanErase(layerUid, 'native-stroke:99999:9', [[0, 0], [10, 0], [10, 10]]), { refused: true });
@@ -109,7 +109,7 @@ const rows = [
 
   { id: '2108-layer-lifecycle', title: 'layer create, rename, duplicate, visibility, split, delete: each one revision, one undo', tasks: ['F07'],
     async run(ctx) {
-      const { layerUid: l1 } = await K.fresh(ctx);
+      const { layerUid: l1 } = await K.fresh(ctx, { transparent: true });
       await stroke(ctx, 'create artwork on layer 1', rect(l1, 40, 40, 140, 140, RED));
       await stroke(ctx, 'create a second shape on layer 1', rect(l1, 200, 40, 300, 140, BLUE));
       const base = await K.exportPng(ctx, 'base');
@@ -152,7 +152,7 @@ const rows = [
   { id: '2108-layer-reorder', title: 'layer reorder: one revision, a pure permutation, one undo restores the order', tasks: ['F07'], last: true,
     limitations: ['Runs after every other row: on the first candidate run a reorder left the app unconfirmed and unusable for later rows.'],
     async run(ctx) {
-      const { layerUid: l1 } = await K.fresh(ctx);
+      const { layerUid: l1 } = await K.fresh(ctx, { transparent: true });
       await stroke(ctx, 'create artwork on layer 1', rect(l1, 40, 40, 140, 140, RED));
       await K.apply(ctx, 'create a layer', P.layerCreate('Second'));
       const order0 = await K.layerOrder(ctx);
@@ -170,7 +170,7 @@ const rows = [
 
   { id: '2108-selection-clipboard-remap', title: 'selection duplicate and delete, copy and paste remap group and stroke ids atomically, cut, locked layer refuses', tasks: ['F08', 'F15'],
     async run(ctx) {
-      const { layerUid: l1 } = await K.fresh(ctx);
+      const { layerUid: l1 } = await K.fresh(ctx, { transparent: true });
       const a = await stroke(ctx, 'create rectangle A', rect(l1, 40, 40, 140, 140, RED));
       const b = await stroke(ctx, 'create rectangle B', rect(l1, 200, 40, 300, 140, BLUE));
       const known = new Set([a, b]);
@@ -216,4 +216,4 @@ const rows = [
     } },
 ];
 
-module.exports = { lane: '2108', issue: 2108, rows, helpers: { flattenGroup } };
+module.exports = { lane: '2108', issue: 2108, rows: [...rows, ...require('./rows-2108-groups.cjs').rows], helpers: { flattenGroup } };

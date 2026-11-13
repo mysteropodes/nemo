@@ -28,7 +28,7 @@ const rows = [
   { id: '2113-mixed-scene-one-export', title: 'vector with gradient and stroke, text and a raster in one export: families, layer opacity once, reopen', tasks: ['D32', 'F16', 'G03a'],
     limitations: ['Vector, gradient, text and raster producers only; no component or rig producer is built.'],
     async run(ctx) {
-      const { layerUid: l1 } = await K.fresh(ctx);
+      const { layerUid: l1 } = await K.fresh(ctx, { transparent: true });
       await K.apply(ctx, 'create a red rectangle', P.vectorCreate(P.vectorRecord({ layerUid: l1, segments: P.rectSegments(20, 20, 160, 140), fill: RED })));
       const gradient = { fillGradient: { kind: 'linear', from: [20, 0], to: [200, 0], stops: [{ offset: 0, color: '#ff0000' }, { offset: 1, color: '#0000ff' }] } };
       await K.apply(ctx, 'create a gradient-filled, stroked rectangle', P.vectorCreate(P.vectorRecord({ layerUid: l1, segments: P.rectSegments(20, 200, 200, 280), fill: RED, stroke: [0, 0, 0, 1], width: 6, ext: gradient })));
@@ -64,7 +64,7 @@ const rows = [
   { id: '2113-mixed-z-order-reorder', title: 'a raster and a vector overlap in one export: reordering flips which one is on top, undo restores', tasks: ['D32', 'F16'], last: true,
     limitations: ['Runs after every other row: on the first candidate run a reorder left the app unconfirmed and unusable for later rows.'],
     async run(ctx) {
-      const { layerUid: l1 } = await K.fresh(ctx);
+      const { layerUid: l1 } = await K.fresh(ctx, { transparent: true });
       const image = K.stage(ctx, 'teal.png', K.solidPng(160, 100, [...TEAL, 255]));
       const att = await attach(ctx, 'attach a raster on a new layer', image, 'mix-image');
       const l2 = att.result.target.layerUid;
@@ -89,7 +89,7 @@ const rows = [
   { id: '2113-image-mesh-sculpt', title: 'raster bound to an image mesh: bind, read the mesh and its offsets back, sculpt one outline vertex, the pixels move, undo, redo, reopen', tasks: ['G03a'],
     limitations: ['The mesh id and offsets come from the imageMesh read view; image.mesh.edit answers only its receipt.'],
     async run(ctx) {
-      await K.fresh(ctx);
+      await K.fresh(ctx, { transparent: true });
       // A raster with four distinct quadrants, so a deformation has content to move (a flat image cannot show one).
       const image = K.stage(ctx, 'quadrants.png', K.quadrantPng(160, 100, QUAD));
       const att = await attach(ctx, 'attach the quadrant raster on a new layer', image, 'mesh-image');
@@ -115,14 +115,14 @@ const rows = [
       ctx.ok('pixel', 'a rest mesh draws the same image (seam noise only)', probe.differing(e0.image, e1.image) <= 0.02 * box.count, probe.differing(e0.image, e1.image), '<=' + Math.round(0.02 * box.count));
       // Sculpt the top-right OUTLINE vertex (index 2) toward the centre: the outline is the mask, so the corner must disappear.
       const corner = at(0.97, 0.03), keep = at(0.05, 0.95);
-      ctx.ok('pixel', 'the corner probe is inked before the sculpt', probe.distanceAt(e1.image, ...corner) > 64, probe.distanceAt(e1.image, ...corner), '>64');
+      ctx.ok('pixel', 'the corner probe is inked before the sculpt', probe.inkAt(e1.image, ...corner) > 64, probe.inkAt(e1.image, ...corner), '>64');
       await K.apply(ctx, 'sculpt the top-right outline vertex', P.meshSetOffset(meshId, 2, -0.4, 0.4));
       const sculpted = await ctx.behavior('the sculpt is stored and moves pixels', async () => {
         const state = await K.meshState(ctx, layer);
         ctx.near('read', 'the offset of vertex 2 is the one sent', state.offsets[2], [-0.4, 0.4], 1e-6);
         ctx.eq('read', 'no other vertex moved', state.offsets.filter((_, i) => i !== 2).every(([du, dv]) => du === 0 && dv === 0), true);
         const e2 = await K.exportPng(ctx, 'sculpt');
-        ctx.ok('pixel', 'the corner is cut away by the moved outline vertex', probe.distanceAt(e2.image, ...corner) < 16, probe.distanceAt(e2.image, ...corner), '<16');
+        ctx.ok('pixel', 'the corner is cut away by the moved outline vertex', probe.inkAt(e2.image, ...corner) < 16, probe.inkAt(e2.image, ...corner), '<16');
         ctx.eq('pixel', 'the opposite corner still shows the image', probe.near(probe.over(e2.image, ...keep), probe.over(e1.image, ...keep), 12), true);
         const after = probe.inkBounds(e2.image);
         ctx.near('pixel', 'the left and bottom edges of the raster did not move', [after.box[0], after.box[3]], [x0, y1], 2);
@@ -147,7 +147,7 @@ const rows = [
 
   { id: '2113-bitmap-brush-resources', title: 'bitmap brush publication, accounting, replacement, refusal, and a baked stroke in one revision', tasks: ['G06', 'G17'],
     async run(ctx) {
-      const { layerUid } = await K.fresh(ctx);
+      const { layerUid } = await K.fresh(ctx, { transparent: true });
       const small = K.stage(ctx, 'tip8.png', K.solidPng(8, 8, [10, 10, 10, 255])), large = K.stage(ctx, 'tip16.png', K.solidPng(16, 16, [200, 40, 40, 255]));
       const a1 = await attach(ctx, 'attach the first tip image', small, 'tip-small'), a2 = await attach(ctx, 'attach the second tip image', large, 'tip-large');
       const inspect = async brushId => {
@@ -191,25 +191,27 @@ const rows = [
       await K.roundTrip(ctx, 'brush', e2);
     } },
 
-  { id: '2113-evaluate-vs-export-pin', title: 'the evaluated layer value agrees with the export; an edit after a pin cannot change what the pinned revision reports', tasks: ['D32', 'I16a'],
-    limitations: ['The document evaluate query is an opacity-document operation (authority NativeOpacityHistory) that the object owner refuses; the evaluated value is the layer opacity sample of the object property read (rawSample view).'],
+  { id: '2113-evaluate-vs-export-pin', title: 'the evaluated output (export alpha on a transparent canvas) agrees with the authored layer value; an edit after a pin cannot change what the pinned revision reports', tasks: ['D32', 'I16a'],
+    limitations: ['The document evaluate read (query.document.evaluate) is refused on an object project ("Unsupported object read operation."): the evaluated output is observed as the alpha of the export, the authored value as the object property read (rawSample). Needed for the evaluate read itself: an object-project evaluate query (see coverage.notCovered).'],
     async run(ctx) {
-      const { layerUid } = await K.fresh(ctx);
+      const { layerUid } = await K.fresh(ctx, { transparent: true });
       await K.apply(ctx, 'create a rectangle', P.vectorCreate(P.vectorRecord({ layerUid, segments: P.rectSegments(40, 40, 200, 160), fill: RED })));
       const e0 = await K.exportPng(ctx, 'full');
+      ctx.eq('pixel', 'evaluated output at full opacity: the rectangle is alpha 255 and the empty canvas alpha 0', [probe.alphaAt(e0.image, 120, 100), probe.alphaAt(e0.image, 400, 300)], [255, 0]);
       const valueAt = async (revision, pin) => {
         const b = P.propertyRead(revision, pin, layerUid, 'opacity'), res = await ctx.wire.query(b.operation, b.payload);
         return res.ok ? { ok: true, value: res.result.value[0] } : { ok: false, error: res.error, frontDoor: res.frontDoor === true };
       };
       const valueNow = async () => { const { revision, pin } = await K.pinNow(ctx); return valueAt(revision, pin); };
       const ev0 = await valueNow();
-      ctx.eq('read', 'evaluate reports full opacity for the layer', [ev0.ok, ev0.value], [true, 100]);
+      ctx.eq('read', 'the authored opacity of the layer is full (the property read, rawSample)', [ev0.ok, ev0.value], [true, 100]);
       await K.apply(ctx, 'layer opacity to half', () => opacityBuilder(ctx, layerUid, 0.5));
       const e1 = await K.exportPng(ctx, 'half');
       const ev1 = await valueNow();
-      ctx.near('read', 'evaluate reports half opacity', ev1.value, 50, 0.5);
+      ctx.near('read', 'the authored opacity after the edit is half', ev1.value, 50, 0.5);
       const ratio = probe.coverageRatio(e0.image, e1.image, probe.inkBounds(e0.image).box);
-      ctx.near('pixel', 'the export coverage agrees with the evaluated value', ratio, ev1.value / 100, 0.08);
+      ctx.near('pixel', 'the export coverage agrees with the authored value', ratio, ev1.value / 100, 0.08);
+      ctx.near('pixel', 'the evaluated output: export alpha is the authored opacity (50 of 100) of 255', probe.alphaAt(e1.image, 120, 100), (ev1.value / 100) * 255, 3);
       const { revision: r1, pin: p1 } = await K.pinNow(ctx);
       await K.apply(ctx, 'edit after the pin: opacity to a quarter', () => opacityBuilder(ctx, layerUid, 0.25));
       const e2 = await K.exportPng(ctx, 'quarter');
@@ -221,10 +223,11 @@ const rows = [
       ctx.ok('reply', 'a history read with the pre-edit pin is a typed stale refusal from the owner', typed(staleRead, STALE), staleRead.ok ? 'accepted' : { code: staleRead.error.code, frontDoor: staleRead.frontDoor === true }, STALE);
       const ev2 = await valueNow();
       ctx.near('read', 'the current revision evaluates to a quarter', ev2.value, 25, 0.5);
+      ctx.near('pixel', 'the evaluated output at the current revision: export alpha is a quarter of 255', probe.alphaAt(e2.image, 120, 100), (ev2.value / 100) * 255, 3);
       await K.step(ctx, 'undo the edit', 'undo');
       ctx.eq('pixel', 'undo returns the export to the pinned state', (await K.exportPng(ctx, 'back')).digest, e1.digest);
       await K.roundTrip(ctx, 'evaluate', e1);
     } },
 ];
 
-module.exports = { lane: '2113', issue: 2113, rows };
+module.exports = { lane: '2113', issue: 2113, rows: [...rows, ...require('./rows-2113-brush-quota.cjs').rows] };

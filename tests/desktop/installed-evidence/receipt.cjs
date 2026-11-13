@@ -11,7 +11,7 @@ const EXIT = Object.freeze({ pass: 0, fail: 1, refused: 2, unrun: 4, 'subset-pas
 const STATEMENT = 'Agent evidence produced only through the package\'s bundled nemo-mcp (nemo_discover, nemo_command): no keyboard or mouse input was sent. ' +
   'It shows the native owner\'s contract for the operations listed per row on this candidate. It is not the CS7 batched installed session (#2348) and it does not ' +
   'record the installed/client acceptance disposition of any lane; that disposition belongs to the project owners. Lane totals count the rows that ran: ' +
-  '`coverage` lists, per lane, the assigned ids no row observes and the behaviours the lane text requires that no row covers, and `subset-pass` marks a run that left rows out.';
+  '`coverage` lists, per lane, each assigned id as covered (a passing row observes it), attempted-not-passed (only failing rows) or never attempted (no row ran for it), and the behaviours the lane text requires that no row covers; `totals.retries` counts every operation that was refused and repeated; `subset-pass` marks a run that left rows out.';
 const RESIDUAL_HANDS_ON = Object.freeze([
   'Drawing-tool strokes, Add-tool shapes and gestures that reach the owner through the UI (not through nemo-mcp)',
   'Keyboard shortcuts for copy, cut and paste, and the group, flatten and layer buttons as an artist presses them',
@@ -20,11 +20,26 @@ const RESIDUAL_HANDS_ON = Object.freeze([
   'Every behaviour listed under coverage.notCovered for a lane (no row observes it yet)',
 ]);
 
+// Retries are reported next to the verdicts, never inside the pass count: a row that passed only after an operation was refused and
+// repeated counts as passed AND as retried, and the totals say how many operations were refused and repeated, how many rows it touched,
+// and whether any retry ran out of attempts.
+const emptyRetries = () => ({ retriedOperations: 0, refusedAttempts: 0, exhausted: 0, rows: 0, byOperation: {} });
+function addRetries(t, row) {
+  const list = Array.isArray(row.retries) ? row.retries : [];
+  if (list.length === 0) return;
+  t.retries.rows++;
+  for (const r of list) {
+    t.retries.retriedOperations++; t.retries.refusedAttempts += r.refused; if (r.accepted !== true) t.retries.exhausted++;
+    const o = t.retries.byOperation[r.operation] ||= { retriedOperations: 0, refusedAttempts: 0 };
+    o.retriedOperations++; o.refusedAttempts += r.refused;
+  }
+}
 function totals(rows, catalogRows = {}) {
-  const lane = {}, all = { rows: 0, pass: 0, fail: 0, unrun: 0 };
+  const lane = {}, all = { rows: 0, pass: 0, fail: 0, unrun: 0, retries: emptyRetries() };
   for (const row of rows) {
-    const t = lane[row.lane] ||= { rows: 0, pass: 0, fail: 0, unrun: 0 };
+    const t = lane[row.lane] ||= { rows: 0, pass: 0, fail: 0, unrun: 0, retries: emptyRetries() };
     t.rows++; t[row.verdict]++; all.rows++; all[row.verdict]++;
+    addRetries(t, row); addRetries(all, row);
   }
   for (const key of Object.keys(lane)) { lane[key].catalogRows = Number.isInteger(catalogRows[key]) ? catalogRows[key] : null; lane[key].complete = lane[key].catalogRows === lane[key].rows; }
   return { overall: all, byLane: lane };

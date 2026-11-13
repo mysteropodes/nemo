@@ -100,6 +100,21 @@ const presentationRead = revision => ({ operation: QOBJ, payload: { atRevision: 
 const meshQuery = (revision, pin, { contextId, layerUid, frame, workId, viewGeneration, page }) => ({ operation: QOBJ,
   payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'imageMesh', contextId, layerUid, frame, workId, viewGeneration, page } } });
 const propertyMetadata = (revision, pin, layerUid) => ({ operation: 'query.document.object.property.metadata', payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'properties', target: { contextId: ROOT, layerUid }, offset: 0, limit: 8 } } });
+const canvasBackground = color => ({ operation: OBJ + 'project.settings.edit', payload: { command: 'object.project.settings.edit', action: { kind: 'setCanvasBackground', color } } });
+const vectorOrder = (stableTarget, placement) => ({ operation: OBJ + 'vector.edit', payload: { command: 'object.vector.batch', ops: [{ op: 'order', stableTarget, placement }] } });
+const fillTrace = (layerUid, point, color, opacity = 1, remove = false) => ({ operation: OBJ + 'fill.trace', payload: { command: 'object.fill.trace', layerUid, contextId: ROOT, frame: 0, point, color, opacity, remove } });
+// An element (stroke-level) Motion value: the same property edit a layer uses, with the stroke named in the target.
+const elementValue = (layerUid, strokeId, property, values, frame = 0) => ({ operation: OBJ + 'property.edit',
+  payload: { command: 'object.property.edit', target: { contextId: ROOT, layerUid, strokeId }, property, action: { kind: 'setValue', frame, values } } });
+const elementRead = (revision, pin, layerUid, strokeId, property, frame = 0) => ({ operation: 'query.document.object.property.read',
+  payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'rawSample', target: { contextId: ROOT, layerUid, strokeId }, property, frame } } });
+// The hit-test listing of one layer (every painted record with its role, bounds, style, parametric intent and group path; a text block's
+// bounds are its glyph box): query.document.object, view kind subselect with hitTest (nemo-mcp native_subselect_contract.rs).
+const hitTestRead = (revision, pin, { layerUid, frame, workId, viewGeneration, cursor = 0, limit = 8 }) => ({ operation: QOBJ,
+  payload: { atRevision: revision, documentSnapshotId: pin, view: { kind: 'subselect', contextId: ROOT, layerUid, frame, workId, viewGeneration, cursor, limit, hitTest: true } } });
+// One page (at most 16) of the anchors of an editable record: the plain subselect read. A record with many anchors (a donut ellipse) exceeds the
+// 4096-byte limit of the whole-object read, which answers `unavailable`, so its anchors are paged here.
+const subselectRead = (revision, pin, stableTarget, cursor = 0, limit = 16) => ({ operation: QOBJ, payload: { atRevision: revision, documentSnapshotId: pin, stableTarget, subselect: { cursor, limit } } });
 const historyRead = (revision, pin) => ({ operation: QOBJ + '.history', payload: { atRevision: revision, documentSnapshotId: pin } });
 // The layer's own sample of a property (rawSample view of query.document.object.property.read) at a frame, pinned.
 const propertyRead = (revision, pin, layerUid, property, frame = 0) => ({ operation: 'query.document.object.property.read',
@@ -109,4 +124,4 @@ module.exports = { OBJ, ROOT, target, seg, rectSegments, solid, vectorRecord, ve
   pathEffects, layerPolicy, undo, redo, groupCreate, groupUngroup, groupCombine, groupMode, groupRename, groupMemberRemove, booleanApply, booleanErase, booleanFlatten,
   layerCreate, layerDuplicate, layerRename, layerReorder, layerDelete, layerVisibility, layerSplit, selectionDelete, selectionDuplicate, clipboardCopy, clipboardCut, clipboardPaste,
   assetAttach, assetRemove, rasterDelete, rasterMove, rasterResize, rasterRotate, rasterOpacity, textBlock, textCreate, textEdit, textDelete, textTargets, textInspect, textBody,
-  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, propertyMetadata, meshAttach, meshSetOffset, presentationRead, meshQuery, historyRead, propertyRead };
+  brushPublish, brushInspect, brushStroke, compositingBlend, objectRead, propertyOpacity, propertyMetadata, meshAttach, meshSetOffset, presentationRead, meshQuery, historyRead, propertyRead, canvasBackground, vectorOrder, fillTrace, elementValue, elementRead, hitTestRead, subselectRead };

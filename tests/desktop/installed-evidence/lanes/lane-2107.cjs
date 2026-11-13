@@ -21,15 +21,17 @@ async function createRecord(ctx, label, layerUid, spec, extra) {
 const rows = [
   { id: '2107-vector-create-export-reopen', title: 'open and closed vector records with paint, stroke and alpha: records, export pixels, save and reopen', tasks: ['G14'],
     async run(ctx) {
-      const { layerUid } = await K.fresh(ctx);
+      const { layerUid } = await K.fresh(ctx, { transparent: true });
       const blank = await K.exportPng(ctx, 'blank');
       ctx.eq('pixel', 'empty document exports no ink', probe.inkBounds(blank.image), null);
       const a = await createRecord(ctx, 'create closed filled rectangle', layerUid, { segments: P.rectSegments(20, 20, 160, 140), fill: RED });
       const b = await createRecord(ctx, 'create open stroked path', layerUid, { closed: false, segments: [P.seg(200, 60), P.seg(420, 160)], stroke: BLUE, width: 8, cap: 'butt' });
       const c = await createRecord(ctx, 'create half-alpha closed fill', layerUid, { segments: P.rectSegments(450, 40, 600, 140), fill: GREEN_HALF });
-      ctx.eq('reply', 'three distinct stroke ids', new Set([a, b, c]).size, 3);
+      // White paint: on an opaque canvas it can not be told from nothing (colour distance 0), on this transparent canvas it is alpha 255.
+      const w = await createRecord(ctx, 'create a white-filled rectangle', layerUid, { segments: P.rectSegments(165, 25, 195, 45), fill: [1, 1, 1, 1] });
+      ctx.eq('reply', 'four distinct stroke ids', new Set([a, b, c, w]).size, 4);
       const ra = await K.readObject(ctx, P.target(layerUid, a)), rb = await K.readObject(ctx, P.target(layerUid, b)), rc = await K.readObject(ctx, P.target(layerUid, c));
-      ctx.ok('read', 'all three records read back', ra.ok && rb.ok && rc.ok, [ra.ok, rb.ok, rc.ok]);
+      ctx.ok('read', 'all records read back', ra.ok && rb.ok && rc.ok, [ra.ok, rb.ok, rc.ok]);
       ctx.eq('read', 'closed rectangle: closed flag and anchors as sent', [ra.object.geometry.closed, pts(ra.object)], [true, [[20, 20], [160, 20], [160, 140], [20, 140]]]);
       ctx.eq('read', 'closed rectangle: solid red fill, no real stroke', [ra.object.fill, ra.object.vector.hasRealStroke], [P.solid(RED), false]);
       ctx.eq('read', 'open path: independent closure, anchors as sent', [rb.object.geometry.closed, pts(rb.object)], [false, [[200, 60], [420, 160]]]);
@@ -44,11 +46,13 @@ const rows = [
       ctx.near('pixel', 'rectangle interior is the fill colour', probe.over(scene.image, 90, 80), [230, 51, 51], 8);
       ctx.near('pixel', 'open path centre is the stroke colour', probe.over(scene.image, 310, 110), [0, 69, 204], 14);
       ctx.near('pixel', 'half-alpha fill composites to half coverage', probe.over(scene.image, 525, 90), [140, 204, 153], 12);
-      ctx.near('pixel', 'half-alpha fill alpha, recovered from the composite over the background', probe.paintAlphaAt(scene.image, 525, 90, [26, 153, 51]), 128, 6);
-      ctx.eq('pixel', 'outside the artwork is the canvas background', [probe.distanceAt(scene.image, 5, 5), probe.distanceAt(scene.image, 300, 300)], [0, 0]);
+      ctx.near('pixel', 'half-alpha fill alpha, recovered from the composite over white', probe.paintAlphaAt(scene.image, 525, 90, [26, 153, 51]), 128, 6);
+      ctx.near('pixel', 'half-alpha fill alpha, read from the alpha channel itself', probe.alphaAt(scene.image, 525, 90), 128, 3);
+      ctx.eq('pixel', 'white paint is alpha 255 although its colour distance from white is 0', [probe.alphaAt(scene.image, 180, 35), probe.distanceAt(scene.image, 180, 35)], [255, 0]);
+      ctx.eq('pixel', 'outside the artwork nothing is painted: alpha 0', [probe.inkAt(scene.image, 5, 5), probe.inkAt(scene.image, 300, 300)], [0, 0]);
       const trip = await K.roundTrip(ctx, 'vector', scene);
       const saved = K.objectStrokeIds(trip.first.document);
-      ctx.ok('file', 'saved project holds every created stroke', [a, b, c].every(id => saved.includes(id)), saved, [a, b, c]);
+      ctx.ok('file', 'saved project holds every created stroke', [a, b, c, w].every(id => saved.includes(id)), saved, [a, b, c, w]);
       const after = await Promise.all([a, b, c].map(id => K.readObject(ctx, P.target(layerUid, id))));
       ctx.eq('read', 'records after reopen equal the records before', after.map(r => r.ok && r.object), [ra.object, rb.object, rc.object]);
     } },
@@ -56,7 +60,7 @@ const rows = [
   { id: '2107-stroke-style-pressure-fields', title: 'stroke join, miter limit, dash, paint order and pressure fields: read back exactly, visible in the export, undo, save and reopen', tasks: ['G14'],
     limitations: ['Pressure fields are read back and persisted; the ribbon itself is the record geometry, so the export shows the geometry sent.'],
     async run(ctx) {
-      const { layerUid } = await K.fresh(ctx);
+      const { layerUid } = await K.fresh(ctx, { transparent: true });
       const GREEN = [0.1, 0.7, 0.3, 1], BLACK = [0, 0, 0, 1];
       const fields = v => ({ join: v.strokeJoin, miterLimit: v.miterLimit, dashArray: v.dashArray, dashOffset: v.dashOffset, paintOrder: v.paintOrder });
       const first = await createRecord(ctx, 'create a stroked, filled rectangle painting the stroke first', layerUid, { segments: P.rectSegments(40, 40, 200, 140), fill: GREEN, stroke: BLUE, width: 24, style: { paintOrder: 'strokeFirst' } });
@@ -78,7 +82,7 @@ const rows = [
       ctx.near('pixel', 'stroke-first: the fill paints over the inner half of the stroke', probe.over(scene.image, 46, 90), [26, 179, 77], 14);
       ctx.near('pixel', 'fill-first: the stroke paints over the fill edge', probe.over(scene.image, 266, 90), [0, 69, 204], 14);
       let inked = 0, total = 0;
-      for (let x = 60; x < 280; x++) { total++; if (probe.distanceAt(scene.image, x, 190) > 128) inked++; }
+      for (let x = 60; x < 280; x++) { total++; if (probe.inkAt(scene.image, x, 190) > 128) inked++; }
       ctx.within('pixel', 'the dash pattern 12 on / 8 off leaves about 60% of the line inked', inked / total, 0.45, 0.75);
       const top = box => probe.inkBounds(scene.image, { box }).box[1];
       ctx.ok('pixel', 'a miter join reaches farther than a bevel join at the same corner', top([0, 230, 180, 359]) < top([180, 230, 340, 359]) - 4, [top([0, 230, 180, 359]), top([180, 230, 340, 359])]);
@@ -97,7 +101,7 @@ const rows = [
 
   { id: '2107-vector-replace-delete-undo-redo', title: 'replace, delete, no-op, undo and redo restore exact pixels; stale target, stale revision and locked layer refuse', tasks: ['G14'],
     async run(ctx) {
-      const { layerUid } = await K.fresh(ctx);
+      const { layerUid } = await K.fresh(ctx, { transparent: true });
       const id = await createRecord(ctx, 'create rectangle', layerUid, { segments: P.rectSegments(20, 20, 160, 140), fill: RED });
       const tgt = P.target(layerUid, id);
       const e0 = await K.exportPng(ctx, 'original'), r0 = await K.readObject(ctx, tgt);
@@ -134,7 +138,7 @@ const rows = [
 
   { id: '2107-parametric-set-translate-scale', title: 'parametric rectangle: exact translate and scale arithmetic, corner radius, undo, persistence', tasks: ['G22'],
     async run(ctx) {
-      const { layerUid } = await K.fresh(ctx);
+      const { layerUid } = await K.fresh(ctx, { transparent: true });
       const ext = { paramShape: { kind: 'rect', tl: 0, tr: 0, br: 0, bl: 0, box: { x1: 100, y1: 100, x2: 300, y2: 200 } } };
       const id = await createRecord(ctx, 'create parametric rectangle', layerUid, { segments: P.rectSegments(100, 100, 300, 200), fill: RED, ext });
       const tgt = P.target(layerUid, id);
@@ -155,8 +159,8 @@ const rows = [
       const r3 = await K.readObject(ctx, tgt), e3 = await K.exportPng(ctx, 'p3');
       ctx.eq('read', 'corner radius is stored', [r3.object.vectorExt.paramShape.tl, r3.object.vectorExt.paramShape.br], [20, 20]);
       ctx.ok('read', 'rounded outline has more anchors than the rectangle', r3.object.geometry.segments.length > 4, r3.object.geometry.segments.length, '>4');
-      ctx.ok('pixel', 'the corner pixel is no longer inked', probe.distanceAt(e3.image, 141, 131) < 40, probe.distanceAt(e3.image, 141, 131), '<40');
-      ctx.ok('pixel', 'the middle edge is still inked', probe.distanceAt(e3.image, 340, 131) > 64, probe.distanceAt(e3.image, 340, 131), '>64');
+      ctx.ok('pixel', 'the corner pixel is no longer inked', probe.inkAt(e3.image, 141, 131) < 40, probe.inkAt(e3.image, 141, 131), '<40');
+      ctx.ok('pixel', 'the middle edge is still inked', probe.inkAt(e3.image, 340, 131) > 64, probe.inkAt(e3.image, 340, 131), '>64');
       around(ctx, 'pixel', 'rounded shape keeps its bounds', probe.inkBounds(e3.image), [140, 130, 540, 180], 2);
       await K.step(ctx, 'undo the radius', 'undo');
       const r4 = await K.readObject(ctx, tgt), e4 = await K.exportPng(ctx, 'p4');
@@ -172,7 +176,7 @@ const rows = [
 
   { id: '2107-path-effects-stack', title: 'ordered zigzag and roughen stack: source geometry immutable, order, disable, no-op, removal, refusal while active', tasks: ['G13'],
     async run(ctx) {
-      const { layerUid } = await K.fresh(ctx);
+      const { layerUid } = await K.fresh(ctx, { transparent: true });
       const id = await createRecord(ctx, 'create a straight open path', layerUid, { closed: false, segments: [P.seg(60, 180), P.seg(580, 180)], stroke: BLUE, width: 6, cap: 'butt' });
       const tgt = P.target(layerUid, id);
       const r0 = await K.readObject(ctx, tgt), e0 = await K.exportPng(ctx, 'x0');
@@ -207,4 +211,4 @@ const rows = [
     } },
 ];
 
-module.exports = { lane: '2107', issue: 2107, rows };
+module.exports = { lane: '2107', issue: 2107, rows: [...rows, ...require('./rows-2107-shapes.cjs').rows] };
