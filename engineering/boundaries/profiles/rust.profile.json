@@ -1154,6 +1154,7 @@
         "object_brush_dab_component.rs",
         "object_brush_dab_pixels.rs",
         "object_group_combine_render.rs",
+        "object_group_combine_export.rs",
         "object_paint_plan_tests.rs",
         "property_follow_path_sample_controls.rs",
         "property_expression_views.rs",

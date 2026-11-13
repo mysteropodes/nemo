@@ -26,6 +26,15 @@ pub(crate) struct DabPaint {
     pub(crate) opacity: f64,
     pub(crate) layer_opacity: f64,
     pub(crate) closed: bool,
+    /// Set on an island of a combined group (not a brush dab): the exporters write it as a filled shape.
+    pub(crate) combine: Option<CombineIsland>,
+}
+
+/// Which stroke and which island of a combined group a [`DabPaint`] is.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct CombineIsland {
+    pub(crate) stroke_id: String,
+    pub(crate) island: usize,
 }
 
 /// The segments `build_path` drew (`[x, y, inX, inY, outX, outY]`); a closed path's closing curve ends on its first
@@ -143,6 +152,7 @@ pub(crate) fn expand(
                 opacity: item.opacity,
                 layer_opacity,
                 closed: item.path.closed,
+                combine: None,
             });
         }
     }

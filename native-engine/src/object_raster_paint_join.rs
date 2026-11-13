@@ -163,6 +163,27 @@ pub(crate) fn layered_entries(
         .map(|index| (plan.layer_of_entry(index), entry_of(plan, index)))
 }
 impl ObjectPaintPlan {
+    /// The source layers that lost a member to a combined group. Their GPU fills (`commands()`) still list the
+    /// members, so a layered compositor must paint such a layer from its entries, never from those fills.
+    pub(crate) fn combine_suppressed_layers(&self) -> std::collections::BTreeSet<usize> {
+        let Some(listed) = &self.listed else {
+            return std::collections::BTreeSet::new();
+        };
+        let kept: std::collections::HashSet<usize> = self
+            .mixed
+            .iter()
+            .filter_map(|index| match index {
+                PaintIndex::Contour(entry) => Some(*entry),
+                _ => None,
+            })
+            .collect();
+        listed
+            .iter()
+            .filter(|index| matches!(index, PaintIndex::Contour(entry) if !kept.contains(entry)))
+            .map(|index| self.layer_of_entry(index))
+            .collect()
+    }
+
     /// The source layer an entry belongs to (a placed component's image or text: its host layer).
     fn layer_of_entry(&self, index: &PaintIndex) -> usize {
         match index {

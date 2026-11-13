@@ -255,7 +255,36 @@ fn strokes_by_layer(
                 continue;
             }
             // `!sd.isBrushTextureCopy`: the dabs stay out; the anchor is written with its own wobble.
-            PaintEntry::Dab(_) => continue,
+            // A combined group's result island is a filled shape and is written like one.
+            PaintEntry::Dab(dab) => {
+                let Some(tag) = &dab.combine else { continue };
+                let Some(fill) = dab.svg_rgba else {
+                    return refuse(
+                        dab.source_index,
+                        "a combined group result styled with a stroke or gradient has no admitted Rive representation",
+                    );
+                };
+                if dab.opacity == 0.0 {
+                    continue;
+                }
+                let (v, i, o, closed) = geometry(&dab.path, dab.source_index)?;
+                let stroke = Stroke {
+                    id: format!("{}#combine{}", tag.stroke_id, tag.island),
+                    v,
+                    i,
+                    o,
+                    closed,
+                    fill: Some(fill),
+                    stroke: None,
+                    width: 1.0,
+                    real: false,
+                    opacity: dab.opacity,
+                    texture: None,
+                    pre_texture_opacity: None,
+                };
+                push(&mut out, dab.layer_index, stroke)?;
+                continue;
+            }
             // A video frame is never a stroke dict, so `exportRive` writes nothing for it.
             PaintEntry::Video(_) => continue,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]

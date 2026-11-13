@@ -432,7 +432,11 @@ fn emit_frame(
                 // G16 option C: a produced dab is one closed fill, as the baseline's dab Path.
                 let refusal = SvgExportError::Unsupported {
                     source_object_index: dab.source_index,
-                    reason: "brush-texture dab paint has no admitted SVG representation",
+                    reason: if dab.combine.is_some() {
+                        "a combined group result styled with a stroke or gradient has no admitted SVG representation"
+                    } else {
+                        "brush-texture dab paint has no admitted SVG representation"
+                    },
                 };
                 let contour = dab.svg_contour.as_ref().ok_or(refusal)?;
                 let rgba = dab.svg_rgba.ok_or(refusal)?;

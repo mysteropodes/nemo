@@ -19,7 +19,7 @@ use crate::evaluation::object_scene_style_kernels::object_scene_style_item::{
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::FillResolution;
 use crate::object_render_scene::object_scene_style_emit::prepare_item;
-use crate::object_render_scene::paint::dab_paint::DabPaint;
+use crate::object_render_scene::paint::dab_paint::{CombineIsland, DabPaint};
 use crate::object_render_scene::render_vector_path::build_path;
 use crate::object_render_scene::{ObjectPaintPlanError, ObjectRenderScene, PaintIndex};
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
@@ -191,8 +191,9 @@ fn islands_of(
         _ => None,
     };
     let prepared = prepare_item(&style).map_err(|_| ObjectPaintPlanError::Unavailable)?;
+    let stroke_id = entry.source().record().target().stroke_id().to_string();
     let mut out = Vec::new();
-    for island in islands {
+    for (number, island) in islands.iter().enumerate() {
         let segments: Vec<CubicSegment> = island
             .iter()
             .map(|s| CubicSegment {
@@ -211,6 +212,10 @@ fn islands_of(
             opacity,
             layer_opacity: entry.layer_opacity(),
             closed: true,
+            combine: Some(CombineIsland {
+                stroke_id: stroke_id.clone(),
+                island: number,
+            }),
         });
     }
     Ok(out)
