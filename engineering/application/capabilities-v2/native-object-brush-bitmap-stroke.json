@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.brush.bitmap.stroke": "Draw a bitmap brush stroke."
+  },
   "operations": [
     "command.document.object.brush.bitmap.stroke"
   ],

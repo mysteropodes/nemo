@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.project.composition.read": "Read the project composition settings.",
+    "command.document.object.project.composition.edit": "Edit the project composition settings."
+  },
   "operations": [
     "query.document.object.project.composition.read",
     "command.document.object.project.composition.edit"

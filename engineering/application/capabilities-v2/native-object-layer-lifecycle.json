@@ -9,6 +9,13 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.layer.delete": "Delete a layer.",
+    "command.document.object.layer.duplicate": "Duplicate a layer.",
+    "command.document.object.layer.rename": "Rename a layer.",
+    "command.document.object.layer.reorder": "Reorder layers."
+  },
   "operations": [
     "command.document.object.layer.delete",
     "command.document.object.layer.duplicate",

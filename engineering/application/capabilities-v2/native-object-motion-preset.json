@@ -9,6 +9,12 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.property.preset.apply": "Apply a motion preset to a property.",
+    "command.document.object.property.keys.paste": "Paste copied keys onto a property.",
+    "command.document.object.property.batch": "Apply several property edits as one history entry."
+  },
   "operations": [
     "command.document.object.property.preset.apply",
     "command.document.object.property.keys.paste",

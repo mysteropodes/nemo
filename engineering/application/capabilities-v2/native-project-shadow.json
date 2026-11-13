@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.project.shadow.read": "Read the project shadow settings.",
+    "command.document.object.project.shadow.edit": "Edit the project shadow settings."
+  },
   "operations": [
     "query.document.object.project.shadow.read",
     "command.document.object.project.shadow.edit"

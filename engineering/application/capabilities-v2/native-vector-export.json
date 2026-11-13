@@ -9,6 +9,12 @@
     "reason": "host export route for native SVG frame jobs is not registered"
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "job.export.svg.begin": "Start an SVG frame export job (not available in this build).",
+    "job.export.svg.status": "Read the status of an SVG export job.",
+    "job.export.svg.cancel": "Cancel an SVG export job."
+  },
   "operations": [
     "job.export.svg.begin",
     "job.export.svg.status",

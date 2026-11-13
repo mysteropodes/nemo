@@ -9,6 +9,12 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.widget.create": "Create a rig widget (joystick or slider).",
+    "command.document.object.widget.write": "Write a value into a rig widget.",
+    "command.document.object.widget.settings": "Change the settings of a rig widget."
+  },
   "operations": [
     "command.document.object.widget.create",
     "command.document.object.widget.write",

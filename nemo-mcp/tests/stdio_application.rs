@@ -236,7 +236,7 @@ async fn compiled_mcp_shares_application_revision_retries_and_history() {
         );
         let direct_capabilities = app.direct(&capabilities).await;
         let discovery = client
-            .call_tool(CallToolRequestParams::new("nemo_discover"))
+            .call_tool(CallToolRequestParams::new("nemo_discover").with_arguments(json!({"detail": "full"}).as_object().unwrap().clone()))
             .await
             .unwrap()
             .structured_content

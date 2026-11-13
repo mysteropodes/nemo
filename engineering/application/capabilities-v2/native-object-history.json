@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.history": "Read the undo and redo depth and entries of the open document."
+  },
   "operations": [
     "query.document.object.history"
   ],

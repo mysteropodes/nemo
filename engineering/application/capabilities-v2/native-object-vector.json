@@ -9,6 +9,12 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.vector.edit": "Create, replace or delete vector shapes and strokes.",
+    "command.document.object.parametric.edit": "Edit a parametric shape (rectangle, ellipse, polygon).",
+    "command.document.object.path.effects.edit": "Edit path effects of a shape."
+  },
   "operations": [
     "command.document.object.vector.edit",
     "command.document.object.parametric.edit",

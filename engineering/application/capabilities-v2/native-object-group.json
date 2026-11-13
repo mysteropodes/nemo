@@ -9,6 +9,15 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.group.create": "Group shapes.",
+    "command.document.object.group.ungroup": "Ungroup shapes.",
+    "command.document.object.group.combine": "Combine groups.",
+    "command.document.object.group.mode.set": "Set the mode of a group.",
+    "command.document.object.group.rename": "Rename a group.",
+    "command.document.object.group.member.remove": "Remove a member from a group."
+  },
   "operations": [
     "command.document.object.group.create",
     "command.document.object.group.ungroup",

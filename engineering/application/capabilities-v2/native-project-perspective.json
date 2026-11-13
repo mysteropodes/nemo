@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.project.perspective.read": "Read the perspective grid.",
+    "command.document.object.project.perspective.edit": "Edit the perspective grid."
+  },
   "operations": [
     "query.document.object.project.perspective.read",
     "command.document.object.project.perspective.edit"

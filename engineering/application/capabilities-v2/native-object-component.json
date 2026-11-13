@@ -9,6 +9,15 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.component.convert": "Convert layers into a component.",
+    "command.document.object.component.expose": "Expose a property of a component.",
+    "command.document.object.component.place": "Place a component instance.",
+    "command.document.object.component.instance.set": "Change a component instance.",
+    "command.document.object.component.breakApart": "Break a component instance apart.",
+    "command.document.object.component.state.edit": "Edit the state of a component."
+  },
   "operations": [
     "command.document.object.component.convert",
     "command.document.object.component.expose",

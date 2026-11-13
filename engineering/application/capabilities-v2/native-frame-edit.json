@@ -9,6 +9,26 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.frames.insert": "Insert blank frames into the timeline.",
+    "command.document.object.frames.extend": "Extend the timeline by repeating frames.",
+    "command.document.object.frames.duplicate": "Duplicate a range of frames.",
+    "command.document.object.frames.remove": "Remove a range of frames.",
+    "command.document.object.layer.key.promote": "Turn a held frame into a keyframe.",
+    "command.document.object.layer.key.blank": "Insert a blank keyframe on a layer.",
+    "command.document.object.layer.key.clear": "Clear a keyframe of a layer.",
+    "command.document.object.layer.key.clear_cells": "Clear the contents of selected timeline cells.",
+    "command.document.object.layer.tween.remove": "Remove a tween between two keyframes.",
+    "command.document.object.layer.key.move": "Move a keyframe to another frame.",
+    "command.document.object.frames.clipboard.duplicate": "Duplicate frames through the frame clipboard.",
+    "command.document.object.frames.clipboard.copy": "Copy frames to the frame clipboard.",
+    "command.document.object.frames.clipboard.cut": "Cut frames to the frame clipboard.",
+    "command.document.object.frames.clipboard.paste": "Paste frames from the frame clipboard.",
+    "command.document.object.frames.move": "Move frames to another position.",
+    "command.document.object.layer.range.drag": "Drag a layer range on the timeline.",
+    "command.document.object.frames.repeat": "Repeat a range of frames."
+  },
   "operations": [
     "command.document.object.frames.insert",
     "command.document.object.frames.extend",

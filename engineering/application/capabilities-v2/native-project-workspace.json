@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.project.workspace.read": "Read the workspace state of the project.",
+    "command.document.object.project.workspace.edit": "Edit the workspace state of the project."
+  },
   "operations": [
     "query.document.object.project.workspace.read",
     "command.document.object.project.workspace.edit"

@@ -444,6 +444,11 @@ pub struct NativeHostStatus {
     /// here (never assumes 1) immediately before such a request.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lifecycle_generation: Option<u64>,
+    /// `object` or `opacity`, as the host owning the open document reports it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub document_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
 }
@@ -458,6 +463,8 @@ impl NativeHostStatus {
             document_id: None,
             content_revision: None,
             lifecycle_generation: None,
+            document_kind: None,
+            pid: None,
             reason: Some(reason.into()),
         }
     }
@@ -476,6 +483,7 @@ impl NativeHostStatus {
             || self
                 .lifecycle_generation
                 .is_some_and(|value| value == 0 || value > MAX_SAFE_REVISION)
+            || (self.document_kind.as_deref()).is_some_and(|k| !matches!(k, "object" | "opacity"))
             || (self.available
                 && (self.document_id.is_none()
                     || self.content_revision.is_none()

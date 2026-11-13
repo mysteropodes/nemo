@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.import.batch": "Import several files into the open document in one step."
+  },
   "operations": [
     "command.document.object.import.batch"
   ],

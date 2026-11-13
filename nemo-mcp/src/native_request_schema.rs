@@ -196,6 +196,57 @@ pub(crate) fn expected_revision_policy(operation: &str) -> Option<bool> {
     catalog().ok()?.operations.get(operation)?.revision
 }
 
+/// A standalone copy of one operation's payload schema for discovery: the branch's
+/// payload node with every local `$defs` entry it reaches inlined beside it, and any
+/// sibling schema document it references under `referencedSchemas`.
+pub(crate) fn standalone_payload_schema(operation: &str) -> Option<Value> {
+    fn refs(value: &Value, out: &mut Vec<String>) {
+        match value {
+            Value::Object(map) => map.iter().for_each(|(key, item)| match item.as_str() {
+                Some(target) if key == "$ref" => out.push(target.to_owned()),
+                _ => refs(item, out),
+            }),
+            Value::Array(items) => items.iter().for_each(|item| refs(item, out)),
+            _ => {}
+        }
+    }
+    let catalog = catalog().ok()?;
+    let entry = catalog.operations.get(operation)?;
+    let branch = &catalog.schema["$defs"]["Request"]["oneOf"][entry.branch];
+    let mut root = branch["allOf"][1]["properties"]["payload"].clone();
+    let (mut defs, mut external) = (serde_json::Map::new(), serde_json::Map::new());
+    let mut pending = Vec::new();
+    refs(&root, &mut pending);
+    while let Some(target) = pending.pop() {
+        let (file, fragment) = target.split_once('#').unwrap_or((&target, ""));
+        let name = fragment.strip_prefix("/$defs/").and_then(|rest| rest.split('/').next());
+        if file.is_empty() {
+            let Some((name, node)) = name.and_then(|n| catalog.schema["$defs"].get(n).map(|v| (n, v)))
+            else {
+                continue;
+            };
+            if defs.insert(name.to_owned(), node.clone()).is_none() {
+                refs(node, &mut pending);
+            }
+        } else if let Some((file, source)) = RESOURCES
+            .iter()
+            .find(|(name, _)| *name == file.trim_start_matches("./"))
+        {
+            if let Ok(document) = serde_json::from_str::<Value>(source) {
+                external.insert((*file).to_owned(), document);
+            }
+        }
+    }
+    let object = root.as_object_mut()?;
+    if !defs.is_empty() {
+        object.insert("$defs".into(), Value::Object(defs));
+    }
+    if !external.is_empty() {
+        object.insert("referencedSchemas".into(), Value::Object(external));
+    }
+    Some(root)
+}
+
 #[cfg(test)]
 pub(super) fn declares(operation: &str) -> bool {
     catalog().is_ok_and(|c| c.operations.contains_key(operation))

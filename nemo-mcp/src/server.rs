@@ -3,10 +3,8 @@
 mod command_projection;
 use crate::{
     capabilities,
-    contract::{
-        ApplicationRequest, NativeApplicationRequest, NativeHostStatus, NativeStatusRequest,
-        Operation, NATIVE_API_VERSION,
-    },
+    contract::{ApplicationRequest, NativeApplicationRequest, Operation, NATIVE_API_VERSION},
+    discovery::{self, DiscoverArgs},
     registry, wire,
 };
 use rmcp::{
@@ -338,91 +336,21 @@ fn failure(code: &str, message: &str) -> CallToolResult {
 #[tool_router]
 impl NemoServer {
     #[tool(
-        description = "Discover running Nemo instances and their build identity. Launch Nemo if none respond. No document is edited."
+        description = "Start here. Lists the running Nemo instances (instanceId, pid, buildId, open documentId, documentKind, revision) and a short start-here guide for the open document's kind: the few operations you need, each with one request to copy. Ask for more with arguments: {\"operation\": name} for one operation's full contract, {\"detail\": \"operations\", \"family\": ..., \"page\": n} for names with purposes and availability, {\"detail\": \"full\"} for every declaration (very large). Launch Nemo if no instance responds. No document is edited."
     )]
-    async fn nemo_discover(&self, context: RequestContext<RoleServer>) -> CallToolResult {
-        let endpoints = match registry::read_endpoints(&self.root) {
-            Ok(endpoints) => endpoints,
-            Err(_) => return failure("unavailable", "Nemo discovery registry is unavailable"),
-        };
-        let mut instances = Vec::new();
-        for endpoint in endpoints {
-            let request = ApplicationRequest {
-                api_version: 1,
-                request_id: uuid::Uuid::new_v4().to_string(),
-                instance_id: Some(endpoint.instance_id.clone()),
-                document_id: None,
-                expected_revision: None,
-                operation: Operation::Capabilities,
-                payload: json!({}),
-            };
-            let wait = std::time::Duration::from_secs(2);
-            let legacy = tokio::time::timeout(
-                wait,
-                wire::call(&endpoint, request, context.ct.child_token()),
-            )
-            .await
-            .ok()
-            .and_then(Result::ok)
-            .filter(|response| response.ok);
-            let status_request = NativeStatusRequest {
-                api_version: NATIVE_API_VERSION,
-                request_id: uuid::Uuid::new_v4().to_string(),
-                instance_id: endpoint.instance_id.clone(),
-            };
-            let probe_native = legacy.as_ref().is_none_or(|response| {
-                response.result.as_ref().is_some_and(|result| {
-                    result.get("nativeApiVersion").and_then(Value::as_u64)
-                        == Some(NATIVE_API_VERSION.into())
-                })
-            });
-            let status = if probe_native {
-                let token = context.ct.child_token();
-                let probe = wire::native_status(&endpoint, status_request.clone(), token);
-                match tokio::time::timeout(wait, probe).await {
-                    Ok(status) => {
-                        status.map_err(|error| format!("native host status unavailable: {error}"))
-                    }
-                    Err(_) => Err("native host status timed out".to_owned()),
-                }
-            } else {
-                Err("endpoint does not advertise nativeApiVersion 2".to_owned())
-            };
-            let instance = if let Some(response) = legacy {
-                let native_status = status.unwrap_or_else(|reason| {
-                    NativeHostStatus::unavailable(&status_request, reason)
-                });
-                json!({"instanceId": endpoint.instance_id, "buildId": endpoint.build_id,
-                    "documentId": response.document_id, "revision": response.revision,
-                    "capabilities": response.result, "nativeHostStatus": native_status})
-            } else {
-                let Ok(native_status) = status else {
-                    continue;
-                };
-                let active = native_status.available.then_some(&native_status);
-                json!({"instanceId": endpoint.instance_id, "buildId": endpoint.build_id,
-                    "documentId": active.and_then(|s| s.document_id.as_deref()),
-                    "revision": active.and_then(|s| s.content_revision),
-                    "capabilities": null, "nativeHostStatus": native_status})
-            };
-            instances.push(instance);
+    async fn nemo_discover(
+        &self,
+        Parameters(args): Parameters<DiscoverArgs>,
+        context: RequestContext<RoleServer>,
+    ) -> CallToolResult {
+        match discovery::run(&self.root, args, &context.ct).await {
+            Ok(answer) => CallToolResult::structured(answer),
+            Err((code, message)) => failure(code, &message),
         }
-        // These embedded declarations are transport-owned contract metadata, not a
-        // second application registry. They are present even when no desktop instance
-        // is running, so a client can discover exact input/output contracts before it
-        // chooses an instance and the live application result remains authoritative
-        // for that instance's current state.
-        CallToolResult::structured(json!({
-            "apiVersion": 1,
-            "registeredCapabilities": capabilities::catalog().descriptors(),
-            "nativeApiVersion": NATIVE_API_VERSION,
-            "registeredNativeCapabilities": capabilities::native_catalog().descriptors(),
-            "instances": instances
-        }))
     }
 
     #[tool(
-        description = "Read Nemo capabilities, current document snapshot, a registered property capability, or bounded diagnostics. Always select the instance from nemo_discover. The payload schema carries one copyable template per operation; property.get needs {\"layerId\",\"property\"} (property names a registered capability id) and the other reads take {}."
+        description = "Read through apiVersion 1: capabilities, snapshot (documentId, revision, current frame, layer list), property.get and diagnostics.trace. Select the instance from nemo_discover. snapshot is the quick way to orient; reads of an object document's objects and properties are apiVersion 2 queries sent through nemo_command (nemo_discover shows the request to copy). The payload schema carries one template per operation; property.get needs {\"layerId\",\"property\"} and the other reads take {}."
     )]
     async fn nemo_query(
         &self,
@@ -450,7 +378,7 @@ impl NemoServer {
     }
 
     #[tool(
-        description = "Call the same application command/history service as Nemo UI. Use the latest snapshot instanceId, documentId, expectedRevision and a unique requestId. Identical retries reuse their result; changed-body retries fail. Supports editing/keying a registered property capability, undo/redo, diagnostic replay and project open/new/saveAs/export. The payload schema carries one copyable template per operation: send it as a JSON object, not as a JSON-encoded string."
+        description = "Read and edit the open document, and open, save or export projects. Workflow: call nemo_discover first; its startHere lists the steps for the open document, each with a request to copy (instanceId and documentId are filled in). apiVersion 2 requests read (query.*) or edit (command.*) the document: a read carries atRevision in its payload and never expectedRevision; a command carries expectedRevision (the current revision, +1 after each command) and a new requestId. apiVersion 1 carries project.open, project.new, project.saveAs and project.export, with documentId and expectedRevision from a snapshot. Identical retries reuse their result; a changed body under the same requestId fails. A refusal names the operation to use instead where there is one; nemo_discover {operation} gives any operation's full contract. Send payload as a JSON object, never as a JSON-encoded string."
     )]
     async fn nemo_command(
         &self,
@@ -496,5 +424,5 @@ impl NemoServer {
     }
 }
 
-#[tool_handler(router = self.tool_router, name = "nemo", version = "0.1.0", instructions = "Discover Nemo, select an instance, read snapshot, then use its identity and revision for commands. Nemo owns document state. Every payload is a JSON object shaped by the template its operation advertises in the tool schema. After a cancelled or disconnected write query state before retrying; reuse the exact requestId and body for idempotent retries.")]
+#[tool_handler(router = self.tool_router, name = "nemo", version = "0.1.0", instructions = "Call nemo_discover first: it lists the running instances and, for the open document, a short guide with a request to copy for each step (pin a snapshot, read, edit a property, undo, redo, history, save, open, export). Send those requests with nemo_command, or nemo_query for the apiVersion 1 snapshot. Ask nemo_discover with {operation: name} for one operation's schema and example, or {detail: operations} for names, purposes and availability. Nemo owns document state. After a cancelled or disconnected write query state before retrying; reuse the exact requestId and body for idempotent retries.")]
 impl ServerHandler for NemoServer {}

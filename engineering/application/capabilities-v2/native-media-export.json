@@ -9,6 +9,12 @@
     "reason": "host export route and media decoder port for native media jobs are not registered"
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "job.export.media.begin": "Start a media export job (not available in this build).",
+    "job.export.media.status": "Read the status of a media export job.",
+    "job.export.media.cancel": "Cancel a media export job."
+  },
   "operations": [
     "job.export.media.begin",
     "job.export.media.status",

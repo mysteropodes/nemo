@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.project.comments.read": "Read the project comments.",
+    "command.document.object.project.comments.edit": "Add, edit or remove project comments."
+  },
   "operations": [
     "query.document.object.project.comments.read",
     "command.document.object.project.comments.edit"

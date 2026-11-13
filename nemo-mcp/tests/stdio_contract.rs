@@ -227,7 +227,7 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
 async fn compiled_discovery_advertises_complete_registered_descriptors_without_an_instance() {
     let client = client().await;
     let discovery = client
-        .call_tool(CallToolRequestParams::new("nemo_discover"))
+        .call_tool(CallToolRequestParams::new("nemo_discover").with_arguments(json!({"detail": "full"}).as_object().unwrap().clone()))
         .await
         .unwrap();
     let body = discovery.structured_content.unwrap();

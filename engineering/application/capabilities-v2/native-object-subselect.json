@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.subselect.edit": "Edit anchors and handles inside a selected shape."
+  },
   "operations": [
     "command.document.object.subselect.edit"
   ],

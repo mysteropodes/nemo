@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.brush.bitmap.publish": "Publish a bitmap brush resource so strokes can use it.",
+    "query.document.object.brush.bitmap": "Read a published bitmap brush resource."
+  },
   "operations": [
     "command.document.object.brush.bitmap.publish",
     "query.document.object.brush.bitmap"

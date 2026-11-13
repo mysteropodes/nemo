@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.item.edit": "Edit an item (shape or image) of the open document."
+  },
   "operations": [
     "command.document.object.item.edit"
   ],

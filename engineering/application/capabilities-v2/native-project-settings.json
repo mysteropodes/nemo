@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.project.settings.edit": "Edit project settings: size, frame rate, length."
+  },
   "operations": [
     "command.document.object.project.settings.edit"
   ],

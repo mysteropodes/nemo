@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.layer.cut": "Cut a layer at the playhead into two layers."
+  },
   "operations": [
     "command.document.object.layer.cut"
   ],

@@ -9,6 +9,10 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "query.document.object.workspace.context": "Read which context the viewport presents and at which frame."
+  },
   "operations": [
     "query.document.object.workspace.context"
   ],

@@ -9,6 +9,15 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.selection.delete": "Delete the selected items.",
+    "command.document.object.selection.duplicate": "Duplicate the selected items.",
+    "command.document.object.layer.split": "Split a layer into several layers.",
+    "command.document.object.clipboard.paste": "Paste items from the clipboard.",
+    "command.document.object.clipboard.copy": "Copy the selected items to the clipboard.",
+    "command.document.object.clipboard.cut": "Cut the selected items to the clipboard."
+  },
   "operations": [
     "command.document.object.selection.delete",
     "command.document.object.selection.duplicate",

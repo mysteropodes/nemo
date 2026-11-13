@@ -9,6 +9,11 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.asset.font.import": "Import a font file into the open document.",
+    "query.document.object.asset.font": "Read a font asset of the open document."
+  },
   "operations": [
     "command.document.object.asset.font.import",
     "query.document.object.asset.font"

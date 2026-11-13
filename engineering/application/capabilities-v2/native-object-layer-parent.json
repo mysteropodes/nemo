@@ -9,6 +9,16 @@
     "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
+  "documentKinds": ["object"],
+  "purposes": {
+    "command.document.object.layer.parent.set": "Set the parent of a layer.",
+    "command.document.object.layer.timeLink.set": "Link a layer time to another layer.",
+    "command.document.object.layer.followPath.set": "Make a layer follow a path.",
+    "command.document.object.layer.color.set": "Set the label color of a layer.",
+    "command.document.object.layer.kind.create": "Create a special layer (null, guide, folder, widget).",
+    "command.document.object.layer.folder.reparent": "Move layers into or out of a folder.",
+    "command.document.object.layer.range.arrange": "Arrange layer ranges on the timeline."
+  },
   "operations": [
     "command.document.object.layer.parent.set",
     "command.document.object.layer.timeLink.set",
