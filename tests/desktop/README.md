@@ -394,9 +394,9 @@ only passing rows; every retry recorded). The stub follows the published reply s
 
 ## Real client workflow, Codex and Claude Code (`installed-evidence/f03-clients.cjs`, #1049)
 
-Runs the issue's original opacity workflow (static 25, set 40 then 60, save, undo, an out-of-date write, save, reopen, replace the
-project by the keyed fixture, a write against the replaced project, read keyed frames 0 and 20) twice against an already built
-package: through the real Codex CLI (`codex exec`) and through the real Claude Code CLI (`claude -p`). Each half has its own fresh
+Runs the issue's original opacity workflow (static 25, set 40 then 60, save, undo, an out-of-date write, save, replace the project by
+the keyed fixture, a write against the replaced project, read keyed frames 0 and 20, reopen the saved file) twice against an already
+built package: through the real Codex CLI (`codex exec`) and through the real Claude Code CLI (`claude -p`). Each half has its own fresh
 isolated session, bound to the candidate by `candidate.cjs` exactly like `run.cjs`, and a per-invocation MCP configuration naming the
 package's own `nemo-mcp` and that session's registry; no user or project client configuration is touched and no input is sent.
 The identification rule is in `engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md`.
@@ -411,15 +411,25 @@ lockf -k /tmp/nemo-heavy-job.lock node tests/desktop/installed-evidence/f03-clie
 override with `--claude-model`); `codex exec` gets `--model` only when `--codex-model` is given. The receipt records the requested model next to
 the client version (`clients[].requestedModel`: the Claude model, or the Codex model / `client default`), and the recorded command line shows the flag.
 
-The prompt names goals and file paths only (no tool or operation names), so the client derives requests from the advertised schema.
-The harness stages the fixed fixture (`tests/animation/fixtures/curve-workflow.json`, pinned by hash, as the static and keyed shells of
-N21), opens the static shell itself, runs the client, and after it exits judges only from its own reads: `saved-60.json` holds 60
-and `saved.json` holds 40 (written by the application), the fixtures are unchanged, the open project is a different document at
-revision 0 evaluating 20, 50, 80 at frames 0, 10, 20, reopening `saved.json` reads 40, and the harness itself shows that a write
-naming the previous revision is refused (`stale_revision`) and one naming the replaced project is refused (`wrong_document`).
+The prompt names goals and file paths only (no tool, operation or payload names) and says which kind of project it is, so the client
+derives requests from the advertised schema. The fixed fixture (`tests/animation/fixtures/curve-workflow.json`, pinned by hash, as the
+static and keyed shells of N21) opens as an **object project**, which answers only the native operations (apiVersion 2) plus
+`project.open`/`saveAs`/`new`: the opacity-document reads (`query.document.opacity`, `query.document.evaluate`) and the apiVersion 1
+`property.*` operations are refused on it. The scenario therefore reads opacity with `query.document.object.property.read` (view
+`rawSample`, pinned by the `presentation` view of `query.document.object`), writes it with `command.document.object.property.edit`
+(`setValue`) and undoes with `command.document.object.undo`; the declarations are cited in the F03 change note. The application also
+refuses to open the project file that is already open, so the prompt reopens the saved file after the keyed project replaced it.
+The harness stages the fixtures, opens the static shell itself, runs the client, and after it exits judges only from its own reads:
+`saved-60.json` holds 60 and `saved.json` holds 40 (`drawing.propertyHolders`, written by the application), the fixtures are
+unchanged, the open project is a different document at revision 0 with no history reading 40, the keyed fixture opened by the harness evaluates
+20, 50, 80 at frames 0, 10, 20, reopening `saved.json` reads 40, and the harness itself shows that a write naming the previous revision
+is refused (`stale_revision`) and one naming the replaced project is refused (`wrong_document`), then undoes its own write.
+Claude Code is given the read-only `Read` and `Grep` tools next to the three `nemo_*` tools, because the discovery answer is about
+280000 characters and the client spills it to a file; Codex is given `default_tools_approval_mode="approve"` for the `nemo` server,
+because under approval policy `never` every MCP call is otherwise refused.
 A client that is not installed, not authenticated, over quota or that rejects the command line leaves its half `unrun` with the
 reason; the client's last message and tool trace are in the receipt as information and never decide a verdict. The receipt
 `f03-clients-receipt.json` (plus `<client>.stream.jsonl`, `<client>.stderr.txt`, `<client>.wire.jsonl`, private) records the candidate
 identity, per client name, version, binary SHA-256, exact prompt and command line, every assertion and the limitations. Exit status as
 `run.cjs`: 0 both passed, 5 one client was selected and passed, 1 a half failed, 2 refused, 4 a half unrun. Unit tests (`node --test tests/desktop/unit/f03-clients.test.cjs`)
-use stubs only; no client or app has been run with this harness.
+use stubs whose reply shapes are the ones observed from the installed candidate; the first real runs are recorded in the F03 change note.
