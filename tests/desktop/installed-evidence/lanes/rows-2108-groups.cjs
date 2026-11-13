@@ -26,6 +26,11 @@ async function nested(ctx, layerUid, { left = [130, 100, 180, 220], right = [320
   return { a, b, c };
 }
 
+// Paper.js simplify(2.5) of the closed 200,100 - 250,220 rectangle, from the fold's own corner order (the start whose result the packaged app answered); recomputed with the
+// shipped paper-full.min.js by installed-evidence-defects.test.cjs, which fails if these drift. Hull: control-point bounds [x0, y0, x1, y1] (what the hit-test lists). Ink: the
+// outline's own bounds [x0, y0, x1 - 1, y1 - 1] in export pixels.
+const REFIT_HULL = [143.06, 84.62, 306.94, 236.67], REFIT_INK = [187.79, 88.46, 261.21, 201.5];
+
 const rows = [
   { id: '2108-nested-group-structure', title: 'nested groups: path outermost first, independent combine modes, rename, member removal dissolves a group below two, undo, refusals', tasks: ['G24'],
     limitations: ['Structure is read from the hit-test listing; the combined paint of a nested group and its flatten are observed by 2108-nested-group-operand-flatten.'],
@@ -83,7 +88,7 @@ const rows = [
   //    `unite(a,unite(b,c),d)` but the flatten fold `unite(a,b,c,d)`. The native owner keeps the rule (object_boolean_ops_flatten.rs: one fold over all leaves; an empty fold is
   //    PlanError::EmptyResult, answered invalid_request, object_boolean_ops_owner.rs). The baseline JS would have silently deleted the members of an empty fold; the native refusal is a
   //    deliberate, safer deviation, so the row asserts the refusal and an untouched document, not a result.
-  { id: '2108-nested-group-operand-flatten', title: 'nested combined children: Outer intersect with an Inner union PAINTS both bars as one operand; flatten folds all leaves once (empty fold: refused, nothing changes; non-empty: exactly that fold, one undo)', tasks: ['G24', 'G19'],
+  { id: '2108-nested-group-operand-flatten', title: 'nested combined children: Outer intersect with an Inner union PAINTS both bars as one operand; flatten folds all leaves once (empty fold: refused, nothing changes; non-empty: the baseline refit of that fold, one undo)', tasks: ['G24', 'G19'],
     limitations: ['Flatten of a group is judged by the baseline rule (one fold over all leaves), which differs from the paint of the same group by design; hidden members and a child group with mode none are not exercised here.'],
     async run(ctx) {
       // ---- scene 1: the bars are disjoint, so the all-leaves fold of Outer is empty ----
@@ -113,10 +118,16 @@ const rows = [
       ctx.near('pixel', 'paint: the ink spans both bars, 130..370 by 100..220', probe.inkBounds(p0.image).box, [130, 100, 369, 219], 2);
       await K.apply(ctx, 'flatten Outer, whose all-leaves fold is the overlap', P.booleanFlatten(second.layerUid, 'g_outer'));
       const m1 = await K.hitTest(ctx, second.layerUid), p1 = await K.exportPng(ctx, 'overlap-flattened');
-      ctx.eq('read', 'one result record replaces the three members, loose and bounded by the overlap 200..250 by 100..220', [m1.length, m1.length === 1 ? (m1[0].groupPath || []).length : null, m1.length === 1 ? m1[0].bounds.map(Math.round) : null], [1, 0, [200, 100, 250, 220]]);
-      ctx.ok('read', 'the result is a new record, none of the members', m1.length === 1 && ![s2.a, s2.b, s2.c].includes(m1[0].stableTarget.strokeId), m1.map(i => i.stableTarget.strokeId));
-      ctx.eq('pixel', 'flattened: only the overlap is inked; the bar parts outside it, which the paint showed, are gone', [alpha(p1, 225, 150), alpha(p1, 150, 150), alpha(p1, 345, 150), alpha(p1, 110, 70)], [255, 0, 0, 0]);
-      ctx.near('pixel', 'flattened: the ink is exactly the all-leaves fold, 200..250 by 100..220', probe.inkBounds(p1.image).box, [200, 100, 249, 219], 2);
+      // The result is the REFIT of the overlap, not the sharp 200..250 by 100..220 box: flatten inserts the fold through insertBooleanResult, whose flattenBooleanResult ends in
+      // _eraseDegenerateSelfLoops(path, preserveGeometry), and that runs path.simplify(2.5) on a result without a kept slit (src/js/tools.js 6305-6420 at 1065e9d8; the engine
+      // ports it as erase_degenerate_self_loops, native-engine/src/object_boolean_ops_ring.rs). Paper.js simplify(2.5) of the 50 x 120 overlap rectangle gives a 2-anchor curve whose
+      // control hull is REFIT_HULL and whose drawn outline spans REFIT_INK (derived with the shipped src/paper-full.min.js, see installed-evidence-defects.test.cjs). The overlap rectangle
+      // has no hole, so no slit and no kept revisit: the refit applies, exactly as in the baseline.
+      ctx.eq('read', 'one result record replaces the three members and is loose (no group path): the baseline refit curve of the overlap, two anchors, the style member\'s id', [m1.length, m1.length === 1 ? (m1[0].groupPath || []).length : null, m1.length === 1 ? m1[0].count : null, m1.length === 1 ? m1[0].stableTarget.strokeId : null], [1, 0, 2, s2.c]);
+      ctx.near('read', 'the result hull is the Paper.js simplify(2.5) hull of the overlap rectangle', m1.length === 1 ? m1[0].bounds : null, REFIT_HULL, 0.5);
+      ctx.ok('read', 'neither the big rectangle nor the left bar survives', m1.length === 1 && ![s2.a, s2.b].includes(m1[0].stableTarget.strokeId), m1.map(i => i.stableTarget.strokeId));
+      ctx.eq('pixel', 'flattened: the centre of the overlap is inked; the bar parts outside the refit curve, which the paint showed, are gone', [alpha(p1, 225, 150), alpha(p1, 150, 150), alpha(p1, 345, 150), alpha(p1, 110, 70)], [255, 0, 0, 0]);
+      ctx.near('pixel', 'flattened: the ink is the refit curve of the all-leaves fold, not the two bars', probe.inkBounds(p1.image).box, REFIT_INK, 2);
       await K.step(ctx, 'one undo of the flatten', 'undo');
       ctx.eq('read', 'one undo restores the three records, their bounds and both groups', JSON.stringify(await K.hitTest(ctx, second.layerUid)), JSON.stringify(m0));
       ctx.eq('pixel', 'one undo restores the export of the paint', (await K.exportPng(ctx, 'overlap-unflattened')).digest, p0.digest);
