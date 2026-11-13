@@ -71,7 +71,7 @@ test('one client selected and passing is a subset pass, never the full result', 
 });
 
 test('product failure: an application that accepts an out-of-date write, saves the wrong value or accepts a replaced project fails the half', async () => {
-  for (const [flags, pattern] of [[{ acceptStale: true }, /saved\.json holds opacity 40/], [{ saveWrong: true }, /saved-60\.json holds opacity 60/], [{ acceptWrongDocument: true }, /revision 0/]]) {
+  for (const [flags, pattern] of [[{ acceptStale: true }, /saved\.json holds opacity 40/], [{ saveWrong: true }, /saved-60\.json holds opacity 60/], [{ acceptWrongDocument: true }, /refused as wrong_document/]]) {
     const h = harness({ flags });
     const { exit, receipt } = await main(h.config, h.deps);
     assert.equal(exit, 1, JSON.stringify(flags));
@@ -136,18 +136,22 @@ test('refusals: a candidate that does not bind refuses the whole run; usage erro
 test('the prompt is goals and paths only, and the invocations carry a per-invocation MCP configuration and no user configuration', () => {
   const paths = { static: '/w/s.json', keyed: '/w/k.json', saved60: '/w/60.json', saved: '/w/40.json' };
   const prompt = W.promptFor(paths);
-  for (const word of ['nemo_command', 'nemo_discover', 'command.document', 'layer.opacity', 'stableTarget', 'apiVersion', 'expectedRevision', 'history.undo']) assert.ok(!prompt.includes(word), word);
+  for (const word of ['nemo_command', 'nemo_discover', 'nemo_query', 'command.document', 'query.document', 'property.edit', 'property.read', 'rawSample', 'presentation', 'documentSnapshotId', 'layer.opacity', 'stableTarget', 'expectedRevision', 'history.undo', 'object.undo']) assert.ok(!prompt.includes(word), word);
   for (const p of Object.values(paths).filter(p => p !== paths.static)) assert.ok(prompt.includes(p));
   const base = { command: '/bin/x', mcpCommand: '/pkg/MacOS/nemo-mcp', mcpRegistry: '/iso/mcp', prompt, cwd: '/w/cwd', reportDir: '/r' };
   const codex = C.invocation('codex', base);
   assert.equal(codex.input, prompt); assert.equal(codex.args.at(-1), '-');
   assert.ok(codex.args.includes('mcp_servers.nemo.command="/pkg/MacOS/nemo-mcp"'));
   assert.ok(codex.args.includes('mcp_servers.nemo.env.NEMO_MCP_REGISTRY="/iso/mcp"'));
+  assert.ok(codex.args.includes('mcp_servers.nemo.default_tools_approval_mode="approve"'), 'approval policy never refuses every MCP tool call otherwise');
   assert.deepEqual(codex.files, {});
   const claude = C.invocation('claude', base), [file, text] = Object.entries(claude.files)[0];
   assert.deepEqual(JSON.parse(text), { mcpServers: { nemo: { command: '/pkg/MacOS/nemo-mcp', args: [], env: { NEMO_MCP_REGISTRY: '/iso/mcp' } } } });
   assert.ok(claude.args.includes('--strict-mcp-config') && claude.args[claude.args.indexOf('--mcp-config') + 1] === file);
   assert.equal(claude.args.indexOf('-p'), 0); assert.equal(claude.input, prompt);
+  const tools = claude.args[claude.args.indexOf('--tools') + 1], allowed = claude.args.slice(claude.args.indexOf('--allowedTools') + 1, claude.args.indexOf('--output-format'));
+  assert.equal(tools, 'Read,Grep', 'only read-only built-in tools, for the discovery answer the client spills to a file');
+  assert.deepEqual(allowed, ['mcp__nemo__nemo_discover', 'mcp__nemo__nemo_query', 'mcp__nemo__nemo_command', 'Read', 'Grep']);
   assert.deepEqual(Object.keys(C.scrubbedEnv({ NEMO_MCP_REGISTRY: 'x', NEMO_TASK_ID: 'y', HOME: '/h' })), ['HOME']);
 });
 
