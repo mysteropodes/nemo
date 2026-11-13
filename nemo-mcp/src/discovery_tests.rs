@@ -32,10 +32,16 @@ fn instance(kind: Option<&str>, document: &str) -> Instance {
 
 fn fill_tokens(value: &Value) -> Value {
     match value {
-        Value::String(text) if text == "<documentSnapshotId>" => json!(format!("native-object:{DOC}:7")),
+        Value::String(text) if text == "<documentSnapshotId>" => {
+            json!(format!("native-object:{DOC}:7"))
+        }
         Value::String(text) if text == "<layerUid>" => json!("layer-1"),
         Value::Array(items) => Value::Array(items.iter().map(fill_tokens).collect()),
-        Value::Object(map) => Value::Object(map.iter().map(|(k, v)| (k.clone(), fill_tokens(v))).collect()),
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .map(|(k, v)| (k.clone(), fill_tokens(v)))
+                .collect(),
+        ),
         other => other.clone(),
     }
 }
@@ -43,7 +49,14 @@ fn fill_tokens(value: &Value) -> Value {
 #[test]
 fn every_start_here_example_is_a_valid_request() {
     for kind in ["object", "opacity"] {
-        let live = instance(Some(kind), if kind == "object" { DOC } else { "native-document-1" });
+        let live = instance(
+            Some(kind),
+            if kind == "object" {
+                DOC
+            } else {
+                "native-document-1"
+            },
+        );
         let guide = start_here(Some(&live));
         assert_eq!(guide["documentKind"], kind);
         for step in guide["steps"].as_array().unwrap() {
@@ -51,9 +64,12 @@ fn every_start_here_example_is_a_valid_request() {
             let what = format!("{kind} step {}", step["id"]);
             match step["tool"].as_str().unwrap() {
                 "nemo_query" => {
-                    let operation: Operation = serde_json::from_value(request["operation"].clone()).unwrap();
+                    let operation: Operation =
+                        serde_json::from_value(request["operation"].clone()).unwrap();
                     assert!(operation.is_query(), "{what}");
-                    operation.check_payload(&request["payload"]).unwrap_or_else(|e| panic!("{what}: {e}"));
+                    operation
+                        .check_payload(&request["payload"])
+                        .unwrap_or_else(|e| panic!("{what}: {e}"));
                 }
                 _ if request["apiVersion"] == 1 => {
                     let parsed: ApplicationRequest = serde_json::from_value(request).unwrap();
@@ -69,7 +85,9 @@ fn every_start_here_example_is_a_valid_request() {
     let none = instance(None, DOC);
     for step in start_here(Some(&none))["steps"].as_array().unwrap() {
         let parsed: ApplicationRequest = serde_json::from_value(step["request"].clone()).unwrap();
-        parsed.validate().unwrap_or_else(|e| panic!("none step {}: {e}", step["id"]));
+        parsed
+            .validate()
+            .unwrap_or_else(|e| panic!("none step {}: {e}", step["id"]));
     }
 }
 
@@ -79,9 +97,18 @@ fn every_guide_step_is_available_for_its_kind() {
         for step in section["steps"].as_array().unwrap() {
             let operation = step["operation"].as_str().unwrap();
             if step["apiVersion"] == 2 {
-                assert_eq!(catalog::native_applicability(kind, operation), Applicability::Available, "{kind} {operation}");
+                assert_eq!(
+                    catalog::native_applicability(kind, operation),
+                    Applicability::Available,
+                    "{kind} {operation}"
+                );
             } else {
-                assert!(catalog::guide()["legacyOperations"].get(operation).is_some(), "{operation}");
+                assert!(
+                    catalog::guide()["legacyOperations"]
+                        .get(operation)
+                        .is_some(),
+                    "{operation}"
+                );
             }
         }
     }
@@ -103,8 +130,16 @@ fn every_native_operation_declares_kinds_and_a_purpose() {
     for operation in catalog::all_native_operations() {
         let d = catalog::descriptor(operation).unwrap();
         let kinds = catalog::document_kinds(d);
-        assert!(!kinds.is_empty() && kinds.iter().all(|k| matches!(*k, "object" | "opacity")), "{operation}");
-        assert!(d["purposes"][operation].as_str().is_some_and(|p| !p.is_empty() && p.len() <= 110), "{operation} purpose");
+        assert!(
+            !kinds.is_empty() && kinds.iter().all(|k| matches!(*k, "object" | "opacity")),
+            "{operation}"
+        );
+        assert!(
+            d["purposes"][operation]
+                .as_str()
+                .is_some_and(|p| !p.is_empty() && p.len() <= 110),
+            "{operation} purpose"
+        );
     }
 }
 
@@ -112,27 +147,54 @@ fn every_native_operation_declares_kinds_and_a_purpose() {
 fn use_instead_names_an_operation_the_kind_accepts() {
     let object = catalog::available_native_operations("object");
     let mut seen = 0;
-    for operation in catalog::all_native_operations().into_iter().chain(Operation::labels().iter().copied()) {
+    for operation in catalog::all_native_operations()
+        .into_iter()
+        .chain(Operation::labels().iter().copied())
+    {
         if let Some(other) = catalog::use_instead("object", operation) {
             seen += 1;
             let v1_project = other.starts_with("project.");
-            assert!(v1_project || object.contains(&other.as_str()), "{operation} -> {other}");
+            assert!(
+                v1_project || object.contains(&other.as_str()),
+                "{operation} -> {other}"
+            );
         }
     }
     assert!(seen >= 20);
     let message = catalog::inapplicable_message("object", "command.document.apply").unwrap();
-    assert!(message.contains("command.document.object.property.edit"), "{message}");
+    assert!(
+        message.contains("command.document.object.property.edit"),
+        "{message}"
+    );
     assert!(catalog::inapplicable_message("object", "command.document.object.undo").is_none());
 }
 
 #[test]
 fn availability_follows_the_open_document_kind() {
-    assert_eq!(catalog::native_applicability("object", "command.document.object.property.edit"), Applicability::Available);
-    assert!(matches!(catalog::native_applicability("object", "command.document.apply"), Applicability::OtherKind { .. }));
-    assert_eq!(catalog::native_applicability("opacity", "command.document.apply"), Applicability::Available);
-    assert!(matches!(catalog::native_applicability("opacity", "command.document.object.undo"), Applicability::OtherKind { .. }));
-    assert!(matches!(catalog::native_applicability("object", "job.export.media.begin"), Applicability::Unavailable(_)));
-    assert_eq!(catalog::native_applicability("object", "query.nothing"), Applicability::Undeclared);
+    assert_eq!(
+        catalog::native_applicability("object", "command.document.object.property.edit"),
+        Applicability::Available
+    );
+    assert!(matches!(
+        catalog::native_applicability("object", "command.document.apply"),
+        Applicability::OtherKind { .. }
+    ));
+    assert_eq!(
+        catalog::native_applicability("opacity", "command.document.apply"),
+        Applicability::Available
+    );
+    assert!(matches!(
+        catalog::native_applicability("opacity", "command.document.object.undo"),
+        Applicability::OtherKind { .. }
+    ));
+    assert!(matches!(
+        catalog::native_applicability("object", "job.export.media.begin"),
+        Applicability::Unavailable(_)
+    ));
+    assert_eq!(
+        catalog::native_applicability("object", "query.nothing"),
+        Applicability::Undeclared
+    );
 }
 
 #[test]
@@ -151,12 +213,18 @@ fn operation_lists_are_paged_and_filterable() {
     }
     assert_eq!(names as u64, first["total"].as_u64().unwrap());
     let property = catalog::list_page(&selected, Some("property"), 1).unwrap();
-    assert!(property["operations"].as_array().unwrap().iter().all(|e| e["family"] == "property"));
+    assert!(property["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|e| e["family"] == "property"));
     let apply = catalog::list_page(&selected, Some("opacity"), 1).unwrap();
     let apply = &apply["operations"][0];
     assert_eq!(apply["available"], false);
     assert_eq!(apply["useInstead"], "command.document.object.property.edit");
-    assert!(catalog::list_page(&selected, Some("nonsense"), 1).unwrap_err().contains("families:"));
+    assert!(catalog::list_page(&selected, Some("nonsense"), 1)
+        .unwrap_err()
+        .contains("families:"));
     assert!(catalog::list_page(&selected, None, pages as usize + 1).is_err());
 }
 
@@ -165,23 +233,38 @@ fn every_operation_has_a_contract_with_schema_codes_and_availability() {
     let live = instance(Some("object"), DOC);
     let selected = live.selected();
     for operation in catalog::all_native_operations() {
-        let contract = discovery_contract::contract(operation, Some(2), &selected).unwrap_or_else(|| panic!("{operation}"));
+        let contract = discovery_contract::contract(operation, Some(2), &selected)
+            .unwrap_or_else(|| panic!("{operation}"));
         assert_eq!(contract["operation"], operation);
-        assert!(contract["requestSchema"].is_object(), "{operation} request schema");
-        assert!(contract["refusalCodes"].as_array().is_some_and(|c| !c.is_empty()), "{operation}");
+        assert!(
+            contract["requestSchema"].is_object(),
+            "{operation} request schema"
+        );
+        assert!(
+            contract["refusalCodes"]
+                .as_array()
+                .is_some_and(|c| !c.is_empty()),
+            "{operation}"
+        );
         assert!(contract["availability"]["state"].is_string());
         let size = serde_json::to_string(&contract).unwrap().len();
         assert!(size <= 80_000, "{operation} contract is {size} characters");
     }
     for operation in Operation::labels() {
-        let contract = discovery_contract::contract(operation, Some(1), &selected).unwrap_or_else(|| panic!("{operation}"));
+        let contract = discovery_contract::contract(operation, Some(1), &selected)
+            .unwrap_or_else(|| panic!("{operation}"));
         assert!(contract["example"].is_object(), "{operation}");
     }
-    let edit = discovery_contract::contract("command.document.object.property.edit", None, &selected).unwrap();
+    let edit =
+        discovery_contract::contract("command.document.object.property.edit", None, &selected)
+            .unwrap();
     assert_eq!(edit["availability"]["state"], "available");
     assert_eq!(edit["example"]["instanceId"], live.instance_id);
     assert_eq!(edit["example"]["expectedRevision"], 7);
     let apply = discovery_contract::contract("command.document.apply", None, &selected).unwrap();
     assert_eq!(apply["availability"]["state"], "not-for-open-document");
-    assert_eq!(apply["availability"]["useInstead"], "command.document.object.property.edit");
+    assert_eq!(
+        apply["availability"]["useInstead"],
+        "command.document.object.property.edit"
+    );
 }

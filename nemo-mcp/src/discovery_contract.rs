@@ -8,8 +8,14 @@ use crate::{
 };
 use serde_json::{json, Value};
 
-const V1_REFUSALS: [&str; 6] =
-    ["invalid_request", "stale_revision", "unavailable", "unsaved_changes", "indeterminate", "export_failed"];
+const V1_REFUSALS: [&str; 6] = [
+    "invalid_request",
+    "stale_revision",
+    "unavailable",
+    "unsaved_changes",
+    "indeterminate",
+    "export_failed",
+];
 
 /// Declared codes, or the transport's common set when a declaration names none.
 fn refusal_codes(d: &Value) -> Vec<Value> {
@@ -24,8 +30,17 @@ fn refusal_codes(d: &Value) -> Vec<Value> {
     }
 }
 
-const COMMON_REFUSALS: [&str; 9] = ["invalid_request", "wrong_instance", "wrong_document", "stale_revision",
-    "busy_conflict", "not_found", "unavailable", "cancelled_before_dispatch", "internal"];
+const COMMON_REFUSALS: [&str; 9] = [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "not_found",
+    "unavailable",
+    "cancelled_before_dispatch",
+    "internal",
+];
 
 fn live_request(mut request: Value, selected: &Selected) -> Value {
     if let Some((instance, document, revision)) = selected.identity {
@@ -71,7 +86,11 @@ fn availability(operation: &str, api: u32, selected: &Selected) -> Value {
 fn native_contract(operation: &str, selected: &Selected) -> Option<Value> {
     let d = catalog::descriptor(operation)?;
     let policy = request_schema::expected_revision_policy(operation);
-    let example = d["examples"].as_array().into_iter().flatten().find(|e| e["request"]["operation"] == operation);
+    let example = d["examples"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|e| e["request"]["operation"] == operation);
     let mut out = json!({
         "operation": operation, "api": 2, "tool": "nemo_command",
         "family": catalog::family_of(operation), "capability": d["id"],
@@ -85,7 +104,13 @@ fn native_contract(operation: &str, selected: &Selected) -> Option<Value> {
         "requestSchema": request_schema::standalone_payload_schema(operation),
         "refusalCodes": refusal_codes(d),
     });
-    for key in ["semantics", "readPolicy", "input", "output", "resourceBoundary"] {
+    for key in [
+        "semantics",
+        "readPolicy",
+        "input",
+        "output",
+        "resourceBoundary",
+    ] {
         if !d[key].is_null() {
             out[key] = d[key].clone();
         }
@@ -109,9 +134,14 @@ fn v1_contract(operation: &str, selected: &Selected) -> Option<Value> {
     let schema = if project_contract::is_project_operation(&op) {
         project_contract::payload_schemas(&[op]).pop()
     } else {
-        Some(json!({"type": "object", "description": "property operations name a registered capability in payload.property; see example"}))
+        Some(
+            json!({"type": "object", "description": "property operations name a registered capability in payload.property; see example"}),
+        )
     };
-    let steps = catalog::guide()["kinds"].as_object()?.values().flat_map(|k| k["steps"].as_array().into_iter().flatten());
+    let steps = catalog::guide()["kinds"]
+        .as_object()?
+        .values()
+        .flat_map(|k| k["steps"].as_array().into_iter().flatten());
     let payload = steps
         .filter(|step| step["operation"] == operation)
         .map(|step| step["payload"].clone())

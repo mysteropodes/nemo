@@ -11,7 +11,10 @@ const GUIDE_SOURCE: &str = include_str!("../../engineering/application/discovery
 
 /// The apiVersion 1 project operations run the app's lifecycle flows on every kind.
 pub fn project_operations() -> impl Iterator<Item = &'static str> {
-    Operation::labels().iter().copied().filter(|label| label.starts_with("project."))
+    Operation::labels()
+        .iter()
+        .copied()
+        .filter(|label| label.starts_with("project."))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -20,7 +23,9 @@ pub enum Applicability {
     /// The capability declares itself unavailable in this build.
     Unavailable(String),
     /// Declared for other document kinds only.
-    OtherKind { use_instead: Option<String> },
+    OtherKind {
+        use_instead: Option<String>,
+    },
     Undeclared,
 }
 
@@ -53,7 +58,9 @@ pub fn use_instead(kind: &str, operation: &str) -> Option<String> {
 pub fn native_applicability(kind: &str, operation: &str) -> Applicability {
     match declared_applicability(operation) {
         Applicability::Available if !descriptor_kinds_contain(operation, kind) => {
-            Applicability::OtherKind { use_instead: use_instead(kind, operation) }
+            Applicability::OtherKind {
+                use_instead: use_instead(kind, operation),
+            }
         }
         other => other,
     }
@@ -92,15 +99,25 @@ pub fn inapplicable_message(kind: &str, operation: &str) -> Option<String> {
         || "No equivalent exists on this document.".to_owned(),
         |other| format!("Use {other} instead."),
     );
-    Some(format!("{operation} does not apply to a {kind} document. {hint}"))
+    Some(format!(
+        "{operation} does not apply to a {kind} document. {hint}"
+    ))
 }
 
-pub fn v1_applicability(kind: Option<&str>, listed: Option<&[String]>, operation: &str) -> Applicability {
-    let Some(listed) = listed else { return Applicability::Available };
+pub fn v1_applicability(
+    kind: Option<&str>,
+    listed: Option<&[String]>,
+    operation: &str,
+) -> Applicability {
+    let Some(listed) = listed else {
+        return Applicability::Available;
+    };
     if project_operations().any(|op| op == operation) || listed.iter().any(|op| op == operation) {
         return Applicability::Available;
     }
-    Applicability::OtherKind { use_instead: kind.and_then(|k| use_instead(k, operation)) }
+    Applicability::OtherKind {
+        use_instead: kind.and_then(|k| use_instead(k, operation)),
+    }
 }
 
 pub fn all_native_operations() -> Vec<&'static str> {
@@ -155,11 +172,18 @@ pub fn summary(operation: &str, api: u32, selected: &Selected) -> Option<Value> 
     let (purpose, family, tool) = if api == 1 {
         let entry = v1_entry(operation)?;
         let query = Operation::labels().contains(&operation) && is_v1_query(operation);
-        (entry["purpose"].as_str()?.to_owned(), entry["family"].as_str()?.to_owned(),
-         if query { "nemo_query" } else { "nemo_command" })
+        (
+            entry["purpose"].as_str()?.to_owned(),
+            entry["family"].as_str()?.to_owned(),
+            if query { "nemo_query" } else { "nemo_command" },
+        )
     } else {
         let d = descriptor(operation)?;
-        (d["purposes"][operation].as_str().unwrap_or("").to_owned(), family_of(operation), "nemo_command")
+        (
+            d["purposes"][operation].as_str().unwrap_or("").to_owned(),
+            family_of(operation),
+            "nemo_command",
+        )
     };
     let mut out = json!({"operation": operation, "purpose": purpose, "family": family, "api": api, "tool": tool});
     match applicability_of(operation, api, selected) {
@@ -170,7 +194,10 @@ pub fn summary(operation: &str, api: u32, selected: &Selected) -> Option<Value> 
         }
         Applicability::OtherKind { use_instead } => {
             out["available"] = json!(false);
-            out["why"] = json!(format!("does not apply to the open {} document", selected.kind.unwrap_or("")));
+            out["why"] = json!(format!(
+                "does not apply to the open {} document",
+                selected.kind.unwrap_or("")
+            ));
             if let Some(other) = use_instead {
                 out["useInstead"] = json!(other);
             }
@@ -181,17 +208,27 @@ pub fn summary(operation: &str, api: u32, selected: &Selected) -> Option<Value> 
 }
 
 pub fn is_v1_query(operation: &str) -> bool {
-    matches!(operation, "capabilities" | "snapshot" | "property.get" | "diagnostics.trace")
+    matches!(
+        operation,
+        "capabilities" | "snapshot" | "property.get" | "diagnostics.trace"
+    )
 }
 
 pub fn all_summaries(selected: &Selected) -> Vec<Value> {
-    let v2 = all_native_operations().into_iter().filter_map(|op| summary(op, 2, selected));
-    let v1 = Operation::labels().iter().filter_map(|op| summary(op, 1, selected));
+    let v2 = all_native_operations()
+        .into_iter()
+        .filter_map(|op| summary(op, 2, selected));
+    let v1 = Operation::labels()
+        .iter()
+        .filter_map(|op| summary(op, 1, selected));
     v2.chain(v1).collect()
 }
 
 pub fn families(entries: &[Value]) -> Vec<String> {
-    let mut out: Vec<String> = entries.iter().filter_map(|e| e["family"].as_str().map(str::to_owned)).collect();
+    let mut out: Vec<String> = entries
+        .iter()
+        .filter_map(|e| e["family"].as_str().map(str::to_owned))
+        .collect();
     out.sort();
     out.dedup();
     out
@@ -203,12 +240,21 @@ pub fn list_page(selected: &Selected, family: Option<&str>, page: usize) -> Resu
     let known = families(&all);
     if let Some(family) = family {
         if !known.iter().any(|f| f.eq_ignore_ascii_case(family)) {
-            return Err(format!("unknown family {family}; families: {}", known.join(", ")));
+            return Err(format!(
+                "unknown family {family}; families: {}",
+                known.join(", ")
+            ));
         }
     }
     let matching: Vec<Value> = all
         .into_iter()
-        .filter(|e| family.is_none_or(|f| e["family"].as_str().is_some_and(|x| x.eq_ignore_ascii_case(f))))
+        .filter(|e| {
+            family.is_none_or(|f| {
+                e["family"]
+                    .as_str()
+                    .is_some_and(|x| x.eq_ignore_ascii_case(f))
+            })
+        })
         .collect();
     let pages = matching.len().div_ceil(PAGE_SIZE).max(1);
     if page == 0 || page > pages {
