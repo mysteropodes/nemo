@@ -66,12 +66,9 @@ fn contract_examples_carry_the_open_documents_identity_not_the_fixtures() {
         }
     }
     assert!(pins >= 20, "only {pins} pinned examples seen");
-    let read = discovery_contract::contract(
-        "query.document.object.property.read",
-        Some(2),
-        &selected,
-    )
-    .unwrap();
+    let read =
+        discovery_contract::contract("query.document.object.property.read", Some(2), &selected)
+            .unwrap();
     assert_eq!(read["example"]["payload"]["documentSnapshotId"], json!(pin));
     assert_eq!(read["example"]["payload"]["atRevision"], 7);
     let edit =
@@ -81,7 +78,10 @@ fn contract_examples_carry_the_open_documents_identity_not_the_fixtures() {
         .iter()
         .filter_map(|e| e["payload"]["action"]["kind"].as_str())
         .collect();
-    assert!(kinds.contains(&"setValue") && kinds.contains(&"setKey"), "{kinds:?}");
+    assert!(
+        kinds.contains(&"setValue") && kinds.contains(&"setKey"),
+        "{kinds:?}"
+    );
 }
 
 #[test]
@@ -91,9 +91,8 @@ fn contract_examples_are_placeholders_where_there_is_no_pin_to_give() {
         v1_operations: None,
         identity: None,
     };
-    let read =
-        discovery_contract::contract("query.document.object.property.read", Some(2), &none)
-            .unwrap();
+    let read = discovery_contract::contract("query.document.object.property.read", Some(2), &none)
+        .unwrap();
     assert_eq!(read["example"]["instanceId"], "<instanceId>");
     assert_eq!(read["example"]["documentId"], "<documentId>");
     assert_eq!(
@@ -101,9 +100,8 @@ fn contract_examples_are_placeholders_where_there_is_no_pin_to_give() {
         "<documentSnapshotId>"
     );
     let opacity = instance(Some("opacity"), "native-document-1");
-    let read =
-        discovery_contract::contract("query.document.opacity", Some(2), &opacity.selected())
-            .unwrap();
+    let read = discovery_contract::contract("query.document.opacity", Some(2), &opacity.selected())
+        .unwrap();
     assert!(!read["example"].to_string().contains(FIXTURE_DOC));
 }
 
@@ -118,7 +116,10 @@ fn no_native_operation_is_available_while_nothing_is_open() {
         let summary = catalog::summary(operation, 2, &none).unwrap();
         assert_eq!(summary["available"], false, "{operation}");
         let contract = discovery_contract::contract(operation, Some(2), &none).unwrap();
-        assert_eq!(contract["availability"]["state"], "unavailable", "{operation}");
+        assert_eq!(
+            contract["availability"]["state"], "unavailable",
+            "{operation}"
+        );
         if catalog::declared_applicability(operation) == Applicability::Available {
             assert_eq!(contract["availability"]["reason"], catalog::NO_DOCUMENT);
         }
@@ -175,7 +176,9 @@ fn schema_examples_are_object_requests_the_object_document_accepts() {
             "{operation}"
         );
         let parsed: NativeApplicationRequest = serde_json::from_value(example).unwrap();
-        parsed.validate().unwrap_or_else(|e| panic!("{operation}: {e}"));
+        parsed
+            .validate()
+            .unwrap_or_else(|e| panic!("{operation}: {e}"));
     }
 }
 

@@ -93,7 +93,9 @@ impl Localize<'_> {
 
 fn live_request(mut request: Value, selected: &Selected) -> Value {
     let fixture_document = request["documentId"].as_str().map(str::to_owned);
-    let live = selected.identity.map(|(_, document, revision)| (document, revision));
+    let live = selected
+        .identity
+        .map(|(_, document, revision)| (document, revision));
     if let Some(payload) = request.get_mut("payload") {
         Localize {
             fixture_document: fixture_document.as_deref(),
