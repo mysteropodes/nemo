@@ -107,6 +107,21 @@ test('a merge revision replaces its source rows with the minted instance row and
   assert.equal(root.state.activeLayerIdx,0);assert.deepEqual(root._layerSel,[0]);
   assert.equal(Files.projectionReadyForUI(root,info([A,B],2)),true);
 });
+test('a layer.reorder revision moves the existing rows, follows the UID selection and is undone by its inverse revision',()=>{
+  const root=view([A,B,C]),rows=root.state.layers,original=rows.slice();
+  root.state.activeLayerIdx=2;root._layerSel=[0,2];root._layerSelAnchor=0;
+  assert.equal(Files.refreshLayerTable(root,info([C,A,B],1)),true);
+  assert.strictEqual(root.state.layers,rows);assert.deepEqual(rows.map(row=>row.layerUid),[C.layerUid,A.layerUid,B.layerUid]);
+  assert.strictEqual(rows[0],original[2]);assert.strictEqual(rows[1],original[0]);assert.strictEqual(rows[2],original[1]);
+  assert.strictEqual(rows[1].uiOnly,original[0].uiOnly,'per-row UI state travels with its row');
+  assert.equal(root.state.activeLayerIdx,0);assert.deepEqual(root._layerSel,[1,0]);assert.equal(root._layerSelAnchor,1);
+  assert.equal(Files.projectionMatches(root,info([C,A,B],1)),true);assert.equal(Files.projectionReadyForUI(root,info([C,A,B],1)),true);
+  assert.equal(root.state.currentFrame,7);assert.equal(root.state.waIn,3);assert.equal(root.state.waOut,19);
+  // undo: the inverse permutation at the next revision restores the order and the selection
+  assert.equal(Files.refreshLayerTable(root,info([A,B,C],2)),true);
+  assert.deepEqual(rows.map(row=>row.layerUid),[A.layerUid,B.layerUid,C.layerUid]);
+  assert.deepEqual(rows,original);assert.equal(root.state.activeLayerIdx,2);assert.deepEqual(root._layerSel,[0,2]);
+});
 test('contiguous removal of both rows projects the empty native table without replacing its array',()=>{
   const root=view(),rows=root.state.layers;root._layerSelAnchor=1;
   assert.equal(Files.refreshLayerTable(root,info([],1)),true);
@@ -115,7 +130,7 @@ test('contiguous removal of both rows projects the empty native table without re
   assert.equal(Files.projectionReadyForUI(root,info([],1)),true);
 });
 for(const [name,layers,revision=1] of [
-  ['reordered',[B,A]],['same-revision single removal',[B],0],['same-revision replacement',[A,C],0],['replacement re-adding a UID',[C,A]],
+  ['same-revision reorder',[B,A],0],['same-revision single removal',[B],0],['same-revision replacement',[A,C],0],['replacement re-adding a UID',[C,A]],
   ['noncontiguous inserts',[{layerUid:'X'},A,{layerUid:'Y'},B]],
   ['same-revision two appends',[A,B,C,{layerUid:'D'}],0],['same-revision two removals',[],0],['duplicate',[A,B,A]],['empty UID',[A,B,{layerUid:''}]],
   ['late malformed visibility',[{...A,visible:false},{...B,visible:'false'}]],
@@ -231,6 +246,17 @@ test('real desktop transport subscriber updates append/undo/redo rows before con
     assert.equal(h.root.state.waIn,3);assert.equal(h.root.state.waOut,19);assert.deepEqual(h.root._layerSel,[1]);
   }
 });
+test('real desktop transport subscriber projects a layer.reorder and its undo, then ACKs (installed defect: indeterminate after reorder)',async()=>{
+  const h=desktop();await h.open();const rows=h.root.state.layers,first=rows[0],second=rows[1];
+  for(const [next,selection] of [[[B,A],[0]],[[A,B],[1]]]){
+    h.log.length=0;await h.external(next);
+    assert.deepEqual(rows.map(row=>row.layerUid),next.map(row=>row.layerUid));
+    assert.ok(h.log.includes('acknowledge'),'the revision is acknowledged');assert.equal(h.session.isActive(),true);
+    assert.ok(h.session.readPresentedObjectSession());assert.deepEqual(h.root._layerSel,selection);
+    assert.equal(h.root.state.currentFrame,7);
+  }
+  assert.strictEqual(rows[0],first);assert.strictEqual(rows[1],second);
+});
 test('local existing history publication uses native metadata before presenting the changed table',async()=>{
   const h=desktop();await h.open();const rows=h.root.state.layers,first=rows[0];
   for(const operation of ['redo','undo','redo']){
@@ -241,11 +267,11 @@ test('local existing history publication uses native metadata before presenting 
     assert.deepEqual(h.root._layerSel,[1]);assert.ok(h.session.readPresentedObjectSession());
   }
 });
-for(const fault of ['duplicate','reordered','foreign','preview','corrupt-ui'])test('invalid '+fault+' external update fences delivery and never ACKs',async()=>{
+for(const fault of ['duplicate','foreign','preview','corrupt-ui'])test('invalid '+fault+' external update fences delivery and never ACKs',async()=>{
   const h=desktop();await h.open();
   if(fault==='corrupt-ui')h.root.state.layers[0].layerUid='foreign';
   if(['foreign','preview'].includes(fault))h.fail(fault);
-  const before=snapshot(h.root),next=fault==='duplicate'?[A,B,A]:fault==='reordered'?[B,A]:[A,B,C];
+  const before=snapshot(h.root),next=fault==='duplicate'?[A,B,A]:[A,B,C];
   await h.external(next);
   assert.equal(h.log.includes('acknowledge'),false);assert.equal(h.session.isActive(),false);assert.equal(h.session.readPresentedObjectSession(),null);
   if(fault!=='preview')assert.equal(snapshot(h.root),before);
