@@ -1051,3 +1051,35 @@ test('a recorded script run undoes and redoes as ONE native move carrying its en
   await assert.rejects(s.historyFromUi('undo'));assert.equal(groups.plan('undo',s.info()),2,'a refused move leaves the group in place');
   assert.ok(h.calls.length>before);
 });
+// Installed evidence defect 4: project.saveAs right after a change or project.new was refused "pin-changed-before-picker"
+// when unrelated work (a preview presentation) entered the owner queue between the reads of ONE Save As.
+test('Save As is deterministic when unrelated owner work is queued between its presented-session reads',async()=>{
+  const h=host();let gate=null;
+  const slow=(command,args)=>gate&&command==='nemo_native_object_reference'&&JSON.parse(args.requestJson).action.kind==='inspect'
+    ?gate.promise.then(()=>h.invoke(command,args)):h.invoke(command,args);
+  const s=Project.create({invoke:slow,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
+    physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});
+  await s.openPath('/project.json');await s.presentPreview(0);
+  const f=files(s);
+  gate=deferred();
+  const pending=f.ui.saveAs('/requested.json');await turn();
+  const unrelated=s.presentPreview(0);
+  gate.resolve();await unrelated;
+  const result=await pending;
+  assert.equal(result.acknowledged,true,JSON.stringify(result));assert.equal(h.copies.length,1);
+  assert.equal(h.copies[0].destinationPath,'/requested.json');
+});
+test('an application Save As still refuses when the document itself changed between its reads',async()=>{
+  const h=host();let gate=null;
+  const slow=(command,args)=>gate&&command==='nemo_native_object_reference'&&JSON.parse(args.requestJson).action.kind==='inspect'
+    ?gate.promise.then(()=>h.invoke(command,args)):h.invoke(command,args);
+  const s=Project.create({invoke:slow,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
+    physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});
+  await s.openPath('/project.json');await s.presentPreview(0);
+  const f=files(s);
+  gate=deferred();
+  const pending=f.ui.saveAs('/requested.json');await turn();
+  const edit=s.reference({kind:'remove'});
+  gate.resolve();await edit.catch(()=>{});
+  assert.equal((await pending).acknowledged,false);assert.equal(h.copies.length,0);
+});
