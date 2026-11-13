@@ -2610,7 +2610,6 @@
       "files": [
         "native_application_dispatch_release_tests.rs",
         "native_object_host_tests.rs",
-        "native_discovery_availability_tests.rs",
         "native_media_host_tests.rs",
         "native_object_bootstrap_tests.rs",
         "native_object_host_read_tests.rs",
@@ -2710,7 +2709,8 @@
         "native_widget_read_public_tests.rs",
         "native_ghost_read_public_tests.rs",
         "native_rig_read_public_tests.rs",
-        "native_object_legacy_import_tests.rs"
+        "native_object_legacy_import_tests.rs",
+        "native_discovery_availability_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
