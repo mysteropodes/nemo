@@ -173,6 +173,11 @@ test('the prompt is goals and paths only, and the invocations carry a per-invoca
   const tools = claude.args[claude.args.indexOf('--tools') + 1], allowed = claude.args.slice(claude.args.indexOf('--allowedTools') + 1, claude.args.indexOf('--output-format'));
   assert.equal(tools, '', 'no built-in tools: the compact discovery answer needs no file reader');
   assert.deepEqual(allowed, ['mcp__nemo__nemo_discover', 'mcp__nemo__nemo_query', 'mcp__nemo__nemo_command']);
+  // Only the identification session reads the documentation: Read of the repository folder and a shell limited to shasum and ps, still the nemo tools.
+  const idc = C.invocation('claude', { ...base, tag: 'identify', identify: true, docsRoot: '/repo' }), at = flag => idc.args[idc.args.indexOf(flag) + 1];
+  assert.equal(at('--tools'), 'Read,Bash'); assert.equal(at('--add-dir'), '/repo');
+  assert.deepEqual(idc.args.slice(idc.args.indexOf('--allowedTools') + 1, idc.args.indexOf('--output-format')), [...allowed, 'Read', 'Bash(shasum:*)', 'Bash(ps:*)']);
+  assert.ok(!claude.args.includes('--add-dir'));
   assert.deepEqual(Object.keys(C.scrubbedEnv({ NEMO_MCP_REGISTRY: 'x', NEMO_TASK_ID: 'y', HOME: '/h' })), ['HOME']);
 });
 

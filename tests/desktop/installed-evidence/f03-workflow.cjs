@@ -25,7 +25,7 @@ const K = require('./kit.cjs');
 const P = require('./payloads.cjs');
 const { structured } = require('../cs7-read.cjs');
 const ROOT = path.resolve(__dirname, '../../..');
-const DOCS = path.join(ROOT, 'engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md');
+const DOCS_ROOT = ROOT, DOCS = path.join(ROOT, 'engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md');
 const FIXTURE = path.join(ROOT, 'tests/animation/fixtures/curve-workflow.json');
 const FIXTURE_SHA256 = 'dceb05d13576a4dda0eb1a1a9d8c0184e8617e9a3a2662150ee54f4badedf08d';
 const KEYS = path.join(ROOT, 'native-engine/tests/fixtures/opacity-v2/project.json');
@@ -267,4 +267,4 @@ function makeRaw(client, uuid) {
   return async request => structured(await client.callTool('nemo_command', { requestId: uuid(), ...request }));
 }
 
-module.exports = { FIXTURE_SHA256, LAYER, DOCS, STEPS, loadShells, stageFixtures, promptOne, promptTwo, promptIdentify, arrange, stateOf, judgeSessionOne, judgeHandover, judge, parseIdentity, judgeIdentify, makeRaw };
+module.exports = { FIXTURE_SHA256, LAYER, DOCS, DOCS_ROOT, STEPS, loadShells, stageFixtures, promptOne, promptTwo, promptIdentify, arrange, stateOf, judgeSessionOne, judgeHandover, judge, parseIdentity, judgeIdentify, makeRaw };

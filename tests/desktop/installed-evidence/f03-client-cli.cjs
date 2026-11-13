@@ -50,7 +50,9 @@ function probeClient(name, { env = process.env, run = spawnSync } = {}) {
 // The command line, the standard input (the exact prompt) and the private files for one invocation. Pure.
 // `tag` names one invocation of several in the same report directory (a session of the workflow, the identification session); without it the
 // private files keep their plain names.
-function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, reportDir, maxTurns = 80, model, tag }) {
+// The identification session (`identify`) reads the repository documentation, so Claude Code gets `Read` (the repository folder added) and a shell
+// limited to `shasum` and `ps`, the two commands the documented rule uses; the workflow sessions keep MCP tools only. Codex already has its read-only shell.
+function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, reportDir, maxTurns = 80, model, tag, identify = false, docsRoot }) {
   const asked = model === undefined ? requestedModel(name) : model;
   if (name === 'codex') {
     const lastMessage = path.join(reportDir, tag ? 'codex.' + tag + '.last-message.txt' : 'codex.last-message.txt');
@@ -66,7 +68,8 @@ function invocation(name, { command, mcpCommand, mcpRegistry, prompt, cwd, repor
   const config = path.join(reportDir, tag ? 'claude.' + tag + '.mcp-config.json' : 'claude.mcp-config.json');
   return { command, input: prompt, cwd, lastMessage: null, model: asked,
     files: { [config]: JSON.stringify({ mcpServers: { nemo: { command: mcpCommand, args: [], env: { NEMO_MCP_REGISTRY: mcpRegistry } } } }, null, 2) + '\n' },
-    args: ['-p', '--model', asked, '--mcp-config', config, '--strict-mcp-config', '--tools', '', '--allowedTools', 'mcp__nemo__nemo_discover', 'mcp__nemo__nemo_query', 'mcp__nemo__nemo_command',
+    args: ['-p', '--model', asked, '--mcp-config', config, '--strict-mcp-config', '--tools', identify ? 'Read,Bash' : '', ...(identify && docsRoot ? ['--add-dir', docsRoot] : []),
+      '--allowedTools', 'mcp__nemo__nemo_discover', 'mcp__nemo__nemo_query', 'mcp__nemo__nemo_command', ...(identify ? ['Read', 'Bash(shasum:*)', 'Bash(ps:*)'] : []),
       '--output-format', 'stream-json', '--verbose', '--max-turns', String(maxTurns), '--no-session-persistence'] };
 }
 
