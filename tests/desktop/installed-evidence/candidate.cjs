@@ -63,6 +63,8 @@ function harnessOnlyDelta(candidateHead, head, git = args => require('node:child
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
 async function openCandidate(config, deps = {}) {
+  // Before anything starts: a locked session stops the window from presenting, and project.new would only time out after the launch.
+  require('./session-preflight.cjs').requireUnlockedSession(deps.session);
   const identityLib = deps.identity || require('../../../scripts/nemo/lib/identity.cjs');
   const runtime = deps.runtime || require('../../../scripts/nemo/lib/native-runtime.cjs');
   const isolation = deps.isolation || require('../../../scripts/nemo/lib/isolation.cjs');

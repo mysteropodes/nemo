@@ -370,6 +370,14 @@ receipt states that it is not the CS7 batched session (#2348) and that it does n
 disposition; the rows that need real input (drawing-tool strokes, keyboard shortcuts, UI buttons, how text looks in the viewport,
 the export modal and video export) stay hands-on and are listed in `residualHandsOn`.
 
+**Pre-flight: a locked screen is refused, not timed out.** A locked macOS login session (or a covered Nemo window) stops the window from
+presenting, so the app never completes its first command (`project.new`). `candidate.cjs` therefore reads the session before anything starts
+(`session-preflight.cjs`: `ioreg -n Root -d1`, `CGSSessionScreenIsLocked` = Yes in the console user entry) and refuses with exit status `2`
+(`refused`) and the reason in the receipt, for `run.cjs` and for `f03-clients.cjs` alike. Only a positive reading refuses; a host without
+`ioreg` is not stopped. When the first `nemo_command` after launch still times out, the row reason says the window is probably not
+presenting (Mac locked or window covered) with the underlying timeout, instead of a bare transport timeout; a later timeout stays a plain
+transport failure. Do not work around either: unlock the Mac, keep the Nemo window on screen, run again.
+
 Known limits, stated so nobody reads more into a pass: the only public read of a text layout is one glyph box per block (the hit-test
 listing), compared with the ink of the export, so glyph identity and advances are not observed; the CS7 read route and this runner both bind replies to the candidate through
 the registry, `lsof` and the build id because `nemo-mcp` reports no pid of its own; rows cannot show that a UI caller reaches the
