@@ -25,6 +25,9 @@ const FLAGS = {
   keepsInMemory: false,
   // groups: flatten only bumps the revision and the history
   flattenNoop: false,
+  // groups: the export ignores group.combine (a defect the first real runs found); flatten folds a nested combining group as ONE operand (the paint rule)
+  // instead of folding every leaf once; a flatten whose fold is empty deletes the members instead of being refused (the baseline JS quirk)
+  groupCombineIgnored: false, flattenNestedAsOperand: false, flattenEmptyDeletes: false,
   // image mesh: the attach is acknowledged but nothing is bound; a sculpt is acknowledged but changes nothing
   meshNeverBound: false, meshOffsetsIgnored: false,
   // bitmap brush: a publication is wrongly treated as an edit
@@ -54,7 +57,7 @@ function createStubApp(options = {}) {
   const state = { doc: null, dirty: false, docSeq: 0, generation: 0, brushes: {}, calls: [], ...options.initial };
   const flags = { ...FLAGS, ...options };
   const structured = value => ({ result: { structuredContent: value } });
-  const newDoc = (w, h, body = {}) => ({ id: 'doc-' + (++state.docSeq), rev: 0, w, h, strokes: [], rasters: [], assets: [], meshes: {}, layers: [{ layerUid: 'L1', name: 'Layer 1' }], canvasBg: '#ffffff', motion: {}, undo: [], redo: [], seq: 0, ...body });
+  const newDoc = (w, h, body = {}) => ({ id: 'doc-' + (++state.docSeq), rev: 0, w, h, strokes: [], rasters: [], assets: [], meshes: {}, layers: [{ layerUid: 'L1', name: 'Layer 1' }], groups: {}, canvasBg: '#ffffff', motion: {}, undo: [], redo: [], seq: 0, ...body });
   const snapshotId = () => 'native-object:' + state.doc.id + ':' + state.doc.rev;
   const envelope = (version, request, extra) => {
     const base = { apiVersion: version, requestId: flags.wrongRequestId ? 'other' : request.requestId, instanceId: flags.foreignReply ? FOREIGN : INSTANCE,
@@ -70,7 +73,7 @@ function createStubApp(options = {}) {
   };
   const receipt = (extra = {}) => ({ applied: true, historyEntriesAdded: flags.noHistory ? 0 : 1, ...extra });
   const noop = () => ({ applied: false, historyEntriesAdded: 0 });
-  const snap = d => JSON.stringify({ strokes: d.strokes, rasters: d.rasters, assets: d.assets, meshes: d.meshes, layers: d.layers, canvasBg: d.canvasBg, motion: d.motion });
+  const snap = d => JSON.stringify({ strokes: d.strokes, groups: d.groups, rasters: d.rasters, assets: d.assets, meshes: d.meshes, layers: d.layers, canvasBg: d.canvasBg, motion: d.motion });
   const restore = (d, text) => Object.assign(d, JSON.parse(text));
   function commit(doc, label, mutate) {
     const before = snap(doc);
@@ -93,14 +96,40 @@ function createStubApp(options = {}) {
     for (let i = 0; i < 3; i++) image.rgba[o + i] = oa === 0 ? 0 : Math.round((rgb[i] * a + image.rgba[o + i] * ba * (1 - a)) / oa);
     image.rgba[o + 3] = Math.round(oa * 255);
   }
+  // ---- groups: a stroke carries its group path (outermost first); a group has a name and a combine mode. Only axis-aligned boxes are modelled. ----
+  const coversPoint = (stroke, x, y) => { const b = bounds(stroke.record.geometry.segments); return x >= Math.round(b.x0) && x < Math.round(b.x1) && y >= Math.round(b.y0) && y < Math.round(b.y1); };
+  const FOLDS = { unite: (a, b) => a || b, intersect: (a, b) => a && b, subtract: (a, b) => a && !b, exclude: (a, b) => a !== b };
+  const fold = (mode, preds) => (x, y) => preds.slice(1).reduce((acc, pred) => FOLDS[mode](acc, pred(x, y)), preds[0](x, y));
+  const groupsOf = (doc, stroke) => stroke.groupPath || [];
+  // The operands a group contributes to its parent, the way the paint path reads nested groups (baseline emit()): a combining child is ONE operand,
+  // a child with mode none contributes its own operands as if the group were absent; a combining group with fewer than two operands passes them on.
+  function emitOperands(doc, gid) {
+    const operands = [], seen = new Set();
+    for (const s of doc.strokes) {
+      const path = groupsOf(doc, s), at = path.indexOf(gid);
+      if (at < 0) continue;
+      if (at === path.length - 1) operands.push({ pred: (x, y) => coversPoint(s, x, y), fill: s.record.fill, ids: [s.id], folded: false });
+      else if (!seen.has(path[at + 1])) { seen.add(path[at + 1]); operands.push(...emitOperands(doc, path[at + 1])); }
+    }
+    const mode = flags.groupCombineIgnored ? 'none' : doc.groups[gid].mode;
+    if (mode === 'none' || operands.length < 2) return operands;
+    return [{ pred: fold(mode, operands.map(o => o.pred)), fill: operands[operands.length - 1].fill, ids: operands.flatMap(o => o.ids), folded: true }];
+  }
   function render(doc) {
     // The export fills the project canvas background (new projects: #ffffff, opaque; #00000000 is a transparent export) and the paint composites over it.
     const image = png.canvas(doc.w, doc.h, parseColor(doc.canvasBg));
+    const folded = [], tops = [...new Set(doc.strokes.filter(s => groupsOf(doc, s).length).map(s => groupsOf(doc, s)[0]))];
+    for (const top of tops) folded.push(...emitOperands(doc, top).filter(o => o.folded));
+    const suppressed = new Set(folded.flatMap(o => o.ids));
     for (const s of doc.strokes) {
       const { x0, y0, x1, y1 } = bounds(s.record.geometry.segments), fill = s.record.fill;
-      if (!fill) continue;
+      if (!fill || suppressed.has(s.id)) continue;
       const c = [fill.r, fill.g, fill.b].map(v => Math.round(v * 255));
       for (let y = Math.max(0, Math.round(y0)); y < Math.min(doc.h, Math.round(y1)); y++) for (let x = Math.max(0, Math.round(x0)); x < Math.min(doc.w, Math.round(x1)); x++) over(image, x, y, c, fill.a);
+    }
+    for (const o of folded) {
+      const c = [o.fill.r, o.fill.g, o.fill.b].map(v => Math.round(v * 255));
+      for (let y = 0; y < doc.h; y++) for (let x = 0; x < doc.w; x++) if (o.pred(x, y)) over(image, x, y, c, o.fill.a);
     }
     for (const r of doc.rasters) {
       const asset = doc.assets.find(a => a.id === r.assetId), polygon = flags.meshNeverBound ? null : meshPolygon(doc, r);
@@ -113,9 +142,9 @@ function createStubApp(options = {}) {
     return png.encodeRGBA(doc.w, doc.h, image.rgba);
   }
   const fileOf = doc => ({ format: 'stub', w: doc.w, h: doc.h, layers: doc.layers, project: { canvasW: doc.w, canvasH: doc.h, canvasBg: doc.canvasBg }, motion: doc.motion,
-    drawing: { layers: doc.layers.map(l => ({ layerUid: l.layerUid, name: l.name })), objects: doc.strokes.map(s => ({ target: { strokeId: s.id }, layerUid: s.layerUid, ...(s.groupId ? { groupId: s.groupId } : {}), record: s.record })),
+    drawing: { layers: doc.layers.map(l => ({ layerUid: l.layerUid, name: l.name })), objects: doc.strokes.map(s => ({ target: { strokeId: s.id }, layerUid: s.layerUid, ...(groupsOf(doc, s).length ? { groupId: groupsOf(doc, s)[groupsOf(doc, s).length - 1], groupPath: groupsOf(doc, s) } : {}), record: s.record })),
       items: { raster: doc.rasters.map(r => ({ target: { strokeId: r.id }, item: { layerUid: r.layerUid, x: r.x, y: r.y, width: r.width, height: r.height, assetId: r.assetId, ...(r.meshId ? { meshId: r.meshId } : {}) } })) } },
-    assets: doc.assets, meshes: doc.meshes });
+    groups: doc.groups, assets: doc.assets, meshes: doc.meshes });
 
   function decodePng(bytes) {
     // Corrupt bytes are a decode failure whatever their header says; only a PNG that decodes can be too large.
@@ -148,9 +177,9 @@ function createStubApp(options = {}) {
     if (request.operation === 'project.open') {
       const file = JSON.parse(fs.readFileSync(p.path, 'utf8'));
       if (!flags.keepsInMemory) {
-        const strokes = file.drawing.objects.map(o => ({ id: o.target.strokeId, layerUid: o.layerUid, ...(o.groupId ? { groupId: o.groupId } : {}), record: o.record }));
+        const strokes = file.drawing.objects.map(o => ({ id: o.target.strokeId, layerUid: o.layerUid, ...(o.groupPath ? { groupPath: o.groupPath } : o.groupId ? { groupPath: [o.groupId] } : {}), record: o.record }));
         const rasters = file.drawing.items.raster.map(r => ({ id: r.target.strokeId, ...r.item }));
-        state.doc = newDoc(file.w, file.h, { strokes, rasters, assets: file.assets, meshes: file.meshes, layers: file.layers, canvasBg: file.project.canvasBg, motion: file.motion || {} });
+        state.doc = newDoc(file.w, file.h, { strokes, rasters, assets: file.assets, meshes: file.meshes, groups: file.groups || {}, layers: file.layers, canvasBg: file.project.canvasBg, motion: file.motion || {} });
         state.generation++; state.brushes = {};
       }
       state.dirty = false;
@@ -191,18 +220,37 @@ function createStubApp(options = {}) {
       case 'command.document.object.group.create': {
         const missing = p.strokeIds.filter(id => !doc.strokes.some(s => s.id === id));
         if (missing.length) return ownerRefusal(request, 'not_found', 'unknown stroke');
-        commit(doc, 'group', () => { for (const s of doc.strokes) if (p.strokeIds.includes(s.id)) s.groupId = p.groupId; });
+        commit(doc, 'group', () => { doc.groups[p.groupId] = { name: p.name, mode: 'none' }; for (const s of doc.strokes) if (p.strokeIds.includes(s.id)) s.groupPath = [p.groupId, ...groupsOf(doc, s)]; });
         return ok(2, request, receipt());
       }
+      // Setting a mode on a group that exists (combine also creates the group from its members when it does not).
+      case 'command.document.object.group.combine': case 'command.document.object.group.mode.set': {
+        if (!doc.groups[p.groupId]) return ownerRefusal(request, 'not_found', 'unknown group');
+        if (doc.groups[p.groupId].mode === p.mode) return ok(2, request, noop());
+        commit(doc, 'group mode', () => { doc.groups[p.groupId].mode = p.mode; });
+        return ok(2, request, receipt());
+      }
+      // Flatten follows the baseline rule (git show 1065e9d8:src/js/group-bridge.js, flattenGroup lines 399-452 over resolveGroupMembers lines 303-315): ONE fold of ALL
+      // leaves of the group (nested groups are not collapsed into operands), the group's own mode (none = unite). An empty fold is refused by the native owner as
+      // invalid_request, with the reply the installed app gave (evidence-1112 dev50 wire log, seq 1059); the baseline JS deleted the members instead.
       case 'command.document.object.boolean.flatten': {
-        const members = doc.strokes.filter(s => s.groupId === p.groupId);
-        if (!members.length) return ownerRefusal(request, 'not_found', 'unknown group');
+        const members = doc.strokes.filter(s => groupsOf(doc, s).includes(p.groupId));
+        if (!doc.groups[p.groupId] || !members.length) return ownerRefusal(request, 'not_found', 'unknown group');
+        const mode = doc.groups[p.groupId].mode === 'none' ? 'unite' : doc.groups[p.groupId].mode;
+        const operands = flags.flattenNestedAsOperand ? emitOperands(doc, p.groupId) : members.map(s => ({ pred: (x, y) => coversPoint(s, x, y), fill: s.record.fill }));
+        const pred = operands.length > 1 ? fold(mode, operands.map(o => o.pred)) : operands[0].pred, fill = operands[operands.length - 1].fill;
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, count = 0;
+        if (!flags.flattenNoop) for (let y = 0; y < doc.h; y++) for (let x = 0; x < doc.w; x++) if (pred(x, y)) { count++; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + 1); y1 = Math.max(y1, y + 1); }
+        if (!flags.flattenNoop && count === 0 && !flags.flattenEmptyDeletes) return ownerRefusal(request, 'invalid_request', 'Boolean payload is invalid or target is absent.');
+        if (count > 0 && !flags.flattenNestedAsOperand && count !== (x1 - x0) * (y1 - y0)) throw new Error('the stub models boxes only: this fold is not a box');
         commit(doc, 'flatten', () => {
           if (flags.flattenNoop) return;
-          const box = members.map(s => bounds(s.record.geometry.segments)), x0 = Math.min(...box.map(b => b.x0)), y0 = Math.min(...box.map(b => b.y0)), x1 = Math.max(...box.map(b => b.x1)), y1 = Math.max(...box.map(b => b.y1));
-          doc.strokes = doc.strokes.filter(s => s.groupId !== p.groupId);
+          const consumed = new Set(members.flatMap(s => groupsOf(doc, s).slice(groupsOf(doc, s).indexOf(p.groupId))));
+          doc.strokes = doc.strokes.filter(s => !members.includes(s));
+          for (const gid of consumed) delete doc.groups[gid];
+          if (count === 0) return;
           const id = 'native-stroke:' + (doc.rev + 1) + ':' + doc.seq++;
-          doc.strokes.push({ id, layerUid: p.layerUid, record: { ...members[0].record, target: target(p.layerUid, id), geometry: { ...members[0].record.geometry, segments: [{ point: { x: x0, y: y0 } }, { point: { x: x1, y: y1 } }] } } });
+          doc.strokes.push({ id, layerUid: p.layerUid, record: { ...members[0].record, target: target(p.layerUid, id), fill, geometry: { ...members[0].record.geometry, segments: [{ point: { x: x0, y: y0 } }, { point: { x: x1, y: y1 } }] } } });
         });
         return ok(2, request, receipt());
       }
@@ -279,7 +327,7 @@ function createStubApp(options = {}) {
       const v = p.view, hex = fill => '#' + [fill.r, fill.g, fill.b].map(c => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
       const listed = doc.strokes.filter(s => s.layerUid === v.layerUid).map(s => { const b = bounds(s.record.geometry.segments), f = s.record.fill;
         return { stableTarget: target(s.layerUid, s.id), closed: s.record.geometry.closed, count: s.record.geometry.segments.length, matrix: [1, 0, 0, 1, 0, 0], bounds: [b.x0, b.y0, b.x1, b.y1], role: 'plain', filled: !!f, strokeWidth: 0,
-          ...(s.groupId ? { groupPath: [{ id: s.groupId, mode: 'none', name: 'G' }] } : {}), style: { cap: 'round', join: 'round', opacity: 1, strokeStyle: 'solid', width: 4, ...(f ? { fill: hex(f) } : {}) } }; })
+          ...(groupsOf(doc, s).length ? { groupPath: groupsOf(doc, s).map(id => ({ id, mode: doc.groups[id].mode, name: doc.groups[id].name })) } : {}), style: { cap: 'round', join: 'round', opacity: 1, strokeStyle: 'solid', width: 4, ...(f ? { fill: hex(f) } : {}) } }; })
         // `initial.listingExtra`: listed items the stub does not model (a text block, a dynamic shape) served exactly as the candidate answered them.
         .concat((state.listingExtra || []).map(i => ({ ...i, stableTarget: { ...i.stableTarget, layerUid: v.layerUid } })));
       const items = listed.slice(v.cursor, v.cursor + v.limit), end = v.cursor + items.length;

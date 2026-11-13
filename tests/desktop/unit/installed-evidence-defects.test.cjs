@@ -293,3 +293,33 @@ test('an app that asks to be reopened leaves the row unrun with that reason, not
   assert.equal(result.verdict, 'unrun');
   assert.match(result.reason, /blocked: the app asks to be reopened/);
 });
+
+// ---- #2108 nested group operand and flatten: the paint rule and the baseline flatten rule are different rules ----------------------------------
+test('2108-nested-group-operand-flatten passes against a stub that follows both rules and fails for each rule it breaks', async t => {
+  const row = lane('2108-nested-group-operand-flatten');
+  assert.ok(row);
+  const good = await verdict(t, {}, row);
+  assert.equal(good.verdict, 'pass', good.reason);
+  const said = text => good.assertions.some(a => text.test(a.id) && a.verdict === 'pass');
+  assert.ok(said(/paint: both bars are inked/) && said(/flatten Outer, whose all-leaves fold is empty: refused/) && said(/refused flatten left every record/) && said(/the ink is exactly the all-leaves fold/), 'paint, refusal, unchanged document and the fold are each asserted');
+  // Flatten that collapses the nested group into one operand (the paint rule) yields the bars instead of refusing: the baseline rule says it must refuse.
+  const operand = await verdict(t, { flattenNestedAsOperand: true }, row);
+  assert.equal(operand.verdict, 'fail');
+  assert.match(operand.reason, /flatten Outer, whose all-leaves fold is empty/);
+  // The baseline JS deleted the members of an empty fold; the native owner must refuse and leave the document alone.
+  const deletes = await verdict(t, { flattenEmptyDeletes: true }, row);
+  assert.equal(deletes.verdict, 'fail');
+  assert.match(deletes.reason, /flatten Outer, whose all-leaves fold is empty/);
+  // A flatten that only bumps the revision and the history shows neither the fold nor the consumed members.
+  const bump = await verdict(t, { flattenNoop: true }, row);
+  assert.equal(bump.verdict, 'fail');
+  // An export that ignores group.combine paints the three rectangles as they are: both bars are inked but so is the ring and the gap.
+  const ignored = await verdict(t, { groupCombineIgnored: true }, row);
+  assert.equal(ignored.verdict, 'fail');
+  assert.match(ignored.reason, /paint: the gap between the bars/);
+  // The refusal must be the native owner's: a front-door reply or another code does not count.
+  for (const flags of [{ frontDoorRefusals: true }, { refusalCode: 'unavailable' }]) {
+    const refused = await verdict(t, flags, row);
+    assert.equal(refused.verdict, 'fail', JSON.stringify(flags));
+  }
+});

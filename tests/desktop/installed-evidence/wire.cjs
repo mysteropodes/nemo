@@ -10,6 +10,7 @@
 const crypto = require('node:crypto');
 const { randomUUID } = require('node:crypto');
 const { structured } = require('../cs7-read.cjs');
+const { FIRST_COMMAND_TIMEOUT } = require('./session-preflight.cjs');
 
 class EvidenceError extends Error {
   constructor(kind, message) { super(message); this.name = 'EvidenceError'; this.kind = kind; }
@@ -38,9 +39,16 @@ function createWire({ client, expect, now = () => Date.now(), sink = () => {} })
   const log = [];
   let sequence = 0, state = null;
 
+  let commandAttempted = false;
   async function call(tool, args) {
+    // The first command after launch (project.new) never completes when the window is not presenting (macOS session locked, window covered): say that
+    // instead of a bare transport timeout. Discovery before it is answered by the MCP process and does not depend on the window.
+    const first = tool === 'nemo_command' && !commandAttempted;
+    if (tool === 'nemo_command') commandAttempted = true;
     try { return await client.callTool(tool, args); } catch (error) {
-      throw new EvidenceError('transport', 'MCP client failed: ' + (error && error.message ? String(error.message).slice(0, 120) : 'unknown'));
+      const message = error && error.message ? String(error.message) : 'unknown';
+      if (first && /time(d)? ?out/i.test(message)) throw new EvidenceError('transport', FIRST_COMMAND_TIMEOUT + ' [' + message.slice(0, 40) + ']');
+      throw new EvidenceError('transport', 'MCP client failed: ' + message.slice(0, 120));
     }
   }
 

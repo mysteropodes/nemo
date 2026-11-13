@@ -370,6 +370,14 @@ receipt states that it is not the CS7 batched session (#2348) and that it does n
 disposition; the rows that need real input (drawing-tool strokes, keyboard shortcuts, UI buttons, how text looks in the viewport,
 the export modal and video export) stay hands-on and are listed in `residualHandsOn`.
 
+**Pre-flight: a locked screen is refused, not timed out.** A locked macOS login session (or a covered Nemo window) stops the window from
+presenting, so the app never completes its first command (`project.new`). `candidate.cjs` therefore reads the session before anything starts
+(`session-preflight.cjs`: `ioreg -n Root -d1`, `CGSSessionScreenIsLocked` = Yes in the console user entry) and refuses with exit status `2`
+(`refused`) and the reason in the receipt, for `run.cjs` and for `f03-clients.cjs` alike. Only a positive reading refuses; a host without
+`ioreg` is not stopped. When the first `nemo_command` after launch still times out, the row reason says the window is probably not
+presenting (Mac locked or window covered) with the underlying timeout, instead of a bare transport timeout; a later timeout stays a plain
+transport failure. Do not work around either: unlock the Mac, keep the Nemo window on screen, run again.
+
 Known limits, stated so nobody reads more into a pass: the only public read of a text layout is one glyph box per block (the hit-test
 listing), compared with the ink of the export, so glyph identity and advances are not observed; the CS7 read route and this runner both bind replies to the candidate through
 the registry, `lsof` and the build id because `nemo-mcp` reports no pid of its own; rows cannot show that a UI caller reaches the
@@ -382,7 +390,7 @@ canvas background edit, brush cancellation and quota refusals answered with lite
 only passing rows; every retry recorded). The stub follows the published reply shapes; it is not what is being proved. The first real runs
 (task evidence-1112, receipts kept outside the repository) found four product defects the rows keep reporting rather than work around:
 `group.combine` is ignored by the export, `layer.reorder` commits and then answers an indeterminate refusal that leaves the session unusable
-(those rows run last), `layer.delete` refuses a layer holding a raster placement, and flatten refuses a group that contains a nested group.
+(those rows run last), and `layer.delete` refuses a layer holding a raster placement. (An earlier reading, "flatten refuses a group that contains a nested group", was the row's mistake: flatten folds ALL leaves once with the outer mode, so Outer(intersect: big, Inner(unite: two disjoint bars)) has an empty fold and is refused `invalid_request` with the document unchanged, which is the native owner's deliberate, safer deviation from the baseline that silently deleted the members. `2108-nested-group-operand-flatten` observes the paint of a nested combining group as one operand, that refusal, and a case whose fold is non-empty flattening to exactly that fold.)
 
 ## Real client workflow, Codex and Claude Code (`installed-evidence/f03-clients.cjs`, #1049)
 
@@ -395,8 +403,13 @@ The identification rule is in `engineering/remediation/reference/03_TESTING_AND_
 
 ```sh
 lockf -k /tmp/nemo-heavy-job.lock node tests/desktop/installed-evidence/f03-clients.cjs \
-  --app /abs/Nemo.app --build-proof /abs/build-proof.json --report-dir /abs/empty-dir [--client codex,claude] [--timeout-min 20] [--task ID]
+  --app /abs/Nemo.app --build-proof /abs/build-proof.json --report-dir /abs/empty-dir [--client codex,claude] [--timeout-min 20] [--task ID] \
+  [--claude-model sonnet] [--codex-model NAME]
 ```
+
+**The model is pinned, not whatever the client defaults to.** `claude -p` is always run with an explicit `--model` (default `sonnet`,
+override with `--claude-model`); `codex exec` gets `--model` only when `--codex-model` is given. The receipt records the requested model next to
+the client version (`clients[].requestedModel`: the Claude model, or the Codex model / `client default`), and the recorded command line shows the flag.
 
 The prompt names goals and file paths only (no tool or operation names), so the client derives requests from the advertised schema.
 The harness stages the fixed fixture (`tests/animation/fixtures/curve-workflow.json`, pinned by hash, as the static and keyed shells of

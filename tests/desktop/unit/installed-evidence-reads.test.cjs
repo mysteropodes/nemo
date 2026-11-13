@@ -37,6 +37,8 @@ const REAL = {
   cancelled: { code: 'cancelled_before_dispatch', details: { reason: 'cancelled' }, message: 'Native brush resource request refused.' },
   overQuota: { code: 'unavailable', details: { reason: 'over-quota' }, message: 'Native brush resource request refused.' },
   receipt: { applied: true, historyEntriesAdded: 1 },
+  // evidence-1112 dev50 wire log, seq 1059: command.document.object.boolean.flatten of Outer(intersect: big, Inner(unite: left bar, right bar)), whose all-leaves fold is empty.
+  flattenRefusal: { apiVersion: 2, contentRevision: 8, documentId: 'native-object-document-22', error: { code: 'invalid_request', message: 'Boolean payload is invalid or target is absent.' }, instanceId: INSTANCE, ok: false, requestId: '41289b1e-18c1-41cb-95ef-02bc2f514865' },
 };
 const shape = value => Array.isArray(value) ? (value.length ? [shape(value[0])] : []) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(k => [k, shape(value[k])])) : typeof value;
 const optionalTop = { groupPath: 1, strokeWidth: 1 };
@@ -246,4 +248,23 @@ test('coverage: the receipt shows covered, attempted-not-passed and never-attemp
   for (const id of ASSIGNED['2108'].filter(id => !['F07', 'G24'].includes(id))) assert.equal(c.status[id], 'never-attempted', id);
   assert.ok(!c.coveredIds.includes('F07') && c.neverAttempted.includes('F15'));
   assert.equal(receipt.verdict, 'fail');
+});
+
+test('the stub refuses the flatten of a nested group whose all-leaves fold is empty with the reply the packaged candidate gave, and changes nothing', async t => {
+  const { wire, work } = setup(t);
+  const ctx = K.createContext({ wire, work, rowId: 'x' });
+  const { layerUid } = await K.fresh(ctx, { transparent: true });
+  const ids = [];
+  for (const box of [[100, 60, 400, 260], [130, 100, 180, 220], [320, 100, 370, 220]]) ids.push((await make(ctx, layerUid, box, RED)).result.strokeId);
+  await K.apply(ctx, 'inner', P.groupCreate(layerUid, 'g_inner', 'Inner', ids.slice(1)));
+  await K.apply(ctx, 'outer', P.groupCreate(layerUid, 'g_outer', 'Outer', ids));
+  await K.apply(ctx, 'combine inner', P.groupCombine(layerUid, 'g_inner', 'unite', ids.slice(1)));
+  await K.apply(ctx, 'combine outer', P.groupCombine(layerUid, 'g_outer', 'intersect', ids));
+  const before = await K.history(ctx), flat = P.booleanFlatten(layerUid, 'g_outer'), res = await wire.command(flat.operation, flat.payload);
+  assert.equal(res.ok, false);
+  assert.deepEqual(shape(res.reply), shape(REAL.flattenRefusal));
+  assert.deepEqual(res.reply.error, REAL.flattenRefusal.error);
+  assert.equal(res.reply.contentRevision, (await wire.discover()).contentRevision, 'the refusal names the unchanged revision');
+  const after = await K.history(ctx);
+  assert.deepEqual([after.undo, after.redo, after.revision], [before.undo, before.redo, before.revision]);
 });

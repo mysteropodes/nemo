@@ -9,6 +9,7 @@
 //
 //   lockf -k /tmp/nemo-heavy-job.lock node tests/desktop/installed-evidence/f03-clients.cjs \
 //     --app /abs/Nemo.app --build-proof /abs/build-proof.json --report-dir /abs/empty-dir [--client codex,claude] [--timeout-min 20]
+//     [--claude-model sonnet] [--codex-model NAME]   (Claude is always run with an explicit --model, default sonnet; Codex only when --codex-model is given)
 //
 // Exit status as run.cjs: 0 both halves passed (5 when only one client was selected and it passed); 1 a half failed or cleanup was incomplete; 2 refused before anything ran;
 // 4 nothing failed but a half is unrun (client missing, unauthenticated or over quota, or an operation unavailable).
@@ -39,16 +40,17 @@ const TITLE = { codex: 'original opacity workflow through the real Codex CLI', c
 // One half. `deps` makes every external effect replaceable: probeClient, runClient, openCandidate, uuid.
 async function runHalf(name, config, deps, sessions) {
   const base = { id: 'f03-' + name, lane: 'f03', issue: 1049, title: TITLE[name], tasks: ['F03'], limitations: [] };
-  const probe = (deps.probeClient || C.probeClient)(name);
-  if (!probe.available) return { result: { ...base, verdict: 'unrun', reason: probe.reason, operations: [], assertions: [], ms: 0, client: { name, available: false } }, cleanup: { ok: true } };
+  const probe = (deps.probeClient || C.probeClient)(name), model = C.requestedModel(name, config);
+  if (!probe.available) return { result: { ...base, verdict: 'unrun', reason: probe.reason, operations: [], assertions: [], ms: 0, client: { name, available: false, requestedModel: model } }, cleanup: { ok: true } };
   const taskId = (config.taskId || 'f03-' + randomUUID().slice(0, 8)) + '-' + name;
   let candidate;
   try { candidate = await (deps.openCandidate || require('./candidate.cjs').openCandidate)({ ...config, taskId }, deps); }
   catch (error) {
-    return { refusal: refusalReason(error), result: { ...base, verdict: 'unrun', reason: 'candidate refused: ' + refusalReason(error), operations: [], assertions: [], ms: 0, client: { name, ...probe } }, cleanup: { ok: true } };
+    return { refusal: refusalReason(error), result: { ...base, verdict: 'unrun', reason: 'candidate refused: ' + refusalReason(error), operations: [], assertions: [], ms: 0, client: { name, ...probe, requestedModel: model } }, cleanup: { ok: true } };
   }
   sessions.push(candidate.identity);
-  const transcript = [], meta = { name, ...probe };
+  // `requestedModel` sits next to the client version: the model the client was ASKED to use (Claude: always explicit; Codex: 'client default' unless the runner set one).
+  const transcript = [], meta = { name, ...probe, requestedModel: model };
   const wire = createWire({ client: candidate.client, expect: { instanceId: candidate.bound.instanceId, buildId: candidate.bound.buildId }, sink: entry => transcript.push(entry) });
   const row = { ...base, async run(ctx) {
     const { paths, staged } = W.stageFixtures(candidate.work);
@@ -56,7 +58,7 @@ async function runHalf(name, config, deps, sessions) {
     const cwd = path.join(candidate.work, 'f03-client-cwd-' + name);
     fs.mkdirSync(cwd, { recursive: true });
     const prompt = W.promptFor(paths);
-    const spec = C.invocation(name, { command: probe.path, mcpCommand: candidate.mcpCommand, mcpRegistry: candidate.mcpRegistry, prompt, cwd, reportDir: config.reportDir });
+    const spec = C.invocation(name, { command: probe.path, mcpCommand: candidate.mcpCommand, mcpRegistry: candidate.mcpRegistry, prompt, cwd, reportDir: config.reportDir, model });
     meta.prompt = prompt; meta.argv = [path.basename(probe.path), ...spec.args]; meta.fixtures = staged;
     const done = await (deps.runClient || C.runClient)(spec, { timeoutMs: (config.timeoutMin || 20) * 60 * 1000 });
     const how = C.classify(done);
@@ -84,6 +86,7 @@ async function main(config, deps = {}) {
     validateConfig(config);
     names = config.clients || [...C.NAMES];
     if (!names.length || !names.every(n => C.NAMES.includes(n)) || new Set(names).size !== names.length) throw new UsageError('clients must be codex, claude or both');
+    for (const key of ['claudeModel', 'codexModel']) if (config[key] !== undefined && !C.validModel(config[key])) throw new UsageError(key + ' must be a model name');
     if (config.timeoutMin !== undefined && !(Number.isFinite(config.timeoutMin) && config.timeoutMin >= 1 && config.timeoutMin <= 120)) throw new UsageError('timeout must be 1 to 120 minutes');
   } catch (error) { return { exit: EXIT.refused, refused: refusalReason(error), receipt: null }; }
   const rows = [], cleanups = [], sessions = [];
@@ -114,6 +117,7 @@ function parse(argv) {
     if (keys[arg]) { need(value !== undefined && !value.startsWith('--'), arg + ' needs a value'); out[keys[arg]] = value; i++; }
     else if (arg === '--client') { need(value !== undefined, '--client needs a value'); out.clients = value === 'all' ? [...C.NAMES] : value.split(',').map(s => s.trim()).filter(Boolean); i++; }
     else if (arg === '--reserve') { need(value !== undefined, '--reserve needs a value'); out.reserve = value === 'none' ? [] : value.split(',').map(s => s.trim()).filter(Boolean); i++; }
+    else if (arg === '--claude-model' || arg === '--codex-model') { need(value !== undefined && !value.startsWith('--'), arg + ' needs a value'); out[arg === '--claude-model' ? 'claudeModel' : 'codexModel'] = value; i++; }
     else if (arg === '--timeout-min') { need(value !== undefined, '--timeout-min needs a value'); out.timeoutMin = Number(value); i++; }
     else throw new UsageError('unknown argument');
   }

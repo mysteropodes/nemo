@@ -17,10 +17,10 @@ const alpha = (e, x, y) => probe.alphaAt(e.image, x, y);
 const paths = (items, ids) => ids.map(id => (K.itemOf(items, id) ? (K.itemOf(items, id).groupPath || []).map(g => [g.id, g.mode, g.name]) : null));
 const order = items => items.map(i => i.stableTarget.strokeId);
 // a (red) holds b (blue) and c (green) in an inner group, itself inside an outer group with a.
-async function nested(ctx, layerUid) {
+async function nested(ctx, layerUid, { left = [130, 100, 180, 220], right = [320, 100, 370, 220] } = {}) {
   const a = await stroke(ctx, 'create the big rectangle', layerUid, [100, 60, 400, 260], RED);
-  const b = await stroke(ctx, 'create the left bar', layerUid, [130, 100, 180, 220], BLUE);
-  const c = await stroke(ctx, 'create the right bar', layerUid, [320, 100, 370, 220], GREEN);
+  const b = await stroke(ctx, 'create the left bar', layerUid, left, BLUE);
+  const c = await stroke(ctx, 'create the right bar', layerUid, right, GREEN);
   await K.apply(ctx, 'group the two bars as Inner', P.groupCreate(layerUid, 'g_inner', 'Inner', [b, c]));
   await K.apply(ctx, 'group the big rectangle with the inner group as Outer', P.groupCreate(layerUid, 'g_outer', 'Outer', [a, b, c]));
   return { a, b, c };
@@ -28,7 +28,7 @@ async function nested(ctx, layerUid) {
 
 const rows = [
   { id: '2108-nested-group-structure', title: 'nested groups: path outermost first, independent combine modes, rename, member removal dissolves a group below two, undo, refusals', tasks: ['G24'],
-    limitations: ['Structure is read from the hit-test listing; the combined result of a nested group is observed by 2108-nested-group-operand-flatten.'],
+    limitations: ['Structure is read from the hit-test listing; the combined paint of a nested group and its flatten are observed by 2108-nested-group-operand-flatten.'],
     async run(ctx) {
       const { layerUid } = await K.fresh(ctx, { transparent: true });
       const { a, b, c } = await nested(ctx, layerUid);
@@ -74,23 +74,54 @@ const rows = [
       await K.apply(ctx, 'send a stroke that does not exist to the back', P.vectorOrder(P.target(layerUid, 'native-stroke:99999:9'), 'back'), { refused: true });
     } },
 
-  { id: '2108-nested-group-operand-flatten', title: 'nested combined children are one operand: Outer intersect with an Inner union flattens to the two bars, one undo restores', tasks: ['G24', 'G19'],
+  // Nested combined children. Two different rules, both from the baseline (git show 1065e9d8:src/js/group-bridge.js), observed separately:
+  //  - PAINT: a combining child group is ONE operand of its parent (the render adapters, emit() at lines 505-522 and dictOperands() at 677-693): Outer(intersect: big, Inner(unite: bars))
+  //    paints big AND (left OR right). A child group with mode none contributes its leaves as if absent.
+  //  - FLATTEN: flattenGroup (lines 399-452) takes resolveGroupMembers (lines 303-315), which recurses through nested groups and returns every LEAF, then folds ALL leaves ONCE with the
+  //    outer group's own mode (none = unite). A nested child is NOT collapsed into one operand: flatten of this Outer is intersect(big, left, right), not big AND (left OR right).
+  //    The oracle fixture native-engine/tests/fixtures/object-group-combine-plan/oracle.txt (recorded from that JS) says the same: case nested_combining_child_one_operand has the render fold
+  //    `unite(a,unite(b,c),d)` but the flatten fold `unite(a,b,c,d)`. The native owner keeps the rule (object_boolean_ops_flatten.rs: one fold over all leaves; an empty fold is
+  //    PlanError::EmptyResult, answered invalid_request, object_boolean_ops_owner.rs). The baseline JS would have silently deleted the members of an empty fold; the native refusal is a
+  //    deliberate, safer deviation, so the row asserts the refusal and an untouched document, not a result.
+  { id: '2108-nested-group-operand-flatten', title: 'nested combined children: Outer intersect with an Inner union PAINTS both bars as one operand; flatten folds all leaves once (empty fold: refused, nothing changes; non-empty: exactly that fold, one undo)', tasks: ['G24', 'G19'],
+    limitations: ['Flatten of a group is judged by the baseline rule (one fold over all leaves), which differs from the paint of the same group by design; hidden members and a child group with mode none are not exercised here.'],
     async run(ctx) {
+      // ---- scene 1: the bars are disjoint, so the all-leaves fold of Outer is empty ----
       const { layerUid } = await K.fresh(ctx, { transparent: true });
       const { a, b, c } = await nested(ctx, layerUid);
       await K.apply(ctx, 'combine Inner by unite', P.groupCombine(layerUid, 'g_inner', 'unite', [b, c]));
       await K.apply(ctx, 'combine Outer by intersect', P.groupCombine(layerUid, 'g_outer', 'intersect', [a, b, c]));
       const l0 = await K.hitTest(ctx, layerUid), e0 = await K.exportPng(ctx, 'before-flatten');
-      // Outer = big rectangle INTERSECT (left bar UNION right bar): if the inner group were flattened into the outer list the intersection of the three would be empty.
-      await K.apply(ctx, 'flatten Outer', P.booleanFlatten(layerUid, 'g_outer'));
-      const l1 = await K.hitTest(ctx, layerUid), e1 = await K.exportPng(ctx, 'flattened');
-      ctx.eq('pixel', 'both bars are painted: the inner union is one operand', [alpha(e1, 150, 150), alpha(e1, 345, 150)], [255, 255]);
-      ctx.eq('pixel', 'the gap between the bars and the rest of the big rectangle are clear', [alpha(e1, 250, 150), alpha(e1, 110, 70), alpha(e1, 390, 250)], [0, 0, 0]);
-      ctx.near('pixel', 'the ink is the two bars: 130..370 by 100..220', probe.inkBounds(e1.image).box, [130, 100, 369, 219], 2);
-      ctx.eq('read', 'flatten leaves no group: every record is loose', l1.map(i => (i.groupPath || []).length), l1.map(() => 0));
+      ctx.eq('read', 'Outer intersects, Inner unites, and the structure is nested as built', paths(l0, [a, b, c]).map(p => p.map(g => g.slice(0, 2).join(':'))), [['g_outer:intersect'], ['g_outer:intersect', 'g_inner:unite'], ['g_outer:intersect', 'g_inner:unite']]);
+      // The paint path, before any flatten. Outer = big INTERSECT (left UNION right): if Inner were spread into Outer's list the intersection of the three disjoint-bar shapes would be empty.
+      ctx.eq('pixel', 'paint: both bars are inked (the inner union is one operand of the intersection)', [alpha(e0, 150, 150), alpha(e0, 345, 150)], [255, 255]);
+      ctx.eq('pixel', 'paint: the gap between the bars and the ring of the big rectangle around them are clear', [alpha(e0, 250, 150), alpha(e0, 110, 70), alpha(e0, 390, 250), alpha(e0, 250, 80)], [0, 0, 0, 0]);
+      ctx.near('pixel', 'paint: the ink is the two bars, 130..370 by 100..220', probe.inkBounds(e0.image).box, [130, 100, 369, 219], 2);
+      // Flatten of the SAME group: one fold over all three leaves, intersect(big, left, right), empty because the bars are disjoint. The owner refuses (invalid_request); revision,
+      // history count, redo, the listing and the export are exactly as before (K.apply checks the revision and the history; the rest is read back here).
+      await K.apply(ctx, 'flatten Outer, whose all-leaves fold is empty', P.booleanFlatten(layerUid, 'g_outer'), { refused: true, codes: ['invalid_request'] });
+      ctx.eq('read', 'the refused flatten left every record, bound and group path as they were', JSON.stringify(await K.hitTest(ctx, layerUid)), JSON.stringify(l0));
+      ctx.eq('pixel', 'and the export as it was', (await K.exportPng(ctx, 'after-refused-flatten')).digest, e0.digest);
+
+      // ---- scene 2: the bars overlap at x 200..250, so the all-leaves fold is non-empty and is NOT the painted result ----
+      const second = await K.fresh(ctx, { transparent: true });
+      const s2 = await nested(ctx, second.layerUid, { left: [130, 100, 250, 220], right: [200, 100, 370, 220] });
+      await K.apply(ctx, 'combine Inner by unite', P.groupCombine(second.layerUid, 'g_inner', 'unite', [s2.b, s2.c]));
+      await K.apply(ctx, 'combine Outer by intersect', P.groupCombine(second.layerUid, 'g_outer', 'intersect', [s2.a, s2.b, s2.c]));
+      const m0 = await K.hitTest(ctx, second.layerUid), p0 = await K.exportPng(ctx, 'overlap-before-flatten');
+      ctx.eq('pixel', 'paint: left bar, the overlap and right bar are all inked, the outer ring is clear', [alpha(p0, 150, 150), alpha(p0, 225, 150), alpha(p0, 345, 150), alpha(p0, 110, 70), alpha(p0, 390, 250)], [255, 255, 255, 0, 0]);
+      ctx.near('pixel', 'paint: the ink spans both bars, 130..370 by 100..220', probe.inkBounds(p0.image).box, [130, 100, 369, 219], 2);
+      await K.apply(ctx, 'flatten Outer, whose all-leaves fold is the overlap', P.booleanFlatten(second.layerUid, 'g_outer'));
+      const m1 = await K.hitTest(ctx, second.layerUid), p1 = await K.exportPng(ctx, 'overlap-flattened');
+      ctx.eq('read', 'one result record replaces the three members, loose and bounded by the overlap 200..250 by 100..220', [m1.length, m1.length === 1 ? (m1[0].groupPath || []).length : null, m1.length === 1 ? m1[0].bounds.map(Math.round) : null], [1, 0, [200, 100, 250, 220]]);
+      ctx.ok('read', 'the result is a new record, none of the members', m1.length === 1 && ![s2.a, s2.b, s2.c].includes(m1[0].stableTarget.strokeId), m1.map(i => i.stableTarget.strokeId));
+      ctx.eq('pixel', 'flattened: only the overlap is inked; the bar parts outside it, which the paint showed, are gone', [alpha(p1, 225, 150), alpha(p1, 150, 150), alpha(p1, 345, 150), alpha(p1, 110, 70)], [255, 0, 0, 0]);
+      ctx.near('pixel', 'flattened: the ink is exactly the all-leaves fold, 200..250 by 100..220', probe.inkBounds(p1.image).box, [200, 100, 249, 219], 2);
       await K.step(ctx, 'one undo of the flatten', 'undo');
-      ctx.eq('read', 'one undo restores the three records and both groups', JSON.stringify(paths(await K.hitTest(ctx, layerUid), [a, b, c])), JSON.stringify(paths(l0, [a, b, c])));
-      ctx.eq('pixel', 'one undo restores the export', (await K.exportPng(ctx, 'unflattened')).digest, e0.digest);
+      ctx.eq('read', 'one undo restores the three records, their bounds and both groups', JSON.stringify(await K.hitTest(ctx, second.layerUid)), JSON.stringify(m0));
+      ctx.eq('pixel', 'one undo restores the export of the paint', (await K.exportPng(ctx, 'overlap-unflattened')).digest, p0.digest);
+      await K.step(ctx, 'redo of the flatten', 'redo');
+      ctx.eq('pixel', 'redo reapplies the flattened export', (await K.exportPng(ctx, 'overlap-reflattened')).digest, p1.digest);
     } },
 
   { id: '2108-linked-fill-join', title: 'a traced fill follows its walls: one revision to fill, one to move a wall (the fill regenerates in it), undo restores both, an unenclosed point is a no-op', tasks: ['G18', 'G19'],
