@@ -249,18 +249,36 @@
         baseline=null;(ports.closeFailed||ports.failed)(error);ports.repaint();return false;
       }finally{opening=false;}
     }
+    // An application save (project.saveAs with a destination path, #2510) reads the presented session three times (pin, before
+    // the destination, before dispatch) and has no user gesture to protect. Each read is its own proof: a fresh capture awaits the
+    // owner's queue as of that moment and refuses a changed owner. A capture taken once at the start is superseded by ANY work
+    // entering the queue after it, and unrelated work (the preview presentation the UI renders after an edit or New Project)
+    // legitimately does, so the save of an unchanged document used to be refused ("pin-changed-before-picker") and accepted on
+    // retry. The workflow still compares the pinned identity (instance, document, revision, snapshot, generation) across the
+    // reads, which is exactly what a changed document breaks. A read that races queued work waits for it (bounded). The
+    // interactive picker flow keeps the single start capture: a newer queue before its picker is refused by contract.
+    var SETTLE_ATTEMPTS=12,SETTLE_MS=10;
+    async function presentedForSave(onRefusal){
+      for(var attempt=1;attempt<SETTLE_ATTEMPTS;attempt++){
+        var shown=await session.captureSaveSession()();
+        if(shown)return shown;
+        await new Promise(function(resolve){setTimeout(resolve,SETTLE_MS);});
+      }
+      return session.captureSaveSession()(onRefusal);
+    }
     // destination: an application request's path (#2510) in place of the picker; the same workflow otherwise.
     // replace: true is the in-place Save of a titled project (the host renames over the existing file); it never applies to a picker choice.
     async function saveAs(destination,mode){
       if(saving||opening)return {status:saving?'save-in-progress':'open-in-progress',acknowledged:false};
-      var pick=typeof destination==='string'&&destination?function(){return Promise.resolve(destination);}:ports.pick;
+      var requested=typeof destination==='string'&&destination;
+      var pick=requested?function(){return Promise.resolve(destination);}:ports.pick;
       saving=true;
       try{
         var options={requestId:session.requestId('save'),pinRequestId:session.requestId('save-pin'),project:true};
         if(mode&&mode.replace===true&&typeof destination==='string'&&destination)options.replace=true;
         var ticket=saved.begin({saveRequestId:options.requestId,serializerRequestId:options.pinRequestId}),serialization;
         options.isCurrent=function(){return saved.isCurrent(ticket);};
-        var written=await workflow.run({readPresentedObjectSession:session.captureSaveSession(),
+        var written=await workflow.run({readPresentedObjectSession:requested?presentedForSave:session.captureSaveSession(),
           acquirePin:async function(request){serialization=await session.acquirePin(request);return serialization;},
           pickDestination:pick,savePinned:session.savePinned},options);
         var result=await saved.acknowledge(ticket,{written:written,serialization:serialization},options);
