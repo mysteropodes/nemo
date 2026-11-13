@@ -70,7 +70,7 @@ test('f03-clients.cjs on a locked session exits refused before a client is invok
   const { exit, receipt } = await f03.main(f.config, deps);
   assert.deepEqual([exit, receipt.verdict, receipt.refusal], [2, 'refused', LOCKED_REASON]);
   assert.equal(invoked.length, 0, 'no client was invoked');
-  assert.equal(receipt.rows.length, 1, 'the first half is recorded as not run, the second is not started');
+  assert.deepEqual(receipt.rows.map(r => [r.id, r.verdict]), [['f03-codex', 'unrun'], ['f03-codex-identify', 'unrun']], 'the first half (its workflow and identification rows) is recorded as not run, the second is not started');
   assert.match(receipt.rows[0].reason, /session is locked/);
 });
 

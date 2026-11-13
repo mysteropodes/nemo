@@ -3,7 +3,7 @@
 // observations (history depth, PNG export, save and reopen, independent object reads) that every lane needs.
 //
 // Assertion kinds: `reply` (what the command answered), `read` (an independent read of document state through a query),
-// `pixel` (a decoded PNG export), `file` (the saved project file). A row can only pass if at least one assertion is not a
+// `pixel` (a decoded PNG export), `file` (the saved project file), `stream` (what the application answered, as recorded in an agent client's event stream; F03 only). A row can only pass if at least one assertion is not a
 // `reply`: "the command returned ok" is never evidence by itself (the runner enforces it).
 //
 // Bookkeeping: the kit's own plumbing (setup, the revision and history deltas of every command, the export and save mechanics)
@@ -22,7 +22,7 @@ class AssertionFailure extends Error {
 }
 const short = value => { const text = canonical(value) ?? 'undefined'; return text.length > 600 ? { truncated: text.slice(0, 600), length: text.length } : value; };
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-const KINDS = new Set(['reply', 'read', 'pixel', 'file']);
+const KINDS = new Set(['reply', 'read', 'pixel', 'file', 'stream']);
 
 // One counter for the whole run: every row writes into the same work directory, and the app refuses to save over an existing file
 // (a second row's `scratch-1.json` was refused as "publication-response-unavailable"), so file names must never repeat across rows.
