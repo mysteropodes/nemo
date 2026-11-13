@@ -6,7 +6,7 @@ use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
     consult, index_of, order, resolve_all, LayerEditPolicy, LayerOp, LayerSelection,
     LifecycleError, LifecyclePlan, SelectionOutcome,
 };
-use crate::object_document::{ObjectDocument, Presence};
+use crate::object_document::{ItemRecords, ObjectDocument, Presence};
 
 /// `deleteLayer`: the selection (or the active layer when none) goes, highest
 /// slot first, until one layer is left. The active slot number is kept and
@@ -83,9 +83,33 @@ pub(crate) fn plan_delete(
     candidate
         .objects
         .retain(|record| !gone.contains(record.target.layer_uid.as_str()));
+    // The raster placements and text blocks of the deleted layers go with them, every frame. An asset they named stays in
+    // the project inventory (the undo brings the placement back; an asset still in use cannot be removed).
+    if let Some(items) = document.item_records() {
+        // Scene items only: an item a component carries keeps its own context (a merge moves the items of its source layers
+        // there before the source layers are deleted).
+        let keep = |target: &crate::object_document::ObjectTarget| {
+            target.context_id() != "scene-root" || !gone.contains(target.layer_uid())
+        };
+        candidate.items = ItemRecords::normalized(
+            items
+                .raster_entries()
+                .iter()
+                .filter(|entry| keep(&entry.target))
+                .cloned()
+                .collect(),
+            items
+                .text_entries()
+                .iter()
+                .filter(|entry| keep(&entry.target))
+                .cloned()
+                .collect(),
+        );
+    }
     if let Presence::Present(holders) = &mut candidate.property_holders {
         holders.retain(|holder| !gone.contains(holder.target.layer_uid.as_str()));
     }
+    release_layer_tables(&mut candidate, &gone);
     order::remove_layers(&mut candidate, &gone);
     let slot = active.min(candidate.layers.len() - 1);
     Ok(LifecyclePlan {
@@ -104,4 +128,46 @@ pub(crate) fn plan_delete(
         spared: spared.map(|index| document.layers[index].layer_uid.clone()),
         created: None,
     })
+}
+
+/// The tables keyed by a scene layer: a placed component, a duplicator or effector hosted by the layer and its tween spans
+/// leave with it, and a duplicator on another layer stops naming it (a path layer is cleared, a source pool member
+/// dropped). The component a deleted instance placed stays in the document: it is a library entry the undo, and every other
+/// instance, still use.
+fn release_layer_tables(candidate: &mut ObjectDocument, gone: &HashSet<&str>) {
+    const SCENE: &str = "scene-root";
+    if let Presence::Present(tables) = &mut candidate.component_tables {
+        if let Presence::Present(set) = &mut tables.components {
+            set.instances.retain(|instance| {
+                instance.context_id != SCENE || !gone.contains(instance.layer_uid.as_str())
+            });
+        }
+        if let Presence::Present(set) = &mut tables.duplicators {
+            let ours = |context: &str, layer: &str| context == SCENE && gone.contains(layer);
+            set.duplicators
+                .retain(|record| !ours(&record.context_id, &record.layer_uid));
+            set.effector_layers
+                .retain(|record| !ours(&record.context_id, &record.layer_uid));
+            for record in &mut set.duplicators {
+                if record.context_id != SCENE {
+                    continue;
+                }
+                let duplicator = &mut record.duplicator;
+                if duplicator
+                    .path_layer_uid()
+                    .is_some_and(|uid| gone.contains(uid))
+                {
+                    duplicator.path_layer_uid = Presence::Present(None);
+                }
+                if let Presence::Present(uids) = &mut duplicator.source_layer_uids {
+                    uids.retain(|uid| !gone.contains(uid.as_str()));
+                }
+            }
+        }
+    }
+    if let Presence::Present(store) = &mut candidate.tweens {
+        store
+            .layers
+            .retain(|tweens| !gone.contains(tweens.layer_uid.as_str()));
+    }
 }
