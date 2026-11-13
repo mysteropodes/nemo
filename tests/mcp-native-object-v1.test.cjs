@@ -88,6 +88,9 @@ test('the v1 refusal hints are the declared useInstead pairs of the opacity capa
   const declared = require('../engineering/application/capabilities-v2/native-opacity.json').useInstead.object;
   const { ops } = operations(project);
   for (const [operation, other] of Object.entries(ops.objectUseInstead)) assert.equal(declared[operation], other, operation);
+  // And the other way: every declared apiVersion 1 pair is in the table, nothing else is.
+  const v1 = Object.keys(require('../engineering/application/discovery-guide-v1.json').legacyOperations);
+  assert.deepEqual(Object.keys(ops.objectUseInstead).sort(), Object.keys(declared).filter((op) => v1.includes(op)).sort());
   for (const operation of ['property.get', 'property.set', 'property.key.set', 'property.key.remove', 'property.animation.set',
     'history.undo', 'history.redo']) assert.ok(ops.objectUseInstead[operation], operation + ' has a replacement');
 });

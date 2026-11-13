@@ -2712,7 +2712,8 @@
         "native_ghost_read_public_tests.rs",
         "native_rig_read_public_tests.rs",
         "native_object_legacy_import_tests.rs",
-        "native_discovery_availability_tests.rs"
+        "native_discovery_availability_tests.rs",
+        "native_discovery_opacity_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
