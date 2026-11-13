@@ -485,7 +485,7 @@ test('ordinary New 64 by 64 Save As waits for admitted presentation and saves th
     assert.ok(f.app.writes.every(([key])=>key==='nemo-recents'));
   }finally{f.gate.resolve();await Promise.allSettled([f.preview,saving]);}
 });
-for(const drift of ['revision','snapshot','lifecycle','document','newer-queue','replacement','deferred']){
+for(const drift of ['revision','snapshot','lifecycle','document','replacement','deferred']){
   test('pending ordinary Save As refuses '+drift+' before picker or publication',async()=>{
     const f=await pendingBlankSave(),other=[];
     const saving=f.app.project.saveAs();
@@ -495,7 +495,6 @@ for(const drift of ['revision','snapshot','lifecycle','document','newer-queue','
       if(drift==='snapshot')f.h.info().documentSnapshotId+='-advanced';
       if(drift==='lifecycle')f.h.info().lifecycleGeneration++;
       if(drift==='document')f.h.info().documentId='replacement-owner';
-      if(drift==='newer-queue')other.push(f.s.presentPreview(0));
       if(drift==='replacement')other.push(f.s.newProject({canvasW:64,canvasH:64,fps:24}));
       if(drift==='deferred')f.h.after=(command,request,result)=>command==='nemo_native_object_preview'?
         {...result,status:'deferred-occluded'}:result;
@@ -508,6 +507,21 @@ for(const drift of ['revision','snapshot','lifecycle','document','newer-queue','
     }finally{f.gate.resolve();await Promise.allSettled([f.preview,saving,...other]);}
   });
 }
+// Evidence defect 4 follow-up: unrelated owner work (a preview presentation) entering the queue is NOT a change of the document. The
+// interactive picker flow reads the presented session freshly, like an application Save As; the pinned identity (revision, snapshot,
+// lifecycle, document: every drift above) is the guard, so the same document still saves.
+test('pending ordinary Save As tolerates unrelated newer queue work before the picker and saves the same document',async()=>{
+  const f=await pendingBlankSave(),other=[];
+  const saving=f.app.project.saveAs();
+  try{
+    await turn();assert.equal(f.picked(),0);assert.equal(f.writes().length,0);
+    other.push(f.s.presentPreview(0));other.forEach(p=>p.catch(()=>{}));
+    f.gate.resolve();await Promise.allSettled([f.preview,...other]);
+    const result=await saving;
+    assert.equal(result.acknowledged,true,JSON.stringify(result));
+    assert.equal(f.picked(),1);assert.equal(f.writes().length,1);
+  }finally{f.gate.resolve();await Promise.allSettled([f.preview,saving,...other]);}
+});
 test('pending ordinary Save As retains picker cancellation without publication or a saved label',async()=>{
   const f=await pendingBlankSave();let cancelled=0;
   f.app.window.__TAURI__.dialog.save=async()=>{cancelled++;return null;};
