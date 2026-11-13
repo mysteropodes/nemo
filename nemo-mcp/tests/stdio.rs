@@ -5,6 +5,10 @@ use rmcp::{model::CallToolRequestParams, transport::TokioChildProcess, ServiceEx
 use serde_json::{json, Value};
 use std::process::Command;
 
+/// The advertised command input schema was ~1 MB with the declaration dump embedded;
+/// what remains is the validating transport schema (`$defs`).
+const SCHEMA_BUDGET: usize = 450_000;
+
 /// Expected set, READ from the crate's declaration rather than copied.
 /// A copied list drifts silently: #1310 added one descriptor and four
 /// hand-maintained copies failed at once, in a crate no job ran (#1318).
@@ -148,11 +152,19 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         );
     }
     assert_eq!(command_schema["x-nemo-nativeApiVersion"], 2);
-    assert_eq!(command_schema["x-nemo-nativeTransportV2"], native_transport);
-    assert_eq!(
-        command_schema["x-nemo-registeredNativeCapabilities"],
-        registered_native_capabilities()
-    );
+    // The transport schema is `$defs.native`; the declaration dump and a second copy of the
+    // transport are not repeated here (the schema once weighed about a megabyte for that).
+    for dump in ["x-nemo-nativeTransportV2", "x-nemo-registeredNativeCapabilities"] {
+        assert!(command_schema.get(dump).is_none(), "{dump} is not embedded");
+    }
+    let size = serde_json::to_string(&command_schema).unwrap().len();
+    assert!(size <= SCHEMA_BUDGET, "nemo_command input schema is {size} characters");
+    let text = serde_json::to_string(&command_schema).unwrap();
+    assert!(!text.contains("static base opacity"));
+    for example in command_schema["examples"].as_array().unwrap() {
+        assert_ne!(example["operation"], "command.document.apply");
+        assert_ne!(example["operation"], "history.undo");
+    }
     jsonschema::draft202012::meta::validate(&command_schema)
         .expect("advertised command schema is valid Draft 2020-12");
     let validator = jsonschema::draft202012::new(&command_schema)

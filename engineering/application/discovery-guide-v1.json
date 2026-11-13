@@ -3,7 +3,9 @@
   "description": "Start-here guide served by the default nemo_discover answer, one list of steps per document kind. Each step names one operation with the smallest request that is valid for it. Tokens: payload value \"$revision\" is replaced by the open document's current revision, \"<documentSnapshotId>\" and \"<layerUid>\" stay for the client to fill from an earlier step. `expectedRevision: true` adds the current revision to the request envelope (commands carry it, reads never do). Every example is validated against the request schema by a test, and every operation must be declared by a registered capability.",
   "notes": [
     "Reads carry atRevision (the current revision) and, after the pin step, documentSnapshotId; they never carry expectedRevision.",
-    "Commands carry expectedRevision (the revision returned by your previous command or read) and a requestId that is new for each command.",
+    "atRevision and the pin are valid only for the current revision. Every command and every project.open changes it, so repeat the pin step (and use the new revision) before each read that follows a command or an open; a read at an older revision or pin is refused as stale_revision. Example: set a value, repeat pin, read it back, set again, repeat pin, read it back.",
+    "Commands carry expectedRevision (the revision returned by your previous command or read). Every request needs a requestId that is new: the ids in these steps (pin-1, read-property-1) are examples, change them for each request you send.",
+    "project.open replaces the open document: documentId and revision change, so call nemo_discover again afterwards and use the identity it returns.",
     "A refusal names the operation to use instead when the one you called does not apply to the open document."
   ],
   "kinds": {
@@ -23,7 +25,7 @@
           "tool": "nemo_command",
           "apiVersion": 2,
           "operation": "query.document.object",
-          "purpose": "Take the snapshot pin: result.documentSnapshotId, plus the presented contextId and frame. Property and history reads need it.",
+          "purpose": "Take the snapshot pin: result.documentSnapshotId, plus the presented contextId and frame. Property and history reads need it; take a new one after every command or open.",
           "payload": { "atRevision": "$revision", "view": { "kind": "presentation" } }
         },
         {
@@ -43,7 +45,7 @@
           "tool": "nemo_command",
           "apiVersion": 2,
           "operation": "query.document.object.property.read",
-          "purpose": "Read a property at a frame (opacity is on a 0..100 scale): result.value. Other views: authoredKeys, expressionSource.",
+          "purpose": "Read a property at a frame (opacity is on a 0..100 scale): result.value. Needs a current pin. Other views: authoredKeys, expressionSource.",
           "payload": {
             "atRevision": "$revision",
             "documentSnapshotId": "<documentSnapshotId>",
@@ -92,7 +94,7 @@
           "tool": "nemo_command",
           "apiVersion": 2,
           "operation": "query.document.object.history",
-          "purpose": "Read undoDepth and redoDepth of the open document.",
+          "purpose": "Read undoDepth and redoDepth of the open document. Needs a current pin.",
           "payload": { "atRevision": "$revision", "documentSnapshotId": "<documentSnapshotId>" }
         },
         {
@@ -109,7 +111,7 @@
           "tool": "nemo_command",
           "apiVersion": 1,
           "operation": "project.open",
-          "purpose": "Open another project file (refused when it is the file already open, and while the open project has unsaved changes).",
+          "purpose": "Open another project file (refused when it is the file already open, and while the open project has unsaved changes). Then call nemo_discover again: the documentId and revision change.",
           "expectedRevision": true,
           "payload": { "path": "/absolute/path/other-project.json" }
         },
@@ -184,7 +186,7 @@
           "tool": "nemo_command",
           "apiVersion": 1,
           "operation": "project.open",
-          "purpose": "Open another project file.",
+          "purpose": "Open another project file; then call nemo_discover again.",
           "expectedRevision": true,
           "payload": { "path": "/absolute/path/other-project.json" }
         },

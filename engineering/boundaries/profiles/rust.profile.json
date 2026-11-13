@@ -2245,6 +2245,7 @@
         "src/discovery_catalog.rs",
         "src/discovery_contract.rs",
         "src/discovery_tests.rs",
+        "src/discovery_live_tests.rs",
         "src/wire.rs",
         "src/native_project_settings_contract.rs",
         "src/native_project_settings_wire_tests.rs",
