@@ -4,6 +4,7 @@
 
 use serde::Serialize;
 
+use crate::bitmap::BitmapData;
 use crate::report::ImportReport;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -339,9 +340,11 @@ pub struct LibrarySymbol {
 pub struct LibraryBitmap {
     pub name: String,
     pub href: Option<String>,
-    /// Entry under `bin/` holding the pixels (decoded in a later slice).
+    /// Entry under `bin/` holding the pixels.
     pub bitmap_data_href: Option<String>,
     pub data_present: bool,
+    /// Decoded or encoded pixels; `None` when missing or not decodable (reported).
+    pub data: Option<BitmapData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

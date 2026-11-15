@@ -9,6 +9,7 @@
 //! feature it reads but does not convert in an [`ImportReport`].
 
 mod archive;
+mod bitmap;
 mod document;
 mod edges;
 mod model;
@@ -17,6 +18,7 @@ mod shape;
 mod xml;
 
 pub use archive::Archive;
+pub use bitmap::{decode_bitmap, BitmapData};
 pub use edges::{decode_edges, parse_number, EdgeCommand};
 pub use model::*;
 pub use report::{ImportReport, Skipped};

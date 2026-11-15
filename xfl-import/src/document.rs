@@ -315,19 +315,34 @@ pub(crate) fn read_document(archive: &Archive) -> Result<XflDocument, XflError> 
         match media.name.as_str() {
             "DOMBitmapItem" => {
                 let data_href = media.attr("bitmapDataHRef").map(str::to_string);
-                let data_present = data_href
+                let raw = data_href
                     .as_ref()
-                    .is_some_and(|h| archive.get(&format!("bin/{h}")).is_some());
+                    .and_then(|h| archive.get(&format!("bin/{h}")));
+                let data_present = raw.is_some();
                 let name = media.attr("name").unwrap_or("").to_string();
-                if !data_present {
-                    ctx.report.skip("bitmap data missing from archive", &name);
-                }
+                let data = match raw {
+                    None => {
+                        ctx.report.skip("bitmap data missing from archive", &name);
+                        None
+                    }
+                    Some(bytes) => match crate::bitmap::decode_bitmap(bytes) {
+                        Ok(d) => {
+                            ctx.report.count("decodedBitmaps", 1);
+                            Some(d)
+                        }
+                        Err(e) => {
+                            ctx.report.skip(format!("bitmap not decoded: {e}"), &name);
+                            None
+                        }
+                    },
+                };
                 ctx.report.count("libraryBitmaps", 1);
                 bitmaps.push(LibraryBitmap {
                     name,
                     href: media.attr("href").map(str::to_string),
                     bitmap_data_href: data_href,
                     data_present,
+                    data,
                 });
             }
             "DOMSoundItem" => ctx

@@ -70,7 +70,7 @@ fn sample() -> Vec<u8> {
     zip_bytes(&[
         ("DOMDocument.xml", doc.as_bytes()),
         ("LIBRARY/Hero.xml", HERO.as_bytes()),
-        ("bin/M 1 1.dat", b"\x03\x05pixels"),
+        ("bin/M 1 1.dat", &lossless_2x1()),
     ])
 }
 
@@ -345,7 +345,7 @@ fn folder_form_reads_like_the_zip() {
     std::fs::create_dir_all(dir.join("bin")).unwrap();
     std::fs::write(dir.join("DOMDocument.xml"), doc_xml(SQUARE_WITH_HOLE)).unwrap();
     std::fs::write(dir.join("LIBRARY/hero.XML"), HERO).unwrap(); // case differs on purpose
-    std::fs::write(dir.join("bin/M 1 1.dat"), b"x").unwrap();
+    std::fs::write(dir.join("bin/M 1 1.dat"), lossless_2x1()).unwrap();
     let from_dir = read_xfl_dir(&dir).unwrap();
     std::fs::remove_dir_all(&dir).unwrap();
     let from_zip = read_fla(&sample()).unwrap();
@@ -507,4 +507,45 @@ fn duplicate_zip_entries_are_refused() {
         buf.into_inner()
     };
     assert!(matches!(read_fla(&bytes), Err(XflError::NotAnArchive(_))));
+}
+
+/// A 2×1 lossless ARGB entry: opaque blue, then fully transparent.
+fn lossless_2x1() -> Vec<u8> {
+    let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+    z.write_all(&[255, 0, 0, 255, 0, 0, 0, 0]).unwrap();
+    let stream = z.finish().unwrap();
+    let mut out = vec![0x03, 0x05, 8, 0, 2, 0, 1, 0];
+    out.extend_from_slice(&[0; 16]);
+    out.extend_from_slice(&[1, 1]);
+    out.extend_from_slice(&(stream.len() as u16).to_le_bytes());
+    out.extend_from_slice(&stream);
+    out.extend_from_slice(&[0, 0]);
+    out
+}
+
+#[test]
+fn library_bitmaps_are_decoded() {
+    let doc = read_fla(&sample()).unwrap();
+    let Some(BitmapData::Rgba {
+        width,
+        height,
+        pixels,
+    }) = &doc.bitmaps[0].data
+    else {
+        panic!("{:?}", doc.bitmaps[0].data)
+    };
+    assert_eq!((*width, *height), (2, 1));
+    assert_eq!(pixels, &vec![0, 0, 255, 255, 0, 0, 0, 0]);
+    assert_eq!(doc.report.converted["decodedBitmaps"], 1);
+
+    let bad = zip_bytes(&[
+        ("DOMDocument.xml", doc_xml("").as_bytes()),
+        ("bin/M 1 1.dat", b"junk"),
+    ]);
+    let doc = read_fla(&bad).unwrap();
+    assert!(doc.bitmaps[0].data_present && doc.bitmaps[0].data.is_none());
+    assert!(doc
+        .report
+        .skipped_feature("bitmap not decoded: unrecognised bitmap data")
+        .is_some());
 }
