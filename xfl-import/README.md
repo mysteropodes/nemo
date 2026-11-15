@@ -34,7 +34,11 @@ cargo run --example fla_dump -- path/to/file.fla
 ## Slices (#2020)
 
 1. **This crate:** XFL reading into a neutral model, with the import report. Done here.
-2. Bitmap `.dat` decoding (lossless and JPEG entries of `bin/`).
+2. **Bitmap `.dat` decoding:** done. JPEG/PNG/GIF entries are passed through
+   encoded; Animate's lossless ARGB entries (`03 05`) are decoded to straight
+   RGBA. The 8-bit palette form (`03 03`) is reported, not decoded. The
+   lossless layout follows public XFL references and must be confirmed on
+   real files.
 3. Mapping onto a Nemo document through the native import path (shape
    islands, colours as hex8, layers and folders, held keyframes, labels as
    markers, masks). Needs a decision with the native-engine owners on the
