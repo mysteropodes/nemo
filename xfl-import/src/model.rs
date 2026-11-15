@@ -268,6 +268,10 @@ pub struct Tween {
     pub custom_ease: bool,
     pub rotate: Option<String>,
     pub rotate_times: u32,
+    /// `motionTweenScale` (default true).
+    pub tween_scale: bool,
+    /// `motionTweenOrientToPath`.
+    pub orient_to_path: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

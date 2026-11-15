@@ -187,6 +187,8 @@ fn read_frame(node: &Node, ctx: &mut Ctx<'_>, timeline: &str, layer: &str) -> Fr
                 .filter(|r| *r != "none")
                 .map(str::to_string),
             rotate_times: node.attr_u32("motionTweenRotateTimes").unwrap_or(0),
+            tween_scale: node.attr_bool("motionTweenScale").unwrap_or(true),
+            orient_to_path: node.attr_bool("motionTweenOrientToPath").unwrap_or(false),
         }
     });
     if node.child("Actionscript").is_some() {

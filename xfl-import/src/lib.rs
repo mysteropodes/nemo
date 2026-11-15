@@ -15,6 +15,7 @@ mod edges;
 mod model;
 mod report;
 mod shape;
+mod tween;
 mod xml;
 
 pub use archive::Archive;
@@ -22,6 +23,7 @@ pub use bitmap::{decode_bitmap, BitmapData};
 pub use edges::{decode_edges, parse_number, EdgeCommand};
 pub use model::*;
 pub use report::{ImportReport, Skipped};
+pub use tween::{classic_tweens, simple_ease, ClassicTween, Decomposed, TweenSkip};
 
 use std::fmt;
 use std::path::Path;
