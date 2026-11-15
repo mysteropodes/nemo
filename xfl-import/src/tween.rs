@@ -28,15 +28,20 @@ pub struct Decomposed {
 }
 
 impl Decomposed {
+    /// A mirrored matrix (negative determinant) decomposes as a negative
+    /// `scale_x`, so that a flip tweens by squashing through zero rather
+    /// than by spinning one skew by π.
     pub fn from_instance(m: &Matrix, pivot: Point) -> Decomposed {
         let p = m.apply(pivot);
+        let flipped = m.a * m.d - m.b * m.c < 0.0;
+        let sign = if flipped { -1.0 } else { 1.0 };
         Decomposed {
             x: p.x,
             y: p.y,
-            scale_x: (m.a * m.a + m.b * m.b).sqrt(),
+            scale_x: sign * (m.a * m.a + m.b * m.b).sqrt(),
             scale_y: (m.c * m.c + m.d * m.d).sqrt(),
             skew_x: (-m.c).atan2(m.d),
-            skew_y: m.b.atan2(m.a),
+            skew_y: (sign * m.b).atan2(sign * m.a),
         }
     }
 
@@ -62,6 +67,9 @@ impl Decomposed {
     }
 }
 
+/// Below this, two angles are the same (radians).
+const ANGLE_EPS: f64 = 1e-6;
+
 /// Angle into (-π, π].
 fn wrap(a: f64) -> f64 {
     let mut r = a % (2.0 * PI);
@@ -83,7 +91,12 @@ pub fn simple_ease(t: f64, acceleration: f64) -> f64 {
 
 /// Signed angular travel from `from` to `to` for a rotation option.
 fn angle_delta(from: f64, to: f64, rotate: Option<&str>, times: u32) -> f64 {
-    let short = wrap(to - from);
+    let mut short = wrap(to - from);
+    // XFL matrices carry limited precision: nominally equal angles must not
+    // add or lose a whole turn under cw/ccw.
+    if short.abs() < ANGLE_EPS {
+        short = 0.0;
+    }
     let turns = 2.0 * PI * times as f64;
     match rotate {
         // Screen y points down, so clockwise is a positive angle.
@@ -113,13 +126,18 @@ pub struct ClassicTween {
     pub acceleration: f64,
     pub rotate: Option<String>,
     pub rotate_times: u32,
+    /// `motionTweenScale="false"`: scale holds the start value over the span.
+    pub tween_scale: bool,
     pub pivot: Point,
+    /// What the samples do not reproduce (custom ease curve, orient to path,
+    /// motion guide). Empty when the samples are exact.
+    pub approximations: Vec<String>,
 }
 
 impl ClassicTween {
     /// Interpolated transform and alpha at `frame` (clamped to the span).
     pub fn sample(&self, frame: u32) -> (Decomposed, f64) {
-        let span = (self.end_frame - self.start_frame).max(1) as f64;
+        let span = self.end_frame.saturating_sub(self.start_frame).max(1) as f64;
         let t = ((frame.saturating_sub(self.start_frame)) as f64 / span).clamp(0.0, 1.0);
         let k = simple_ease(t, self.acceleration);
         let lerp = |a: f64, b: f64| a + (b - a) * k;
@@ -127,8 +145,16 @@ impl ClassicTween {
         let d = Decomposed {
             x: lerp(self.from.x, self.to.x),
             y: lerp(self.from.y, self.to.y),
-            scale_x: lerp(self.from.scale_x, self.to.scale_x),
-            scale_y: lerp(self.from.scale_y, self.to.scale_y),
+            scale_x: if self.tween_scale {
+                lerp(self.from.scale_x, self.to.scale_x)
+            } else {
+                self.from.scale_x
+            },
+            scale_y: if self.tween_scale {
+                lerp(self.from.scale_y, self.to.scale_y)
+            } else {
+                self.from.scale_y
+            },
             skew_x: self.from.skew_x
                 + angle_delta(self.from.skew_x, self.to.skew_x, rot, self.rotate_times) * k,
             skew_y: self.from.skew_y
@@ -156,9 +182,20 @@ fn single_instance(frame: &Frame) -> Option<&SymbolInstance> {
     }
 }
 
-/// Every classic tween of a layer, in frame order, plus the frames that are
-/// marked as classic tweens but cannot be one (to report).
-pub fn classic_tweens(layer: &Layer) -> (Vec<ClassicTween>, Vec<(u32, TweenSkip)>) {
+/// Every classic tween of layer `index` of `timeline`, in frame order, plus
+/// the frames that are marked as classic tweens but cannot be one (to report).
+pub fn classic_tweens(
+    timeline: &Timeline,
+    index: usize,
+) -> (Vec<ClassicTween>, Vec<(u32, TweenSkip)>) {
+    let Some(layer) = timeline.layers.get(index) else {
+        return (Vec::new(), Vec::new());
+    };
+    // A layer under a guide layer follows the guide's path (motion guide).
+    let guided = layer
+        .parent_layer_index
+        .and_then(|p| timeline.layers.get(p))
+        .is_some_and(|p| p.kind == LayerKind::Guide);
     let mut tweens = Vec::new();
     let mut skipped = Vec::new();
     for (i, f) in layer.frames.iter().enumerate() {
@@ -179,6 +216,16 @@ pub fn classic_tweens(layer: &Layer) -> (Vec<ClassicTween>, Vec<(u32, TweenSkip)
         };
         // Flash tweens around the start instance's transformation point.
         let pivot = a.transformation_point;
+        let mut approximations = Vec::new();
+        if tw.custom_ease {
+            approximations.push("custom ease curve (sampled with the simple ease)".to_string());
+        }
+        if tw.orient_to_path {
+            approximations.push("orient to path".to_string());
+        }
+        if guided {
+            approximations.push("motion guide (sampled as a straight line)".to_string());
+        }
         tweens.push(ClassicTween {
             library_item: a.library_item.clone(),
             start_frame: f.index,
@@ -190,7 +237,9 @@ pub fn classic_tweens(layer: &Layer) -> (Vec<ClassicTween>, Vec<(u32, TweenSkip)
             acceleration: tw.acceleration,
             rotate: tw.rotate.clone(),
             rotate_times: tw.rotate_times,
+            tween_scale: tw.tween_scale,
             pivot,
+            approximations,
         });
     }
     (tweens, skipped)
@@ -258,5 +307,43 @@ mod tests {
         assert!(close(angle_delta(0.0, -q, Some("cw"), 0), 3.0 * q));
         assert!(close(angle_delta(0.0, q, Some("ccw"), 0), -3.0 * q));
         assert!(close(angle_delta(0.0, 0.0, Some("clockwise"), 2), 4.0 * PI));
+        // Precision noise around equal angles adds no extra turn.
+        assert!(close(
+            angle_delta(0.3, 0.3 - 1e-12, Some("clockwise"), 1),
+            2.0 * PI
+        ));
+        assert!(close(
+            angle_delta(0.3, 0.3 + 1e-12, Some("counter-clockwise"), 1),
+            -2.0 * PI
+        ));
+    }
+
+    #[test]
+    fn flip_is_negative_scale() {
+        let pivot = Point { x: 0.0, y: 0.0 };
+        let flip = Matrix {
+            a: -1.0,
+            ..Matrix::IDENTITY
+        };
+        let d = Decomposed::from_instance(&flip, pivot);
+        assert!(close(d.scale_x, -1.0) && close(d.scale_y, 1.0));
+        assert!(close(d.rotation().unwrap(), 0.0));
+        let back = d.to_matrix(pivot);
+        assert!(
+            close(back.a, -1.0) && close(back.b, 0.0) && close(back.c, 0.0) && close(back.d, 1.0)
+        );
+        // Flipped and rotated by 0.4 round-trips too.
+        let r = 0.4f64;
+        let m = Matrix {
+            a: -r.cos(),
+            b: -r.sin(),
+            c: -r.sin(),
+            d: r.cos(),
+            ..Matrix::IDENTITY
+        };
+        let back = Decomposed::from_instance(&m, pivot).to_matrix(pivot);
+        for (u, v) in [(m.a, back.a), (m.b, back.b), (m.c, back.c), (m.d, back.d)] {
+            assert!(close(u, v), "{m:?} vs {back:?}");
+        }
     }
 }

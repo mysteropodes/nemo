@@ -564,7 +564,7 @@ fn classic_tween_samples_between_keyframes() {
         <DOMSymbolInstance libraryItemName="Other"/></elements></DOMFrame>
     </frames></DOMLayer></layers></DOMTimeline></timelines></DOMDocument>"##;
     let doc = read_fla(&zip_bytes(&[("DOMDocument.xml", doc.as_bytes())])).unwrap();
-    let (tweens, skipped) = classic_tweens(&doc.timelines[0].layers[0]);
+    let (tweens, skipped) = classic_tweens(&doc.timelines[0], 0);
     assert_eq!(tweens.len(), 1);
     assert_eq!(skipped, vec![(10, TweenSkip::EndMismatch)]);
     let t = &tweens[0];
@@ -580,4 +580,24 @@ fn classic_tween_samples_between_keyframes() {
     assert!(
         (end.a - 2.0).abs() < 1e-9 && (end.tx - 100.0).abs() < 1e-9 && (end.ty - 50.0).abs() < 1e-9
     );
+}
+
+#[test]
+fn classic_tween_scale_hold_and_guide_flagged() {
+    let doc = r##"<DOMDocument><timelines><DOMTimeline name="S"><layers>
+      <DOMLayer name="G" layerType="guide"><frames><DOMFrame index="0" duration="10"><elements/></DOMFrame></frames></DOMLayer>
+      <DOMLayer name="L" parentLayerIndex="0"><frames>
+      <DOMFrame index="0" duration="10" tweenType="motion" motionTweenScale="false" motionTweenOrientToPath="true" hasCustomEase="true"><elements>
+        <DOMSymbolInstance libraryItemName="Ball"><matrix><Matrix/></matrix></DOMSymbolInstance></elements></DOMFrame>
+      <DOMFrame index="10"><elements>
+        <DOMSymbolInstance libraryItemName="Ball"><matrix><Matrix a="3" d="3"/></matrix></DOMSymbolInstance></elements></DOMFrame>
+    </frames></DOMLayer></layers></DOMTimeline></timelines></DOMDocument>"##;
+    let doc = read_fla(&zip_bytes(&[("DOMDocument.xml", doc.as_bytes())])).unwrap();
+    let (tweens, _) = classic_tweens(&doc.timelines[0], 1);
+    let t = &tweens[0];
+    assert!(!t.tween_scale);
+    assert!((t.sample(5).0.scale_x - 1.0).abs() < 1e-9);
+    assert_eq!(t.approximations.len(), 3, "{:?}", t.approximations);
+    // Out-of-range layer index is empty, not a panic.
+    assert_eq!(classic_tweens(&doc.timelines[0], 9), (vec![], vec![]));
 }

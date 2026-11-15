@@ -44,7 +44,7 @@ cargo run --example fla_dump -- path/to/file.fla
    markers, masks). Needs a decision with the native-engine owners on the
    entry point, like the SVG/PSD/Figma import plans.
 4. Symbols as Components (one instance per layer for now) and classic tweens
-   as Motion keys with ease. Model side started: `classic_tweens(layer)`
+   as Motion keys with ease. Model side started: `classic_tweens(timeline, layer_index)`
    finds each tween and `ClassicTween::sample(frame)` gives Flash's
    decomposed transform (pivot position, scales, skews) with its simple ease
    and rotation options; custom ease curves are not sampled yet.
