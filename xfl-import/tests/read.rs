@@ -36,7 +36,7 @@ fn doc_xml(elements: &str) -> String {
         </DOMSymbolInstance>
         <DOMBitmapInstance libraryItemName="photo.png"/>
         <DOMStaticText><textRuns><DOMTextRun><characters>Hi &amp; bye</characters></DOMTextRun></textRuns></DOMStaticText>
-        <DOMOvalObject/>
+        <DOMOvalObject x="10" y="20" objectWidth="40" objectHeight="20" startAngle="90"><fill><SolidColor color="#0000FF"/></fill></DOMOvalObject>
         <DOMGroup><members>{elements}</members></DOMGroup>
       </elements></DOMFrame>
     </frames></DOMLayer>
@@ -187,7 +187,7 @@ fn stage_and_structure() {
         matches!(&els[1], Element::BitmapInstance { library_item, .. } if library_item == "photo.png")
     );
     assert!(matches!(&els[2], Element::Text { text, .. } if text == "Hi & bye"));
-    assert!(matches!(&els[3], Element::Other { element } if element == "DOMOvalObject"));
+    assert!(matches!(&els[3], Element::Shape(_)));
     assert!(
         matches!(&els[4], Element::Group { members } if matches!(members[0], Element::Shape(_)))
     );
@@ -211,7 +211,6 @@ fn report_lists_what_was_left_out() {
         "sound on frame — v2",
         "colour transform other than alpha (tint, brightness, advanced)",
         "text (DOMStaticText) — v2",
-        "element DOMOvalObject",
         "library symbol file missing",
         "sound — v2",
     ] {
@@ -227,7 +226,7 @@ fn report_lists_what_was_left_out() {
     );
     assert_eq!(r.converted["layers"], 5);
     assert_eq!(r.converted["classicTweens"], 1);
-    assert_eq!(r.converted["shapes"], 2);
+    assert_eq!(r.converted["shapes"], 3);
     assert!(r
         .skipped_feature("fill contour that does not close (kept open)")
         .is_none());
@@ -388,4 +387,124 @@ fn model_serializes_to_json() {
         json["timelines"][0]["layers"][2]["frames"][0]["tween"]["kind"],
         "motion"
     );
+}
+
+fn shape_doc(shape: &str) -> XflDocument {
+    read_fla(&zip_bytes(&[(
+        "DOMDocument.xml",
+        doc_xml(shape).as_bytes(),
+    )]))
+    .unwrap()
+}
+
+#[test]
+fn primitives_become_geometry() {
+    let doc = read_fla(&sample()).unwrap();
+    let Element::Shape(oval) = &doc.timelines[0].layers[2].frames[2].elements[3] else {
+        panic!()
+    };
+    let c = &oval.paths[0].contours[0];
+    assert!(c.closed);
+    assert_eq!(c.segments.len(), 8);
+    // Every arc end lies on the ellipse centred (30, 30) with radii (20, 10).
+    for s in &c.segments {
+        let p = s.end();
+        let v = ((p.x - 30.0) / 20.0).powi(2) + ((p.y - 30.0) / 10.0).powi(2);
+        assert!((v - 1.0).abs() < 1e-12, "{p:?}");
+    }
+    assert!(doc
+        .report
+        .skipped_feature("oval primitive arc or inner radius (full ellipse used)")
+        .is_some());
+
+    let rect = r##"<DOMRectangleObject x="1" y="2" objectWidth="30" objectHeight="40" topLeftRadius="5">
+      <fill><SolidColor color="#00FF00"/></fill>
+      <stroke><SolidStroke weight="2"><fill><SolidColor color="#000000"/></fill></SolidStroke></stroke></DOMRectangleObject>"##;
+    let doc = shape_doc(rect);
+    let s = first_shape(&doc);
+    assert_eq!(s.paths.len(), 2);
+    assert!((area(&s.paths[0].contours[0]).abs() - 1200.0).abs() < 1e-9);
+    assert_eq!(s.paths[1].stroke.as_ref().unwrap().weight, 2.0);
+    assert!(doc
+        .report
+        .skipped_feature("rectangle primitive corner radius (square corners used)")
+        .is_some());
+}
+
+#[test]
+fn same_fill_on_both_sides_is_ignored() {
+    let shape = r##"<DOMShape><fills><FillStyle index="1"><SolidColor/></FillStyle></fills><edges>
+      <Edge fillStyle1="1" edges="!0 0|2000 0|2000 2000|0 2000|0 0"/>
+      <Edge fillStyle0="1" fillStyle1="1" edges="!0 0|2000 2000"/>
+    </edges></DOMShape>"##;
+    let doc = shape_doc(shape);
+    let p = &first_shape(&doc).paths[0];
+    assert_eq!(p.contours.len(), 1);
+    assert!(p.contours[0].closed);
+    assert_eq!(p.contours[0].segments.len(), 4);
+}
+
+#[test]
+fn touching_loops_at_one_vertex_all_close() {
+    // Figure-eight: two squares meet at (100,100); that vertex has two outgoing
+    // pieces of the same fill. In a balanced graph a greedy walk can only stop
+    // at its start, so every loop closes whatever the pick.
+    let shape = r##"<DOMShape><fills><FillStyle index="1"><SolidColor/></FillStyle></fills><edges>
+      <Edge fillStyle1="1" edges="!2000 2000|4000 2000|4000 4000|2000 4000|2000 2000"/>
+      <Edge fillStyle1="1" edges="!0 0|2000 0|2000 2000|0 2000|0 0"/>
+    </edges></DOMShape>"##;
+    let doc = shape_doc(shape);
+    let p = &first_shape(&doc).paths[0];
+    assert!(p.contours.iter().all(|c| c.closed), "{p:?}");
+    let total: f64 = p.contours.iter().map(area).sum();
+    assert!((total.abs() - 20_000.0).abs() < 1e-9);
+    assert!(doc
+        .report
+        .skipped_feature("fill contour that does not close (kept open)")
+        .is_none());
+}
+
+#[test]
+fn negative_hex_coordinates_end_to_end() {
+    // The same square in decimal and in 24-bit hex (-100 px = -2000 twips = #FFF830).
+    let shape = r##"<DOMShape><fills><FillStyle index="1"><SolidColor/></FillStyle></fills><edges>
+      <Edge fillStyle1="1" edges="!-2000 -2000|0 -2000"/>
+      <Edge fillStyle1="1" edges="!#0 #FFF830|#0 #0|#FFF830 #0|#FFF830 #FFF830"/>
+    </edges></DOMShape>"##;
+    let doc = shape_doc(shape);
+    let c = &first_shape(&doc).paths[0].contours;
+    assert_eq!(c.len(), 1);
+    assert!(c[0].closed);
+    assert!((area(&c[0]).abs() - 10_000.0).abs() < 1e-9);
+}
+
+#[test]
+fn single_closed_quad_stroke_is_closed() {
+    let shape = r##"<DOMShape><strokes><StrokeStyle index="1"><SolidStroke><fill><SolidColor/></fill></SolidStroke></StrokeStyle></strokes>
+      <edges><Edge strokeStyle="1" edges="!0 0[400 400 0 0"/><Edge cubics="!0 0(1 1 2 2 3 3)"/></edges></DOMShape>"##;
+    let doc = shape_doc(shape);
+    let c = &first_shape(&doc).paths[0].contours[0];
+    assert!(c.closed);
+    assert!(doc
+        .report
+        .skipped_feature("edge stored only as cubics (not read)")
+        .is_some());
+}
+
+#[test]
+fn duplicate_zip_entries_are_refused() {
+    let bytes = {
+        let mut buf = std::io::Cursor::new(Vec::new());
+        {
+            let mut w = zip::ZipWriter::new(&mut buf);
+            let o = zip::write::SimpleFileOptions::default();
+            w.start_file("DOMDocument.xml", o).unwrap();
+            w.write_all(b"<DOMDocument/>").unwrap();
+            w.start_file("./DOMDocument.xml", o).unwrap();
+            w.write_all(b"<DOMDocument/>").unwrap();
+            w.finish().unwrap();
+        }
+        buf.into_inner()
+    };
+    assert!(matches!(read_fla(&bytes), Err(XflError::NotAnArchive(_))));
 }

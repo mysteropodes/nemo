@@ -17,6 +17,8 @@ const OLE_MAGIC: [u8; 8] = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
 #[derive(Debug, Default)]
 pub struct Archive {
     files: BTreeMap<String, Vec<u8>>,
+    /// Lower-cased name → stored name, for case-insensitive fallback lookups.
+    folded: BTreeMap<String, String>,
 }
 
 fn normalize(name: &str) -> String {
@@ -28,12 +30,20 @@ fn normalize(name: &str) -> String {
 
 impl Archive {
     pub fn from_entries<I: IntoIterator<Item = (String, Vec<u8>)>>(entries: I) -> Self {
-        Archive {
-            files: entries
+        Archive::indexed(
+            entries
                 .into_iter()
                 .map(|(k, v)| (normalize(&k), v))
                 .collect(),
+        )
+    }
+
+    fn indexed(files: BTreeMap<String, Vec<u8>>) -> Self {
+        let mut folded = BTreeMap::new();
+        for k in files.keys() {
+            folded.entry(k.to_lowercase()).or_insert_with(|| k.clone());
         }
+        Archive { files, folded }
     }
 
     pub fn from_zip(bytes: &[u8]) -> Result<Self, XflError> {
@@ -74,9 +84,11 @@ impl Archive {
                     "more than {MAX_TOTAL_BYTES} bytes uncompressed"
                 )));
             }
-            files.insert(name, data);
+            if files.insert(name.clone(), data).is_some() {
+                return Err(XflError::NotAnArchive(format!("duplicate entry {name}")));
+            }
         }
-        Ok(Archive { files })
+        Ok(Archive::indexed(files))
     }
 
     pub fn from_dir(dir: &Path) -> Result<Self, XflError> {
@@ -116,13 +128,28 @@ impl Archive {
                     let rel = path
                         .strip_prefix(dir)
                         .map_err(|e| XflError::Io(e.to_string()))?;
-                    let data = std::fs::read(&path)
+                    // Bounded read: the file may have grown since metadata().
+                    let mut data = Vec::new();
+                    std::fs::File::open(&path)
+                        .and_then(|f| f.take(MAX_ENTRY_BYTES + 1).read_to_end(&mut data))
                         .map_err(|e| XflError::Io(format!("{}: {e}", path.display())))?;
+                    if data.len() as u64 > MAX_ENTRY_BYTES {
+                        return Err(XflError::TooLarge(format!(
+                            "{} is larger than {MAX_ENTRY_BYTES} bytes",
+                            path.display()
+                        )));
+                    }
+                    total = total - len + data.len() as u64;
+                    if total > MAX_TOTAL_BYTES {
+                        return Err(XflError::TooLarge(format!(
+                            "more than {MAX_TOTAL_BYTES} bytes"
+                        )));
+                    }
                     files.insert(normalize(&rel.to_string_lossy()), data);
                 }
             }
         }
-        Ok(Archive { files })
+        Ok(Archive::indexed(files))
     }
 
     /// Exact lookup, then a case-insensitive one (documents saved on macOS
@@ -132,11 +159,8 @@ impl Archive {
         if let Some(v) = self.files.get(&key) {
             return Some(v);
         }
-        let lower = key.to_lowercase();
-        self.files
-            .iter()
-            .find(|(k, _)| k.to_lowercase() == lower)
-            .map(|(_, v)| v.as_slice())
+        let stored = self.folded.get(&key.to_lowercase())?;
+        self.files.get(stored).map(Vec::as_slice)
     }
 
     pub fn names(&self) -> impl Iterator<Item = &str> {

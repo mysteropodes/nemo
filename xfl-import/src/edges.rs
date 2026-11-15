@@ -54,7 +54,15 @@ fn parse_fixed(tok: &str) -> Option<i64> {
             return None;
         }
         let raw = u32::from_str_radix(int_part, 16).ok()?;
-        let integer = raw as i32 as i64;
+        // Animate writes the integer part with as few digits as needed. A full
+        // 8-digit value is 32-bit two's complement; a 6-digit value with its
+        // high bit set is a 24-bit negative (24.8 fixed point). Positive
+        // coordinates that large (over 419 000 px) do not occur in a document.
+        let integer = if int_part.len() == 6 && raw & 0x80_0000 != 0 {
+            (raw as i64) - 0x100_0000
+        } else {
+            raw as i32 as i64
+        };
         let frac_units = if frac_part.is_empty() {
             0
         } else {
@@ -185,6 +193,9 @@ mod tests {
         assert_eq!(parse_number("#14.80"), Some(20.5 / 20.0));
         assert_eq!(parse_number("#14.8"), Some(20.5 / 20.0));
         assert_eq!(parse_number("#FFFFFFEC"), Some(-1.0));
+        assert_eq!(parse_number("#FFFFEC"), Some(-1.0));
+        assert_eq!(parse_number("#FFFFFF.80"), Some(-0.5 / 20.0));
+        assert_eq!(parse_number("#7FFFFF"), Some(8_388_607.0 / 20.0));
         assert_eq!(parse_fixed("#14.80"), parse_fixed("20.5"));
         assert_eq!(parse_number("#"), None);
         assert_eq!(parse_number("#123456789"), None);

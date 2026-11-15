@@ -3,7 +3,7 @@
 use crate::archive::Archive;
 use crate::model::*;
 use crate::report::ImportReport;
-use crate::shape::{parse_color, parse_matrix, read_shape};
+use crate::shape::{parse_color, parse_matrix, read_primitive, read_shape};
 use crate::xml::{self, Node};
 use crate::XflError;
 
@@ -119,6 +119,9 @@ fn read_element(node: &Node, ctx: &mut Ctx<'_>, at: &str) -> Element {
                 matrix: parse_matrix(node),
             }
         }
+        "DOMRectangleObject" | "DOMOvalObject" => {
+            Element::Shape(read_primitive(node, ctx.report, at))
+        }
         "DOMStaticText" | "DOMDynamicText" | "DOMInputText" => {
             ctx.report.skip(format!("text ({}) — v2", node.name), at);
             Element::Text {
@@ -155,7 +158,9 @@ fn read_frame(node: &Node, ctx: &mut Ctx<'_>, timeline: &str, layer: &str) -> Fr
             other => TweenKind::Other(other.to_string()),
         };
         let custom_ease = node.attr_bool("hasCustomEase").unwrap_or(false)
-            || node.child("tweens").is_some_and(|t| !t.children.is_empty());
+            || node
+                .child("tweens")
+                .is_some_and(|t| t.child("CustomEase").is_some());
         match &kind {
             TweenKind::Motion => ctx.report.count("classicTweens", 1),
             TweenKind::Shape => ctx.report.skip(
@@ -338,11 +343,12 @@ pub(crate) fn read_document(archive: &Archive) -> Result<XflDocument, XflError> 
         }
     }
 
-    let background = parse_color(&root, "backgroundColor", "__none__").unwrap_or(Rgba::WHITE);
-    let background = if root.attr("backgroundColor").is_none() {
-        Rgba::WHITE
-    } else {
-        background
+    let background = match root.attr("backgroundColor") {
+        None => Rgba::WHITE,
+        Some(_) => parse_color(&root, "backgroundColor", "__none__").unwrap_or_else(|| {
+            report.skip("unreadable background colour (white used)", "document");
+            Rgba::WHITE
+        }),
     };
     Ok(XflDocument {
         width: root.attr_f64("width").unwrap_or(550.0),

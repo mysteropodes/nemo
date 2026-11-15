@@ -17,6 +17,10 @@ wound opposite to their outer boundary) and stroke paths. Quadratic curves
 stay quadratic in the model; `Segment::to_cubic` gives the exact cubic.
 Points are matched on exact fixed-point values (1/256 twip), so edges listed
 in any order and in either number form (decimal or `#hex.frac`) close.
+A 6-digit hex integer with its high bit set is read as a 24-bit negative;
+this is inferred, to be confirmed on real files. Animate's rectangle and
+oval primitives become a rectangle or 8-arc ellipse (corner radii, arcs and
+inner radii are reported).
 
 Binary `.fla` files from Flash CS4 and earlier are refused with
 `XflError::LegacyBinaryFla`. Archives are read under hard limits

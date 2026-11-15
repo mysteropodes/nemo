@@ -226,7 +226,8 @@ fn assemble_strokes(pieces: &[Piece]) -> Vec<Contour> {
     out.into_iter()
         .map(|(start, end, segments)| Contour {
             start: start.px(),
-            closed: start == end && segments.len() > 1,
+            closed: start == end
+                && (segments.len() > 1 || matches!(segments[0], Segment::Quad { .. })),
             segments,
         })
         .collect()
@@ -249,6 +250,9 @@ pub(crate) fn read_shape(node: &Node, report: &mut ImportReport, loc: &str) -> S
     let mut stroke_pieces: BTreeMap<u32, Vec<Piece>> = BTreeMap::new();
     for edge in node.list("edges").filter(|n| n.name == "Edge") {
         let Some(data) = edge.attr("edges") else {
+            if edge.attr("cubics").is_some() {
+                report.skip("edge stored only as cubics (not read)", loc);
+            }
             continue;
         };
         let cmds = match decode_fixed(data) {
@@ -281,6 +285,13 @@ pub(crate) fn read_shape(node: &Node, report: &mut ImportReport, loc: &str) -> S
             };
             pen = piece.to;
             if piece.from == piece.to && piece.ctrl.is_none_or(|c| c == piece.from) {
+                continue;
+            }
+            if f0 > 0 && f0 == f1 {
+                // Same fill on both sides: an interior edge, not a boundary.
+                if s > 0 {
+                    stroke_pieces.entry(s).or_default().push(piece);
+                }
                 continue;
             }
             if f1 > 0 {
@@ -328,6 +339,107 @@ pub(crate) fn read_shape(node: &Node, report: &mut ImportReport, loc: &str) -> S
     Shape {
         matrix: parse_matrix(node),
         is_drawing_object: node.attr_bool("isDrawingObject").unwrap_or(false),
+        paths,
+    }
+}
+
+fn pt(x: f64, y: f64) -> Point {
+    Point { x, y }
+}
+
+/// Ellipse as 8 quadratic arcs (the construction Flash itself uses).
+fn ellipse(cx: f64, cy: f64, rx: f64, ry: f64) -> Contour {
+    let step = std::f64::consts::FRAC_PI_4;
+    let k = 1.0 / (step / 2.0).cos();
+    let segments = (1..=8)
+        .map(|i| {
+            let a = step * i as f64;
+            let m = a - step / 2.0;
+            Segment::Quad {
+                ctrl: pt(cx + rx * k * m.cos(), cy + ry * k * m.sin()),
+                to: pt(cx + rx * a.cos(), cy + ry * a.sin()),
+            }
+        })
+        .collect();
+    Contour {
+        start: pt(cx + rx, cy),
+        segments,
+        closed: true,
+    }
+}
+
+/// `DOMRectangleObject` / `DOMOvalObject` (Animate primitives): geometry is
+/// stored as attributes, not edges. Rounded corners, arcs and inner radii are
+/// reported and drawn as the plain rectangle or full ellipse.
+pub(crate) fn read_primitive(node: &Node, report: &mut ImportReport, loc: &str) -> Shape {
+    let x = node.attr_f64("x").unwrap_or(0.0);
+    let y = node.attr_f64("y").unwrap_or(0.0);
+    let w = node.attr_f64("objectWidth").unwrap_or(0.0).max(0.0);
+    let h = node.attr_f64("objectHeight").unwrap_or(0.0).max(0.0);
+    let contour = if node.name == "DOMOvalObject" {
+        let partial = node.attr_f64("startAngle").is_some_and(|v| v != 0.0)
+            || node
+                .attr_f64("endAngle")
+                .is_some_and(|v| v != 0.0 && v != 360.0)
+            || node.attr_f64("innerRadius").is_some_and(|v| v != 0.0);
+        if partial {
+            report.skip(
+                "oval primitive arc or inner radius (full ellipse used)",
+                loc,
+            );
+        }
+        ellipse(x + w / 2.0, y + h / 2.0, w / 2.0, h / 2.0)
+    } else {
+        let rounded = [
+            "topLeftRadius",
+            "topRightRadius",
+            "bottomLeftRadius",
+            "bottomRightRadius",
+        ]
+        .iter()
+        .any(|k| node.attr_f64(k).is_some_and(|v| v != 0.0));
+        if rounded {
+            report.skip(
+                "rectangle primitive corner radius (square corners used)",
+                loc,
+            );
+        }
+        Contour {
+            start: pt(x, y),
+            segments: vec![
+                Segment::Line { to: pt(x + w, y) },
+                Segment::Line {
+                    to: pt(x + w, y + h),
+                },
+                Segment::Line { to: pt(x, y + h) },
+                Segment::Line { to: pt(x, y) },
+            ],
+            closed: true,
+        }
+    };
+    let mut paths = Vec::new();
+    if let Some(paint) = node.child("fill").and_then(|f| parse_paint(f, report, loc)) {
+        paths.push(ShapePath {
+            fill: Some(paint),
+            stroke: None,
+            contours: vec![contour.clone()],
+        });
+    }
+    if let Some(stroke) = node
+        .child("stroke")
+        .and_then(|s| parse_stroke(s, report, loc))
+    {
+        paths.push(ShapePath {
+            fill: None,
+            stroke: Some(stroke),
+            contours: vec![contour],
+        });
+    }
+    report.count("shapes", 1);
+    report.count("primitives", 1);
+    Shape {
+        matrix: parse_matrix(node),
+        is_drawing_object: true,
         paths,
     }
 }
