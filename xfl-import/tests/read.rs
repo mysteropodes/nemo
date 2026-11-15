@@ -509,10 +509,11 @@ fn duplicate_zip_entries_are_refused() {
     assert!(matches!(read_fla(&bytes), Err(XflError::NotAnArchive(_))));
 }
 
-/// A 2×1 lossless ARGB entry: opaque blue, then fully transparent.
+/// A 2×1 lossless ARGB entry: opaque red, then fully transparent.
+/// (Red tells ARGB from BGRA: misreading the order would give blue.)
 fn lossless_2x1() -> Vec<u8> {
     let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
-    z.write_all(&[255, 0, 0, 255, 0, 0, 0, 0]).unwrap();
+    z.write_all(&[255, 255, 0, 0, 0, 0, 0, 0]).unwrap();
     let stream = z.finish().unwrap();
     let mut out = vec![0x03, 0x05, 8, 0, 2, 0, 1, 0];
     out.extend_from_slice(&[0; 16]);
@@ -535,7 +536,7 @@ fn library_bitmaps_are_decoded() {
         panic!("{:?}", doc.bitmaps[0].data)
     };
     assert_eq!((*width, *height), (2, 1));
-    assert_eq!(pixels, &vec![0, 0, 255, 255, 0, 0, 0, 0]);
+    assert_eq!(pixels, &vec![255, 0, 0, 255, 0, 0, 0, 0]);
     assert_eq!(doc.report.converted["decodedBitmaps"], 1);
 
     let bad = zip_bytes(&[

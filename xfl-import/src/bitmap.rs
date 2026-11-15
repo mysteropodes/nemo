@@ -21,6 +21,10 @@ use serde::Serialize;
 /// Upper bound on a decoded bitmap (Animate caps bitmaps at 8192×8192).
 pub const MAX_PIXELS: u64 = 8192 * 8192;
 
+/// Budget for all bitmaps of one document together; later bitmaps past it
+/// are reported instead of decoded.
+pub const MAX_TOTAL_DECODED_BYTES: u64 = 1024 * 1024 * 1024;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum BitmapData {
@@ -40,8 +44,43 @@ pub enum BitmapData {
     },
 }
 
+impl BitmapData {
+    /// Bytes held in memory for this bitmap.
+    pub fn byte_len(&self) -> usize {
+        match self {
+            BitmapData::Encoded { bytes, .. } => bytes.len(),
+            BitmapData::Rgba { pixels, .. } => pixels.len(),
+        }
+    }
+}
+
 fn u16_at(b: &[u8], at: usize) -> Option<u16> {
     Some(u16::from_le_bytes([*b.get(at)?, *b.get(at + 1)?]))
+}
+
+/// Reads a list of byte slices as one stream.
+struct ChunkReader<'a> {
+    chunks: &'a [&'a [u8]],
+    index: usize,
+    offset: usize,
+}
+
+impl Read for ChunkReader<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        while let Some(chunk) = self.chunks.get(self.index) {
+            let rest = &chunk[self.offset..];
+            if rest.is_empty() {
+                self.index += 1;
+                self.offset = 0;
+                continue;
+            }
+            let n = rest.len().min(buf.len());
+            buf[..n].copy_from_slice(&rest[..n]);
+            self.offset += n;
+            return Ok(n);
+        }
+        Ok(0)
+    }
 }
 
 const HEADER_LEN: usize = 2 + 2 + 2 + 2 + 16 + 1 + 1;
@@ -82,7 +121,8 @@ pub fn decode_bitmap(data: &[u8]) -> Result<BitmapData, String> {
     }
     let expected = width as usize * height as usize * 4;
 
-    let mut stream = Vec::new();
+    // Collect chunk slices without copying them.
+    let mut chunks: Vec<&[u8]> = Vec::new();
     let mut at = HEADER_LEN;
     loop {
         let len = u16_at(data, at)
@@ -95,27 +135,36 @@ pub fn decode_bitmap(data: &[u8]) -> Result<BitmapData, String> {
         let chunk = data
             .get(at..at + len)
             .ok_or_else(|| "bitmap chunk runs past the end".to_string())?;
-        stream.extend_from_slice(chunk);
+        chunks.push(chunk);
         at += len;
     }
-    let argb = if compressed {
-        let mut out = Vec::with_capacity(expected);
-        flate2::read::ZlibDecoder::new(stream.as_slice())
+    let mut stream = ChunkReader {
+        chunks: &chunks,
+        index: 0,
+        offset: 0,
+    };
+    // The buffer grows with the actual output: header sizes alone never
+    // reserve memory, and `take` bounds a decompression bomb.
+    let mut pixels = Vec::new();
+    let read = if compressed {
+        flate2::read::ZlibDecoder::new(stream)
             .take(expected as u64 + 1)
-            .read_to_end(&mut out)
-            .map_err(|e| format!("bitmap zlib stream: {e}"))?;
-        out
+            .read_to_end(&mut pixels)
     } else {
         stream
+            .by_ref()
+            .take(expected as u64 + 1)
+            .read_to_end(&mut pixels)
     };
-    if argb.len() != expected {
+    read.map_err(|e| format!("bitmap zlib stream: {e}"))?;
+    if pixels.len() != expected {
         return Err(format!(
             "bitmap holds {} bytes, expected {expected}",
-            argb.len()
+            pixels.len()
         ));
     }
-    let mut pixels = Vec::with_capacity(expected);
-    for px in argb.chunks_exact(4) {
+    // Premultiplied ARGB → straight RGBA, in place.
+    for px in pixels.chunks_exact_mut(4) {
         let a = if has_alpha { px[0] } else { 255 };
         let unmul = |c: u8| -> u8 {
             if a == 0 {
@@ -126,7 +175,8 @@ pub fn decode_bitmap(data: &[u8]) -> Result<BitmapData, String> {
                 ((c as u32 * 255 + a as u32 / 2) / a as u32).min(255) as u8
             }
         };
-        pixels.extend_from_slice(&[unmul(px[1]), unmul(px[2]), unmul(px[3]), a]);
+        let (r, g, b) = (unmul(px[1]), unmul(px[2]), unmul(px[3]));
+        px.copy_from_slice(&[r, g, b, a]);
     }
     Ok(BitmapData::Rgba {
         width,

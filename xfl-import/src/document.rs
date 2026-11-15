@@ -311,6 +311,7 @@ pub(crate) fn read_document(archive: &Archive) -> Result<XflDocument, XflError> 
     }
 
     let mut bitmaps = Vec::new();
+    let mut decoded_bytes = 0u64;
     for media in root.list("media") {
         match media.name.as_str() {
             "DOMBitmapItem" => {
@@ -325,8 +326,14 @@ pub(crate) fn read_document(archive: &Archive) -> Result<XflDocument, XflError> 
                         ctx.report.skip("bitmap data missing from archive", &name);
                         None
                     }
+                    Some(_) if decoded_bytes >= crate::bitmap::MAX_TOTAL_DECODED_BYTES => {
+                        ctx.report
+                            .skip("bitmap not decoded: document bitmap budget exceeded", &name);
+                        None
+                    }
                     Some(bytes) => match crate::bitmap::decode_bitmap(bytes) {
                         Ok(d) => {
+                            decoded_bytes += d.byte_len() as u64;
                             ctx.report.count("decodedBitmaps", 1);
                             Some(d)
                         }
