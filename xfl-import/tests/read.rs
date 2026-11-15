@@ -550,3 +550,34 @@ fn library_bitmaps_are_decoded() {
         .skipped_feature("bitmap not decoded: unrecognised bitmap data")
         .is_some());
 }
+
+#[test]
+fn classic_tween_samples_between_keyframes() {
+    let doc = r##"<DOMDocument><timelines><DOMTimeline name="S"><layers><DOMLayer name="L"><frames>
+      <DOMFrame index="0" duration="10" tweenType="motion" acceleration="0"><elements>
+        <DOMSymbolInstance libraryItemName="Ball" symbolType="graphic"><matrix><Matrix tx="0" ty="0"/></matrix>
+          <transformationPoint><Point x="5" y="5"/></transformationPoint></DOMSymbolInstance></elements></DOMFrame>
+      <DOMFrame index="10" duration="5" tweenType="motion"><elements>
+        <DOMSymbolInstance libraryItemName="Ball" symbolType="graphic"><matrix><Matrix a="2" d="2" tx="100" ty="50"/></matrix>
+          <color><Color alphaMultiplier="0"/></color></DOMSymbolInstance></elements></DOMFrame>
+      <DOMFrame index="15"><elements>
+        <DOMSymbolInstance libraryItemName="Other"/></elements></DOMFrame>
+    </frames></DOMLayer></layers></DOMTimeline></timelines></DOMDocument>"##;
+    let doc = read_fla(&zip_bytes(&[("DOMDocument.xml", doc.as_bytes())])).unwrap();
+    let (tweens, skipped) = classic_tweens(&doc.timelines[0].layers[0]);
+    assert_eq!(tweens.len(), 1);
+    assert_eq!(skipped, vec![(10, TweenSkip::EndMismatch)]);
+    let t = &tweens[0];
+    assert_eq!((t.start_frame, t.end_frame), (0, 10));
+    // Pivot (5,5): start at (5,5); end matrix puts it at (110,60).
+    let (mid, alpha) = t.sample(5);
+    assert!(
+        (mid.x - 57.5).abs() < 1e-9 && (mid.y - 32.5).abs() < 1e-9,
+        "{mid:?}"
+    );
+    assert!((mid.scale_x - 1.5).abs() < 1e-9 && (alpha - 0.5).abs() < 1e-9);
+    let end = t.sample(10).0.to_matrix(t.pivot);
+    assert!(
+        (end.a - 2.0).abs() < 1e-9 && (end.tx - 100.0).abs() < 1e-9 && (end.ty - 50.0).abs() < 1e-9
+    );
+}

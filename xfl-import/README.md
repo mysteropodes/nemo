@@ -44,7 +44,10 @@ cargo run --example fla_dump -- path/to/file.fla
    markers, masks). Needs a decision with the native-engine owners on the
    entry point, like the SVG/PSD/Figma import plans.
 4. Symbols as Components (one instance per layer for now) and classic tweens
-   as Motion keys with ease.
+   as Motion keys with ease. Model side started: `classic_tweens(layer)`
+   finds each tween and `ClassicTween::sample(frame)` gives Flash's
+   decomposed transform (pivot position, scales, skews) with its simple ease
+   and rotation options; custom ease curves are not sampled yet.
 5. Validation on a real Animate corpus (PNG export from Animate against
    Nemo's render), then the `.swf` fallback via Ruffle's `swf` crate.
 
