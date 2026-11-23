@@ -359,3 +359,76 @@ fn duplicator_hosts_and_component_instances_are_refused() {
         Err(E::Geometry(_))
     ));
 }
+
+/// [`drawing`] with A's eye off, and B under G, a folder layer whose eye is off.
+fn hidden() -> Value {
+    let mut d = drawing();
+    let layers = d["layers"].as_array_mut().unwrap();
+    layers[0]["visible"] = json!(false);
+    layers[1]["parentLayerUid"] = json!("G");
+    layers.push(json!({"layerUid":"G","name":"G","visible":false,"isFolderLayer":true}));
+    d["compositionOrder"]["contexts"][0]["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"G","naturalPosition":7,"order":{}}));
+    d
+}
+
+#[test]
+fn a_layer_that_is_not_effectively_visible_has_no_box() {
+    let p = pin(&project(hidden(), 24.0));
+    let at =
+        |uid: &str, stroke: Option<&str>| content_box(&view(&p, "scene-root", uid, stroke), &p, 3);
+    // Eye off: loadFrame empties the layer, so the stroke and the layer box are both gone.
+    assert_eq!(at("A", Some("a1")), Ok(ContentBox::Missing));
+    assert_eq!(at("A", None), Ok(ContentBox::Missing));
+    assert_eq!(at("A", None).unwrap().motion_value(), [0.0; 4]);
+    // A hidden folder parent hides its child whatever the child's own eye says.
+    assert_eq!(at("B", Some("b1")), Ok(ContentBox::Missing));
+    // Visible neighbours are untouched, and in/out points never read visibility.
+    assert_eq!(at("C", None), Ok(bounds(5., 5., 5., 5.)));
+    assert_eq!(frames(&p, "A"), (2.0, 20.0));
+}
+
+#[test]
+fn the_solo_view_decides_over_the_eye() {
+    use crate::object_frame_packet::solo_view::enter;
+    let p = pin(&project(hidden(), 24.0));
+    let at = |uid: &str| content_box(&view(&p, "scene-root", uid, None), &p, 3);
+    {
+        // Soloing A shows it although its eye is off; every other layer is left out.
+        let _solo = enter("scene-root", &["A".to_owned()]);
+        assert_eq!(at("A"), Ok(bounds(20., 30., 190., 180.)));
+        assert_eq!(at("C"), Ok(ContentBox::Missing));
+    }
+    {
+        // A soloed folder shows its children, whatever the folder's own eye says.
+        let _solo = enter("scene-root", &["G".to_owned()]);
+        assert_eq!(at("B"), Ok(bounds(0., 0., 10., 10.)));
+        assert_eq!(at("C"), Ok(ContentBox::Missing));
+    }
+    {
+        // A Solo view of another context leaves the eyes in charge here.
+        let _solo = enter("sym", &["A".to_owned()]);
+        assert_eq!(at("A"), Ok(ContentBox::Missing));
+        assert_eq!(at("C"), Ok(bounds(5., 5., 5., 5.)));
+    }
+    // The scope is closed: the eyes decide again.
+    assert_eq!(at("C"), Ok(bounds(5., 5., 5., 5.)));
+}
+
+#[test]
+fn a_hidden_layer_answers_before_any_geometry_refusal() {
+    let mut d = drawing();
+    d["layers"].as_array_mut().unwrap()[1]["visible"] = json!(false);
+    d["componentTables"] = json!({
+        "duplicators":{"format":"nemo.native-duplicator-set","formatVersion":1,
+            "effectorLayers":[],"duplicators":[
+                {"contextId":"scene-root","layerUid":"B","duplicator":{"mode":"path"}}]}});
+    let p = pin(&project(d, 24.0));
+    // Baseline draws nothing for a hidden duplicator host, so there is no copy to box.
+    assert_eq!(
+        content_box(&view(&p, "scene-root", "B", None), &p, 0),
+        Ok(ContentBox::Missing)
+    );
+}

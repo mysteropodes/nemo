@@ -23,7 +23,14 @@
 //! answers inside an element's own expression. Motion answers the loaded frame; here
 //! the frame is explicit. Motion maps "no layer" and "no geometry" to the same zero
 //! box; this kernel keeps [`ContentBox::Missing`] distinct from a real zero-size box,
-//! and [`ContentBox::motion_value`] restores the Motion mapping. Typed refusals: a
+//! and [`ContentBox::motion_value`] restores the Motion mapping.
+//!
+//! `loadFrame` empties a layer that `layerIsEffectivelyVisible` rejects (eye off, a
+//! hidden folder parent, or another layer soloed), so neither the stroke nor the layer
+//! has Paper bounds and Motion answers the zero box whatever the layer holds. The same
+//! rule is read here through `solo_view::layer_visible`, before any geometry refusal.
+//! A hidden ELEMENT (`elemHidden`) cannot occur: the legacy importer refuses any value
+//! of it, so no native record carries one. Typed refusals: a
 //! component context, a component instance, a duplicator host (its copies are in the
 //! Paper layer), a rig, raster/text items and any non-`editable-vector-path` record.
 
@@ -40,6 +47,7 @@ use crate::evaluation::property_expression_lookup::LookupRefusal;
 use crate::evaluation::property_expression_views::ExpressionContextView;
 use crate::object_document::{RangeError, RangeEvaluator};
 use crate::object_frame_packet::projection::layer_bounds;
+use crate::object_frame_packet::solo_view::layer_visible;
 use crate::object_frame_packet::FrameScopeKind;
 use crate::revision::ObjectSnapshot;
 
@@ -247,6 +255,9 @@ pub(crate) fn layer_box(
     let (_, layer) = context
         .layer(layer_uid)
         .ok_or(SelfExtentError::UnknownLayer)?;
+    if !layer_visible(context.id(), context.layers(), layer) {
+        return Ok(ContentBox::Missing);
+    }
     if context.id() != "scene-root" {
         return Err(Geometry(
             "component strokes need a context-scoped stored loader",
