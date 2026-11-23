@@ -28,9 +28,14 @@
 //! `loadFrame` empties a layer that `layerIsEffectivelyVisible` rejects (eye off, a
 //! hidden folder parent, or another layer soloed), so neither the stroke nor the layer
 //! has Paper bounds and Motion answers the zero box whatever the layer holds. The same
-//! rule is read here through `solo_view::layer_visible`, before any geometry refusal.
-//! A hidden ELEMENT (`elemHidden`) cannot occur: the legacy importer refuses any value
-//! of it, so no native record carries one. Typed refusals: a
+//! rule is read here through `solo_view::layer_visible`, after the component-context
+//! refusal (Motion only reads the shown context's `userLayers`) and before the other
+//! geometry refusals. Solo is read from the thread's open Solo view: a caller must
+//! `solo_view::enter` the shown context's Solo set first, or a soloed session boxes
+//! layers Motion would answer zero for. A stored hidden element (`elemHidden`) cannot
+//! occur: the legacy importer refuses any value of it. Element SOLO (`_elemSolo`,
+//! session-only) is not modelled: with an element soloed Motion's layer box shrinks to
+//! the soloed elements, while this kernel still boxes every element. Typed refusals: a
 //! component context, a component instance, a duplicator host (its copies are in the
 //! Paper layer), a rig, raster/text items and any non-`editable-vector-path` record.
 
@@ -255,13 +260,13 @@ pub(crate) fn layer_box(
     let (_, layer) = context
         .layer(layer_uid)
         .ok_or(SelfExtentError::UnknownLayer)?;
-    if !layer_visible(context.id(), context.layers(), layer) {
-        return Ok(ContentBox::Missing);
-    }
     if context.id() != "scene-root" {
         return Err(Geometry(
             "component strokes need a context-scoped stored loader",
         ));
+    }
+    if !layer_visible(context.id(), context.layers(), layer) {
+        return Ok(ContentBox::Missing);
     }
     if source.instance(layer_uid).is_some() {
         return Err(Geometry(

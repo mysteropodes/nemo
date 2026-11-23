@@ -418,6 +418,26 @@ fn the_solo_view_decides_over_the_eye() {
 }
 
 #[test]
+fn a_folder_child_follows_its_own_eye_and_its_own_solo() {
+    use crate::object_frame_packet::solo_view::enter;
+    let mut d = hidden();
+    let layers = d["layers"].as_array_mut().unwrap();
+    layers[1]["visible"] = json!(false);
+    layers.last_mut().unwrap()["visible"] = json!(true);
+    let p = pin(&project(d, 24.0));
+    let at = |uid: &str| content_box(&view(&p, "scene-root", uid, None), &p, 3);
+    // A visible folder does not show a child whose own eye is off.
+    assert_eq!(at("B"), Ok(ContentBox::Missing));
+    let mut d = hidden();
+    d["layers"].as_array_mut().unwrap()[1]["visible"] = json!(true);
+    let p = pin(&project(d, 24.0));
+    let at = |uid: &str| content_box(&view(&p, "scene-root", uid, None), &p, 3);
+    // Soloing the child itself shows it under a hidden folder.
+    let _solo = enter("scene-root", &["B".to_owned()]);
+    assert_eq!(at("B"), Ok(bounds(0., 0., 10., 10.)));
+}
+
+#[test]
 fn a_hidden_layer_answers_before_any_geometry_refusal() {
     let mut d = drawing();
     d["layers"].as_array_mut().unwrap()[1]["visible"] = json!(false);
