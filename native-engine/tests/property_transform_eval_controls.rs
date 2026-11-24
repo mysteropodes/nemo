@@ -397,15 +397,15 @@ fn chain_dispatch_runs_only_the_taken_branch() {
 /// local (10, 0) -> scaled (20, 0) -> rot 90 (x, y) -> (-y, x) = (0, 20)
 /// -> + pivot (105, 120) -> + translate (115, 140). Second point (tangent
 /// (0, 1) * 10) (115, 110): local (10, 10) -> (20, 30) -> (-30, 20) ->
-/// (75, 120) -> (85, 140). Then the parent (scale 2 about the origin,
-/// translate (100, 0)): (115, 140) -> (330, 280), (85, 140) -> (270, 280).
-/// Translating before rotating would give (95, 100) instead of (115, 140).
+/// (75, 120) -> (85, 140). Then the parent (scale 2 about its own pivot
+/// (10, 0), translate (100, 0)): (115, 140) -> local (105, 140) -> (210, 280)
+/// -> (320, 280); (85, 140) -> (75, 140) -> (150, 280) -> (260, 280).
 #[test]
 fn affine_composition_and_pivot_order() {
     let target = (mm(10.0, 20.0, 90.0, 2.0, 3.0, 5.0, 0.0), [100.0, 100.0]);
     let chain = vec![ChainEntry {
         mat: mm(100.0, 0.0, 0.0, 2.0, 2.0, 0.0, 0.0),
-        pivot: [0.0, 0.0],
+        pivot: [10.0, 0.0],
     }];
     let saved = chain.clone();
     let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).abs() < 1e-9 && (a[1] - b[1]).abs() < 1e-9;
@@ -416,7 +416,7 @@ fn affine_composition_and_pivot_order() {
     );
     let [p, q] = follow_path_points([115.0, 100.0], Some([0.0, 1.0]), Some(target), &chain);
     assert!(
-        near(p, [330.0, 280.0]) && near(q, [270.0, 280.0]),
+        near(p, [320.0, 280.0]) && near(q, [260.0, 280.0]),
         "{p:?} {q:?}"
     );
     assert_eq!(chain, saved, "the evaluated chain is never rewritten");

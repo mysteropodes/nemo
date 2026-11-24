@@ -367,8 +367,9 @@ fn trig_tolerance_still_rejects_real_mistakes() {
     assert!(mat_matches(&one_ulp, &m, true) && !mat_matches(&one_ulp, &m, false));
 }
 
-/// D25: key (200, 100, w 960, rot 90) at frame 10 is exact; at frame 5 the symmetric default
-/// ease gives y = .5 (bx(.5) = .1575 + .2175 + .125), so x 100, y 50, w 1440, rot 45. Scale
+/// D25: frame 10 clamps to the last key (200, 100, w 960, rot 90); at frame 5 the symmetric
+/// default ease gives y = .5, as a straight line would (the ease shape is pinned by
+/// `interpolation_reads_departing_ease_and_both_handles`), so x 100, y 50, w 1440, rot 45. Scale
 /// 1920 / 1440 = 4/3 about (100, 50), which lands on (960, 540); world (130, 50) is +(40, 0)
 /// on screen rolled by -45: (960 + 20 sqrt2, 540 - 20 sqrt2). NaN width: NaN matrix, returned.
 #[test]
