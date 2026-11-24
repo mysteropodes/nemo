@@ -366,3 +366,28 @@ fn trig_tolerance_still_rejects_real_mistakes() {
     one_ulp[0] = f64::from_bits(m[0].to_bits() + 1);
     assert!(mat_matches(&one_ulp, &m, true) && !mat_matches(&one_ulp, &m, false));
 }
+
+/// D25: key (200, 100, w 960, rot 90) at frame 10 is exact; at frame 5 the symmetric default
+/// ease gives y = .5 (bx(.5) = .1575 + .2175 + .125), so x 100, y 50, w 1440, rot 45. Scale
+/// 1920 / 1440 = 4/3 about (100, 50), which lands on (960, 540); world (130, 50) is +(40, 0)
+/// on screen rolled by -45: (960 + 20 sqrt2, 540 - 20 sqrt2). NaN width: NaN matrix, returned.
+#[test]
+fn fixed_poses_at_key_and_midpoint_frames() {
+    let mut b = k(10.0, 200.0, 100.0, 960.0);
+    b.rot = Some(90.0);
+    let ks = [k(0.0, 0.0, 0.0, 1920.0), b];
+    assert_eq!(pose_arr(pose(&ks, 10.0)), [200.0, 100.0, 960.0, 90.0]);
+    let (p, m) = (
+        pose(&ks, 5.0),
+        camera_matrix_at_frame(Some(&ks), 5.0, 1920.0, 1080.0).unwrap(),
+    );
+    let at = |x: f64, y: f64| [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
+    let (c, r, h) = (at(100.0, 50.0), at(130.0, 50.0), 20.0 * 2f64.sqrt());
+    let near = |a: f64, b: f64| (a - b).abs() < 1e-9;
+    assert!(near(p.x, 100.0) && near(p.y, 50.0) && near(p.w, 1440.0) && near(p.rot, 45.0));
+    assert!(
+        near(c[0], 960.0) && near(c[1], 540.0) && near(r[0], 960.0 + h) && near(r[1], 540.0 - h)
+    );
+    let nan = camera_matrix_at_frame(Some(&[k(0.0, 0.0, 0.0, f64::NAN)]), 0.0, 1920.0, 1080.0);
+    assert!(nan.unwrap()[..4].iter().all(|v| v.is_nan()));
+}
