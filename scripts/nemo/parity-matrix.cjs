@@ -111,11 +111,9 @@ function main() {
     const undecided = lib.undecidedSurfaces(matrix);
     if (undecided.length) problems.push(`${undecided.length} surface(s) have several contributing issues and no primaryOwner (strict; list them with --undecided)`);
   }
-  if (args.includes('--undecided')) {
-    for (const u of lib.undecidedSurfaces(matrix)) console.log(JSON.stringify(u));
-    return;
-  }
+  if (args.includes('--undecided')) for (const u of lib.undecidedSurfaces(matrix)) console.log(JSON.stringify(u));
   if (problems.length) { console.error('parity matrix: ' + problems.slice(0, 10).join('; ')); process.exit(1); }
+  if (args.includes('--undecided')) return;
   console.log(`parity matrix: ${matrix.counts.surfaces} surfaces ${JSON.stringify(matrix.counts.surfaceStatus)}, ${matrix.counts.tasks} tasks ${JSON.stringify(matrix.counts.taskStatus)}`);
 }
 
