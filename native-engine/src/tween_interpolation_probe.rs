@@ -227,12 +227,20 @@ pub(super) fn choose(pair: &PreparedInterpolation) -> Decision {
     for trajectory in &mut trajectories {
         trajectory.push(pair.b.clone());
     }
-    let scores: Vec<_> = trajectories
+    let scores: Vec<_> = trajectories[..4]
         .iter()
-        .enumerate()
-        .map(|(i, t)| score(t, pair, expected, &folds, i == 4))
+        .map(|t| score(t, pair, expected, &folds, false))
         .collect();
     let best = scores.iter().copied().fold(f64::INFINITY, f64::min);
+    // The registered candidate is compared with the other four on one and the
+    // same (tolerant) crossing count; the choice among those four is untouched.
+    let registered = pair.articulated && {
+        let fair: Vec<_> = trajectories
+            .iter()
+            .map(|t| score(t, pair, expected, &folds, true))
+            .collect();
+        fair[4] + 0.05 < fair[..4].iter().copied().fold(f64::INFINITY, f64::min)
+    };
     let mut out = Decision {
         weight: peak,
         trust: Some(trust),
@@ -240,8 +248,7 @@ pub(super) fn choose(pair: &PreparedInterpolation) -> Decision {
         folds: Some(folds),
         registered: false,
     };
-    let others = scores[..4].iter().copied().fold(f64::INFINITY, f64::min);
-    if pair.articulated && scores[4] + 0.05 < others {
+    if registered {
         out.weight = 0.;
         out.registered = true;
     } else if scores[0] - best < 0.05 {

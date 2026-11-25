@@ -95,21 +95,33 @@ impl PreparedInterpolation {
     /// The swing is admitted when the similarity leaves less than 20% of the
     /// shape's size unexplained; a redrawn, non-rigid pair keeps the baseline
     /// result exactly. Manual arc handles still take precedence.
-    pub(crate) fn with_pivot_arc(mut self) -> Self {
+    ///
+    /// Any turn with a translation has a fixed point, so the pivot must also
+    /// be near: within `reach` times the shape's own radius of its centre. A
+    /// limb pivots at its end; an object that crosses the stage while turning
+    /// has its fixed point far away and keeps the straight path.
+    pub(crate) fn with_pivot_arc(self) -> Self {
+        self.with_pivot_arc_within(3.5)
+    }
+    pub(crate) fn with_pivot_arc_within(mut self, reach: f64) -> Self {
         self.articulated = articulated(&self.a, &self.b);
-        let Some((theta, scale, rigidity)) = similarity(&self.a, &self.b, self.ca, self.cb) else {
+        self.pivot_arc(reach);
+        if self.articulated || self.pivot.is_some() {
             self.decide();
-            return self;
+        }
+        self
+    }
+    fn pivot_arc(&mut self, reach: f64) {
+        let Some((theta, scale, rigidity)) = similarity(&self.a, &self.b, self.ca, self.cb) else {
+            return;
         };
         if rigidity < 1. / 3. {
-            self.decide();
-            return self;
+            return;
         }
         let (re, im) = (scale * theta.cos(), scale * theta.sin());
         let den = (1. - re) * (1. - re) + im * im;
         if theta.abs() < 0.06 || den < 1e-9 {
-            self.decide();
-            return self;
+            return;
         }
         // p = (cb - w ca) / (1 - w), complex arithmetic.
         let n = [
@@ -120,15 +132,17 @@ impl PreparedInterpolation {
             (n[0] * (1. - re) - n[1] * im) / den,
             (n[1] * (1. - re) + n[0] * im) / den,
         ];
-        if !pivot.iter().all(|v| v.is_finite()) {
-            self.decide();
-            return self;
+        let radius = self
+            .a
+            .iter()
+            .map(|s| norm(sub(s.point, self.ca)))
+            .fold(0., f64::max);
+        if !pivot.iter().all(|v| v.is_finite()) || norm(sub(pivot, self.ca)) > reach * radius {
+            return;
         }
         self.theta = theta;
         self.scale = scale;
         self.pivot = Some(pivot);
-        self.decide();
-        self
     }
     /// How far the registered reconstruction replaces the blend at `t`: none at
     /// the keys (their own drawing is kept), all of it through the middle.
@@ -183,10 +197,9 @@ impl PreparedInterpolation {
             let line = mix(self.ca, self.cb, at);
             norm(sub(control, line)) <= 1e-6 * (1. + norm(sub(self.cb, self.ca)))
         };
+        let steered = !(straight(out, 1. / 3.) && straight(input, 2. / 3.));
         let center = match self.pivot {
-            Some(pivot) if straight(out, 1. / 3.) && straight(input, 2. / 3.) => {
-                self.orbit(pivot, t)
-            }
+            Some(pivot) if !steered => self.orbit(pivot, t),
             _ => [
                 cubic(self.ca[0], out[0], input[0], self.cb[0]),
                 cubic(self.ca[1], out[1], input[1], self.cb[1]),
@@ -198,7 +211,14 @@ impl PreparedInterpolation {
             self.linear_at(t, center)
         };
         if self.decision.registered {
-            let target = registered(&self.a, &self.b, t, self.closed_at(t));
+            let mut target = registered(&self.a, &self.b, t, self.closed_at(t));
+            if steered {
+                // Manual arc handles carry the reconstruction with the centre.
+                let shift = sub(center, self.center_at(t));
+                for p in &mut target {
+                    p.point = [p.point[0] + shift[0], p.point[1] + shift[1]];
+                }
+            }
             s = blend_segments(&s, &target, &vec![self.swell(t); s.len()]);
         }
         let weight = self.decision.weight * (std::f64::consts::PI * t.clamp(0., 1.)).sin();

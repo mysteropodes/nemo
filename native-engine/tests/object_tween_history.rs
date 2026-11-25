@@ -436,7 +436,7 @@ fn endpoint_key_edit_keeps_in_betweens_until_regenerate_recomputes_them() {
         assert_eq!((o.history_depths(), o.content_revision()), ((2, 0), 2));
         // The edited key turns the stroke 18 degrees and moves it four radii away. The JavaScript
         // baseline drops that turn; the rigid swing keeps it, so the result sits near the oracle.
-        assert_frames_within(&head(&o), &wanted["regenerated"], "endpoint-regenerated", 2.5);
+        assert_frames(&head(&o), &wanted["regenerated"], "endpoint-regenerated");
         assert_ne!(bytes(&o), edited);
         let regenerated = bytes(&o);
         for (id, want) in [("undo-regenerate", &edited), ("undo-edit", &original)] {
@@ -451,7 +451,7 @@ fn endpoint_key_edit_keeps_in_betweens_until_regenerate_recomputes_them() {
         assert_eq!(bytes(&o), regenerated);
         assert_eq!(encode_storage_project(retained.document()).unwrap(), original);
         let reopened = NativeObjectHistory::new("reopened", decode_storage_project(&regenerated).unwrap()).unwrap();
-        assert_frames_within(&head(&reopened), &wanted["regenerated"], "endpoint-reopened", 2.5);
+        assert_frames(&head(&reopened), &wanted["regenerated"], "endpoint-reopened");
     }
 }
 
