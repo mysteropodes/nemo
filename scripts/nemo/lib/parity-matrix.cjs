@@ -116,6 +116,14 @@ function validate({ tasks, baseline, mapping, ownership, owners }) {
     }
     if (m.confidence !== undefined && !CONFIDENCE.includes(m.confidence)) problems.push(`mapping for ${id} has invalid confidence ${m.confidence}`);
     if (m.noTask === true && ts.length) problems.push(`mapping for ${id} sets noTask but lists tasks`);
+    if (m.primaryOwner !== undefined) {
+      if (!Number.isSafeInteger(m.primaryOwner) || m.primaryOwner <= 0) problems.push(`mapping for ${id} has an invalid primaryOwner`);
+      else if (m.disposition || !ts.length) problems.push(`mapping for ${id} names primaryOwner but has no tasks to accept`);
+      else if (owners) {
+        const contrib = contributorsOf(ts, mergedOwners(owners, ownership));
+        if (!contrib.includes(m.primaryOwner)) problems.push(`mapping for ${id} primaryOwner #${m.primaryOwner} is not a contributing issue of its tasks (${contrib.map((n) => '#' + n).join(', ') || 'none'})`);
+      }
+    }
   }
   for (const [task, list] of Object.entries((ownership && ownership.tasks) || {})) {
     if (!taskIds.has(task)) problems.push(`ownership names unknown task ${task}`);
@@ -145,6 +153,22 @@ function surfaceStatus(m, owners) {
   return (curated ? 'curated-' : 'issues-') + (closed ? 'closed' : 'open');
 }
 
+// Distinct issues contributing to a surface through its tasks, ascending.
+function contributorsOf(taskList, owners) {
+  return [...new Set(taskList.flatMap((t) => (owners[t] || []).map((o) => o.issue)))].sort((a, b) => a - b);
+}
+
+// The single issue accountable for accepting a surface. Only a surface that rests on issues
+// needs one. Rule (CS8 #2349): the sole contributing issue is the primary owner; with several,
+// only an explicit mapping `primaryOwner` decides, and an unmade choice is reported 'undecided',
+// never guessed. Closed is not acceptance, so state plays no part here.
+function primaryOwnerOf(status, m, contributors) {
+  if (!/^(issues|curated)-/.test(status)) return { primaryOwner: null, basis: 'n/a' };
+  if (m && m.primaryOwner !== undefined && contributors.includes(m.primaryOwner)) return { primaryOwner: m.primaryOwner, basis: 'explicit' };
+  if (contributors.length === 1) return { primaryOwner: contributors[0], basis: 'sole' };
+  return { primaryOwner: null, basis: 'undecided' };
+}
+
 function mergedOwners(snapshot, ownership) {
   const owners = JSON.parse(JSON.stringify(snapshot.owners || {}));
   for (const [task, list] of Object.entries((ownership && ownership.tasks) || {})) {
@@ -165,6 +189,10 @@ function buildMatrix({ config, tasks, baseline, mapping, owners: snapshot, owner
       tasks: m ? (m.tasks || []) : [], capabilityId: m && m.capability || null,
       disposition: m && m.disposition || null, proposedDisposition: m && m.proposedDisposition || null,
       confidence: m && m.confidence || null, status: surfaceStatus(m, owners) };
+    row.contributors = /^(issues|curated)-/.test(row.status) ? contributorsOf(row.tasks, owners) : [];
+    const po = primaryOwnerOf(row.status, m, row.contributors);
+    row.primaryOwner = po.primaryOwner;
+    row.primaryOwnerBasis = po.basis;
     // Evidence is additive: it never changes status, and the key is absent when no family applies.
     const evidence = family.evidenceFor(row.tasks, results);
     if (evidence) row.evidence = evidence;
@@ -180,10 +208,16 @@ function buildMatrix({ config, tasks, baseline, mapping, owners: snapshot, owner
   const count = (rows) => rows.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
   return { schema: SCHEMA, baseline: config.baseline, baselineStatus: config.baselineStatus, ownersSnapshotAt: snapshot.snapshotAt || null,
     counts: { surfaces: surfaces.length, tasks: taskRows.length, surfaceStatus: count(surfaces), taskStatus: count(taskRows),
+      primaryOwner: surfaces.reduce((acc, s) => { acc[s.primaryOwnerBasis] = (acc[s.primaryOwnerBasis] || 0) + 1; return acc; }, {}),
       evidence: family.evidenceCounts(surfaces), mappingConfidence: surfaces.reduce((acc, s) => { if (s.confidence) acc[s.confidence] = (acc[s.confidence] || 0) + 1; return acc; }, {}) },
     evidence: (results || []).map((r) => ({ family: r.family, verdict: r.verdict, sourceSha: r.sourceSha, generatedAt: r.generatedAt,
       kindsMissing: r.kindsMissing, tasks: r.tasks })).sort((a, b) => (a.family < b.family ? -1 : 1)),
     surfaces, tasks: taskRows };
+}
+
+// Surfaces still lacking a decision on their single accepting issue.
+function undecidedSurfaces(matrix) {
+  return matrix.surfaces.filter((s) => s.primaryOwnerBasis === 'undecided').map((s) => ({ id: s.id, tasks: s.tasks, contributors: s.contributors }));
 }
 
 function renderMarkdown(matrix) {
@@ -201,6 +235,7 @@ function renderMarkdown(matrix) {
     `Owners snapshot: ${matrix.ownersSnapshotAt || 'unknown'}. A *declared* owner is a non-parent issue declaring the task ID (title list or range, \`[NEMO:…]\` prefix or \`**IDs:**\` line); a *curated* owner comes from \`ownership.json\` (first-pass research). \`issues-*\` rows rest on declared owners, \`curated-*\` rows on at least one curated-only task. \`*-closed\` means every owning issue is closed, NOT that the task is accepted; acceptance is matrix rows green at a candidate. \`no-task\` marks a baseline surface no original task covers. The mapping itself is a first-pass curation: medium/low rows need human review.`, '',
     `- Surfaces: ${matrix.counts.surfaces} (${line(matrix.counts.surfaceStatus)})`,
     `- Tasks: ${matrix.counts.tasks} (${line(matrix.counts.taskStatus)})`,
+    `- Primary acceptance owner (the one issue accountable for a row; \`sole\` = exactly one contributing issue, \`explicit\` = \`primaryOwner\` in \`mapping.json\`, \`undecided\` = several contributors and no decision yet, \`n/a\` = disposition, no-task or unowned): ${line(matrix.counts.primaryOwner) || 'none'}`,
     `- Mapping confidence: ${line(matrix.counts.mappingConfidence) || 'none recorded'} (medium/low rows need human review)`, '',
     `- Family evidence (source-level records, additive; surfaces per verdict): ${Object.entries(matrix.counts.evidence || {}).sort().map(([f, v]) => `${f} (${line(v)})`).join(' · ') || 'none recorded'}`, '',
     'Evidence comes from `results/<family>.json`, written by `node scripts/nemo/family-acceptance.cjs <family> --write` at the recorded source SHA. It is a source-level record, NOT a freshness claim about the current HEAD and NOT acceptance: row status above is unchanged. `incomplete` lists a check kind still uncovered.', '',
@@ -212,4 +247,4 @@ function renderMarkdown(matrix) {
   return out.join('\n');
 }
 
-module.exports = { SCHEMA, parseCsv, tasksFromCsv, baselineRow, issueTaskIds, ownersFromIssues, ownersSnapshot, mergedOwners, validate, buildMatrix, renderMarkdown };
+module.exports = { SCHEMA, parseCsv, tasksFromCsv, baselineRow, issueTaskIds, ownersFromIssues, ownersSnapshot, mergedOwners, contributorsOf, primaryOwnerOf, undecidedSurfaces, validate, buildMatrix, renderMarkdown };
