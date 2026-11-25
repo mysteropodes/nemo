@@ -151,8 +151,25 @@ pub(crate) fn has_request_validator(operation: &str) -> bool {
     request_schema::declares(operation)
 }
 
+/// Operations whose request shape is owned by the declared transport schema alone. Their
+/// hand-written validators are retired (CS1b, #2363): the schema branch decides exactly as the
+/// old check did, pinned by `retired_request_equivalence` in `native_contract_tests.rs`.
+/// Listing an operation here keeps the response-correlation gate (`validate_result`)
+/// re-checking the payload against its schema; deleting a hand arm without listing it
+/// would silently stop that.
+const SCHEMA_OWNED_REQUESTS: [&str; 7] = [
+    "command.document.object.layer.create",
+    settings::symmetry::EDIT,
+    custom_brush::EDIT,
+    "job.export.svg.status",
+    "job.export.svg.cancel",
+    "job.export.media.status",
+    "job.export.media.cancel",
+];
+
 fn request_check(operation: &str, payload: &Value) -> Option<bool> {
     Some(match operation {
+        op if SCHEMA_OWNED_REQUESTS.contains(&op) => request_schema::payload(op, payload) == Some(true),
         history_read::OP => history_read::request(payload),
         font::IMPORT | font::QUERY => font::request(operation, payload),
         brush::PUBLISH | brush::QUERY => brush::request(operation, payload),
@@ -171,10 +188,10 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
         guide::READ | guide::EDIT => guide::request(operation, payload),
         shadow::READ | shadow::EDIT => shadow::request(operation, payload),
         perspective::READ | perspective::EDIT => perspective::request(operation, payload),
-        settings::symmetry::READ | settings::symmetry::EDIT | settings::camera::READ => settings::route_request(operation, payload),
+        settings::symmetry::READ | settings::camera::READ => settings::route_request(operation, payload),
         workspace::READ | workspace::EDIT => workspace::request(operation, payload),
         comments::READ | comments::EDIT => comments::request(operation, payload),
-        custom_brush::READ | custom_brush::EDIT => custom_brush::request(operation, payload),
+        custom_brush::READ => custom_brush::request(operation, payload),
         placement::OP => placement::request(payload),
         audio_track::OP => audio_track::request(payload),
         layer_policy::OP => layer_policy::request(payload),
@@ -189,7 +206,6 @@ fn request_check(operation: &str, payload: &Value) -> Option<bool> {
         vector::VECTOR | vector::PARAMETRIC | vector::EFFECTS => {
             vector::request(operation, payload)
         }
-        "command.document.object.layer.create" => object::create_request(payload),
         import::OP => import::request(payload),
         operation if export::owns(operation) => export::request(operation, payload),
         "query.diagnostics.recent" => request_schema::payload(operation, payload) == Some(true),
