@@ -318,7 +318,7 @@ fn swing(a: &[[f64; 2]], b: &[[f64; 2]], closed: bool, improved: bool, t: f64) -
         25,
         false,
     );
-    let rb = align_pair_with(&ra, &rb, improved);
+    let rb = align_pair_with(&ra, &rb, improved.then(|| b[0]));
     let pair = PreparedInterpolation::new(
         ra.segments,
         rb.segments,
@@ -357,29 +357,14 @@ fn a_limb_swinging_about_its_end_keeps_its_length_and_its_pivot() {
         for t in [0.25, 0.5, 0.75] {
             let mid = swing(&a, &b, false, true, t);
             let radii = [mid[0].point, mid[mid.len() - 1].point].map(|p| p[0].hypot(p[1]));
-            assert!(
-                (polyline(&mid) / rest - 1.).abs() < 0.01,
-                "{degrees} t={t}: length"
-            );
-            assert!(
-                radii[0] < 0.5,
-                "{degrees} t={t}: shoulder moved {}",
-                radii[0]
-            );
-            assert!(
-                (radii[1] - 200.).abs() < 1.,
-                "{degrees} t={t}: tip at {}",
-                radii[1]
-            );
+            assert!((polyline(&mid) / rest - 1.).abs() < 0.01);
+            assert!(radii[0] < 0.5);
+            assert!((radii[1] - 200.).abs() < 1.);
             let tip = mid[mid.len() - 1].point;
             let angle = tip[1].atan2(tip[0]).to_degrees();
-            assert!(
-                (angle - degrees * t).abs() < 0.5,
-                "{degrees} t={t}: tip angle {angle}"
-            );
+            assert!((angle - degrees * t).abs() < 0.5);
         }
     }
-    // The baseline this replaces: a 90 degree swing is a straight blend.
     let baseline = swing(&a, &turned(&a, 90.), false, false, 0.5);
     assert!(polyline(&baseline) / rest < 0.75);
 }
@@ -398,43 +383,24 @@ fn a_symmetric_closed_shape_follows_its_arc_without_an_extra_half_turn() {
         let c = mid.iter().fold([0., 0.], |c, s| {
             [c[0] + s.point[0] / n, c[1] + s.point[1] / n]
         });
-        assert!(
-            (c[0].hypot(c[1]) - 150.).abs() < 6.,
-            "{degrees}: radius {}",
-            c[0].hypot(c[1])
-        );
+        assert!((c[0].hypot(c[1]) - 150.).abs() < 6.);
         let far = mid
             .iter()
             .map(|s| [s.point[0] - c[0], s.point[1] - c[1]])
             .max_by(|x, y| x[0].hypot(x[1]).total_cmp(&y[0].hypot(y[1])))
             .unwrap();
-        // Long axis modulo a half turn, against the half-way orientation.
         let axis = (far[1].atan2(far[0]).to_degrees() - degrees / 2.).rem_euclid(180.);
-        assert!(
-            axis.min(180. - axis) < 12.,
-            "{degrees}: long axis off by {axis}"
-        );
-        assert!(
-            (far[0].hypot(far[1]) - 30.).abs() < 3.5,
-            "{degrees}: long axis length"
-        );
+        assert!(axis.min(180. - axis) < 12.);
+        assert!((far[0].hypot(far[1]) - 30.).abs() < 3.5);
     }
 }
 
 #[test]
 fn pairs_that_are_not_a_rigid_swing_keep_the_baseline_result() {
-    let straight: Vec<[f64; 2]> = (0..=12).map(|i| [200. * f64::from(i) / 12., 0.]).collect();
-    let bent: Vec<[f64; 2]> = (0..=12)
-        .map(|i| {
-            if i <= 6 {
-                [100. * f64::from(i) / 6., 0.]
-            } else {
-                [100., 100. * f64::from(i - 6) / 6.]
-            }
-        })
-        .collect();
+    let zed = vec![[0., 0.], [60., 0.], [60., 60.], [100., 60.]];
+    let grown = vec![[10., 10.], [30., 30.], [90., 90.], [150., 90.]];
     let moved: Vec<[f64; 2]> = arm().iter().map(|p| [p[0] + 300., p[1] - 40.]).collect();
-    for (a, b) in [(straight, bent), (arm(), moved)] {
+    for (a, b) in [(zed, grown), (arm(), moved)] {
         for t in [0.2, 0.5, 0.8] {
             let (ra, rb) = resample_pair(
                 &swing_stroke(&a, false),
@@ -494,4 +460,53 @@ fn manual_arc_handles_still_steer_the_centre_of_a_rigid_swing() {
         (ca[1] + 3. * controls.0[1] + 3. * controls.1[1] + cb[1]) / 8.,
     ];
     assert!((centre[0] - expected[0]).hypot(centre[1] - expected[1]) < 1e-6);
+}
+#[test]
+fn an_open_stroke_swinging_wide_is_not_read_as_drawn_backwards() {
+    let hook: Vec<_> = arm()
+        .iter()
+        .map(|p| [p[0], 40. * (p[0] / 200.).powi(3)])
+        .collect();
+    for stroke in [arm(), hook] {
+        let rest = polyline(&swing(&stroke, &stroke, false, false, 0.5));
+        for degrees in [100., 120., 135., 150.] {
+            let mid = swing(&stroke, &turned(&stroke, degrees), false, true, 0.5);
+            let shoulder = mid[0].point;
+            assert!(shoulder[0].hypot(shoulder[1]) < 0.5);
+            assert!((polyline(&mid) / rest - 1.).abs() < 0.02, "{degrees}");
+        }
+        let redrawn: Vec<[f64; 2]> = stroke
+            .iter()
+            .rev()
+            .map(|p| [p[0] + 20., p[1] + 10.])
+            .collect();
+        let first = swing(&stroke, &redrawn, false, true, 0.5)[0].point;
+        assert!((first[0] - 10.).hypot(first[1] - 5.) < 0.5, "{first:?}");
+    }
+}
+
+#[test]
+fn a_bending_elbow_keeps_its_length_and_its_still_half() {
+    let straight: Vec<[f64; 2]> = (0..=12).map(|i| [200. * f64::from(i) / 12., 0.]).collect();
+    for bend in [45_f64, 90., 135.] {
+        let (sin, cos) = bend.to_radians().sin_cos();
+        let bent: Vec<[f64; 2]> = (0..=12)
+            .map(|i| {
+                let reach = 100. * f64::from(i - 6) / 6.;
+                if i <= 6 {
+                    [100. * f64::from(i) / 6., 0.]
+                } else {
+                    [100. + reach * cos, reach * sin]
+                }
+            })
+            .collect();
+        for t in [0.25, 0.5, 0.75] {
+            let mid = swing(&straight, &bent, false, true, t);
+            assert!((polyline(&mid) / 200. - 1.).abs() < 0.005, "{bend} at {t}");
+            let shoulder = mid[0].point;
+            assert!(shoulder[0].hypot(shoulder[1]) < 0.5);
+            let elbow = mid.iter().map(|s| (s.point[0] - 100.).hypot(s.point[1]));
+            assert!(elbow.fold(f64::MAX, f64::min) < 0.5);
+        }
+    }
 }

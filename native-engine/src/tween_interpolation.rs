@@ -26,6 +26,7 @@ pub(crate) struct PreparedInterpolation {
     reduction: Option<Vec<usize>>,
     original_counts: Option<(usize, usize)>,
     pivot: Option<[f64; 2]>,
+    articulated: bool,
 }
 impl PreparedInterpolation {
     pub(crate) fn new(
@@ -63,6 +64,7 @@ impl PreparedInterpolation {
             reduction: None,
             original_counts,
             pivot: None,
+            articulated: false,
         };
         pair.decide();
         Some(pair)
@@ -94,15 +96,19 @@ impl PreparedInterpolation {
     /// shape's size unexplained; a redrawn, non-rigid pair keeps the baseline
     /// result exactly. Manual arc handles still take precedence.
     pub(crate) fn with_pivot_arc(mut self) -> Self {
+        self.articulated = articulated(&self.a, &self.b);
         let Some((theta, scale, rigidity)) = similarity(&self.a, &self.b, self.ca, self.cb) else {
+            self.decide();
             return self;
         };
         if rigidity < 1. / 3. {
+            self.decide();
             return self;
         }
         let (re, im) = (scale * theta.cos(), scale * theta.sin());
         let den = (1. - re) * (1. - re) + im * im;
         if theta.abs() < 0.06 || den < 1e-9 {
+            self.decide();
             return self;
         }
         // p = (cb - w ca) / (1 - w), complex arithmetic.
@@ -115,6 +121,7 @@ impl PreparedInterpolation {
             (n[1] * (1. - re) + n[0] * im) / den,
         ];
         if !pivot.iter().all(|v| v.is_finite()) {
+            self.decide();
             return self;
         }
         self.theta = theta;
@@ -122,6 +129,11 @@ impl PreparedInterpolation {
         self.pivot = Some(pivot);
         self.decide();
         self
+    }
+    /// How far the registered reconstruction replaces the blend at `t`: none at
+    /// the keys (their own drawing is kept), all of it through the middle.
+    fn swell(&self, t: f64) -> f64 {
+        (4. * (std::f64::consts::PI * t.clamp(0., 1.)).sin()).min(1.)
     }
     /// Centre of the straight (handle-free) trajectory at `t`.
     fn center_at(&self, t: f64) -> [f64; 2] {
@@ -185,6 +197,10 @@ impl PreparedInterpolation {
         } else {
             self.linear_at(t, center)
         };
+        if self.decision.registered {
+            let target = registered(&self.a, &self.b, t, self.closed_at(t));
+            s = blend_segments(&s, &target, &vec![self.swell(t); s.len()]);
+        }
         let weight = self.decision.weight * (std::f64::consts::PI * t.clamp(0., 1.)).sin();
         if weight > 0.001 {
             let target = intrinsic(&self.a, &self.b, t, center, self.closed_at(t), Some(&s));

@@ -53,6 +53,33 @@ pub(super) fn crossings(s: &[SegOut]) -> usize {
     }
     count
 }
+/// `crossings` with a tolerance: a straight run that was rotated by a tiny angle
+/// has near-zero turns whose sign is rounding noise, and the exact test reads
+/// two collinear segments of it as crossing.
+pub(super) fn true_crossings(s: &[SegOut]) -> usize {
+    let side = |a: [f64; 2], b: [f64; 2], c: [f64; 2]| {
+        let (u, v) = (sub(b, a), sub(c, a));
+        let cross = u[0] * v[1] - u[1] * v[0];
+        let scale = norm(u) * norm(v);
+        if cross.abs() <= 1e-9 * scale {
+            0.
+        } else {
+            cross.signum()
+        }
+    };
+    let mut count = 0;
+    for i in 0..s.len().saturating_sub(1) {
+        for j in i + 2..s.len().saturating_sub(1) {
+            let (a, b, c, d) = (s[i].point, s[i + 1].point, s[j].point, s[j + 1].point);
+            let (s1, s2) = (side(c, d, a), side(c, d, b));
+            let (s3, s4) = (side(a, b, c), side(a, b, d));
+            if s1 * s2 < 0. && s3 * s4 < 0. {
+                count += 1;
+            }
+        }
+    }
+    count
+}
 pub(super) fn blend_segments(a: &[SegOut], b: &[SegOut], weights: &[f64]) -> Vec<SegOut> {
     a.iter()
         .zip(b)
@@ -203,6 +230,73 @@ pub(super) fn similarity(
         scale,
         ((0.25 - relative) / 0.15).clamp(0., 1.),
     ))
+}
+/// A limb that bends: its length is the same in both keys (within a tenth) and
+/// part of it (a sixth of its points at least) stays where it is. Only such a
+/// pair is offered the `registered` reconstruction; a stroke that changes its
+/// drawing, or that moves as a whole, keeps the baseline candidates.
+pub(super) fn articulated(a: &[SegOut], b: &[SegOut]) -> bool {
+    let len = |s: &[SegOut]| -> f64 {
+        s.windows(2)
+            .map(|w| norm(sub(w[1].point, w[0].point)))
+            .sum()
+    };
+    let (la, lb) = (len(a), len(b));
+    let size = la.max(lb);
+    if size < 1e-6 || (la - lb).abs() > 0.1 * size {
+        return false;
+    }
+    let still = a
+        .iter()
+        .zip(b)
+        .filter(|(a, b)| norm(sub(b.point, a.point)) < 0.03 * size)
+        .count();
+    still * 6 >= a.len() && still < a.len()
+}
+/// Length-true in-between for an articulated stroke: edge lengths and turning
+/// angles are interpolated (so no edge shortens), then the result is laid onto
+/// the point-by-point blend of the keys by a rotation and a translation only. Points that hardly move
+/// between the keys weigh most, so the still part of a limb (the upper arm of a
+/// bending elbow) stays where it is and the moving part swings from it.
+pub(super) fn registered(a: &[SegOut], b: &[SegOut], t: f64, closed: bool) -> Vec<SegOut> {
+    let mut shape = intrinsic(a, b, t, [0.; 2], closed, None);
+    let target: Vec<[f64; 2]> = a
+        .iter()
+        .zip(b)
+        .map(|(a, b)| mix(a.point, b.point, t))
+        .collect();
+    let moved: Vec<f64> = a
+        .iter()
+        .zip(b)
+        .map(|(a, b)| norm(sub(b.point, a.point)))
+        .collect();
+    let reach = (moved.iter().sum::<f64>() / moved.len() as f64).max(1e-6);
+    let weights: Vec<f64> = moved
+        .iter()
+        .map(|d| 1e-3 + (-(4. * d / reach).powi(2)).exp())
+        .collect();
+    let total: f64 = weights.iter().sum();
+    let mean = |s: &[[f64; 2]]| {
+        s.iter().zip(&weights).fold([0.; 2], |c, (s, w)| {
+            [c[0] + s[0] * w / total, c[1] + s[1] * w / total]
+        })
+    };
+    let points: Vec<[f64; 2]> = shape.iter().map(|s| s.point).collect();
+    let (cs, ct) = (mean(&points), mean(&target));
+    let (mut dot, mut cross) = (0., 0.);
+    for ((s, g), w) in shape.iter().zip(&target).zip(&weights) {
+        let (p, q) = (sub(s.point, cs), sub(*g, ct));
+        dot += w * (p[0] * q[0] + p[1] * q[1]);
+        cross += w * (p[0] * q[1] - p[1] * q[0]);
+    }
+    let angle = cross.atan2(dot);
+    for s in &mut shape {
+        let p = rotate(sub(s.point, cs), angle, 1.);
+        s.point = [ct[0] + p[0], ct[1] + p[1]];
+        s.handle_in = rotate(s.handle_in, angle, 1.);
+        s.handle_out = rotate(s.handle_out, angle, 1.);
+    }
+    shape
 }
 pub(super) fn intrinsic(
     a: &[SegOut],

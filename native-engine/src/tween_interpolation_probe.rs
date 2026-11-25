@@ -6,6 +6,8 @@ pub(super) struct Decision {
     pub(super) trust: Option<Vec<f64>>,
     pub(super) mls: Option<Vec<LocalFit>>,
     pub(super) folds: Option<Folds>,
+    /// Use the length-true registered reconstruction (articulated strokes).
+    pub(super) registered: bool,
 }
 fn local_trust(pair: &PreparedInterpolation) -> Vec<f64> {
     let n = pair.a.len();
@@ -94,12 +96,14 @@ fn score(
     pair: &PreparedInterpolation,
     expected_length: f64,
     folds: &Folds,
+    tolerant: bool,
 ) -> f64 {
     let n = pair.a.len();
-    let base = crossings(&pair.a).max(crossings(&pair.b));
+    let count = if tolerant { true_crossings } else { crossings };
+    let base = count(&pair.a).max(count(&pair.b));
     let extra: usize = trajectory[1..trajectory.len() - 1]
         .iter()
-        .map(|s| crossings(s).saturating_sub(base))
+        .map(|s| count(s).saturating_sub(base))
         .sum();
     let middle = &trajectory[3];
     let chord = |s: &[SegOut]| {
@@ -193,7 +197,7 @@ pub(super) fn choose(pair: &PreparedInterpolation) -> Decision {
     }
     let folds = Folds::new(&pair.a, &pair.b);
     let fits = fit_local(&pair.a, &pair.b);
-    let mut trajectories = vec![vec![pair.a.clone()]; 4];
+    let mut trajectories = vec![vec![pair.a.clone()]; if pair.articulated { 5 } else { 4 }];
     for t in [0.15, 0.35, 0.5, 0.65, 0.85] {
         let center = pair.center_at(t);
         let linear = pair.linear_at(t, center);
@@ -214,13 +218,19 @@ pub(super) fn choose(pair: &PreparedInterpolation) -> Decision {
         trajectories[1].push(blend_segments(&linear, &intrinsic, &vec![w; n]));
         trajectories[2].push(linear);
         trajectories[3].push(local_segments(&pair.a, &pair.b, &fits, t));
+        if pair.articulated {
+            let linear = pair.linear_at(t, center);
+            let target = registered(&pair.a, &pair.b, t, pair.closed_at(t));
+            trajectories[4].push(blend_segments(&linear, &target, &vec![pair.swell(t); n]));
+        }
     }
     for trajectory in &mut trajectories {
         trajectory.push(pair.b.clone());
     }
     let scores: Vec<_> = trajectories
         .iter()
-        .map(|t| score(t, pair, expected, &folds))
+        .enumerate()
+        .map(|(i, t)| score(t, pair, expected, &folds, i == 4))
         .collect();
     let best = scores.iter().copied().fold(f64::INFINITY, f64::min);
     let mut out = Decision {
@@ -228,8 +238,13 @@ pub(super) fn choose(pair: &PreparedInterpolation) -> Decision {
         trust: Some(trust),
         mls: None,
         folds: Some(folds),
+        registered: false,
     };
-    if scores[0] - best < 0.05 {
+    let others = scores[..4].iter().copied().fold(f64::INFINITY, f64::min);
+    if pair.articulated && scores[4] + 0.05 < others {
+        out.weight = 0.;
+        out.registered = true;
+    } else if scores[0] - best < 0.05 {
     } else if scores[1] - best < 0.05 {
         out.trust = None;
     } else if scores[3] - best < 0.05 {

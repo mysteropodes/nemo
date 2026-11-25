@@ -88,7 +88,13 @@ pub(super) fn generate_span(
             .max(options.resample_points as f64) as usize;
         let vb = sa.is_vector_brush && sb.is_vector_brush;
         let (ra, rb) = resample_pair(&sa, &sb, n, vb);
-        let rb = align_pair_with(&ra, &rb, true);
+        let drawn_start = sb
+            .center_segments
+            .as_ref()
+            .filter(|c| vb && c.len() > 1)
+            .map(|c| c[0].point)
+            .or_else(|| sb.segments.first().map(|s| s.point));
+        let rb = align_pair_with(&ra, &rb, drawn_start);
         let centroid = |s: &[SegOut]| {
             let p = s.iter().fold([0., 0.], |mut p, s| {
                 p[0] += s.point[0];
