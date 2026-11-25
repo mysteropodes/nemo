@@ -561,7 +561,7 @@
       var c = window.NemoNativeOpacityCutover;
       var owns = c && typeof c.blocksLegacy === 'function' ? c.blocksLegacy() : null;
       if (owns === false) return false;
-      if (state.tool === 'subselect') return true; // Direct Select owns its native controller (subselect-bridge, document capture): never consume its gesture
+      if (state.tool === 'subselect' || (window.NemoSelectCanvasIntent && window.NemoSelectCanvasIntent.ownedDownstream(state.tool))) return true; // Direct Select (document capture) and the tools whose native controller listens AFTER this bridge on canvas-area (eraser, shapes, pen, fill): never consume their gesture
       if (owns === true && state.tool === 'select' && method === 'down' && Number.isSafeInteger(e.pointerId) && !(window.SMEngineBridge && typeof window.SMEngineBridge.isEnabled === 'function' && window.SMEngineBridge.isEnabled()) && nativePaperRotateRingPress(e)) { nativePaperToolPointer = e.pointerId; return false; }
       nativePointer()[method](e);
     } catch (_) {
