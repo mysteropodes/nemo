@@ -260,18 +260,40 @@ pub enum TweenKind {
     Other(String),
 }
 
+/// One `<Ease>` or `<CustomEase>` child of a frame's `<tweens>`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TweenEase {
+    /// `all`, `position`, `rotation`, `scale`, `color` or `filters`.
+    pub target: String,
+    /// `true` for `<CustomEase>` (uses `points`), `false` for `<Ease>`.
+    pub custom: bool,
+    /// `<Ease intensity>`: a simple ease, -100 ..= 100.
+    pub intensity: Option<f64>,
+    /// `<Ease method>`: a named preset (kept, not evaluated).
+    pub method: Option<String>,
+    /// Anchor, out-control, in-control, anchor, …; x is time, y is progress.
+    pub points: Vec<Point>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Tween {
     pub kind: TweenKind,
     /// Simple ease, -100 (ease in) ..= 100 (ease out).
     pub acceleration: f64,
+    /// `hasCustomEase`, or a `<CustomEase>` is present when the attribute is absent.
     pub custom_ease: bool,
+    /// `useSingleEaseCurve`: one `all` curve drives every property.
+    pub use_single_ease_curve: Option<bool>,
+    pub eases: Vec<TweenEase>,
     pub rotate: Option<String>,
     pub rotate_times: u32,
     /// `motionTweenScale` (default true).
     pub tween_scale: bool,
     /// `motionTweenOrientToPath`.
     pub orient_to_path: bool,
+    /// `motionTweenSnap`: an authoring aid (the instance was snapped onto the
+    /// guide when placed); it does not change how the tween is sampled.
+    pub snap: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

@@ -118,7 +118,7 @@ fn report_lists_what_was_left_out() {
     let r = &doc.report;
     for feature in [
         "shape tween (keyframes kept, in-betweens not generated) — v2",
-        "custom ease curve",
+        "custom ease without curve points (sampled with the simple ease)",
         "ActionScript",
         "sound on frame — v2",
         "colour transform other than alpha (tint, brightness, advanced)",

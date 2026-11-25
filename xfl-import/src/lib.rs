@@ -11,7 +11,9 @@
 mod archive;
 mod bitmap;
 mod document;
+mod ease;
 mod edges;
+mod guide;
 mod model;
 mod report;
 mod shape;
@@ -20,10 +22,14 @@ mod xml;
 
 pub use archive::Archive;
 pub use bitmap::{decode_bitmap, BitmapData};
+pub use ease::{
+    check_custom_ease, custom_ease, resolve_eases, simple_ease, CurveError, Ease, PropertyEases,
+};
 pub use edges::{decode_edges, parse_number, EdgeCommand};
+pub use guide::{guide_paths, GuideAnchor, GuideMotion, GuidePath, ATTACH_TOLERANCE};
 pub use model::*;
 pub use report::{ImportReport, Skipped};
-pub use tween::{classic_tweens, simple_ease, ClassicTween, Decomposed, TweenSkip};
+pub use tween::{classic_tweens, ClassicTween, Decomposed, TweenSkip};
 
 use std::fmt;
 use std::path::Path;

@@ -4,7 +4,9 @@
 //! next keyframe of the same layer holding an instance of the same symbol.
 //! Flash interpolates the decomposed transform, not the matrix: the
 //! transformation point's position, the two scales and the two skews
-//! (a rotation is equal skews), with a simple quadratic ease.
+//! (a rotation is equal skews), each property group with its own ease
+//! (`ease.rs`), and the position along the motion guide if there is one
+//! (`guide.rs`).
 //!
 //! This module only computes; mapping the samples onto Nemo Motion keys is
 //! the mapping slice's job.
@@ -13,6 +15,8 @@ use std::f64::consts::PI;
 
 use serde::Serialize;
 
+use crate::ease::{resolve_eases, PropertyEases};
+use crate::guide::{attach, guide_paths, wrap, GuideAnchor, GuideMotion};
 use crate::model::*;
 
 /// Flash's decomposed transform. Angles in radians.
@@ -70,25 +74,6 @@ impl Decomposed {
 /// Below this, two angles are the same (radians).
 const ANGLE_EPS: f64 = 1e-6;
 
-/// Angle into (-π, π].
-fn wrap(a: f64) -> f64 {
-    let mut r = a % (2.0 * PI);
-    if r <= -PI {
-        r += 2.0 * PI;
-    } else if r > PI {
-        r -= 2.0 * PI;
-    }
-    r
-}
-
-/// Flash's simple ease: `acceleration` in -100 (ease in) ..= 100 (ease out).
-/// At ±100 it is the quadratic `t²` / `t(2 - t)`; in between, a blend with
-/// linear, i.e. `t + e·t·(1 - t)` with `e = acceleration / 100`.
-pub fn simple_ease(t: f64, acceleration: f64) -> f64 {
-    let e = (acceleration / 100.0).clamp(-1.0, 1.0);
-    t + e * t * (1.0 - t)
-}
-
 /// Signed angular travel from `from` to `to` for a rotation option.
 fn angle_delta(from: f64, to: f64, rotate: Option<&str>, times: u32) -> f64 {
     let mut short = wrap(to - from);
@@ -123,14 +108,18 @@ pub struct ClassicTween {
     pub to: Decomposed,
     pub from_alpha: f64,
     pub to_alpha: f64,
+    /// The frame's simple ease; `eases` is what the samples use.
     pub acceleration: f64,
+    pub eases: PropertyEases,
+    /// Travel along the motion guide; `None` for a straight line.
+    pub guide: Option<GuideMotion>,
     pub rotate: Option<String>,
     pub rotate_times: u32,
     /// `motionTweenScale="false"`: scale holds the start value over the span.
     pub tween_scale: bool,
     pub pivot: Point,
-    /// What the samples do not reproduce (custom ease curve, orient to path,
-    /// motion guide). Empty when the samples are exact.
+    /// What the samples do not reproduce, or reproduce by a rule that is not
+    /// confirmed against Animate. Empty when the samples are exact.
     pub approximations: Vec<String>,
 }
 
@@ -139,30 +128,47 @@ impl ClassicTween {
     pub fn sample(&self, frame: u32) -> (Decomposed, f64) {
         let span = self.end_frame.saturating_sub(self.start_frame).max(1) as f64;
         let t = ((frame.saturating_sub(self.start_frame)) as f64 / span).clamp(0.0, 1.0);
-        let k = simple_ease(t, self.acceleration);
-        let lerp = |a: f64, b: f64| a + (b - a) * k;
-        let rot = self.rotate.as_deref();
-        let d = Decomposed {
-            x: lerp(self.from.x, self.to.x),
-            y: lerp(self.from.y, self.to.y),
-            scale_x: if self.tween_scale {
-                lerp(self.from.scale_x, self.to.scale_x)
-            } else {
-                self.from.scale_x
-            },
-            scale_y: if self.tween_scale {
-                lerp(self.from.scale_y, self.to.scale_y)
-            } else {
-                self.from.scale_y
-            },
-            skew_x: self.from.skew_x
-                + angle_delta(self.from.skew_x, self.to.skew_x, rot, self.rotate_times) * k,
-            skew_y: self.from.skew_y
-                + angle_delta(self.from.skew_y, self.to.skew_y, rot, self.rotate_times) * k,
+        let lerp = |a: f64, b: f64, k: f64| a + (b - a) * k;
+        let (kp, kr) = (self.eases.position.eval(t), self.eases.rotation.eval(t));
+        let ks = if self.tween_scale {
+            self.eases.scale.eval(t)
+        } else {
+            0.0
         };
-        (d, lerp(self.from_alpha, self.to_alpha))
+        let rot = self.rotate.as_deref();
+        let turn = |a: f64, b: f64| a + angle_delta(a, b, rot, self.rotate_times) * kr;
+        let mut d = Decomposed {
+            x: lerp(self.from.x, self.to.x, kp),
+            y: lerp(self.from.y, self.to.y, kp),
+            scale_x: lerp(self.from.scale_x, self.to.scale_x, ks),
+            scale_y: lerp(self.from.scale_y, self.to.scale_y, ks),
+            skew_x: turn(self.from.skew_x, self.to.skew_x),
+            skew_y: turn(self.from.skew_y, self.to.skew_y),
+        };
+        if let Some(guide) = &self.guide {
+            let (p, path_turn) = guide.sample(kp);
+            d.skew_x += path_turn;
+            d.skew_y += path_turn;
+            (d.x, d.y) = (p.x, p.y);
+            if guide.anchor == GuideAnchor::Registration {
+                // The symbol origin rides the path: put the pivot where the
+                // sampled scale and rotation carry it from there.
+                let linear = Decomposed {
+                    x: 0.0,
+                    y: 0.0,
+                    ..d
+                }
+                .to_matrix(ORIGIN);
+                let o = linear.apply(self.pivot);
+                (d.x, d.y) = (p.x + o.x, p.y + o.y);
+            }
+        }
+        let alpha = lerp(self.from_alpha, self.to_alpha, self.eases.color.eval(t));
+        (d, alpha)
     }
 }
+
+const ORIGIN: Point = Point { x: 0.0, y: 0.0 };
 
 /// Why a frame marked as a classic tween could not be turned into one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -191,11 +197,11 @@ pub fn classic_tweens(
     let Some(layer) = timeline.layers.get(index) else {
         return (Vec::new(), Vec::new());
     };
-    // A layer under a guide layer follows the guide's path (motion guide).
-    let guided = layer
+    // A layer under a guide layer follows the guide's stroke (motion guide).
+    let guide_layer = layer
         .parent_layer_index
         .and_then(|p| timeline.layers.get(p))
-        .is_some_and(|p| p.kind == LayerKind::Guide);
+        .filter(|p| p.kind == LayerKind::Guide);
     let mut tweens = Vec::new();
     let mut skipped = Vec::new();
     for (i, f) in layer.frames.iter().enumerate() {
@@ -216,25 +222,45 @@ pub fn classic_tweens(
         };
         // Flash tweens around the start instance's transformation point.
         let pivot = a.transformation_point;
-        let mut approximations = Vec::new();
-        if tw.custom_ease {
-            approximations.push("custom ease curve (sampled with the simple ease)".to_string());
-        }
+        let (eases, mut approximations) = resolve_eases(tw);
+        let (from, to) = (
+            Decomposed::from_instance(&a.matrix, pivot),
+            Decomposed::from_instance(&b.matrix, pivot),
+        );
+        let guide = guide_layer.and_then(|g| {
+            let at = |d: &Decomposed| Point { x: d.x, y: d.y };
+            let candidates = [
+                (GuideAnchor::TransformationPoint, at(&from), at(&to)),
+                (
+                    GuideAnchor::Registration,
+                    a.matrix.apply(ORIGIN),
+                    b.matrix.apply(ORIGIN),
+                ),
+            ];
+            let found = attach(&guide_paths(g, f.index), &candidates, tw.orient_to_path);
+            if found.is_none() {
+                approximations.push("motion guide (sampled as a straight line)".to_string());
+            }
+            found
+        });
         if tw.orient_to_path {
-            approximations.push("orient to path".to_string());
-        }
-        if guided {
-            approximations.push("motion guide (sampled as a straight line)".to_string());
+            approximations.push(if guide.is_some() {
+                "orient to path (path direction added to the tweened rotation)".to_string()
+            } else {
+                "orient to path".to_string()
+            });
         }
         tweens.push(ClassicTween {
             library_item: a.library_item.clone(),
             start_frame: f.index,
             end_frame: next.index,
-            from: Decomposed::from_instance(&a.matrix, pivot),
-            to: Decomposed::from_instance(&b.matrix, pivot),
+            from,
+            to,
             from_alpha: a.alpha,
             to_alpha: b.alpha,
             acceleration: tw.acceleration,
+            eases,
+            guide,
             rotate: tw.rotate.clone(),
             rotate_times: tw.rotate_times,
             tween_scale: tw.tween_scale,
@@ -287,16 +313,6 @@ mod tests {
         assert!(Decomposed::from_instance(&shear, pivot)
             .rotation()
             .is_none());
-    }
-
-    #[test]
-    fn ease_endpoints_and_direction() {
-        for acc in [-100.0, -40.0, 0.0, 40.0, 100.0] {
-            assert!(close(simple_ease(0.0, acc), 0.0) && close(simple_ease(1.0, acc), 1.0));
-        }
-        assert!(close(simple_ease(0.5, -100.0), 0.25)); // ease in: slow start
-        assert!(close(simple_ease(0.5, 100.0), 0.75)); // ease out: fast start
-        assert!(close(simple_ease(0.5, 0.0), 0.5));
     }
 
     #[test]

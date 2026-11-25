@@ -195,3 +195,174 @@ fn classic_tween_scale_hold_and_guide_flagged() {
     // Out-of-range layer index is empty, not a panic.
     assert_eq!(classic_tweens(&doc.timelines[0], 9), (vec![], vec![]));
 }
+
+const BALL_AT: &str = r##"<DOMSymbolInstance libraryItemName="Ball"><matrix><Matrix tx="TX" ty="TY"/></matrix>
+          <transformationPoint><Point x="5" y="5"/></transformationPoint></DOMSymbolInstance>"##;
+
+fn ball(tx: f64, ty: f64) -> String {
+    BALL_AT
+        .replace("TX", &tx.to_string())
+        .replace("TY", &ty.to_string())
+}
+
+#[test]
+fn custom_ease_curves_drive_each_property() {
+    // `all` is the straight line, `position` is y = u³ over x = u.
+    let curves = r##"<tweens>
+        <CustomEase target="all"><Point/><Point x="0.25" y="0.25"/><Point x="0.75" y="0.75"/><Point x="1" y="1"/></CustomEase>
+        <CustomEase target="position"><Point x="0" y="0"/><Point x="0.3333333333333333" y="0"/><Point x="0.6666666666666666" y="0"/><Point x="1" y="1"/></CustomEase>
+      </tweens>"##;
+    let frame = |index: u32, attrs: &str, body: &str, tx: f64| {
+        format!(
+            r##"<DOMFrame index="{index}" duration="10" tweenType="motion" {attrs}>{body}<elements>{}</elements></DOMFrame>"##,
+            ball(tx, 0.0)
+        )
+    };
+    let doc = format!(
+        r##"<DOMDocument><timelines><DOMTimeline name="S"><layers><DOMLayer name="L"><frames>{}{}{}{}{}
+      <DOMFrame index="50"><elements>{}</elements></DOMFrame>
+    </frames></DOMLayer></layers></DOMTimeline></timelines></DOMDocument>"##,
+        frame(
+            0,
+            r#"hasCustomEase="true" useSingleEaseCurve="false" acceleration="100""#,
+            curves,
+            0.0
+        ),
+        frame(
+            10,
+            r#"hasCustomEase="true" useSingleEaseCurve="true""#,
+            curves,
+            100.0
+        ),
+        // Curve data kept in the file with the custom ease switched off.
+        frame(
+            20,
+            r#"hasCustomEase="false" acceleration="-100""#,
+            curves,
+            200.0
+        ),
+        frame(
+            30,
+            "",
+            r#"<tweens><Ease target="all" intensity="-100"/></tweens>"#,
+            300.0
+        ),
+        frame(
+            40,
+            r#"hasCustomEase="true""#,
+            r#"<tweens><CustomEase target="all"><Point/><Point x="1" y="1"/></CustomEase></tweens>"#,
+            400.0
+        ),
+        ball(500.0, 0.0),
+    );
+    let doc = read_fla(&zip_bytes(&[("DOMDocument.xml", doc.as_bytes())])).unwrap();
+    let (tweens, skipped) = classic_tweens(&doc.timelines[0], 0);
+    assert!(skipped.is_empty() && tweens.len() == 5);
+    // Pivot x at frame 5 of each span: start + 5 + 100·k(0.5).
+    let mid_k =
+        |i: usize| (tweens[i].sample(i as u32 * 10 + 5).0.x - 5.0 - 100.0 * i as f64) / 100.0;
+    assert!((mid_k(0) - 0.125).abs() < 1e-9, "{}", mid_k(0)); // position curve
+    assert!((mid_k(1) - 0.5).abs() < 1e-9); // single curve: `all`
+    assert!((mid_k(2) - 0.25).abs() < 1e-9); // switched off: acceleration
+    assert!((mid_k(3) - 0.25).abs() < 1e-9); // <Ease intensity>
+    assert!((mid_k(4) - 0.5).abs() < 1e-9); // malformed: acceleration 0
+    for t in &tweens[..4] {
+        assert!(t.approximations.is_empty(), "{:?}", t.approximations);
+    }
+    assert_eq!(
+        tweens[4].approximations,
+        ["malformed custom ease curve (sampled with the simple ease)"]
+    );
+    // Rotation, scale and colour of the first tween use `all`, not `position`.
+    assert!(matches!(&tweens[0].eases.position, Ease::Custom { points } if points[1].y == 0.0));
+    assert_eq!(tweens[0].eases.rotation, tweens[1].eases.position);
+    assert_eq!(doc.report.converted["customEases"], 2);
+    assert!(doc
+        .report
+        .skipped_feature("malformed custom ease curve (sampled with the simple ease)")
+        .is_some());
+}
+
+#[test]
+fn motion_guide_moves_along_the_stroke() {
+    let guided = |name: &str, edges: &str, attrs: &str, from: (f64, f64), to: (f64, f64)| {
+        format!(
+            r##"<DOMLayer name="G{name}" layerType="guide"><frames><DOMFrame index="0" duration="11"><elements><DOMShape>
+        <strokes><StrokeStyle index="1"><SolidStroke weight="1"><fill><SolidColor color="#000000"/></fill></SolidStroke></StrokeStyle></strokes>
+        <edges>{edges}</edges></DOMShape></elements></DOMFrame></frames></DOMLayer>
+      <DOMLayer name="{name}" parentLayerIndex="PARENT"><frames>
+        <DOMFrame index="0" duration="10" tweenType="motion" motionTweenSnap="true" {attrs}><elements>{}</elements></DOMFrame>
+        <DOMFrame index="10"><elements>{}</elements></DOMFrame>
+      </frames></DOMLayer>"##,
+            ball(from.0, from.1),
+            ball(to.0, to.1)
+        )
+    };
+    // Half circle of radius 100 px around (200, 200), over the top, drawn as
+    // two strokes that share the top point; then a straight guide; then a
+    // guide the instance is nowhere near.
+    let arc = r##"<Edge strokeStyle="1" edges="!4000 2000[4828 2000 5414 2586[6000 3172 6000 4000"/>
+        <Edge strokeStyle="1" edges="!2000 4000[2000 3172 2586 2586[3172 2000 4000 2000"/>"##;
+    let line = r##"<Edge strokeStyle="1" edges="!2000 4000|6000 4000"/>"##;
+    let orient = r#"motionTweenOrientToPath="true""#;
+    let layers = [
+        guided("Arc", arc, orient, (95.0, 195.0), (295.0, 195.0)).replace("PARENT", "0"),
+        guided("Line", line, orient, (95.0, 195.0), (295.0, 195.0)).replace("PARENT", "2"),
+        guided("Far", line, "", (95.0, 0.0), (295.0, 0.0)).replace("PARENT", "4"),
+        // Symbol origin on the arc instead of the transformation point.
+        guided("Reg", arc, "", (100.0, 200.0), (300.0, 200.0)).replace("PARENT", "6"),
+    ]
+    .concat();
+    let doc = format!(
+        r##"<DOMDocument><timelines><DOMTimeline name="S"><layers>{layers}</layers></DOMTimeline></timelines></DOMDocument>"##
+    );
+    let doc = read_fla(&zip_bytes(&[("DOMDocument.xml", doc.as_bytes())])).unwrap();
+    let tl = &doc.timelines[0];
+    assert!(tl.layers[1].frames[0].tween.as_ref().unwrap().snap);
+    let near = |a: f64, b: f64| (a - b).abs() < 0.05;
+
+    let arc = &classic_tweens(tl, 1).0[0];
+    let g = arc.guide.as_ref().expect("attached to the arc");
+    assert_eq!(g.anchor, GuideAnchor::TransformationPoint);
+    // Four tangent quads run 0.16 % longer than the true half circle.
+    assert!((g.path.length - 100.0 * std::f64::consts::PI).abs() < 1.0);
+    let (mid, _) = arc.sample(5);
+    assert!(near(mid.x, 200.0) && near(mid.y, 100.0), "{mid:?}");
+    // The path turned from straight up to horizontal: a quarter turn.
+    let quarter = std::f64::consts::FRAC_PI_2;
+    assert!((mid.rotation().unwrap() - quarter).abs() < 1e-3, "{mid:?}");
+    let (start, _) = arc.sample(0);
+    let (end, _) = arc.sample(10);
+    assert!(near(start.x, 100.0) && near(start.y, 200.0) && near(end.x, 300.0));
+    assert_eq!(
+        arc.approximations,
+        ["orient to path (path direction added to the tweened rotation)"]
+    );
+
+    // A straight guide is the straight line, and its direction never turns.
+    let line = &classic_tweens(tl, 3).0[0];
+    assert!(line.guide.is_some());
+    for frame in 0..=10 {
+        let (d, _) = line.sample(frame);
+        let x = 100.0 + 20.0 * frame as f64;
+        assert!((d.x - x).abs() < 1e-9 && (d.y - 200.0).abs() < 1e-9);
+        assert!(d.rotation().unwrap().abs() < 1e-12);
+    }
+
+    // Not on the guide: straight line, flagged.
+    let far = &classic_tweens(tl, 5).0[0];
+    assert!(far.guide.is_none());
+    assert!((far.sample(5).0.y - 5.0).abs() < 1e-9);
+    assert_eq!(
+        far.approximations,
+        ["motion guide (sampled as a straight line)"]
+    );
+
+    let reg = &classic_tweens(tl, 7).0[0];
+    assert_eq!(
+        reg.guide.as_ref().unwrap().anchor,
+        GuideAnchor::Registration
+    );
+    let m = reg.sample(5).0.to_matrix(reg.pivot);
+    assert!(near(m.tx, 200.0) && near(m.ty, 100.0), "{m:?}");
+}

@@ -1,6 +1,7 @@
 //! `DOMDocument.xml` and `LIBRARY/*.xml` → [`XflDocument`].
 
 use crate::archive::Archive;
+use crate::ease::{resolve_eases, Ease};
 use crate::model::*;
 use crate::report::ImportReport;
 use crate::shape::{parse_color, parse_matrix, read_primitive, read_shape};
@@ -157,10 +158,23 @@ fn read_frame(node: &Node, ctx: &mut Ctx<'_>, timeline: &str, layer: &str) -> Fr
             "motion object" => TweenKind::MotionObject,
             other => TweenKind::Other(other.to_string()),
         };
-        let custom_ease = node.attr_bool("hasCustomEase").unwrap_or(false)
-            || node
-                .child("tweens")
-                .is_some_and(|t| t.child("CustomEase").is_some());
+        let eases: Vec<TweenEase> = node
+            .list("tweens")
+            .filter(|e| e.name == "Ease" || e.name == "CustomEase")
+            .map(|e| TweenEase {
+                target: e.attr("target").unwrap_or("all").to_string(),
+                custom: e.name == "CustomEase",
+                intensity: e.attr_f64("intensity"),
+                method: e.attr("method").map(str::to_string),
+                points: e
+                    .children_named("Point")
+                    .map(|p| Point {
+                        x: p.attr_f64("x").unwrap_or(0.0),
+                        y: p.attr_f64("y").unwrap_or(0.0),
+                    })
+                    .collect(),
+            })
+            .collect();
         match &kind {
             TweenKind::Motion => ctx.report.count("classicTweens", 1),
             TweenKind::Shape => ctx.report.skip(
@@ -172,16 +186,17 @@ fn read_frame(node: &Node, ctx: &mut Ctx<'_>, timeline: &str, layer: &str) -> Fr
                 .skip("motion tween CS4+ (motion object) — v2", &at),
             TweenKind::Other(o) => ctx.report.skip(format!("tween type {o}"), &at),
         }
-        if custom_ease {
-            ctx.report.skip("custom ease curve", &at);
-        }
-        Tween {
+        let tween = Tween {
             kind,
             acceleration: node
                 .attr_f64("acceleration")
                 .unwrap_or(0.0)
                 .clamp(-100.0, 100.0),
-            custom_ease,
+            custom_ease: node
+                .attr_bool("hasCustomEase")
+                .unwrap_or_else(|| eases.iter().any(|e| e.custom)),
+            use_single_ease_curve: node.attr_bool("useSingleEaseCurve"),
+            eases,
             rotate: node
                 .attr("motionTweenRotate")
                 .filter(|r| *r != "none")
@@ -189,7 +204,16 @@ fn read_frame(node: &Node, ctx: &mut Ctx<'_>, timeline: &str, layer: &str) -> Fr
             rotate_times: node.attr_u32("motionTweenRotateTimes").unwrap_or(0),
             tween_scale: node.attr_bool("motionTweenScale").unwrap_or(true),
             orient_to_path: node.attr_bool("motionTweenOrientToPath").unwrap_or(false),
+            snap: node.attr_bool("motionTweenSnap").unwrap_or(false),
+        };
+        let (resolved, notes) = resolve_eases(&tween);
+        if matches!(resolved.position, Ease::Custom { .. }) {
+            ctx.report.count("customEases", 1);
         }
+        for n in notes {
+            ctx.report.skip(n, &at);
+        }
+        tween
     });
     if node.child("Actionscript").is_some() {
         ctx.report.skip("ActionScript", &at);
