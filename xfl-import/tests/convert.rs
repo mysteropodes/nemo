@@ -240,6 +240,10 @@ fn stroke_width_scale_mode_hidden_folders_and_long_strokes() {
     let p = convert(layers, &[("S", &sym)]).project;
     let layer = &p["layers"][0];
     assert_eq!(layer["visible"], false);
+    // A hidden guide layer does not hide the layer it guides.
+    let guided = r##"<DOMLayer name="G" layerType="guide" visible="false"><frames><DOMFrame index="0"><elements/></DOMFrame></frames></DOMLayer>
+      <DOMLayer name="Ball" parentLayerIndex="0"><frames><DOMFrame index="0"><elements/></DOMFrame></frames></DOMLayer>"##;
+    assert_eq!(convert(guided, &[]).project["layers"][0]["visible"], true);
     let strokes = layer["frames"][0]["strokes"].as_array().unwrap();
     // Each 300-anchor stroke is cut into two pieces sharing an anchor.
     assert_eq!(strokes.len(), 4);

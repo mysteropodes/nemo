@@ -289,7 +289,14 @@ fn visible(timeline: &Timeline, index: usize) -> bool {
         if !layer.visible {
             return false;
         }
-        at = layer.parent_layer_index;
+        // Only folders hide what they hold; a hidden guide or mask layer
+        // does not hide the layers it guides or masks.
+        at = layer.parent_layer_index.filter(|&p| {
+            timeline
+                .layers
+                .get(p)
+                .is_some_and(|l| l.kind == LayerKind::Folder)
+        });
     }
     true
 }
