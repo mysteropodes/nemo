@@ -275,12 +275,32 @@ pub(super) fn align_pair_toward(
     let rev = reverse_resampled(&b);
     // With the prior, an open stroke is judged on shape as well, because raw
     // distance reads any swing past 90 degrees as a reversal (the far ends land
-    // closer). But only when one of its two readings is a near-rigid move, to
-    // a tenth of its size: between two different drawings the residual is no
-    // evidence of direction, and the baseline criterion stands.
+    // closer). Two conditions keep that from misreading other pairs. One of
+    // the two readings must be a near-rigid move, to a tenth of the stroke's
+    // size: between two different drawings the residual is no evidence of
+    // direction. And the baseline reading must move an end by more than 15% of
+    // the stroke's length: a curve flipped across its chord (a smile turned
+    // into a frown) is also "itself, reversed and turned half round", but its
+    // ends have not moved, and it is a change of shape.
     let rigid = !closed && least_turn && {
         let size = turn_penalty(a, b, 0.).1;
-        rotation_fit_residual(a, b).min(rotation_fit_residual(a, &rev)) <= 0.01 * size
+        let kept = if align_cost(a, &rev) < align_cost(a, b) {
+            &rev
+        } else {
+            b
+        };
+        let n = a.segments.len().min(kept.segments.len());
+        let apart = |i: usize| {
+            let (p, q) = (a.segments[i].point, kept.segments[i].point);
+            (p[0] - q[0]).hypot(p[1] - q[1])
+        };
+        let length: f64 = a.segments[..n]
+            .windows(2)
+            .map(|w| (w[1].point[0] - w[0].point[0]).hypot(w[1].point[1] - w[0].point[1]))
+            .sum();
+        n >= 2
+            && apart(0).max(apart(n - 1)) > 0.15 * length
+            && rotation_fit_residual(a, b).min(rotation_fit_residual(a, &rev)) <= 0.01 * size
     };
     let least_turn = least_turn && (closed || rigid);
     let base_fn = if closed || rigid {

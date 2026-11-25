@@ -436,24 +436,17 @@ fn manual_arc_handles_still_steer_the_centre_of_a_rigid_swing() {
     assert!((centre[0] - expected[0]).hypot(centre[1] - expected[1]) < 1e-6);
 }
 #[test]
+#[rustfmt::skip]
 fn an_open_stroke_swinging_wide_is_not_read_as_drawn_backwards() {
-    let hook: Vec<_> = arm()
-        .iter()
-        .map(|p| [p[0], 40. * (p[0] / 200.).powi(3)])
-        .collect();
-    for stroke in [arm(), hook] {
+    let hook: Vec<_> = arm().iter().map(|p| [p[0], 40. * (p[0] / 200.).powi(3)]).collect();
+    for (stroke, widest) in [(arm(), 150.), (hook, 120.)] {
         let rest = polyline(&swing(&stroke, &stroke, false, false, 0.5));
-        for degrees in [100., 120.] {
+        for degrees in [100., 120., 135., 150.].into_iter().filter(|d| *d <= widest) {
             let mid = swing(&stroke, &turned(&stroke, degrees), false, true, 0.5);
-            let shoulder = mid[0].point;
-            assert!(shoulder[0].hypot(shoulder[1]) < 0.5);
+            assert!(mid[0].point[0].hypot(mid[0].point[1]) < 0.5, "{degrees}");
             assert!((polyline(&mid) / rest - 1.).abs() < 0.02, "{degrees}");
         }
-        let redrawn: Vec<[f64; 2]> = stroke
-            .iter()
-            .rev()
-            .map(|p| [p[0] + 20., p[1] + 10.])
-            .collect();
+        let redrawn: Vec<[f64; 2]> = stroke.iter().rev().map(|p| [p[0] + 20., p[1] + 10.]).collect();
         let first = swing(&stroke, &redrawn, false, true, 0.5)[0].point;
         assert!((first[0] - 10.).hypot(first[1] - 5.) < 0.5, "{first:?}");
     }
@@ -490,11 +483,18 @@ fn a_bending_elbow_keeps_its_length_and_its_still_half() {
 fn far_travel_reversed_lines_dots_and_steered_bends_are_handled() {
     let mean = |s: &[SegOut]| s.iter().fold([0., 0.], |c, p| [c[0] + p.point[0] / s.len() as f64, c[1] + p.point[1] / s.len() as f64]);
     let apart = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+    let line: Vec<[f64; 2]> = (0..=12).map(|i| [200. * f64::from(i) / 12., 0.]).collect();
     let far: Vec<[f64; 2]> = turned(&arm(), 40.).iter().map(|p| [p[0] + 600., p[1]]).collect();
     let (old, new) = (swing(&arm(), &far, false, false, 0.5), swing(&arm(), &far, false, true, 0.5));
     assert!(apart(mean(&old), mean(&new)) < 1e-6);
-    // A straight line redrawn from its other end and tilted takes the short way round.
-    let line: Vec<[f64; 2]> = (0..=12).map(|i| [200. * f64::from(i) / 12., 0.]).collect();
+    let across = |dx: f64| mean(&swing(&arm(), &turned(&arm(), 90.).iter().map(|p| [p[0] + dx, p[1]]).collect::<Vec<_>>(), false, true, 0.5));
+    assert!(apart(across(500.), [across(520.)[0] - 10., across(520.)[1]]) < 12.);
+    // A curve flipped across its chord is a change of shape, not a half turn: baseline result, ends in place.
+    for bulge in [18., 30., 80.] {
+        let curve = |h: f64| line.iter().map(|p| [p[0], h * (std::f64::consts::PI * p[0] / 200.).sin()]).collect::<Vec<_>>();
+        let (mid, base) = (swing(&curve(bulge), &curve(-bulge), false, true, 0.25), swing(&curve(bulge), &curve(-bulge), false, false, 0.25));
+        assert!(apart(mid[0].point, base[0].point) < 1e-9 && apart(mid[0].point, [0., 0.]) < 6. && apart(mid[mid.len() - 1].point, [200., 0.]) < 6., "{bulge}");
+    }
     for degrees in [30., 50., 60., 80.] {
         let back: Vec<[f64; 2]> = turned(&line, degrees).into_iter().rev().collect();
         let mid = swing(&line, &back, false, true, 0.5);

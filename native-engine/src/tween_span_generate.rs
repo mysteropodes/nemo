@@ -134,11 +134,8 @@ pub(super) fn generate_span(
             None => rb,
             Some(hint) => align_pair_toward(&ra, &rb, Some(hint.unwrap_or(0.))),
         };
-        let reach = if carried.flatten().is_some() {
-            f64::INFINITY
-        } else {
-            3.5
-        };
+        // A carried shape pivots where its limb does, further out than its own size.
+        let reach = if carried.flatten().is_some() { 8. } else { 3.5 };
         let handles = doc
             .tween_motion_arc_handles(
                 layer,

@@ -26,6 +26,8 @@ pub(crate) struct PreparedInterpolation {
     reduction: Option<Vec<usize>>,
     original_counts: Option<(usize, usize)>,
     pivot: Option<[f64; 2]>,
+    /// Full turn and scale of the swing, and how much of the orbit is used.
+    swing: (f64, f64, f64),
     articulated: bool,
 }
 impl PreparedInterpolation {
@@ -64,6 +66,7 @@ impl PreparedInterpolation {
             reduction: None,
             original_counts,
             pivot: None,
+            swing: (0., 1., 0.),
             articulated: false,
         };
         pair.decide();
@@ -99,7 +102,8 @@ impl PreparedInterpolation {
     /// Any turn with a translation has a fixed point, so the pivot must also
     /// be near: within `reach` times the shape's own radius of its centre. A
     /// limb pivots at its end; an object that crosses the stage while turning
-    /// has its fixed point far away and keeps the straight path.
+    /// has its fixed point far away and keeps the straight path. The orbit
+    /// fades out over the last radius before `reach`, so there is no jump.
     pub(crate) fn with_pivot_arc(self) -> Self {
         self.with_pivot_arc_within(3.5)
     }
@@ -137,11 +141,13 @@ impl PreparedInterpolation {
             .iter()
             .map(|s| norm(sub(s.point, self.ca)))
             .fold(0., f64::max);
-        if !pivot.iter().all(|v| v.is_finite()) || norm(sub(pivot, self.ca)) > reach * radius {
+        let fade = (reach - norm(sub(pivot, self.ca)) / radius.max(1e-9)).clamp(0., 1.);
+        if !pivot.iter().all(|v| v.is_finite()) || !(fade > 0.) {
             return;
         }
-        self.theta = theta;
-        self.scale = scale;
+        self.theta = lerp(self.theta, theta, fade);
+        self.scale = lerp(self.scale, scale, fade);
+        self.swing = (theta, scale, fade);
         self.pivot = Some(pivot);
     }
     /// How far the registered reconstruction replaces the blend at `t`: none at
@@ -152,12 +158,16 @@ impl PreparedInterpolation {
     /// Centre of the straight (handle-free) trajectory at `t`.
     fn center_at(&self, t: f64) -> [f64; 2] {
         match self.pivot {
-            Some(pivot) => self.orbit(pivot, t),
+            Some(pivot) => mix(mix(self.ca, self.cb, t), self.orbit(pivot, t), self.swing.2),
             None => mix(self.ca, self.cb, t),
         }
     }
     fn orbit(&self, pivot: [f64; 2], t: f64) -> [f64; 2] {
-        let r = rotate(sub(self.ca, pivot), self.theta * t, lerp(1., self.scale, t));
+        let r = rotate(
+            sub(self.ca, pivot),
+            self.swing.0 * t,
+            lerp(1., self.swing.1, t),
+        );
         [pivot[0] + r[0], pivot[1] + r[1]]
     }
     fn linear_at(&self, t: f64, center: [f64; 2]) -> Vec<SegOut> {
@@ -199,7 +209,7 @@ impl PreparedInterpolation {
         };
         let steered = !(straight(out, 1. / 3.) && straight(input, 2. / 3.));
         let center = match self.pivot {
-            Some(pivot) if !steered => self.orbit(pivot, t),
+            Some(_) if !steered => self.center_at(t),
             _ => [
                 cubic(self.ca[0], out[0], input[0], self.cb[0]),
                 cubic(self.ca[1], out[1], input[1], self.cb[1]),
@@ -214,7 +224,7 @@ impl PreparedInterpolation {
             let mut target = registered(&self.a, &self.b, t, self.closed_at(t));
             if steered {
                 // Manual arc handles carry the reconstruction with the centre.
-                let shift = sub(center, self.center_at(t));
+                let shift = sub(center, mix(self.ca, self.cb, t));
                 for p in &mut target {
                     p.point = [p.point[0] + shift[0], p.point[1] + shift[1]];
                 }

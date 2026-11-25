@@ -232,7 +232,7 @@ pub(super) fn similarity(
     ))
 }
 /// A limb that bends: its length is the same in both keys (within a tenth) and
-/// part of it (a sixth of its points at least) stays where it is. Only such a
+/// part of it (a sixth of its points at least, one end included) stays where it is. Only such a
 /// pair is offered the `registered` reconstruction; a stroke that changes its
 /// drawing, or that moves as a whole, keeps the baseline candidates.
 pub(super) fn articulated(a: &[SegOut], b: &[SegOut]) -> bool {
@@ -246,12 +246,12 @@ pub(super) fn articulated(a: &[SegOut], b: &[SegOut]) -> bool {
     if size < 1e-6 || (la - lb).abs() > 0.1 * size {
         return false;
     }
-    let still = a
-        .iter()
-        .zip(b)
-        .filter(|(a, b)| norm(sub(b.point, a.point)) < 0.03 * size)
-        .count();
-    still * 6 >= a.len() && still < a.len()
+    let still = |i: usize| norm(sub(b[i].point, a[i].point)) < 0.03 * size;
+    let count = (0..a.len().min(b.len())).filter(|&i| still(i)).count();
+    // One end holds and the other travels. With both ends held (the corners
+    // of a mouth) the stroke is changing shape between fixed points, and
+    // keeping its length would push those points apart.
+    count * 6 >= a.len() && still(0) != still(a.len().min(b.len()) - 1)
 }
 /// Length-true in-between for an articulated stroke: edge lengths and turning
 /// angles are interpolated (so no edge shortens), then the result is laid onto
