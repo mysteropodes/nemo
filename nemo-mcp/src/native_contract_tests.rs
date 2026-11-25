@@ -470,12 +470,15 @@ mod retired_request_equivalence {
     fn fnv(hash: u64, bytes: &[u8]) -> u64 {
         bytes.iter().fold(hash, |h, b| (h ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3))
     }
-    /// (cases, accepted, hash of the ordered accept bits, hash of the ordered `validate_input` outcomes)
-    fn fingerprint(op: &str) -> (usize, usize, u64, u64) {
-        let (mut cases, mut accepted, mut bits, mut outcomes) = (0, 0, 0xcbf2_9ce4_8422_2325u64, 0xcbf2_9ce4_8422_2325u64);
+    /// (cases, accepted, hash of the ordered accept bits, hash of the ordered `validate_input` outcomes, hash of the
+    /// ordered response-correlation re-check bits: `retained_request_constraints`, which `validate_result` uses)
+    fn fingerprint(op: &str) -> (usize, usize, u64, u64, u64) {
+        let seed = 0xcbf2_9ce4_8422_2325u64;
+        let (mut cases, mut accepted, mut bits, mut outcomes, mut retained) = (0, 0, seed, seed, seed);
         for payload in corpus(op) {
             let ok = validate_request(op, &payload);
             (cases, accepted, bits) = (cases + 1, accepted + usize::from(ok), fnv(bits, &[u8::from(ok)]));
+            retained = fnv(retained, &[u8::from(retained_request_constraints(op, &payload))]);
             let mut envelope = json!({"apiVersion":2,"requestId":"r","instanceId":"i","documentId":"d","operation":op,"payload":payload});
             if request_schema::expected_revision_policy(op) == Some(true) {
                 envelope["expectedRevision"] = json!(7);
@@ -486,17 +489,17 @@ mod retired_request_equivalence {
             };
             outcomes = fnv(outcomes, outcome.as_bytes());
         }
-        (cases, accepted, bits, outcomes)
+        (cases, accepted, bits, outcomes, retained)
     }
     /// Recorded while the hand validators still existed (hand, schema and public gate agreed on every case).
-    const PINS: [(&str, (usize, usize, u64, u64)); 7] = [
-        ("command.document.object.layer.create", (187, 36, 17641129590224768843, 17001089142534740129)),
-        ("command.document.object.project.symmetry.edit", (991, 142, 11427756132637649465, 14531589792525650985)),
-        ("command.document.object.project.customBrushPreset.edit", (1880, 526, 12187791451956992335, 14295049260768975869)),
-        ("job.export.svg.status", (72, 8, 11883454897150714105, 8208889130059389549)),
-        ("job.export.svg.cancel", (72, 8, 11883454897150714105, 8208889130059389549)),
-        ("job.export.media.status", (72, 8, 11883454897150714105, 8208889130059389549)),
-        ("job.export.media.cancel", (72, 8, 11883454897150714105, 8208889130059389549)),
+    const PINS: [(&str, (usize, usize, u64, u64, u64)); 7] = [
+        ("command.document.object.layer.create", (187, 36, 17641129590224768843, 17001089142534740129, 17641129590224768843)),
+        ("command.document.object.project.symmetry.edit", (991, 142, 11427756132637649465, 14531589792525650985, 11427756132637649465)),
+        ("command.document.object.project.customBrushPreset.edit", (1880, 526, 12187791451956992335, 14295049260768975869, 12187791451956992335)),
+        ("job.export.svg.status", (72, 8, 11883454897150714105, 8208889130059389549, 11883454897150714105)),
+        ("job.export.svg.cancel", (72, 8, 11883454897150714105, 8208889130059389549, 11883454897150714105)),
+        ("job.export.media.status", (72, 8, 11883454897150714105, 8208889130059389549, 11883454897150714105)),
+        ("job.export.media.cancel", (72, 8, 11883454897150714105, 8208889130059389549, 11883454897150714105)),
     ];
     #[test]
     fn schema_owned_requests_keep_the_retired_validators_decisions_and_visible_errors() {

@@ -199,7 +199,8 @@ pub(super) fn history_result(value: &Value) -> bool {
     })
 }
 
-/// The creation shape is owned by the declared transport schema alone.
+/// The creation shape is owned by the declared transport schema alone; kept for the contract tests.
+#[cfg(test)]
 pub(super) fn create_request(value: &Value) -> bool {
     super::request_schema::payload("command.document.object.layer.create", value) == Some(true)
 }

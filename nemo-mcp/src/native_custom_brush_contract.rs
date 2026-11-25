@@ -105,10 +105,7 @@ fn selector(value: &Value) -> bool {
     }
 }
 pub(super) fn request(operation: &str, value: &Value) -> bool {
-    if operation == EDIT {
-        // The edit shape (preset keys, stamp geometry) is owned by the declared transport schema alone.
-        return super::request_schema::payload(operation, value) == Some(true);
-    }
+    // EDIT is schema-owned (`SCHEMA_OWNED_REQUESTS`); only the pinned read keeps a hand check.
     operation == READ
         && exact(
             value,
