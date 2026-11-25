@@ -348,7 +348,10 @@ pub(super) fn align_pair_toward(
     // round", but its ends have not moved, and it is a change of shape.
     // (Flipped and tilted by more than that, it is the same point set as a wide
     // swing: undecidable, except through a pivot, handled just below.)
-    if !closed && least_turn && pivots(a, b) != pivots(a, &rev) {
+    // A slide along its own axis is an exact move as drawn (no turn): its
+    // reversed reading also "holds" an end, but only by coincidence.
+    let slid = rigid_turn(a, b).is_some_and(|t| t.abs() < 0.3);
+    if !closed && least_turn && !slid && pivots(a, b) != pivots(a, &rev) {
         return if pivots(a, b) { b.clone() } else { rev };
     }
     let rigid = !closed && least_turn && a.segments.len().min(b.segments.len()) >= 2 && {

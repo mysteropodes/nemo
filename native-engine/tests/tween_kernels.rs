@@ -495,6 +495,11 @@ fn far_travel_reversed_lines_dots_and_steered_bends_are_handled() {
         let angle = (tip[1] - root[1]).atan2(tip[0] - root[0]).to_degrees();
         assert!((angle.rem_euclid(180.) - degrees / 2.).abs() < 1., "{degrees}: {angle}");
     }
+    for shift in [195., 200., 205.] {
+        let slid: Vec<[f64; 2]> = line.iter().map(|p| [p[0] + shift, p[1]]).collect();
+        let mid = swing(&line, &slid, false, true, 0.5);
+        assert!(mid.iter().all(|p| p.point[1].abs() < 0.5), "a slide stays level at {shift}");
+    }
     let (ra, rb) = resample_pair(&swing_stroke(&line, false), &swing_stroke(&line[..1], false), 25, false);
     assert!(rigid_turn(&ra, &rb).is_none());
     let bent: Vec<[f64; 2]> = (0..=12).map(|i| if i <= 6 { line[i] } else { [100., line[i][0] - 100.] }).collect();
