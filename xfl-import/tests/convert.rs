@@ -5,25 +5,21 @@ use nemo_xfl_import::*;
 use serde_json::Value;
 
 fn convert(scene_layers: &str, library: &[(&str, &str)]) -> LegacyProject {
-    let includes: String = library
-        .iter()
-        .map(|(name, _)| format!(r##"<Include href="{name}.xml"/>"##))
-        .collect();
-    let doc = format!(
-        r##"<DOMDocument width="640" height="360" frameRate="12" backgroundColor="#336699">
-  <symbols>{includes}</symbols>
-  <timelines><DOMTimeline name="Scene 1"><layers>{scene_layers}</layers></DOMTimeline></timelines>
-</DOMDocument>"##
-    );
-    let mut entries: Vec<(String, Vec<u8>)> = vec![("DOMDocument.xml".into(), doc.into_bytes())];
-    for (name, xml) in library {
-        entries.push((format!("LIBRARY/{name}.xml"), xml.as_bytes().to_vec()));
-    }
-    let refs: Vec<(&str, &[u8])> = entries
-        .iter()
-        .map(|(n, b)| (n.as_str(), b.as_slice()))
-        .collect();
-    to_legacy_project(&read_fla(&zip_bytes(&refs)).unwrap())
+    convert_with(scene_layers, library, ConvertOptions::default())
+}
+
+/// Every layer flattened, as the first mapping did.
+fn flat(scene_layers: &str, library: &[(&str, &str)]) -> LegacyProject {
+    convert_with(scene_layers, library, ConvertOptions { components: false })
+}
+
+fn convert_with(
+    scene_layers: &str,
+    library: &[(&str, &str)],
+    options: ConvertOptions,
+) -> LegacyProject {
+    let bytes = fla_bytes(scene_layers, library);
+    to_legacy_project_with(&read_fla(&bytes).unwrap(), options)
 }
 
 fn keyframes(layer: &Value) -> Vec<usize> {
@@ -111,7 +107,7 @@ fn graphic_symbols_follow_their_timeline() {
             .as_str()
             .map(str::to_string)
     };
-    let looped = convert(&layer("loop"), &[("Ball", BALL)]).project;
+    let looped = flat(&layer("loop"), &[("Ball", BALL)]).project;
     // Oval on 0-1, rectangle on 2-3, oval again from 4.
     assert_eq!(keyframes(&looped["layers"][0]), [0, 2, 4]);
     assert_eq!(color(&looped, 2).as_deref(), Some("#0000ffff"));
@@ -119,9 +115,9 @@ fn graphic_symbols_follow_their_timeline() {
     // The instance matrix places the symbol.
     let (x, _) = first_point(&looped["layers"][0]["frames"][2]["strokes"][0]);
     assert!((x - 100.0).abs() < 1e-9 || (x - 140.0).abs() < 1e-9, "{x}");
-    let once = convert(&layer("play once"), &[("Ball", BALL)]).project;
+    let once = flat(&layer("play once"), &[("Ball", BALL)]).project;
     assert_eq!(keyframes(&once["layers"][0]), [0, 2]);
-    let single = convert(&layer("single frame"), &[("Ball", BALL)]).project;
+    let single = flat(&layer("single frame"), &[("Ball", BALL)]).project;
     assert_eq!(keyframes(&single["layers"][0]), [0]);
 }
 
@@ -134,7 +130,7 @@ fn classic_tweens_are_drawn_frame_by_frame() {
         <DOMSymbolInstance libraryItemName="Ball" symbolType="graphic" loop="single frame"><matrix><Matrix tx="400"/></matrix>
           <color><Color alphaMultiplier="0.5"/></color></DOMSymbolInstance></elements></DOMFrame>
     </frames></DOMLayer>"##;
-    let p = convert(layers, &[("Ball", BALL)]).project;
+    let p = flat(layers, &[("Ball", BALL)]).project;
     let layer = &p["layers"][0];
     assert_eq!(keyframes(layer), [0, 1, 2, 3, 4]);
     let x = |f: usize| {
@@ -237,7 +233,7 @@ fn stroke_width_scale_mode_hidden_folders_and_long_strokes() {
       <DOMLayer name="A" parentLayerIndex="0"><frames><DOMFrame index="0"><elements>
         <DOMSymbolInstance libraryItemName="S" symbolType="graphic"><matrix><Matrix a="3" d="3"/></matrix></DOMSymbolInstance>
       </elements></DOMFrame></frames></DOMLayer>"##;
-    let p = convert(layers, &[("S", &sym)]).project;
+    let p = flat(layers, &[("S", &sym)]).project;
     let layer = &p["layers"][0];
     assert_eq!(layer["visible"], false);
     // A hidden guide layer does not hide the layer it guides.

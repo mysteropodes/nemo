@@ -297,6 +297,96 @@ pub fn push_path(
     out.push(body);
 }
 
+fn pt(v: &Value) -> Option<(f64, f64)> {
+    Some((v[0].as_f64()?, v[1].as_f64()?))
+}
+
+/// Grow `b` (min x, min y, max x, max y) by the curve bounds of a stored
+/// stroke: anchors and the extrema of each cubic, no stroke width.
+fn add_bounds(b: &mut [f64; 4], stroke: &Value) {
+    let Some(segs) = stroke["segments"].as_array() else {
+        return;
+    };
+    let a: Vec<[(f64, f64); 3]> = segs
+        .iter()
+        .filter_map(|s| Some([pt(&s["point"])?, pt(&s["handleIn"])?, pt(&s["handleOut"])?]))
+        .collect();
+    let mut add = |x: f64, y: f64| {
+        *b = [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)];
+    };
+    for k in &a {
+        add(k[0].0, k[0].1);
+    }
+    let n = a.len();
+    let curves = if stroke["closed"] == true {
+        n
+    } else {
+        n.saturating_sub(1)
+    };
+    for i in 0..curves {
+        let (p, q) = (a[i], a[(i + 1) % n]);
+        let xs = [p[0].0, p[0].0 + p[2].0, q[0].0 + q[1].0, q[0].0];
+        let ys = [p[0].1, p[0].1 + p[2].1, q[0].1 + q[1].1, q[0].1];
+        for t in extrema(xs).into_iter().chain(extrema(ys)).flatten() {
+            add(cubic(xs, t), cubic(ys, t));
+        }
+    }
+}
+
+fn cubic(p: [f64; 4], t: f64) -> f64 {
+    let u = 1.0 - t;
+    u * u * u * p[0] + 3.0 * u * u * t * p[1] + 3.0 * u * t * t * p[2] + t * t * t * p[3]
+}
+
+/// Parameters in (0, 1) where one coordinate of a cubic has zero slope.
+fn extrema(p: [f64; 4]) -> [Option<f64>; 2] {
+    let a = -p[0] + 3.0 * p[1] - 3.0 * p[2] + p[3];
+    let b = 2.0 * (p[0] - 2.0 * p[1] + p[2]);
+    let c = p[1] - p[0];
+    let inside = |t: f64| (t > 0.0 && t < 1.0).then_some(t);
+    if a.abs() < 1e-12 {
+        return [(b.abs() > 1e-12).then(|| -c / b).and_then(inside), None];
+    }
+    let disc = b * b - 4.0 * a * c;
+    if disc < 0.0 {
+        return [None, None];
+    }
+    let r = disc.sqrt();
+    [inside((-b + r) / (2.0 * a)), inside((-b - r) / (2.0 * a))]
+}
+
+/// Centre of the content bounds at each frame of a component: the union of
+/// every layer's held keyframe (`getEffectiveStrokes`, symbol branch).
+pub(crate) fn content_centers(layers: &[Value], len: u32) -> Vec<Option<Point>> {
+    let empty = [f64::INFINITY, f64::INFINITY, -f64::INFINITY, -f64::INFINITY];
+    let mut held = vec![empty; layers.len()];
+    let mut out = Vec::with_capacity(len as usize);
+    for f in 0..len as usize {
+        let mut b = empty;
+        for (l, layer) in layers.iter().enumerate() {
+            let frame = &layer["frames"][f];
+            if frame["isKeyframe"] == true {
+                held[l] = empty;
+                for s in frame["strokes"].as_array().into_iter().flatten() {
+                    add_bounds(&mut held[l], s);
+                }
+            }
+            let h = held[l];
+            b = [
+                b[0].min(h[0]),
+                b[1].min(h[1]),
+                b[2].max(h[2]),
+                b[3].max(h[3]),
+            ];
+        }
+        out.push((b[0] <= b[2]).then(|| Point {
+            x: (b[0] + b[2]) / 2.0,
+            y: (b[1] + b[3]) / 2.0,
+        }));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
