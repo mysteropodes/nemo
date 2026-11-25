@@ -6,6 +6,7 @@
   "entries": [
     {"inline":"window.SM_FROZEN_IN_DEV={rig:false,storyboard:true,import3d:true};"},
     {"src":"js/adapters/native-workspace-ui.js"},
+    {"src":"js/animation/curve.js"},
     {"src":"js/ui.js"},
     {"src":"js/color-picker.js"},
     {"src":"js/application/native-opacity-contract.js"},
@@ -149,7 +150,6 @@
     {"src":"js/layer-kind.js"},
     {"src":"js/camera.js"},
     {"src":"js/text-selector.js"},
-    {"src":"js/animation/curve.js"},
     {"src":"js/domain/animation/opacity.js"},
     {"comment":["<!-- Bounded write-trace and replay-envelope preparation (T05): consumed by","     opacity-application.js's diagnostics.trace / diagnostics.replay handling.","     It cannot sit next to its consumer: N20 freezes the exact script ordinals","     of the native-opacity chain (boundaries-application.test.cjs), and the","     7 tags before js/app.js are asserted contiguous. Loading before the first","     create() call -- made by bootstrap/opacity-application.js -- is the real","     requirement, and this position satisfies it. -->"]},
     {"src":"js/domain/diagnostics/opacity-diagnostics.js"},

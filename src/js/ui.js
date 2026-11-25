@@ -153,8 +153,6 @@
   function tY(n,yr){return H-pad-((n-yr.lo)/(yr.hi-yr.lo))*(H-2*pad);}
   function fY(c,yr){return yr.lo+((H-pad-c)/(H-2*pad))*(yr.hi-yr.lo);}
 
-  function cubicAt(t,a,b,c,d){var u=1-t;return u*u*u*a+3*u*u*t*b+3*u*t*t*c+t*t*t*d;}
-  function cubicDerivAt(t,a,b,c,d){var u=1-t;return 3*u*u*(b-a)+6*u*t*(c-b)+3*t*t*(d-c);}
   // Effective tangent at pts[i]: the point's own MANUAL override (tx/ty,
   // set by dragging its Alt-handles — one symmetric tangent per point,
   // in/out aligned like a graph editor's "smooth" knot) when present,
@@ -191,35 +189,11 @@
     }
     return{x:tx,y:m*tx};
   }
-  // Tangent at each knot (manual override or derived Catmull-Rom),
-  // converted to the pair of cubic-Bezier control points for the segment
-  // [pts[i],pts[i+1]].
-  function segCtrl(pts,i){
-    var p0=pts[i],p3=pts[i+1];
-    var t1=tangentAt(pts,i),t2=tangentAt(pts,i+1);
-    return{c1:{x:p0.x+t1.x/3,y:p0.y+t1.y/3},c2:{x:p3.x-t2.x/3,y:p3.y-t2.y/3}};
-  }
-  function segForPts(pts,x){
-    var i=0;
-    while(i<pts.length-2&&pts[i+1].x<x)i++;
-    return i;
-  }
   // Pure function of an explicit points array — pulled out of evalCurve so
   // the preset gallery's thumbnails can plot the exact same math the main
-  // canvas uses, without touching the live `cs.points` state.
-  function evalPointsCurve(pts,x){
-    if(pts.length<2)return x;
-    x=Math.max(0,Math.min(1,x));
-    var i=segForPts(pts,x),p0=pts[i],p3=pts[i+1],ctrl=segCtrl(pts,i);
-    var span=p3.x-p0.x,t=span>1e-6?(x-p0.x)/span:0;
-    for(var k=0;k<8;k++){
-      var ex=cubicAt(t,p0.x,ctrl.c1.x,ctrl.c2.x,p3.x)-x;
-      var dx=cubicDerivAt(t,p0.x,ctrl.c1.x,ctrl.c2.x,p3.x);
-      if(Math.abs(dx)<1e-6)break;
-      t-=ex/dx;t=Math.max(0,Math.min(1,t));
-    }
-    return cubicAt(t,p0.y,ctrl.c1.y,ctrl.c2.y,p3.y);
-  }
+  // canvas uses, without touching the live `cs.points` state. The solve itself
+  // lives in animation/curve.js (one evaluator for the editor and for Motion).
+  function evalPointsCurve(pts,x){return SMAnimationCurve.evalCurvePoints(pts,x);}
   function evalCurve(x){return evalPointsCurve(cs.points,x);}
 
   // Classic 2-off-curve-control-point cubic bezier (0,0)->(1,1) — the exact
