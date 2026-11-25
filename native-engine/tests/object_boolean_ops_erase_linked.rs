@@ -1,12 +1,13 @@
 //! Eraser on a pressure stroke drawn with its linked fill backdrop (the brush default): a bite replaces one half of the
 //! pair by plain islands, so the surviving half must stop claiming a partner or the document fails admission.
-use super::object_boolean_ops_tests::{
+use crate::history::object_history::object_boolean_ops_tests::{
+    erase_payload,
     apply, document, frame_records, ids_of, owner_of, rect, square, state, vector, VectorSpec,
 };
 use serde_json::{json, Value};
 
 fn erase(id: &str, footprint: &[(f64, f64)]) -> Value {
-    super::object_boolean_ops_tests::erase_payload("L0", 0, id, footprint)
+    erase_payload("L0", 0, id, footprint)
 }
 fn pair(version: u32) -> Value {
     let mut backdrop = vector("L0", "backdrop", 0, &square(10.0, 10.0, 80.0), &VectorSpec::default());
