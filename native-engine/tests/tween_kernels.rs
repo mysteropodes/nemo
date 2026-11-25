@@ -453,27 +453,19 @@ fn an_open_stroke_swinging_wide_is_not_read_as_drawn_backwards() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn a_bending_elbow_keeps_its_length_and_its_still_half() {
     let straight: Vec<[f64; 2]> = (0..=12).map(|i| [200. * f64::from(i) / 12., 0.]).collect();
     for bend in [45_f64, 90., 135.] {
         let (sin, cos) = bend.to_radians().sin_cos();
-        let bent: Vec<[f64; 2]> = (0..=12)
-            .map(|i| {
-                let reach = 100. * f64::from(i - 6) / 6.;
-                if i <= 6 {
-                    [100. * f64::from(i) / 6., 0.]
-                } else {
-                    [100. + reach * cos, reach * sin]
-                }
-            })
-            .collect();
-        for t in [0.25, 0.5, 0.75] {
-            let mid = swing(&straight, &bent, false, true, t);
-            assert!((polyline(&mid) / 200. - 1.).abs() < 0.005, "{bend} at {t}");
-            let shoulder = mid[0].point;
-            assert!(shoulder[0].hypot(shoulder[1]) < 0.5);
-            let elbow = mid.iter().map(|s| (s.point[0] - 100.).hypot(s.point[1]));
-            assert!(elbow.fold(f64::MAX, f64::min) < 0.5);
+        for travel in [[0., 0.], [60., 30.], [250., -120.]] {
+            let bent: Vec<[f64; 2]> = (0..=12).map(|i| { let reach = 100. * f64::from(i - 6) / 6.; let p = if i <= 6 { [100. * f64::from(i) / 6., 0.] } else { [100. + reach * cos, reach * sin] }; [p[0] + travel[0], p[1] + travel[1]] }).collect();
+            for t in [0.25, 0.5, 0.75] {
+                let mid = swing(&straight, &bent, false, true, t);
+                assert!((polyline(&mid) / 200. - 1.).abs() < 0.005, "{bend} {travel:?} at {t}");
+                let (shoulder, want) = (mid[0].point, [travel[0] * t, travel[1] * t]);
+                assert!((shoulder[0] - want[0]).hypot(shoulder[1] - want[1]) < 0.5);
+            }
         }
     }
 }

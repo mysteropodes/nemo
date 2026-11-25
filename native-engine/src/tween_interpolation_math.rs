@@ -189,6 +189,7 @@ pub(super) fn similarity(
     b: &[SegOut],
     ca: [f64; 2],
     cb: [f64; 2],
+    turn_known: bool,
 ) -> Option<(f64, f64, f64)> {
     let centred = |s: &[SegOut], c: [f64; 2]| -> Vec<(f64, f64)> {
         s.iter()
@@ -205,7 +206,8 @@ pub(super) fn similarity(
     let (dot, square) = aa.iter().zip(&bb).fold((0., 0.), |(d, q), (a, b)| {
         (d + a.0 * b.0 + a.1 * b.1, q + a.0 * a.0 + a.1 * a.1)
     });
-    let plain_scale = if square > 1e-9 { dot / square } else { 1. };
+    // Not negative: a point reflection is a half turn, which is the turn being tested for.
+    let plain_scale = if square > 1e-9 { (dot / square).max(0.) } else { 1. };
     let (mut residual, mut plain, mut size) = (0., 0., 0.);
     for (a, b) in aa.iter().zip(&bb) {
         let r = [
@@ -222,7 +224,7 @@ pub(super) fn similarity(
     let (relative, unturned) = ((residual / size).sqrt(), (plain / size).sqrt());
     // The turn has to be what explains the pair. A round shape fits any angle,
     // so its fitted rotation says nothing and must not bend a straight move.
-    if unturned < 0.2_f64.max(2. * relative) {
+    if !turn_known && unturned < 0.2_f64.max(2. * relative) {
         return None;
     }
     Some((
@@ -231,8 +233,28 @@ pub(super) fn similarity(
         ((0.25 - relative) / 0.15).clamp(0., 1.),
     ))
 }
+/// How far the held part of a limb travels, when one end of the stroke moves
+/// as a rigid translation (possibly none at all) while the other end does not:
+/// a sixth of the points at least within 3% of the stroke's length of one
+/// common displacement, one end of the stroke among them and not the other.
+/// With both ends held (the corners of a mouth) the stroke is changing shape
+/// between fixed points, and keeping its length would push those points apart.
+fn held_shift(a: &[SegOut], b: &[SegOut], size: f64) -> Option<[f64; 2]> {
+    let n = a.len().min(b.len());
+    let d = |i: usize| sub(b[i].point, a[i].point);
+    let mut best: Option<(usize, [f64; 2])> = None;
+    for end in [0, n.checked_sub(1)?] {
+        let reference = d(end);
+        let still = |i: usize| norm(sub(d(i), reference)) < 0.03 * size;
+        let count = (0..n).filter(|&i| still(i)).count();
+        if count * 6 >= n && !still(n - 1 - end) && best.map_or(true, |(c, _)| count > c) {
+            best = Some((count, reference));
+        }
+    }
+    best.map(|(_, reference)| reference)
+}
 /// A limb that bends: its length is the same in both keys (within a tenth) and
-/// part of it (a sixth of its points at least, one end included) stays where it is. Only such a
+/// part of it stays where it is, or moves as one with the whole figure. Only such a
 /// pair is offered the `registered` reconstruction; a stroke that changes its
 /// drawing, or that moves as a whole, keeps the baseline candidates.
 pub(super) fn articulated(a: &[SegOut], b: &[SegOut]) -> bool {
@@ -243,15 +265,7 @@ pub(super) fn articulated(a: &[SegOut], b: &[SegOut]) -> bool {
     };
     let (la, lb) = (len(a), len(b));
     let size = la.max(lb);
-    if size < 1e-6 || (la - lb).abs() > 0.1 * size {
-        return false;
-    }
-    let still = |i: usize| norm(sub(b[i].point, a[i].point)) < 0.03 * size;
-    let count = (0..a.len().min(b.len())).filter(|&i| still(i)).count();
-    // One end holds and the other travels. With both ends held (the corners
-    // of a mouth) the stroke is changing shape between fixed points, and
-    // keeping its length would push those points apart.
-    count * 6 >= a.len() && still(0) != still(a.len().min(b.len()) - 1)
+    size > 1e-6 && (la - lb).abs() <= 0.1 * size && held_shift(a, b, size).is_some()
 }
 /// Length-true in-between for an articulated stroke: edge lengths and turning
 /// angles are interpolated (so no edge shortens), then the result is laid onto
@@ -265,10 +279,12 @@ pub(super) fn registered(a: &[SegOut], b: &[SegOut], t: f64, closed: bool) -> Ve
         .zip(b)
         .map(|(a, b)| mix(a.point, b.point, t))
         .collect();
+    let size = [a, b].map(|s| s.windows(2).map(|w| norm(sub(w[1].point, w[0].point))).sum::<f64>());
+    let held = held_shift(a, b, size[0].max(size[1])).unwrap_or([0.; 2]);
     let moved: Vec<f64> = a
         .iter()
         .zip(b)
-        .map(|(a, b)| norm(sub(b.point, a.point)))
+        .map(|(a, b)| norm(sub(sub(b.point, a.point), held)))
         .collect();
     let reach = (moved.iter().sum::<f64>() / moved.len() as f64).max(1e-6);
     let weights: Vec<f64> = moved

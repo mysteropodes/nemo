@@ -260,6 +260,70 @@ pub(super) fn rigid_turn(a: &ResampledOut, b: &ResampledOut) -> Option<f64> {
     (size > 1e-6 && (0.8..1.25).contains(&scale) && rotation_fit_residual(a, b) < 0.04 * size)
         .then(|| fit.w_im.atan2(fit.w_re))
 }
+/// The turn of a closed shape whose turn is not a matter of choice: a shape
+/// with a lobe or a chin cannot be laid on its other key any other way round
+/// (every start point that turns it by 40 degrees or more fits much worse), so
+/// the figure's neighbours can take its turn as evidence. A circle or an oval
+/// fits several turns equally, and says nothing.
+pub(super) fn closed_turn(a: &ResampledOut, aligned: &ResampledOut) -> Option<(ResampledOut, f64)> {
+    let n = a.segments.len().min(aligned.segments.len());
+    if n < 8 {
+        return None;
+    }
+    let points = |r: &ResampledOut| -> Vec<(f64, f64)> {
+        r.segments[..n]
+            .iter()
+            .map(|s| (s.point[0], s.point[1]))
+            .collect()
+    };
+    let turn = |r: &ResampledOut| {
+        let fit = fit_similarity_transform(&points(a), &points(r))?;
+        let scale = fit.w_re.hypot(fit.w_im);
+        (0.8..1.25)
+            .contains(&scale)
+            .then(|| fit.w_im.atan2(fit.w_re))
+    };
+    let (_, size) = turn_penalty(a, aligned, 0.);
+    let rev = reverse_resampled(aligned);
+    let mut fits: Vec<(f64, f64, ResampledOut)> = [aligned, &rev]
+        .into_iter()
+        .flat_map(|base| (0..n).map(move |k| rotate_resampled(base, k)))
+        .filter_map(|cand| Some((rotation_fit_residual(a, &cand), turn(&cand)?, cand)))
+        .collect();
+    fits.sort_by(|x, y| x.0.total_cmp(&y.0));
+    let (residual, own, _) = fits.first()?;
+    let (residual, own) = (*residual, *own);
+    if !(size > 1e-6 && residual <= 0.04 * size) {
+        return None;
+    }
+    let rival = fits.iter().skip(1).find(|f| {
+        let d = (f.1 - own).rem_euclid(std::f64::consts::TAU);
+        d.min(std::f64::consts::TAU - d) > 0.7
+    });
+    let clear = rival.is_none_or(|f| f.0 >= 1.5 * residual);
+    clear.then(|| (fits.swap_remove(0).2, own))
+}
+/// A pivoting limb: read this way, one end stays where it was (to 3% of the
+/// stroke's length), the other travels (more than 15%), and the move is a rigid
+/// turn. A swing of 150 degrees or more about the shoulder is the same point
+/// set as the stroke reversed and tilted by the rest; the held end says which.
+fn pivots(a: &ResampledOut, r: &ResampledOut) -> bool {
+    let n = a.segments.len().min(r.segments.len());
+    if n < 4 {
+        return false;
+    }
+    let apart = |i: usize| {
+        let (p, q) = (a.segments[i].point, r.segments[i].point);
+        (p[0] - q[0]).hypot(p[1] - q[1])
+    };
+    let length: f64 = a.segments[..n]
+        .windows(2)
+        .map(|w| (w[1].point[0] - w[0].point[0]).hypot(w[1].point[1] - w[0].point[1]))
+        .sum();
+    let (held, moved) = (apart(0).min(apart(n - 1)), apart(0).max(apart(n - 1)));
+    let size = turn_penalty(a, r, 0.).1;
+    held < 0.03 * length && moved > 0.15 * length && rotation_fit_residual(a, r) <= 0.04 * size
+}
 /// `align_pair_with`, with the least-turn prior centred on `hint` instead of on
 /// no turn at all. A shape with a symmetry cannot tell a 100 degree turn from
 /// an 80 degree one the other way; the limb it rides on can.
@@ -280,9 +344,13 @@ pub(super) fn align_pair_toward(
     // size: between two different drawings the residual is no evidence of
     // direction. And the baseline reading must turn the stroke's end-to-end
     // vector by more than 15% of its length: a curve flipped across its chord
-    // (a smile turned into a frown) is also "itself, reversed and turned half round", but its
-    // ends have not moved, and it is a change of shape. (Flipped and tilted by
-    // more than that, it is the same point set as a wide swing: undecidable.)
+    // (a smile turned into a frown) is also "itself, reversed and turned half
+    // round", but its ends have not moved, and it is a change of shape.
+    // (Flipped and tilted by more than that, it is the same point set as a wide
+    // swing: undecidable, except through a pivot, handled just below.)
+    if !closed && least_turn && pivots(a, b) != pivots(a, &rev) {
+        return if pivots(a, b) { b.clone() } else { rev };
+    }
     let rigid = !closed && least_turn && a.segments.len().min(b.segments.len()) >= 2 && {
         let size = turn_penalty(a, b, 0.).1;
         let kept = if align_cost(a, &rev) < align_cost(a, b) {

@@ -28,6 +28,8 @@ pub(crate) struct PreparedInterpolation {
     pivot: Option<[f64; 2]>,
     /// Full turn and scale of the swing, and how much of the orbit is used.
     swing: (f64, f64, f64),
+    /// The pair's turn is known to be real (a shape with a lobe has only one).
+    turn_known: bool,
     articulated: bool,
 }
 impl PreparedInterpolation {
@@ -68,6 +70,7 @@ impl PreparedInterpolation {
             pivot: None,
             swing: (0., 1., 0.),
             articulated: false,
+            turn_known: false,
         };
         pair.decide();
         Some(pair)
@@ -104,6 +107,10 @@ impl PreparedInterpolation {
     /// limb pivots at its end; an object that crosses the stage while turning
     /// has its fixed point far away and keeps the straight path. The orbit
     /// fades out over the last radius before `reach`, so there is no jump.
+    pub(crate) fn with_known_turn_if(mut self, known: bool) -> Self {
+        self.turn_known = known;
+        self
+    }
     pub(crate) fn with_pivot_arc(self) -> Self {
         self.with_pivot_arc_within(3.5)
     }
@@ -116,7 +123,7 @@ impl PreparedInterpolation {
         self
     }
     fn pivot_arc(&mut self, reach: f64) {
-        let Some((theta, scale, rigidity)) = similarity(&self.a, &self.b, self.ca, self.cb) else {
+        let Some((theta, scale, rigidity)) = similarity(&self.a, &self.b, self.ca, self.cb, self.turn_known) else {
             return;
         };
         if rigidity < 1. / 3. {

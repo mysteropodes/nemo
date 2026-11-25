@@ -100,24 +100,32 @@ pub(super) fn generate_span(
         let vb = sa.is_vector_brush && sb.is_vector_brush;
         let (ra, mut rb) = resample_pair(&sa, &sb, n, vb);
         let closed = !vb && sa.closed && sb.closed;
-        if !closed {
-            rb = align_pair_with(&ra, &rb, true);
-            if let Some(turn) = rigid_turn(&ra, &rb) {
-                let points = |r: &ResampledOut| r.segments.iter().map(|s| s.point).collect();
-                turns.push(([points(&ra), points(&rb)], turn));
+        // A closed shape with a lobe has one possible turn; it settles here.
+        let (mut settled, mut source) = (!closed, None);
+        if closed {
+            let aligned = align_pair_with(&ra, &rb, true);
+            if let Some((best, turn)) = closed_turn(&ra, &aligned) {
+                (rb, settled, source) = (best, true, Some(turn));
             }
+        } else {
+            rb = align_pair_with(&ra, &rb, true);
+            source = rigid_turn(&ra, &rb);
         }
-        sampled.push((sa, sb, vb, ra, rb, closed));
+        if let Some(turn) = source {
+            let points = |r: &ResampledOut| r.segments.iter().map(|s| s.point).collect();
+            turns.push(([points(&ra), points(&rb)], turn));
+        }
+        sampled.push((sa, sb, vb, ra, rb, closed && !settled, closed && settled));
     }
     let mut pairs = vec![];
-    for (spec, (sa, sb, vb, ra, rb, closed)) in specs.into_iter().zip(sampled) {
-        // A closed shape lying within its own width of a rigid limb, in both
+    for (spec, (sa, sb, vb, ra, rb, closed, lobed)) in specs.into_iter().zip(sampled) {
+        // A closed shape whose edge lies within its own width of a rigid limb, in both
         // keys, is carried by it: it takes the limb's turn.
         let carried = closed.then(|| {
             let gap = |shape: &[SegOut], limb: &[[f64; 2]]| {
                 let c = centroid(shape);
                 let far = |p: &[f64; 2]| (p[0] - c[0]).hypot(p[1] - c[1]);
-                let reach = 2. * shape.iter().map(|s| far(&s.point)).fold(0., f64::max);
+                let reach = 3. * shape.iter().map(|s| far(&s.point)).fold(0., f64::max);
                 let gap = limb.iter().map(far).fold(f64::MAX, f64::min);
                 (gap <= reach).then_some(gap)
             };
@@ -154,6 +162,7 @@ pub(super) fn generate_span(
             (!vb).then_some((sa.segments.len(), sb.segments.len())),
         )
         .ok_or(DispatchErrorCode::InvalidRequest)?
+        .with_known_turn_if(lobed)
         .with_pivot_arc_within(reach);
         let id = if spec.a_piece {
             spec.b_data.target.stroke_id.clone()
