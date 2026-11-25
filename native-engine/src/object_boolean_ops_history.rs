@@ -24,6 +24,9 @@ mod fill_brush_tests;
 #[cfg(test)]
 #[path = "../tests/object_boolean_ops_erase_flat.rs"]
 mod erase_flat_tests;
+#[cfg(test)]
+#[path = "../tests/object_boolean_ops_erase_linked.rs"]
+mod erase_linked_tests;
 
 impl NativeObjectHistory {
     pub(crate) fn prepare_fill_trace_json(

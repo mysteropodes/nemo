@@ -130,9 +130,6 @@ mod object_boolean_ops_envelope;
 #[path = "../tests/object_boolean_ops_erase.rs"]
 mod object_boolean_ops_erase;
 #[cfg(test)]
-#[path = "../tests/object_boolean_ops_erase_linked.rs"]
-mod object_boolean_ops_erase_linked;
-#[cfg(test)]
 #[path = "../tests/object_boolean_ops_flatten.rs"]
 mod object_boolean_ops_flatten;
 #[cfg(test)]
