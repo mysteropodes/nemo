@@ -124,6 +124,16 @@ fn track(keys: &[Key], neutral: &[f64]) -> (Option<Value>, Option<Value>) {
     (Some(json!({ "keys": list })), None)
 }
 
+/// JSON has no infinity or NaN: the native reader would refuse the file.
+const NOT_FINITE: &str = "instance transform out of the finite number range";
+
+fn finite(tracks: &[Vec<Key>; 5]) -> bool {
+    tracks
+        .iter()
+        .flatten()
+        .all(|k| k.1.iter().all(|v| v.is_finite()))
+}
+
 fn flat(cx: &mut Ctx, why: &str, loc: &str) -> Option<Map<String, Value>> {
     cx.report
         .skip(format!("symbol layer flattened: {why}"), loc);
@@ -150,6 +160,15 @@ pub(crate) fn instance_layer(
     let lib = content.first()?.1.library_item.as_str();
     if content.iter().any(|c| c.1.library_item != lib) {
         return flat(cx, "it places several symbols", loc);
+    }
+    let reverse = |i: &SymbolInstance| i.loop_mode.contains("reverse");
+    if content
+        .iter()
+        .any(|c| c.1.symbol_type == SymbolType::Graphic && reverse(c.1))
+    {
+        // No baseline play mode runs backwards; the flattening plays it
+        // forwards, as before.
+        return flat(cx, "reverse graphic playback (played forwards)", loc);
     }
     let sym = *cx.symbols.get(lib)?;
     let len = cx.frame_count(sym);
@@ -195,12 +214,23 @@ pub(crate) fn instance_layer(
             (None, None) => 0,
         }
     };
+    // The component is cut after the last frame shown. A loop that wraps
+    // needs every frame (`elapsed % totalFrames`).
+    let (mut need, mut elapsed) = (1, 0);
     for (k, (s, i)) in content.iter().enumerate() {
-        if picks[k].is_none()
-            && (s.index..end(s)).any(|f| shown(k, f) != symbol_frame(i, f - s.index, len))
-        {
-            return flat(cx, "graphic playback that one play mode cannot hold", loc);
+        for f in s.index..end(s) {
+            let ii = shown(k, f);
+            if picks[k].is_none() {
+                if ii != symbol_frame(i, f - s.index, len) {
+                    return flat(cx, "graphic playback that one play mode cannot hold", loc);
+                }
+                elapsed = elapsed.max(i64::from(f) - play.map_or(0, |p| p.1));
+            }
+            need = need.max(ii + 1);
         }
+    }
+    if play.is_some_and(|p| !p.0) && elapsed >= i64::from(need) {
+        need = len;
     }
     let tweens: HashMap<u32, Rc<ClassicTween>> = cx.tweens_of(scene, index).clone();
     let pivot = content
@@ -239,8 +269,12 @@ pub(crate) fn instance_layer(
         if !fixed {
             return flat(cx, "skewed symbol instance (Motion has no skew)", loc);
         }
-        out.insert("symMatrix".into(), json!([m.a, m.b, m.c, m.d, m.tx, m.ty]));
-        cx.component(sym);
+        let entries = [m.a, m.b, m.c, m.d, m.tx, m.ty];
+        if entries.iter().any(|v| !v.is_finite()) {
+            return flat(cx, NOT_FINITE, loc);
+        }
+        out.insert("symMatrix".into(), json!(entries));
+        cx.component(sym, need);
         for (s, i) in &content {
             tracks[3].push((s.index, vec![100.0 * i.alpha], None));
         }
@@ -252,7 +286,10 @@ pub(crate) fn instance_layer(
             );
         }
         motion_keys(&content, &tweens, pivot, total, &mut tracks, cx, loc);
-        let comp = cx.component(sym);
+        if !finite(&tracks) {
+            return flat(cx, NOT_FINITE, loc);
+        }
+        let comp = cx.component(sym, need);
         let mut last: Option<Vec<f64>> = None;
         for (k, (s, _)) in content.iter().enumerate() {
             for f in s.index..end(s) {
@@ -278,6 +315,9 @@ pub(crate) fn instance_layer(
                 "fixed-width strokes inside a scaled component (Motion scales them)",
                 loc,
             );
+        }
+        if !finite(&tracks) {
+            return flat(cx, NOT_FINITE, loc);
         }
         if tracks[2].iter().any(|k| k.1[0].abs() != k.1[1].abs()) {
             cx.report.skip(
@@ -400,7 +440,11 @@ fn motion_keys(
             let linear = curve_points(&Ease::Simple { acceleration: 0.0 });
             for f in s.index..end {
                 let (d, a) = t.sample(f);
-                let v = values(&d, a, d.skew_y + turn)[p].clone();
+                let mut v = values(&d, a, d.skew_y + turn)[p].clone();
+                if p == 3 {
+                    // An overshooting ease must not leave the opacity range.
+                    v[0] = v[0].clamp(0.0, 100.0);
+                }
                 tracks[p].push((f, v, linear.clone()));
             }
             baked = true;

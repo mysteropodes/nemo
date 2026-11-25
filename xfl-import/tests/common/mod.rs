@@ -243,9 +243,34 @@ pub fn shown(layer: &Value, len: i64, f: usize) -> Option<i64> {
     })
 }
 
-/// Centre of the anchor bounds of a component frame (rectangles: the curve bounds).
+/// Extreme of `g` on [0, 1] (`max` picks the side), by a coarse scan
+/// refined with a ternary search: independent of the converter's roots.
+fn extreme(g: impl Fn(f64) -> f64, max: bool) -> f64 {
+    let s = if max { -1.0 } else { 1.0 };
+    let n = 256;
+    let best = (0..=n)
+        .min_by(|a, b| (s * g(*a as f64 / n as f64)).total_cmp(&(s * g(*b as f64 / n as f64))))
+        .unwrap();
+    let (mut lo, mut hi) = (
+        ((best as f64 - 1.0) / n as f64).max(0.0),
+        ((best as f64 + 1.0) / n as f64).min(1.0),
+    );
+    for _ in 0..200 {
+        let (m1, m2) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
+        if s * g(m1) < s * g(m2) {
+            hi = m2;
+        } else {
+            lo = m1;
+        }
+    }
+    g((lo + hi) / 2.0)
+}
+
+/// Centre of the curve bounds (Paper `bounds`, no stroke width) of a
+/// component frame: the pivot the baseline measures the anchor from.
 pub fn center(symbol: &Value, ii: usize) -> (f64, f64) {
     let mut b = [f64::INFINITY, f64::INFINITY, -f64::INFINITY, -f64::INFINITY];
+    let p = |v: &Value| (v[0].as_f64().unwrap(), v[1].as_f64().unwrap());
     for l in symbol["layers"].as_array().unwrap() {
         let frames = l["frames"].as_array().unwrap();
         let key = (0..=ii)
@@ -254,12 +279,30 @@ pub fn center(symbol: &Value, ii: usize) -> (f64, f64) {
             .find(|k| k["isKeyframe"] == true)
             .unwrap();
         for s in key["strokes"].as_array().unwrap() {
-            for seg in s["segments"].as_array().unwrap() {
-                let (x, y) = (
-                    seg["point"][0].as_f64().unwrap(),
-                    seg["point"][1].as_f64().unwrap(),
+            let segs = s["segments"].as_array().unwrap();
+            let n = segs.len();
+            let curves = if s["closed"] == true { n } else { n - 1 };
+            for i in 0..curves {
+                let (a, c) = (&segs[i], &segs[(i + 1) % n]);
+                let (p0, ho, p3, hi) = (
+                    p(&a["point"]),
+                    p(&a["handleOut"]),
+                    p(&c["point"]),
+                    p(&c["handleIn"]),
                 );
-                b = [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)];
+                let xs = [p0.0, p0.0 + ho.0, p3.0 + hi.0, p3.0];
+                let ys = [p0.1, p0.1 + ho.1, p3.1 + hi.1, p3.1];
+                let at = |q: [f64; 4], t: f64| {
+                    let u = 1.0 - t;
+                    u * u * u * q[0]
+                        + 3.0 * u * u * t * q[1]
+                        + 3.0 * u * t * t * q[2]
+                        + t * t * t * q[3]
+                };
+                b[0] = b[0].min(extreme(|t| at(xs, t), false));
+                b[1] = b[1].min(extreme(|t| at(ys, t), false));
+                b[2] = b[2].max(extreme(|t| at(xs, t), true));
+                b[3] = b[3].max(extreme(|t| at(ys, t), true));
             }
         }
     }
@@ -290,4 +333,54 @@ pub fn pose(layer: &Value, symbol: &Value, f: usize) -> Option<(Matrix, f64, i64
         ty: qy + d[1] - (mb * qx + md * qy),
     };
     Some((m, value(layer, "opacity", ff, &[100.0])[0] / 100.0, ii))
+}
+
+// Fixtures of the component tests.
+
+/// One rectangle, one frame.
+pub const BOX: &str = r##"<DOMSymbolItem name="Box" symbolType="graphic"><timeline><DOMTimeline name="Box"><layers>
+<DOMLayer name="L"><frames><DOMFrame index="0"><elements><DOMRectangleObject x="0" y="0" objectWidth="40" objectHeight="20"><fill><SolidColor color="#FF0000"/></fill></DOMRectangleObject></elements></DOMFrame></frames></DOMLayer>
+</layers></DOMTimeline></timeline></DOMSymbolItem>"##;
+
+/// Four frames whose content bounds move: the pivot must follow.
+pub const ANIM: &str = r##"<DOMSymbolItem name="Anim" symbolType="graphic"><timeline><DOMTimeline name="Anim"><layers>
+<DOMLayer name="L"><frames>
+ <DOMFrame index="0"><elements><DOMRectangleObject x="0" y="0" objectWidth="40" objectHeight="40"><fill><SolidColor color="#00FF00"/></fill></DOMRectangleObject></elements></DOMFrame>
+ <DOMFrame index="1"><elements><DOMRectangleObject x="10" y="0" objectWidth="40" objectHeight="40"><fill><SolidColor color="#00FF00"/></fill></DOMRectangleObject></elements></DOMFrame>
+ <DOMFrame index="2" duration="2"><elements><DOMRectangleObject x="20" y="10" objectWidth="60" objectHeight="20"><fill><SolidColor color="#0000FF"/></fill></DOMRectangleObject></elements></DOMFrame>
+</frames></DOMLayer></layers></DOMTimeline></timeline></DOMSymbolItem>"##;
+
+pub fn instance(lib: &str, attrs: &str, m: [f64; 6], alpha: f64) -> String {
+    format!(
+        r##"<DOMSymbolInstance libraryItemName="{lib}" symbolType="graphic" {attrs}>
+          <matrix><Matrix a="{}" b="{}" c="{}" d="{}" tx="{}" ty="{}"/></matrix>
+          <transformationPoint><Point x="20" y="10"/></transformationPoint>
+          <color><Color alphaMultiplier="{alpha}"/></color></DOMSymbolInstance>"##,
+        m[0], m[1], m[2], m[3], m[4], m[5]
+    )
+}
+
+/// Rotation `r` after the scales (`sx`, `sy`), then a translation.
+pub fn rs(r: f64, sx: f64, sy: f64, tx: f64, ty: f64) -> [f64; 6] {
+    [
+        sx * r.cos(),
+        sx * r.sin(),
+        -sy * r.sin(),
+        sy * r.cos(),
+        tx,
+        ty,
+    ]
+}
+
+pub fn frame(index: u32, duration: u32, attrs: &str, body: &str) -> String {
+    format!(
+        r##"<DOMFrame index="{index}" duration="{duration}" {attrs}><elements>{body}</elements></DOMFrame>"##
+    )
+}
+
+pub fn layer(name: &str, frames: &[String]) -> String {
+    format!(
+        r##"<DOMLayer name="{name}"><frames>{}</frames></DOMLayer>"##,
+        frames.concat()
+    )
 }

@@ -61,6 +61,16 @@ cargo run --example fla_dump -- path/to/file.fla
    are exact `curvePoints`, other custom eases and motion guides are baked one
    key per frame. Skewed instances keep a fixed `symMatrix` or are flattened.
    `ConvertOptions { components: false }` flattens every layer.
+   A component keeps only the frames its instances reach (all of them for a
+   loop that wraps). Reverse loop modes, several symbols on one layer, moving
+   skewed instances and values beyond the finite range are flattened, with a
+   report line.
+   Known editor mismatch: the render pivots on the bounds of the frame shown,
+   but Motion's on-canvas gizmo for a component layer is placed on the union
+   bounds of all its frames (`symbolUnionBounds`, motion.js:5848, used at
+   motion.js:6246). On a layer whose anchor is re-keyed per frame (content
+   bounds that move), the crosshair is therefore not on the real pivot; the
+   rendered pose is right.
 5. Validation on a real Animate corpus (PNG export from Animate against
    Nemo's render), then the `.swf` fallback via Ruffle's `swf` crate.
 

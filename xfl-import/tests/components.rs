@@ -10,54 +10,6 @@ use common::*;
 use nemo_xfl_import::*;
 use serde_json::Value;
 
-/// One rectangle, one frame.
-const BOX: &str = r##"<DOMSymbolItem name="Box" symbolType="graphic"><timeline><DOMTimeline name="Box"><layers>
-<DOMLayer name="L"><frames><DOMFrame index="0"><elements><DOMRectangleObject x="0" y="0" objectWidth="40" objectHeight="20"><fill><SolidColor color="#FF0000"/></fill></DOMRectangleObject></elements></DOMFrame></frames></DOMLayer>
-</layers></DOMTimeline></timeline></DOMSymbolItem>"##;
-
-/// Four frames whose content bounds move: the pivot must follow.
-const ANIM: &str = r##"<DOMSymbolItem name="Anim" symbolType="graphic"><timeline><DOMTimeline name="Anim"><layers>
-<DOMLayer name="L"><frames>
- <DOMFrame index="0"><elements><DOMRectangleObject x="0" y="0" objectWidth="40" objectHeight="40"><fill><SolidColor color="#00FF00"/></fill></DOMRectangleObject></elements></DOMFrame>
- <DOMFrame index="1"><elements><DOMRectangleObject x="10" y="0" objectWidth="40" objectHeight="40"><fill><SolidColor color="#00FF00"/></fill></DOMRectangleObject></elements></DOMFrame>
- <DOMFrame index="2" duration="2"><elements><DOMRectangleObject x="20" y="10" objectWidth="60" objectHeight="20"><fill><SolidColor color="#0000FF"/></fill></DOMRectangleObject></elements></DOMFrame>
-</frames></DOMLayer></layers></DOMTimeline></timeline></DOMSymbolItem>"##;
-
-fn instance(lib: &str, attrs: &str, m: [f64; 6], alpha: f64) -> String {
-    format!(
-        r##"<DOMSymbolInstance libraryItemName="{lib}" symbolType="graphic" {attrs}>
-          <matrix><Matrix a="{}" b="{}" c="{}" d="{}" tx="{}" ty="{}"/></matrix>
-          <transformationPoint><Point x="20" y="10"/></transformationPoint>
-          <color><Color alphaMultiplier="{alpha}"/></color></DOMSymbolInstance>"##,
-        m[0], m[1], m[2], m[3], m[4], m[5]
-    )
-}
-
-/// Rotation `r` after the scales (`sx`, `sy`), then a translation.
-fn rs(r: f64, sx: f64, sy: f64, tx: f64, ty: f64) -> [f64; 6] {
-    [
-        sx * r.cos(),
-        sx * r.sin(),
-        -sy * r.sin(),
-        sy * r.cos(),
-        tx,
-        ty,
-    ]
-}
-
-fn frame(index: u32, duration: u32, attrs: &str, body: &str) -> String {
-    format!(
-        r##"<DOMFrame index="{index}" duration="{duration}" {attrs}><elements>{body}</elements></DOMFrame>"##
-    )
-}
-
-fn layer(name: &str, frames: &[String]) -> String {
-    format!(
-        r##"<DOMLayer name="{name}"><frames>{}</frames></DOMLayer>"##,
-        frames.concat()
-    )
-}
-
 const SYMMETRIC: &str = r##"<tweens><CustomEase target="all"><Point x="0" y="0"/><Point x="0.2" y="0"/><Point x="0.4" y="0.5"/><Point x="0.5" y="0.6"/><Point x="0.6" y="0.7"/><Point x="0.8" y="1"/><Point x="1" y="1"/></CustomEase></tweens>"##;
 const LOPSIDED: &str = r##"<tweens><CustomEase target="all"><Point x="0" y="0"/><Point x="0.2" y="0"/><Point x="0.4" y="0.5"/><Point x="0.5" y="0.6"/><Point x="0.55" y="0.9"/><Point x="0.8" y="1"/><Point x="1" y="1"/></CustomEase></tweens>"##;
 
@@ -157,11 +109,72 @@ fn scene() -> String {
         r#"<DOMLayer name="M">"#,
         r#"<DOMLayer name="M" parentLayerIndex="3">"#,
     );
-    [tweened, playing, baked, guide.to_string(), guided].concat()
+    // A curved outline turned and squashed: its pivot sits on a curve extreme.
+    let curved = layer(
+        "C",
+        &[
+            frame(
+                0,
+                6,
+                r#"tweenType="motion" acceleration="-30""#,
+                &instance("Curved", "", rs(0.4, 1.2, 0.7, 50.0, 80.0), 1.0),
+            ),
+            frame(
+                6,
+                1,
+                "",
+                &instance("Curved", "", rs(1.3, 0.9, 1.6, 120.0, 40.0), 1.0),
+            ),
+        ],
+    );
+    let once = layer(
+        "O",
+        &[
+            frame(
+                0,
+                3,
+                r#"tweenType="motion""#,
+                &instance(
+                    "Anim",
+                    r#"loop="play once" firstFrame="1""#,
+                    rs(0.2, 1.0, 1.0, 5.0, 5.0),
+                    1.0,
+                ),
+            ),
+            frame(
+                3,
+                4,
+                "",
+                &instance(
+                    "Anim",
+                    r#"loop="play once" firstFrame="4""#,
+                    rs(-0.2, 2.0, 2.0, 50.0, 5.0),
+                    1.0,
+                ),
+            ),
+        ],
+    );
+    [
+        tweened,
+        playing,
+        baked,
+        guide.to_string(),
+        guided,
+        curved,
+        once,
+    ]
+    .concat()
 }
 
-fn library() -> [(&'static str, &'static str); 2] {
-    [("Box", BOX), ("Anim", ANIM)]
+/// A straight edge and a quadratic bulging to y = 30 at its middle, where
+/// there is no anchor: curve bounds (0, 0)-(40, 30), anchor bounds y 0..0.
+const CURVED: &str = r##"<DOMSymbolItem name="Curved" symbolType="graphic"><timeline><DOMTimeline name="Curved"><layers>
+<DOMLayer name="L"><frames><DOMFrame index="0"><elements><DOMShape><fills><FillStyle index="1"><SolidColor color="#FF00FF"/></FillStyle></fills>
+<edges><Edge fillStyle1="1" edges="!0 0|800 0[400 1200 0 0"/></edges></DOMShape></elements></DOMFrame></frames></DOMLayer>
+</layers></DOMTimeline></timeline></DOMSymbolItem>"##;
+
+fn library() -> [(&'static str, &'static str); 3] {
+    [("Box", BOX), ("Anim", ANIM), ("Curved", CURVED)]
 }
 
 /// Flash's matrix, alpha and symbol frame for XFL layer `index` at frame `f`.
@@ -212,7 +225,7 @@ fn classic_tweens_become_motion_keys_matching_the_samples() {
     let doc = read_fla(&fla_bytes(&scene(), &library())).unwrap();
     let out = to_legacy_project(&doc);
     let p = &out.project;
-    for (index, name) in [(0, "T"), (1, "P"), (2, "B"), (4, "M")] {
+    for (index, name) in [(0, "T"), (1, "P"), (2, "B"), (4, "M"), (5, "C"), (6, "O")] {
         let layer = nemo_layer(p, name);
         let symbol = &p["symbols"][layer["symbolId"].as_str().unwrap()];
         for f in 0..p["totalFrames"].as_u64().unwrap() as u32 {
@@ -280,11 +293,18 @@ fn classic_tweens_become_motion_keys_matching_the_samples() {
     assert!(out.report.skipped_feature(baked).is_some());
     // Box is placed by two layers but is one component.
     let symbols = p["symbols"].as_object().unwrap();
-    assert_eq!(symbols.len(), 2);
+    assert_eq!(symbols.len(), 3);
     assert_eq!(t["symbolId"], "xfl-sym-box");
     assert_eq!(b["symbolId"], "xfl-sym-box");
     assert_eq!(symbols["xfl-sym-box"]["totalFrames"], 1);
-    assert_eq!(out.report.converted.get("components"), Some(&2));
+    assert_eq!(out.report.converted.get("components"), Some(&3));
+    // The pivot of the curved shape is its curve bounds centre (20, 15).
+    assert_eq!(
+        nemo_layer(p, "C")["motionStatic"]["anchor"],
+        serde_json::json!([0.0, -5.0])
+    );
+    assert_eq!(nemo_layer(p, "O")["symPlayMode"], "once");
+    assert_eq!(nemo_layer(p, "O")["frames"][3]["componentFrame"], 3);
 }
 
 #[test]

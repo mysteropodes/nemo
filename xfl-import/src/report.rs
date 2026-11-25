@@ -24,6 +24,20 @@ impl ImportReport {
         *self.converted.entry(what.to_string()).or_insert(0) += n;
     }
 
+    /// Add what `other` converted and skipped (its first locations kept for
+    /// features not seen here yet).
+    pub fn merge(&mut self, other: ImportReport) {
+        for (what, n) in other.converted {
+            self.count(&what, n);
+        }
+        for s in other.skipped {
+            match self.skipped.iter_mut().find(|t| t.feature == s.feature) {
+                Some(t) => t.occurrences += s.occurrences,
+                None => self.skipped.push(s),
+            }
+        }
+    }
+
     pub fn skip(&mut self, feature: impl Into<String>, location: &str) {
         let feature = feature.into();
         if let Some(s) = self.skipped.iter_mut().find(|s| s.feature == feature) {

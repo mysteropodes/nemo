@@ -58,6 +58,8 @@ pub(crate) struct Component {
     /// The content holds strokes whose width ignores the scale (hairlines,
     /// `scaleMode="none"`); Motion scales them.
     pub(crate) fixed_widths: bool,
+    /// What converting the component reported (merged when it is emitted).
+    report: ImportReport,
 }
 
 pub(crate) struct Ctx<'a> {
@@ -87,24 +89,28 @@ impl<'a> Ctx<'a> {
             .or_insert_with(|| sym.timeline.frame_count())
     }
 
-    /// The component of `sym`, converted on first use. Its own layers are
-    /// flattened; symbols nested inside it are expanded into them.
-    pub(crate) fn component(&mut self, sym: &'a LibrarySymbol) -> &Component {
+    /// The component of `sym` holding at least its first `need` frames
+    /// (no more than an instance can reach), converted on first use and again
+    /// when a later instance reaches further. Its own layers are flattened;
+    /// symbols nested inside it are expanded into them. What the conversion
+    /// reports is kept apart until the component is emitted.
+    pub(crate) fn component(&mut self, sym: &'a LibrarySymbol, need: u32) -> &Component {
         let key = sym.name.as_str();
-        if !self.components.contains_key(key) {
+        let len = need.clamp(1, self.frame_count(sym).clamp(1, MAX_FRAMES));
+        if self.components.get(key).is_none_or(|c| c.len < len) {
             let id = self.ids[key].clone();
-            let len = self.frame_count(sym).clamp(1, MAX_FRAMES);
+            let outer = std::mem::take(&mut self.report);
             self.expanding.push(key);
             self.fixed_width = false;
             let at = format!("{} > {}", sym.name, sym.timeline.name);
             let mut layers = convert_layers(&sym.timeline, len, &id, false, false, self, &at);
             let fixed_widths = self.fixed_width;
             self.expanding.pop();
+            let report = std::mem::replace(&mut self.report, outer);
             if layers.is_empty() {
                 layers.push(empty_layer(&format!("{id}-layer-empty")));
             }
             let centers = content_centers(&layers, len);
-            self.report.count("components", 1);
             let name = sym.name.clone();
             let c = Component {
                 id,
@@ -113,6 +119,7 @@ impl<'a> Ctx<'a> {
                 layers,
                 centers,
                 fixed_widths,
+                report,
             };
             self.components.insert(key, c);
         }
@@ -276,6 +283,12 @@ pub fn to_legacy_project_with(doc: &XflDocument, options: ConvertOptions) -> Leg
     } else {
         24.0
     };
+    // Only components an instance layer kept (a layer flattened after its
+    // component was converted leaves it unused).
+    let used: std::collections::HashSet<String> = layers
+        .iter()
+        .filter_map(|l| l["symbolId"].as_str().map(str::to_owned))
+        .collect();
     let mut project = json!({
         "totalFrames": total,
         "fps": fps,
@@ -284,15 +297,17 @@ pub fn to_legacy_project_with(doc: &XflDocument, options: ConvertOptions) -> Leg
         "canvasBg": hex(doc.background, 1.0)[..7].to_string(),
         "layers": layers,
     });
-    if !cx.components.is_empty() {
-        let symbols: serde_json::Map<String, Value> = std::mem::take(&mut cx.components)
-            .into_values()
-            .map(|c| {
-                let record =
-                    json!({"name": c.name, "totalFrames": c.len, "fps": fps, "layers": c.layers});
-                (c.id, record)
-            })
-            .collect();
+    let mut symbols = serde_json::Map::new();
+    for c in std::mem::take(&mut cx.components).into_values() {
+        if !used.contains(&c.id) {
+            continue;
+        }
+        cx.report.merge(c.report);
+        cx.report.count("components", 1);
+        let record = json!({"name": c.name, "totalFrames": c.len, "fps": fps, "layers": c.layers});
+        symbols.insert(c.id, record);
+    }
+    if !symbols.is_empty() {
         project["symbols"] = Value::Object(symbols);
     }
     LegacyProject {
