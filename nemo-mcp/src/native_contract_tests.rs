@@ -362,3 +362,152 @@ fn migrated_request_shapes_remain_closed_in_the_public_response_correlation_gate
         }
     }
 }
+
+/// CS1b batch 1 (#2363): equivalence pins for the hand request validators retired in favour of the
+/// declared transport schema. The corpus (every seed, every one-field replacement, deletion and
+/// extra key, cross-variant merges, cross-operation payloads) was run against the hand validators,
+/// the schema and the public gate before the hand code was deleted: all three decided every case
+/// alike, and the whole `validate_input` outcome (error variant and wording) is identical before
+/// and after. Both are pinned as ordered fingerprints so the schema-only path stays identical.
+mod retired_request_equivalence {
+    use super::*;
+
+    const SYM: &str = "object.project.symmetry.edit";
+    const CTRL: [&str; 4] = ["job.export.svg.status", "job.export.svg.cancel", "job.export.media.status", "job.export.media.cancel"];
+    fn seeds() -> Vec<(&'static str, Value)> {
+        let act = |c: &str, a: Value| json!({"command": c, "action": a});
+        let mut out = vec![];
+        for a in [
+            json!({"kind":"setEnabled","enabled":true}), json!({"kind":"setMode","mode":"radial"}),
+            json!({"kind":"resetGuide"}), json!({"kind":"setAxis","x1":0,"y1":1.5,"x2":2,"y2":3}),
+            json!({"kind":"setRadialCenter","x":1,"y":2}), json!({"kind":"setSectors","sectors":6}),
+            json!({"kind":"setExtend","extend":false}),
+        ] {
+            out.push((settings::symmetry::EDIT, act(SYM, a)));
+        }
+        out.extend(CTRL.map(|op| (op, json!({"jobId":"job-1"}))));
+        out.push(("command.document.object.layer.create", json!({"command":"object.layer.create","name":"L","contextId":"scene-root"})));
+        out.push(("command.document.object.layer.create", json!({"command":"object.layer.create","name":""})));
+        let mut preset = serde_json::Map::new();
+        for key in ["bristleCount", "dashGap", "edgeNoise", "fixedAngle", "grain", "nibSize", "noise", "opacity", "opacityJitter", "polySides",
+            "pressureEnd", "pressureMid", "pressureStart", "rotationJitter", "roughness", "roundness", "scatter", "scribbleAngleSpread",
+            "scribbleCount", "scribbleLen", "scribbleLenJitter", "scribbleSpread", "scribbleWidth", "sharpness", "sizeJitter",
+            "spaceJitter", "spacing", "tipCorner", "valueJitter", "savedBrushSize"] {
+            preset.insert(key.into(), json!(1.5));
+        }
+        for key in ["rotationMode", "scatterDistribution", "tipShape", "label"] {
+            preset.insert(key.into(), json!("s"));
+        }
+        preset.insert("markerTip".into(), json!(true));
+        preset.insert("customStamp".into(), json!({"segments":[{"point":[0,1],"handleIn":[1,2],"handleOut":[3,4]},{"point":[1,1]}],"closed":true,"pointCount":2}));
+        let brush = "object.project.customBrushPreset.edit";
+        for a in [json!({"kind":"upsert","id":"b1","preset":Value::Object(preset)}), json!({"kind":"upsert","id":"b1","preset":{}}), json!({"kind":"delete","id":"b1"})] {
+            out.push((custom_brush::EDIT, act(brush, a)));
+        }
+        out
+    }
+    fn probes() -> Vec<Value> {
+        let mut out = vec![json!(null), json!(true), json!(""), json!("x"), json!("a b"), json!("a\0b"), json!("h"), json!(-1), json!(0), json!(1), json!(6),
+            json!(1.0), json!(1.5), json!(-0.0), json!(4294967295u64), json!(9007199254740992u64), json!(u64::MAX), json!([]), json!([1]), json!({}), json!({"k":1})];
+        for (c, n) in [("x", 128), ("x", 129), ("é", 65), ("x", 1025), ("é", 513)] {
+            out.push(json!(c.repeat(n)));
+        }
+        out
+    }
+    fn paths(value: &Value, at: &str, out: &mut Vec<String>) {
+        out.push(at.to_owned());
+        match value {
+            Value::Object(map) => map.iter().for_each(|(k, v)| paths(v, &format!("{at}/{k}"), out)),
+            Value::Array(items) => items.iter().enumerate().for_each(|(i, v)| paths(v, &format!("{at}/{i}"), out)),
+            _ => {}
+        }
+    }
+    fn corpus(op: &str) -> Vec<Value> {
+        let own: Vec<Value> = seeds().into_iter().filter(|s| s.0 == op).map(|s| s.1).collect();
+        let mut out: Vec<Value> = probes();
+        for seed in &own {
+            out.push(seed.clone());
+            let mut all = vec![];
+            paths(seed, "", &mut all);
+            for at in &all {
+                let (parent, key) = at.rsplit_once('/').unwrap_or(("", ""));
+                if at.is_empty() || seed.pointer(at).is_none() {
+                    continue;
+                }
+                for probe in probes() {
+                    let mut c = seed.clone();
+                    *c.pointer_mut(at).unwrap() = probe;
+                    out.push(c);
+                }
+                let mut c = seed.clone();
+                match c.pointer_mut(parent).unwrap() {
+                    Value::Object(m) => drop(m.remove(key)),
+                    Value::Array(a) => drop(a.remove(key.parse::<usize>().unwrap())),
+                    _ => {}
+                }
+                out.push(c);
+                if seed.pointer(at).unwrap().is_object() {
+                    let mut c = seed.clone();
+                    c.pointer_mut(at).unwrap()["zzExtra"] = json!(1);
+                    out.push(c);
+                }
+            }
+            let mut c = seed.clone();
+            c["zzExtra"] = json!(1);
+            out.push(c);
+            for other in &own {
+                let (mut swapped, mut merged) = (seed.clone(), seed.clone());
+                swapped["action"] = other["action"].clone();
+                for (k, v) in other["action"].as_object().into_iter().flatten().filter(|e| e.0 != "kind") {
+                    merged["action"][k] = v.clone();
+                }
+                out.extend([swapped, merged]);
+            }
+        }
+        out.extend(seeds().into_iter().filter(|s| s.0 != op).map(|s| s.1));
+        out
+    }
+    fn fnv(hash: u64, bytes: &[u8]) -> u64 {
+        bytes.iter().fold(hash, |h, b| (h ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3))
+    }
+    /// (cases, accepted, hash of the ordered accept bits, hash of the ordered `validate_input` outcomes)
+    fn fingerprint(op: &str) -> (usize, usize, u64, u64) {
+        let (mut cases, mut accepted, mut bits, mut outcomes) = (0, 0, 0xcbf2_9ce4_8422_2325u64, 0xcbf2_9ce4_8422_2325u64);
+        for payload in corpus(op) {
+            let ok = validate_request(op, &payload);
+            (cases, accepted, bits) = (cases + 1, accepted + usize::from(ok), fnv(bits, &[u8::from(ok)]));
+            let mut envelope = json!({"apiVersion":2,"requestId":"r","instanceId":"i","documentId":"d","operation":op,"payload":payload});
+            if request_schema::expected_revision_policy(op) == Some(true) {
+                envelope["expectedRevision"] = json!(7);
+            }
+            let outcome = match serde_json::from_value::<crate::contract::NativeApplicationRequest>(envelope) {
+                Ok(request) => format!("{:?}", request.validate_input()),
+                Err(error) => format!("decode {error}"),
+            };
+            outcomes = fnv(outcomes, outcome.as_bytes());
+        }
+        (cases, accepted, bits, outcomes)
+    }
+    /// Recorded while the hand validators still existed (hand, schema and public gate agreed on every case).
+    const PINS: [(&str, (usize, usize, u64, u64)); 7] = [
+        ("command.document.object.layer.create", (187, 36, 17641129590224768843, 17001089142534740129)),
+        ("command.document.object.project.symmetry.edit", (991, 142, 11427756132637649465, 14531589792525650985)),
+        ("command.document.object.project.customBrushPreset.edit", (1880, 526, 12187791451956992335, 14295049260768975869)),
+        ("job.export.svg.status", (72, 8, 11883454897150714105, 8208889130059389549)),
+        ("job.export.svg.cancel", (72, 8, 11883454897150714105, 8208889130059389549)),
+        ("job.export.media.status", (72, 8, 11883454897150714105, 8208889130059389549)),
+        ("job.export.media.cancel", (72, 8, 11883454897150714105, 8208889130059389549)),
+    ];
+    #[test]
+    fn schema_owned_requests_keep_the_retired_validators_decisions_and_visible_errors() {
+        let mut owned = SCHEMA_OWNED_REQUESTS.to_vec();
+        owned.sort_unstable();
+        let mut pinned: Vec<_> = PINS.iter().map(|pin| pin.0).collect();
+        pinned.sort_unstable();
+        assert_eq!(owned, pinned, "every schema-owned request carries its equivalence pin");
+        for (op, pin) in PINS {
+            assert!(has_request_validator(op), "{op}");
+            assert_eq!(fingerprint(op), pin, "{op}");
+        }
+    }
+}

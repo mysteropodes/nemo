@@ -19,31 +19,10 @@ fn axis(v: &Value) -> bool {
 fn point(v: &Value) -> bool {
     exact(v, &["x", "y"], &[]).is_some() && numbers(v, &["x", "y"])
 }
-fn action(v: &Value) -> bool {
-    match v.get("kind").and_then(Value::as_str) {
-        Some("setEnabled") => exact(v, &["kind", "enabled"], &[]).is_some() && v["enabled"].is_boolean(),
-        Some("setMode") => {
-            exact(v, &["kind", "mode"], &[]).is_some()
-                && v["mode"]
-                    .as_str()
-                    .is_some_and(|m| matches!(m, "y" | "x" | "free" | "radial"))
-        }
-        Some("resetGuide") => exact(v, &["kind"], &[]).is_some(),
-        Some("setAxis") => {
-            exact(v, &["kind", "x1", "y1", "x2", "y2"], &[]).is_some()
-                && numbers(v, &["x1", "y1", "x2", "y2"])
-        }
-        Some("setRadialCenter") => exact(v, &["kind", "x", "y"], &[]).is_some() && numbers(v, &["x", "y"]),
-        Some("setSectors") => exact(v, &["kind", "sectors"], &[]).is_some() && numbers(v, &["sectors"]),
-        Some("setExtend") => exact(v, &["kind", "extend"], &[]).is_some() && v["extend"].is_boolean(),
-        _ => false,
-    }
-}
 pub(crate) fn request(op: &str, v: &Value) -> bool {
     if op == EDIT {
-        return exact(v, &["command", "action"], &[]).is_some()
-            && v["command"] == "object.project.symmetry.edit"
-            && action(&v["action"]);
+        // The edit shape is owned by the declared transport schema alone.
+        return crate::native_contract::request_schema::payload(op, v) == Some(true);
     }
     op == READ
         && exact(

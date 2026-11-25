@@ -167,7 +167,8 @@ pub(crate) fn request(operation: &str, payload: &Value) -> bool {
     match operation {
         SVG_BEGIN => svg_begin(payload),
         MEDIA_BEGIN => media_begin(payload),
-        _ => exact(payload, &["jobId"], &[]).is_some_and(|m| id(m.get("jobId"))),
+        // Status and cancel name only the job: owned by the declared transport schema alone.
+        _ => super::request_schema::payload(operation, payload) == Some(true),
     }
 }
 

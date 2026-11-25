@@ -106,23 +106,8 @@ fn selector(value: &Value) -> bool {
 }
 pub(super) fn request(operation: &str, value: &Value) -> bool {
     if operation == EDIT {
-        if exact(value, &["command", "action"], &[]).is_none()
-            || value["command"] != "object.project.customBrushPreset.edit"
-        {
-            return false;
-        }
-        let action = &value["action"];
-        return match action["kind"].as_str() {
-            Some("upsert") => {
-                exact(action, &["kind", "id", "preset"], &[]).is_some()
-                    && action["id"].is_string()
-                    && preset(&action["preset"])
-            }
-            Some("delete") => {
-                exact(action, &["kind", "id"], &[]).is_some() && action["id"].is_string()
-            }
-            _ => false,
-        };
+        // The edit shape (preset keys, stamp geometry) is owned by the declared transport schema alone.
+        return super::request_schema::payload(operation, value) == Some(true);
     }
     operation == READ
         && exact(

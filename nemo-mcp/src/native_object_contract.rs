@@ -199,15 +199,9 @@ pub(super) fn history_result(value: &Value) -> bool {
     })
 }
 
+/// The creation shape is owned by the declared transport schema alone.
 pub(super) fn create_request(value: &Value) -> bool {
-    exact(value, &["command", "name"], &["contextId"]).is_some_and(|value| {
-        value.get("command").and_then(Value::as_str) == Some("object.layer.create")
-            // #2256: the declared component the new layer joins; absent is the scene root.
-            && value
-                .get("contextId")
-                .is_none_or(|id| id.as_str().is_some_and(|id| !id.is_empty()))
-            && value.get("name").is_some_and(Value::is_string)
-    })
+    super::request_schema::payload("command.document.object.layer.create", value) == Some(true)
 }
 
 pub(super) fn create_result(value: &Value) -> bool {
