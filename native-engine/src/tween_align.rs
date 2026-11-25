@@ -204,19 +204,124 @@ pub(super) fn rotation_fit_residual(a: &ResampledOut, b: &ResampledOut) -> f64 {
 // the plain raw-distance test; closed loops keep the rotation-fit
 // criterion (the 90°-rectangle / rotated-start-star fix).
 pub(super) fn align_pair(a: &ResampledOut, b: &ResampledOut) -> ResampledOut {
+    align_pair_with(a, b, false)
+}
+/// Least-turn prior for closed shapes: `5%` of the shape's squared size per
+/// half turn, added to the residual. A shape with a symmetry (an oval eye, a
+/// ball, a rectangle) has several start points that fit equally well, each
+/// with a different rotation; without a prior, rounding picks one, and a
+/// 30 degree move can be interpolated as a 210 degree spin.
+fn turn_penalty(a: &ResampledOut, b: &ResampledOut, hint: f64) -> (f64, f64) {
+    let n = a.segments.len().min(b.segments.len());
+    let points = |r: &ResampledOut| -> Vec<(f64, f64)> {
+        r.segments[..n]
+            .iter()
+            .map(|s| (s.point[0], s.point[1]))
+            .collect()
+    };
+    let (pa, pb) = (points(a), points(b));
+    let Some(fit) = fit_similarity_transform(&pa, &pb) else {
+        return (0.0, 0.0);
+    };
+    let size: f64 = pb
+        .iter()
+        .map(|p| (p.0 - fit.cb.0).powi(2) + (p.1 - fit.cb.1).powi(2))
+        .sum();
+    let turn = (fit.w_im.atan2(fit.w_re) - hint).rem_euclid(std::f64::consts::TAU);
+    let turn = turn.min(std::f64::consts::TAU - turn) / std::f64::consts::PI;
+    (0.05 * size * turn * turn, size)
+}
+/// `least_turn` turns on the least-turn prior (`false` is the baseline behaviour).
+pub(super) fn align_pair_with(
+    a: &ResampledOut,
+    b: &ResampledOut,
+    least_turn: bool,
+) -> ResampledOut {
+    align_pair_toward(a, b, least_turn.then_some(0.))
+}
+/// The turn (radians) that carries `a` onto the aligned `b`, when the pair is a
+/// rigid move: what a stroke can tell a symmetric neighbour about its own turn.
+pub(super) fn rigid_turn(a: &ResampledOut, b: &ResampledOut) -> Option<f64> {
+    let n = a.segments.len().min(b.segments.len());
+    // A loop has no end to hold on to: its fitted turn is a choice among
+    // equals, not evidence for a neighbour.
+    if n < 4 || resampled_is_closed(a) || resampled_is_closed(b) {
+        return None;
+    }
+    let points = |r: &ResampledOut| -> Vec<(f64, f64)> {
+        r.segments[..n]
+            .iter()
+            .map(|s| (s.point[0], s.point[1]))
+            .collect()
+    };
+    let (_, size) = turn_penalty(a, b, 0.);
+    let fit = fit_similarity_transform(&points(a), &points(b))?;
+    let scale = fit.w_re.hypot(fit.w_im);
+    (size > 1e-6 && (0.8..1.25).contains(&scale) && rotation_fit_residual(a, b) < 0.04 * size)
+        .then(|| fit.w_im.atan2(fit.w_re))
+}
+/// `align_pair_with`, with the least-turn prior centred on `hint` instead of on
+/// no turn at all. A shape with a symmetry cannot tell a 100 degree turn from
+/// an 80 degree one the other way; the limb it rides on can.
+pub(super) fn align_pair_toward(
+    a: &ResampledOut,
+    b: &ResampledOut,
+    hint: Option<f64>,
+) -> ResampledOut {
+    let least_turn = hint.is_some();
+    let hint = hint.unwrap_or(0.);
     let closed =
         resampled_is_closed(a) && resampled_is_closed(b) && rotation_ok(a) && rotation_ok(b);
-    let base_fn = if closed {
+    let rev = reverse_resampled(&b);
+    // With the prior, an open stroke is judged on shape as well, because raw
+    // distance reads any swing past 90 degrees as a reversal (the far ends land
+    // closer). Two conditions keep that from misreading other pairs. One of
+    // the two readings must be a near-rigid move, to a tenth of the stroke's
+    // size: between two different drawings the residual is no evidence of
+    // direction. And the baseline reading must turn the stroke's end-to-end
+    // vector by more than 15% of its length: a curve flipped across its chord
+    // (a smile turned into a frown) is also "itself, reversed and turned half round", but its
+    // ends have not moved, and it is a change of shape. (Flipped and tilted by
+    // more than that, it is the same point set as a wide swing: undecidable.)
+    let rigid = !closed && least_turn && a.segments.len().min(b.segments.len()) >= 2 && {
+        let size = turn_penalty(a, b, 0.).1;
+        let kept = if align_cost(a, &rev) < align_cost(a, b) {
+            &rev
+        } else {
+            b
+        };
+        let n = a.segments.len().min(kept.segments.len());
+        // The change of the end-to-end vector: travel alone leaves it at zero.
+        let chord = |r: &ResampledOut| {
+            let (p, q) = (r.segments[0].point, r.segments[n - 1].point);
+            [q[0] - p[0], q[1] - p[1]]
+        };
+        let (va, vb) = (chord(a), chord(kept));
+        let turned = (va[0] - vb[0]).hypot(va[1] - vb[1]) / 2.;
+        let length: f64 = a.segments[..n]
+            .windows(2)
+            .map(|w| (w[1].point[0] - w[0].point[0]).hypot(w[1].point[1] - w[0].point[1]))
+            .sum();
+        n >= 2
+            && turned > 0.15 * length
+            && rotation_fit_residual(a, b).min(rotation_fit_residual(a, &rev)) <= 0.01 * size
+    };
+    let least_turn = least_turn && (closed || rigid);
+    let base_fn = if closed || rigid {
         rotation_fit_residual
     } else {
         align_cost
     };
     let cost_fn = |x: &ResampledOut, y: &ResampledOut| {
-        base_fn(x, y) * (1.0 + ALIGN_TURN_W * align_turn_disagreement(x, y))
+        let cost = base_fn(x, y) * (1.0 + ALIGN_TURN_W * align_turn_disagreement(x, y));
+        if least_turn {
+            cost + turn_penalty(x, y, hint).0
+        } else {
+            cost
+        }
     };
     let mut best = b.clone();
     let mut best_cost = cost_fn(&a, &b);
-    let rev = reverse_resampled(&b);
     let rc = cost_fn(&a, &rev);
     if rc < best_cost {
         best_cost = rc;

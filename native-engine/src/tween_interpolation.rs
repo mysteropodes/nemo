@@ -24,6 +24,11 @@ pub(crate) struct PreparedInterpolation {
     closed_b: bool,
     decision: Decision,
     reduction: Option<Vec<usize>>,
+    original_counts: Option<(usize, usize)>,
+    pivot: Option<[f64; 2]>,
+    /// Full turn and scale of the swing, and how much of the orbit is used.
+    swing: (f64, f64, f64),
+    articulated: bool,
 }
 impl PreparedInterpolation {
     pub(crate) fn new(
@@ -59,17 +64,111 @@ impl PreparedInterpolation {
             closed_b,
             decision: Decision::default(),
             reduction: None,
+            original_counts,
+            pivot: None,
+            swing: (0., 1., 0.),
+            articulated: false,
         };
-        pair.decision = choose(&pair);
-        pair.reduction = original_counts.and_then(|(a, b)| {
+        pair.decide();
+        Some(pair)
+    }
+    fn decide(&mut self) {
+        self.decision = choose(self);
+        self.reduction = self.original_counts.and_then(|(a, b)| {
             reduction_indices(
-                &pair.a,
-                &pair.b,
+                &self.a,
+                &self.b,
                 (((a + b) as f64 / 2.).round() as usize).max(10),
-                pair.decision.folds.as_ref(),
+                self.decision.folds.as_ref(),
             )
         });
-        Some(pair)
+    }
+    /// Opt-in rigid swing: when one rotation and scale explains the pair, turn the
+    /// stroke by that whole angle about the motion's own fixed point.
+    ///
+    /// The baseline turns each key about its own centroid while the centre runs
+    /// along the chord, so a point near the real pivot (a shoulder) travels out
+    /// and back; it answers by damping the rotation as the centroids separate,
+    /// which leaves a swinging limb as a straight blend (measured: a 90 degree
+    /// swing about its end is 72% of its length at the midpoint). Moving the
+    /// centre on the orbit about the fixed point of `z -> cb + w (z - ca)` keeps
+    /// that pivot still for whatever angle is applied, so the damping is not
+    /// needed: length is kept and the stroke travels on its arc.
+    ///
+    /// The swing is admitted when the similarity leaves less than 20% of the
+    /// shape's size unexplained; a redrawn, non-rigid pair keeps the baseline
+    /// result exactly. Manual arc handles still take precedence.
+    ///
+    /// Any turn with a translation has a fixed point, so the pivot must also
+    /// be near: within `reach` times the shape's own radius of its centre. A
+    /// limb pivots at its end; an object that crosses the stage while turning
+    /// has its fixed point far away and keeps the straight path. The orbit
+    /// fades out over the last radius before `reach`, so there is no jump.
+    pub(crate) fn with_pivot_arc(self) -> Self {
+        self.with_pivot_arc_within(3.5)
+    }
+    pub(crate) fn with_pivot_arc_within(mut self, reach: f64) -> Self {
+        self.articulated = articulated(&self.a, &self.b);
+        self.pivot_arc(reach);
+        if self.articulated || self.pivot.is_some() {
+            self.decide();
+        }
+        self
+    }
+    fn pivot_arc(&mut self, reach: f64) {
+        let Some((theta, scale, rigidity)) = similarity(&self.a, &self.b, self.ca, self.cb) else {
+            return;
+        };
+        if rigidity < 1. / 3. {
+            return;
+        }
+        let (re, im) = (scale * theta.cos(), scale * theta.sin());
+        let den = (1. - re) * (1. - re) + im * im;
+        if theta.abs() < 0.06 || den < 1e-9 {
+            return;
+        }
+        // p = (cb - w ca) / (1 - w), complex arithmetic.
+        let n = [
+            self.cb[0] - (re * self.ca[0] - im * self.ca[1]),
+            self.cb[1] - (im * self.ca[0] + re * self.ca[1]),
+        ];
+        let pivot = [
+            (n[0] * (1. - re) - n[1] * im) / den,
+            (n[1] * (1. - re) + n[0] * im) / den,
+        ];
+        let radius = self
+            .a
+            .iter()
+            .map(|s| norm(sub(s.point, self.ca)))
+            .fold(0., f64::max);
+        let fade = (reach - norm(sub(pivot, self.ca)) / radius.max(1e-9)).clamp(0., 1.);
+        if !pivot.iter().all(|v| v.is_finite()) || !(fade > 0.) {
+            return;
+        }
+        self.theta = lerp(self.theta, theta, fade);
+        self.scale = lerp(self.scale, scale, fade);
+        self.swing = (theta, scale, fade);
+        self.pivot = Some(pivot);
+    }
+    /// How far the registered reconstruction replaces the blend at `t`: none at
+    /// the keys (their own drawing is kept), all of it through the middle.
+    fn swell(&self, t: f64) -> f64 {
+        (4. * (std::f64::consts::PI * t.clamp(0., 1.)).sin()).min(1.)
+    }
+    /// Centre of the straight (handle-free) trajectory at `t`.
+    fn center_at(&self, t: f64) -> [f64; 2] {
+        match self.pivot {
+            Some(pivot) => mix(mix(self.ca, self.cb, t), self.orbit(pivot, t), self.swing.2),
+            None => mix(self.ca, self.cb, t),
+        }
+    }
+    fn orbit(&self, pivot: [f64; 2], t: f64) -> [f64; 2] {
+        let r = rotate(
+            sub(self.ca, pivot),
+            self.swing.0 * t,
+            lerp(1., self.swing.1, t),
+        );
+        [pivot[0] + r[0], pivot[1] + r[1]]
     }
     fn linear_at(&self, t: f64, center: [f64; 2]) -> Vec<SegOut> {
         linear(
@@ -104,15 +203,34 @@ impl PreparedInterpolation {
             let u = 1. - t;
             u * u * u * a + 3. * u * u * t * o + 3. * u * t * t * i + t * t * t * b
         };
-        let center = [
-            cubic(self.ca[0], out[0], input[0], self.cb[0]),
-            cubic(self.ca[1], out[1], input[1], self.cb[1]),
-        ];
+        let straight = |control: [f64; 2], at: f64| {
+            let line = mix(self.ca, self.cb, at);
+            norm(sub(control, line)) <= 1e-6 * (1. + norm(sub(self.cb, self.ca)))
+        };
+        let steered = !(straight(out, 1. / 3.) && straight(input, 2. / 3.));
+        let center = match self.pivot {
+            Some(_) if !steered => self.center_at(t),
+            _ => [
+                cubic(self.ca[0], out[0], input[0], self.cb[0]),
+                cubic(self.ca[1], out[1], input[1], self.cb[1]),
+            ],
+        };
         let mut s = if let Some(fits) = &self.decision.mls {
             local_segments(&self.a, &self.b, fits, t)
         } else {
             self.linear_at(t, center)
         };
+        if self.decision.registered {
+            let mut target = registered(&self.a, &self.b, t, self.closed_at(t));
+            if steered {
+                // Manual arc handles carry the reconstruction with the centre.
+                let shift = sub(center, mix(self.ca, self.cb, t));
+                for p in &mut target {
+                    p.point = [p.point[0] + shift[0], p.point[1] + shift[1]];
+                }
+            }
+            s = blend_segments(&s, &target, &vec![self.swell(t); s.len()]);
+        }
         let weight = self.decision.weight * (std::f64::consts::PI * t.clamp(0., 1.)).sin();
         if weight > 0.001 {
             let target = intrinsic(&self.a, &self.b, t, center, self.closed_at(t), Some(&s));

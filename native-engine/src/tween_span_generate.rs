@@ -78,8 +78,19 @@ pub(super) fn generate_span(
         .iter()
         .map(|&i| vanish_plan(&b[i], &persist_b))
         .collect::<R<_>>()?;
-    let mut pairs = vec![];
-    for spec in specs {
+    let centroid = |s: &[SegOut]| {
+        let p = s.iter().fold([0., 0.], |mut p, s| {
+            p[0] += s.point[0];
+            p[1] += s.point[1];
+            p
+        });
+        [p[0] / s.len() as f64, p[1] / s.len() as f64]
+    };
+    // Resample every pair first: an open stroke that moves rigidly tells the
+    // symmetric closed shapes it carries (a hand on its arm) which way they turned.
+    let mut sampled = vec![];
+    let mut turns: Vec<([Vec<[f64; 2]>; 2], f64)> = vec![];
+    for spec in &specs {
         let sa = stroke(&spec.a_data);
         let sb = stroke(&spec.b_data);
         let n = (poly_length(&sa).max(poly_length(&sb)) / 8.)
@@ -87,16 +98,44 @@ pub(super) fn generate_span(
             .min(150.)
             .max(options.resample_points as f64) as usize;
         let vb = sa.is_vector_brush && sb.is_vector_brush;
-        let (ra, rb) = resample_pair(&sa, &sb, n, vb);
-        let rb = align_pair(&ra, &rb);
-        let centroid = |s: &[SegOut]| {
-            let p = s.iter().fold([0., 0.], |mut p, s| {
-                p[0] += s.point[0];
-                p[1] += s.point[1];
-                p
-            });
-            [p[0] / s.len() as f64, p[1] / s.len() as f64]
+        let (ra, mut rb) = resample_pair(&sa, &sb, n, vb);
+        let closed = !vb && sa.closed && sb.closed;
+        if !closed {
+            rb = align_pair_with(&ra, &rb, true);
+            if let Some(turn) = rigid_turn(&ra, &rb) {
+                let points = |r: &ResampledOut| r.segments.iter().map(|s| s.point).collect();
+                turns.push(([points(&ra), points(&rb)], turn));
+            }
+        }
+        sampled.push((sa, sb, vb, ra, rb, closed));
+    }
+    let mut pairs = vec![];
+    for (spec, (sa, sb, vb, ra, rb, closed)) in specs.into_iter().zip(sampled) {
+        // A closed shape lying within its own width of a rigid limb, in both
+        // keys, is carried by it: it takes the limb's turn.
+        let carried = closed.then(|| {
+            let gap = |shape: &[SegOut], limb: &[[f64; 2]]| {
+                let c = centroid(shape);
+                let far = |p: &[f64; 2]| (p[0] - c[0]).hypot(p[1] - c[1]);
+                let reach = 2. * shape.iter().map(|s| far(&s.point)).fold(0., f64::max);
+                let gap = limb.iter().map(far).fold(f64::MAX, f64::min);
+                (gap <= reach).then_some(gap)
+            };
+            turns
+                .iter()
+                .filter_map(|(limb, turn)| {
+                    let (near, then) = (gap(&ra.segments, &limb[0])?, gap(&rb.segments, &limb[1])?);
+                    Some((near + then, *turn))
+                })
+                .min_by(|x, y| x.0.total_cmp(&y.0))
+                .map(|x| x.1)
+        });
+        let rb = match carried {
+            None => rb,
+            Some(hint) => align_pair_toward(&ra, &rb, Some(hint.unwrap_or(0.))),
         };
+        // A carried shape pivots where its limb does, further out than its own size.
+        let reach = if carried.flatten().is_some() { 8. } else { 3.5 };
         let handles = doc
             .tween_motion_arc_handles(
                 layer,
@@ -114,7 +153,8 @@ pub(super) fn generate_span(
             !vb && sb.closed,
             (!vb).then_some((sa.segments.len(), sb.segments.len())),
         )
-        .ok_or(DispatchErrorCode::InvalidRequest)?;
+        .ok_or(DispatchErrorCode::InvalidRequest)?
+        .with_pivot_arc_within(reach);
         let id = if spec.a_piece {
             spec.b_data.target.stroke_id.clone()
         } else {
