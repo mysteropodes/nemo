@@ -167,6 +167,8 @@
         }
         return response;
       } catch (error) {
+        // A failure here may invalidate the binding, silently and for good: say why in the console first.
+        try { console.error('Nemo native dispatch failed (' + request.operation + '):', String((error && error.message) || error)); } catch (_) {}
         if (ticket === epoch) await invalidate();
         throw error;
       } finally {
