@@ -37,6 +37,8 @@
           if (settled) after = session.info();
           // The document did not advance past the revision this request was sent against: nothing was published.
           if (after && ownerKey(after) === key && after.contentRevision === request.expectedRevision) {
+            // The caller only learns 'transport_failure': keep both causes readable in the console (a swallowed one cost a full trial session).
+            try { console.error(`Nemo native ${label} command not delivered (${request.operation}):`, String((first && first.message) || first), '|', String((second && second.message) || second)); } catch (_) {}
             throw fault('unavailable', `Native ${label} command was not delivered`, { reason: 'transport_failure', requestId: request.requestId });
           }
           throw fault(`${label}_command_indeterminate`, `Native ${label} command outcome is indeterminate`,
