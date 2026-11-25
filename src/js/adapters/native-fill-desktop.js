@@ -67,7 +67,7 @@
     if(!nativeMode(root))return false;
     const state=root.state;
     if(!state||state.tool!=='fill'||state.playing)return false;
-    event.stopImmediatePropagation();event.preventDefault();
+    const d=root.document,at=event.target;if(d&&at&&typeof d.getElementById==='function'&&at!==d.getElementById('drawing-canvas')&&at!==d.getElementById('canvas-area'))return true; /* chrome inside the stage: not a fill, nothing consumed */ event.stopImmediatePropagation();event.preventDefault();if(typeof event.button==='number'&&event.button!==0||event.isPrimary===false)return true; // only a primary press fills (as the eraser, shape and pen controllers)
     const toast=(text)=>{if(typeof root.showToast==='function')root.showToast(text);};
     const t=(key)=>root.SM&&typeof root.SM.t==='function'?root.SM.t(key):key;
     if(event.altKey){toast('Close Gap is unavailable.');return true;}

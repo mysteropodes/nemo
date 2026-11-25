@@ -63,3 +63,30 @@ test('a legacy (non-native) project keeps its legacy routing for these tools',()
   assert.equal(h.counts.legacy,1);
   assert.equal(h.counts.downstream,1);
 });
+
+test('a right-click with a downstream tool still suppresses the webview context menu, without consuming the event',()=>{
+  const lines=SELECT.split('\n').filter(l=>l.includes("addEventListener('contextmenu'")&&l.includes('nativePointerEvent('));
+  assert.equal(lines.length,1);
+  const fn=SELECT.slice(SELECT.indexOf('function nativePointerEvent(method, e) {'),SELECT.indexOf('// The engine-off Paper Tool entry'));
+  const area=node('canvas-area'),root={state:{tool:'eraser'},NemoNativeOpacityCutover:{blocksLegacy:()=>true}};
+  let legacy=0,prevented=0,stopped=0;
+  vm.runInNewContext(fn+'\n'+lines[0],{window:root,state:root.state,nativePointerIntent:null,nativePaperToolPointer:null,nativePointer:()=>{throw new Error('select intent');},
+    onContext:()=>legacy++,shouldIntercept:()=>false,target:area});
+  area.listeners[0].fn({type:'contextmenu',preventDefault:()=>prevented++,stopImmediatePropagation:()=>stopped++});
+  assert.deepEqual([prevented,stopped,legacy],[1,0,0]);
+});
+
+test('the bucket fills only on a primary press on the stage',()=>{
+  const fill=require('../src/js/adapters/native-fill-desktop.js');
+  const canvas={},chrome={},toasts=[];
+  const root={state:{tool:'fill'},NemoNativeOpacityCutover:{blocksLegacy:()=>true},showToast:t=>toasts.push(t),
+    document:{getElementById:id=>id==='drawing-canvas'?canvas:null}};
+  const press=over=>{const seen=[];const handled=fill.handlePointerDown(root,{target:canvas,button:0,isPrimary:true,clientX:1,clientY:1,
+    stopImmediatePropagation:()=>seen.push('stop'),preventDefault:()=>seen.push('prevent'),...over},null);return {handled,seen,toasts:toasts.splice(0)};};
+  // A primary stage press reaches the fill path (here it stops at the missing mapping, with its message).
+  assert.deepEqual(press({}),{handled:true,seen:['stop','prevent'],toasts:['Native fill coordinates are unavailable']});
+  // A secondary button or a second touch is consumed and fills nothing.
+  for(const over of [{button:2},{button:1},{isPrimary:false}])assert.deepEqual(press(over),{handled:true,seen:['stop','prevent'],toasts:[]});
+  // Chrome inside the stage keeps its event and is not a fill.
+  assert.deepEqual(press({target:chrome}),{handled:true,seen:[],toasts:[]});
+});
