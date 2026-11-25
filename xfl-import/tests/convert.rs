@@ -182,3 +182,75 @@ fn what_is_not_drawn_is_reported() {
         1
     );
 }
+
+#[test]
+fn self_placing_symbols_and_huge_spans_stay_bounded() {
+    // A symbol holding two copies of itself would expand 2^32 times.
+    let fan = r##"<DOMSymbolItem name="Fan" symbolType="graphic"><timeline><DOMTimeline name="Fan"><layers>
+<DOMLayer name="L"><frames><DOMFrame index="0"><elements>
+  <DOMSymbolInstance libraryItemName="Fan" symbolType="graphic"/>
+  <DOMSymbolInstance libraryItemName="Fan" symbolType="graphic"/>
+  <DOMOvalObject x="0" y="0" objectWidth="4" objectHeight="4"><fill><SolidColor color="#000000"/></fill></DOMOvalObject>
+</elements></DOMFrame></frames></DOMLayer></layers></DOMTimeline></timeline></DOMSymbolItem>"##;
+    let layers = r##"<DOMLayer name="A"><frames><DOMFrame index="0" duration="4000000000"><elements>
+        <DOMSymbolInstance libraryItemName="Fan" symbolType="graphic"/></elements></DOMFrame></frames></DOMLayer>"##;
+    let start = std::time::Instant::now();
+    let out = convert(layers, &[("Fan", fan)]);
+    assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
+    assert!(out
+        .report
+        .skipped_feature("symbol placed inside itself")
+        .is_some());
+    assert!(out.report.skipped_feature("frames after 1000000").is_some());
+    assert_eq!(out.project["totalFrames"], 1_000_000);
+    assert_eq!(keyframes(&out.project["layers"][0]), [0]);
+}
+
+#[test]
+fn empty_scene_still_has_one_layer() {
+    let layers = r##"<DOMLayer name="G" layerType="guide"><frames><DOMFrame index="0"><elements/></DOMFrame></frames></DOMLayer>"##;
+    let p = convert(layers, &[]).project;
+    assert_eq!(p["layers"].as_array().unwrap().len(), 1);
+    assert_eq!(keyframes(&p["layers"][0]), [0]);
+}
+
+#[test]
+fn stroke_width_scale_mode_hidden_folders_and_long_strokes() {
+    // A 300-anchor polyline stroke, no fill.
+    let mut edges = String::from("!0 0");
+    for i in 1..300 {
+        edges.push_str(&format!("|{} {}", i * 20, (i % 2) * 200));
+    }
+    let shape = |mode: &str| {
+        format!(
+            r##"<DOMShape><strokes><StrokeStyle index="1"><SolidStroke weight="2" scaleMode="{mode}"><fill><SolidColor color="#000000"/></fill></SolidStroke></StrokeStyle></strokes>
+          <edges><Edge strokeStyle="1" edges="{edges}"/></edges></DOMShape>"##
+        )
+    };
+    let sym = format!(
+        r##"<DOMSymbolItem name="S" symbolType="graphic"><timeline><DOMTimeline name="S"><layers>
+<DOMLayer name="L"><frames><DOMFrame index="0"><elements>{}{}</elements></DOMFrame></frames></DOMLayer></layers></DOMTimeline></timeline></DOMSymbolItem>"##,
+        shape("normal"),
+        shape("none")
+    );
+    let layers = r##"<DOMLayer name="Dir" layerType="folder" visible="false"/>
+      <DOMLayer name="A" parentLayerIndex="0"><frames><DOMFrame index="0"><elements>
+        <DOMSymbolInstance libraryItemName="S" symbolType="graphic"><matrix><Matrix a="3" d="3"/></matrix></DOMSymbolInstance>
+      </elements></DOMFrame></frames></DOMLayer>"##;
+    let p = convert(layers, &[("S", &sym)]).project;
+    let layer = &p["layers"][0];
+    assert_eq!(layer["visible"], false);
+    let strokes = layer["frames"][0]["strokes"].as_array().unwrap();
+    // Each 300-anchor stroke is cut into two pieces sharing an anchor.
+    assert_eq!(strokes.len(), 4);
+    let widths: Vec<f64> = strokes
+        .iter()
+        .map(|s| s["strokeWidth"].as_f64().unwrap())
+        .collect();
+    assert_eq!(widths, [6.0, 6.0, 2.0, 2.0]);
+    let n: Vec<usize> = strokes
+        .iter()
+        .map(|s| s["segments"].as_array().unwrap().len())
+        .collect();
+    assert_eq!(n[..2], [256, 45]);
+}

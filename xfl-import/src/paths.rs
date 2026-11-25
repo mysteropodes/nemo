@@ -8,6 +8,8 @@
 
 use serde_json::{json, Value};
 
+use crate::report::ImportReport;
+
 use crate::model::*;
 
 /// Most anchors one Nemo path may carry.
@@ -21,7 +23,7 @@ pub struct Anchor {
     pub handle_out: Point,
 }
 
-const ZERO: Point = Point { x: 0.0, y: 0.0 };
+pub const ZERO: Point = Point { x: 0.0, y: 0.0 };
 
 fn sub(a: Point, b: Point) -> Point {
     Point {
@@ -64,29 +66,65 @@ pub fn anchors(c: &Contour, m: &Matrix) -> Vec<Anchor> {
     out
 }
 
-/// Signed area of the anchor polygon (handles ignored), y down.
-fn area(a: &[Anchor]) -> f64 {
+/// The loop flattened into points (each cubic sampled `STEPS` times), so
+/// area and containment see the curves, not just the anchors.
+fn flatten(a: &[Anchor]) -> Vec<Point> {
+    const STEPS: usize = 8;
     let n = a.len();
+    let mut out = Vec::with_capacity(n * STEPS);
+    for i in 0..n {
+        let (p, q) = (a[i], a[(i + 1) % n]);
+        let c1 = Point {
+            x: p.point.x + p.handle_out.x,
+            y: p.point.y + p.handle_out.y,
+        };
+        let c2 = Point {
+            x: q.point.x + q.handle_in.x,
+            y: q.point.y + q.handle_in.y,
+        };
+        for k in 0..STEPS {
+            let t = k as f64 / STEPS as f64;
+            let u = 1.0 - t;
+            let (w0, w1, w2, w3) = (u * u * u, 3.0 * u * u * t, 3.0 * u * t * t, t * t * t);
+            out.push(Point {
+                x: w0 * p.point.x + w1 * c1.x + w2 * c2.x + w3 * q.point.x,
+                y: w0 * p.point.y + w1 * c1.y + w2 * c2.y + w3 * q.point.y,
+            });
+        }
+    }
+    out
+}
+
+/// Signed area of a polygon, y down.
+fn area(pts: &[Point]) -> f64 {
+    let n = pts.len();
     (0..n)
         .map(|i| {
-            let (p, q) = (a[i].point, a[(i + 1) % n].point);
+            let (p, q) = (pts[i], pts[(i + 1) % n]);
             p.x * q.y - q.x * p.y
         })
         .sum::<f64>()
         / 2.0
 }
 
-/// Even-odd test of `p` against the anchor polygon.
-fn inside(p: Point, a: &[Anchor]) -> bool {
-    let n = a.len();
+/// Even-odd test of `p` against a polygon.
+fn inside(p: Point, pts: &[Point]) -> bool {
+    let n = pts.len();
     let mut hit = false;
     for i in 0..n {
-        let (u, v) = (a[i].point, a[(i + 1) % n].point);
+        let (u, v) = (pts[i], pts[(i + 1) % n]);
         if (u.y > p.y) != (v.y > p.y) && p.x < (v.x - u.x) * (p.y - u.y) / (v.y - u.y) + u.x {
             hit = !hit;
         }
     }
     hit
+}
+
+/// Whether most of `hole`'s points lie inside `outer` (robust to a hole
+/// touching the outer boundary at a point or along an edge).
+fn holds(outer: &[Point], hole: &[Point]) -> bool {
+    let hits = hole.iter().filter(|p| inside(**p, outer)).count();
+    hits * 2 > hole.len()
 }
 
 fn dist2(a: Point, b: Point) -> f64 {
@@ -122,37 +160,43 @@ fn bridge(outer: &mut Vec<Anchor>, hole: &[Anchor]) {
 }
 
 /// Closed fill loops grouped into one anchor list per outer loop, holes
-/// bridged in. Loops with fewer than two anchors are dropped.
-pub fn fill_regions(contours: &[Contour], m: &Matrix) -> Vec<Vec<Anchor>> {
-    let loops: Vec<Vec<Anchor>> = contours
+/// bridged in, plus the number of holes that sat in no outer loop (left out:
+/// drawn alone they would fill). Degenerate loops are dropped.
+pub fn fill_regions(contours: &[Contour], m: &Matrix) -> (Vec<Vec<Anchor>>, usize) {
+    let loops: Vec<(Vec<Anchor>, Vec<Point>, f64)> = contours
         .iter()
         .filter(|c| c.closed)
         .map(|c| anchors(c, m))
         .filter(|a| a.len() >= 2)
+        .map(|a| {
+            let pts = flatten(&a);
+            let ar = area(&pts);
+            (a, pts, ar)
+        })
+        .filter(|(_, _, ar)| ar.abs() > 1e-9)
         .collect();
     let Some(outer_sign) = loops
         .iter()
-        .map(|l| area(l))
+        .map(|l| l.2)
         .max_by(|a, b| a.abs().total_cmp(&b.abs()))
         .map(f64::signum)
     else {
-        return Vec::new();
+        return (Vec::new(), 0);
     };
-    let (outers, holes): (Vec<_>, Vec<_>) = loops
-        .into_iter()
-        .partition(|l| area(l).signum() == outer_sign || area(l) == 0.0);
-    let mut regions = outers;
-    for hole in holes {
-        // The smallest outer loop holding the hole, else the hole stands alone.
-        let owner = (0..regions.len())
-            .filter(|&i| inside(hole[0].point, &regions[i]))
-            .min_by(|&i, &j| area(&regions[i]).abs().total_cmp(&area(&regions[j]).abs()));
+    let (mut outers, holes): (Vec<_>, Vec<_>) =
+        loops.into_iter().partition(|l| l.2.signum() == outer_sign);
+    let mut dropped = 0;
+    for (hole, hole_pts, _) in holes {
+        // The smallest outer loop holding the hole.
+        let owner = (0..outers.len())
+            .filter(|&i| holds(&outers[i].1, &hole_pts))
+            .min_by(|&i, &j| outers[i].2.abs().total_cmp(&outers[j].2.abs()));
         match owner {
-            Some(i) => bridge(&mut regions[i], &hole),
-            None => regions.push(hole),
+            Some(i) => bridge(&mut outers[i].0, &hole),
+            None => dropped += 1,
         }
     }
-    regions
+    (outers.into_iter().map(|l| l.0).collect(), dropped)
 }
 
 fn round(v: f64) -> f64 {
@@ -178,6 +222,81 @@ pub fn segments_json(a: &[Anchor]) -> Value {
     )
 }
 
+/// Most paths drawn into one frame of one layer.
+pub const MAX_PATHS_PER_FRAME: usize = 20_000;
+
+pub fn hex(c: Rgba, alpha: f64) -> String {
+    Rgba {
+        a: c.a * alpha,
+        ..c
+    }
+    .hex8()
+}
+
+/// One colour for a paint; gradients fall back to their middle stop.
+pub fn solid(paint: &Paint, alpha: f64, report: &mut ImportReport, loc: &str) -> Option<String> {
+    match paint {
+        Paint::Solid { color } => Some(hex(*color, alpha)),
+        Paint::Linear { stops, .. } | Paint::Radial { stops, .. } => {
+            report.skip("gradient drawn as its middle colour", loc);
+            stops.get(stops.len() / 2).map(|s| hex(s.color, alpha))
+        }
+        Paint::Bitmap { .. } => {
+            report.skip("bitmap fill", loc);
+            None
+        }
+    }
+}
+
+/// Average linear scale of `m`, for stroke widths.
+pub fn scale(m: &Matrix) -> f64 {
+    (m.a * m.d - m.b * m.c).abs().sqrt()
+}
+
+pub fn push_path(
+    out: &mut Vec<Value>,
+    anchors: &[Anchor],
+    closed: bool,
+    mut body: Value,
+    report: &mut ImportReport,
+    loc: &str,
+) {
+    if anchors.len() < 2 {
+        return;
+    }
+    if out.len() >= MAX_PATHS_PER_FRAME {
+        report.skip(
+            format!("more than {MAX_PATHS_PER_FRAME} paths in one frame"),
+            loc,
+        );
+        return;
+    }
+    if anchors.len() > MAX_ANCHORS {
+        if closed {
+            report.skip(
+                format!("filled region with more than {MAX_ANCHORS} anchors"),
+                loc,
+            );
+            return;
+        }
+        // A long stroke is cut into pieces sharing their end anchors.
+        let mut start = 0;
+        while start + 1 < anchors.len() {
+            let end = (start + MAX_ANCHORS).min(anchors.len());
+            let mut piece = anchors[start..end].to_vec();
+            piece[0].handle_in = ZERO;
+            let last = piece.len() - 1;
+            piece[last].handle_out = ZERO;
+            push_path(out, &piece, false, body.clone(), report, loc);
+            start = end - 1;
+        }
+        return;
+    }
+    body["segments"] = segments_json(anchors);
+    body["closed"] = json!(closed);
+    out.push(body);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,7 +320,7 @@ mod tests {
     fn closed_contour_does_not_repeat_its_start() {
         let a = anchors(&square(0.0, 0.0, 10.0, true), &Matrix::IDENTITY);
         assert_eq!(a.len(), 4);
-        assert!(area(&a) > 0.0);
+        assert!(area(&flatten(&a)) > 0.0);
     }
 
     #[test]
@@ -232,11 +351,51 @@ mod tests {
         let outer = square(0.0, 0.0, 100.0, true);
         let hole = square(40.0, 40.0, 20.0, false);
         let lone = square(300.0, 0.0, 10.0, true);
-        let r = fill_regions(&[outer, hole, lone], &Matrix::IDENTITY);
-        assert_eq!(r.len(), 2);
+        let (r, dropped) = fill_regions(&[outer, hole, lone], &Matrix::IDENTITY);
+        assert_eq!((r.len(), dropped), (2, 0));
         // 4 outer + 4 hole + hole start again + outer anchor again.
         assert_eq!(r[0].len(), 10);
         // The net area is the outer minus the hole.
-        assert!((area(&r[0]) - (10_000.0 - 400.0)).abs() < 1e-9);
+        assert!((area(&flatten(&r[0])) - (10_000.0 - 400.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn hole_starting_on_the_outer_edge_is_still_bridged() {
+        let outer = square(0.0, 0.0, 100.0, true);
+        // Triangle hole, wound against the outer, first point on the edge.
+        let hole = Contour {
+            start: Point { x: 100.0, y: 50.0 },
+            segments: [(50.0, 20.0), (50.0, 80.0), (100.0, 50.0)]
+                .into_iter()
+                .map(|(x, y)| Segment::Line { to: Point { x, y } })
+                .collect(),
+            closed: true,
+        };
+        let (r, dropped) = fill_regions(&[outer, hole], &Matrix::IDENTITY);
+        assert_eq!((r.len(), dropped), (1, 0));
+    }
+
+    #[test]
+    fn curved_two_anchor_outer_keeps_its_hole() {
+        // A circle-ish outer from two quads (two anchors, zero polygon area).
+        let outer = Contour {
+            start: Point { x: 0.0, y: 0.0 },
+            segments: vec![
+                Segment::Quad {
+                    ctrl: Point { x: 50.0, y: -60.0 },
+                    to: Point { x: 100.0, y: 0.0 },
+                },
+                Segment::Quad {
+                    ctrl: Point { x: 50.0, y: 60.0 },
+                    to: Point { x: 0.0, y: 0.0 },
+                },
+            ],
+            closed: true,
+        };
+        let sign = area(&flatten(&anchors(&outer, &Matrix::IDENTITY))).signum();
+        let hole = square(45.0, -5.0, 10.0, sign < 0.0);
+        let (r, dropped) = fill_regions(&[outer, hole], &Matrix::IDENTITY);
+        assert_eq!((r.len(), dropped), (1, 0));
+        assert_eq!(r[0].len(), 2 + 4 + 2);
     }
 }

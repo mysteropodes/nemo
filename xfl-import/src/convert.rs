@@ -8,16 +8,19 @@
 //! keys come later; what is not drawn is listed in the report.
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use serde_json::{json, Value};
 
 use crate::model::*;
-use crate::paths::{fill_regions, segments_json, Anchor, MAX_ANCHORS};
+use crate::paths::{fill_regions, hex, push_path, scale, solid, MAX_ANCHORS, ZERO};
 use crate::report::ImportReport;
 use crate::tween::{classic_tweens, ClassicTween};
 
 /// Deepest symbol nesting followed (a symbol placing itself stops here).
 const MAX_DEPTH: usize = 32;
+/// Most frames the native reader accepts.
+const MAX_FRAMES: u32 = 1_000_000;
 
 /// A converted project and what the conversion left out.
 #[derive(Debug, Clone)]
@@ -28,69 +31,24 @@ pub struct LegacyProject {
 
 struct Ctx<'a> {
     symbols: HashMap<&'a str, &'a LibrarySymbol>,
-    tweens: HashMap<*const Layer, HashMap<u32, ClassicTween>>,
+    tweens: HashMap<*const Layer, HashMap<u32, Rc<ClassicTween>>>,
+    frame_counts: HashMap<&'a str, u32>,
+    /// Symbols being expanded, outermost first (a symbol inside itself stops).
+    expanding: Vec<&'a str>,
     report: ImportReport,
 }
 
 impl<'a> Ctx<'a> {
-    fn tweens_of(&mut self, timeline: &Timeline, index: usize) -> &HashMap<u32, ClassicTween> {
+    fn tweens_of(&mut self, timeline: &Timeline, index: usize) -> &HashMap<u32, Rc<ClassicTween>> {
         let key: *const Layer = &timeline.layers[index];
         self.tweens.entry(key).or_insert_with(|| {
             classic_tweens(timeline, index)
                 .0
                 .into_iter()
-                .map(|t| (t.start_frame, t))
+                .map(|t| (t.start_frame, Rc::new(t)))
                 .collect()
         })
     }
-}
-
-fn hex(c: Rgba, alpha: f64) -> String {
-    Rgba {
-        a: c.a * alpha,
-        ..c
-    }
-    .hex8()
-}
-
-/// One colour for a paint; gradients fall back to their middle stop.
-fn solid(paint: &Paint, alpha: f64, report: &mut ImportReport, loc: &str) -> Option<String> {
-    match paint {
-        Paint::Solid { color } => Some(hex(*color, alpha)),
-        Paint::Linear { stops, .. } | Paint::Radial { stops, .. } => {
-            report.skip("gradient drawn as its middle colour", loc);
-            stops.get(stops.len() / 2).map(|s| hex(s.color, alpha))
-        }
-        Paint::Bitmap { .. } => {
-            report.skip("bitmap fill", loc);
-            None
-        }
-    }
-}
-
-/// Average linear scale of `m`, for stroke widths.
-fn scale(m: &Matrix) -> f64 {
-    (m.a * m.d - m.b * m.c).abs().sqrt()
-}
-
-fn push_path(
-    out: &mut Vec<Value>,
-    anchors: &[Anchor],
-    closed: bool,
-    mut body: Value,
-    report: &mut ImportReport,
-    loc: &str,
-) {
-    if anchors.len() < 2 {
-        return;
-    }
-    if anchors.len() > MAX_ANCHORS {
-        report.skip(format!("path with more than {MAX_ANCHORS} anchors"), loc);
-        return;
-    }
-    body["segments"] = segments_json(anchors);
-    body["closed"] = json!(closed);
-    out.push(body);
 }
 
 fn draw_shape(
@@ -105,7 +63,12 @@ fn draw_shape(
     for path in &shape.paths {
         if let Some(fill) = &path.fill {
             if let Some(color) = solid(fill, alpha, &mut cx.report, loc) {
-                for region in fill_regions(&path.contours, &m) {
+                let (regions, dropped) = fill_regions(&path.contours, &m);
+                if dropped > 0 {
+                    cx.report
+                        .skip("fill hole outside any outer loop (left out)", loc);
+                }
+                for region in regions {
                     let body = json!({"fillColor": color, "hasRealStroke": false});
                     push_path(out, &region, true, body, &mut cx.report, loc);
                 }
@@ -125,14 +88,28 @@ fn draw_shape(
                 "bevel" => "bevel",
                 _ => "round",
             };
-            // Flash's hairline (weight 0) is one screen pixel wide.
-            let width = (stroke.weight * scale(&m)).max(0.05);
+            // `scaleMode="none"` keeps the authored width; a hairline (weight
+            // 0) is one pixel. Skew and non-uniform scale use the mean scale.
+            let width = match (stroke.weight, stroke.scale_mode.as_deref()) {
+                (w, _) if w <= 0.0 => 1.0,
+                (w, Some("none")) => w,
+                (w, _) => (w * scale(&m)).max(0.05),
+            };
             let miter = stroke.miter_limit;
             for c in &path.contours {
-                let anchors = crate::paths::anchors(c, &m);
+                let mut anchors = crate::paths::anchors(c, &m);
+                let mut closed = c.closed;
+                if closed && anchors.len() > MAX_ANCHORS {
+                    // Open a long closed stroke so it can be cut into pieces.
+                    let mut back = anchors[0];
+                    back.handle_out = ZERO;
+                    anchors[0].handle_in = ZERO;
+                    anchors.push(back);
+                    closed = false;
+                }
                 let body = json!({"strokeColor": color, "strokeWidth": width,
                     "strokeCap": cap, "strokeJoin": join, "miterLimit": miter});
-                push_path(out, &anchors, c.closed, body, &mut cx.report, loc);
+                push_path(out, &anchors, closed, body, &mut cx.report, loc);
             }
         }
     }
@@ -144,8 +121,10 @@ fn symbol_frame(inst: &SymbolInstance, offset: u32, len: u32) -> u32 {
     let len = len.max(1);
     match (inst.symbol_type, inst.loop_mode.as_str()) {
         (SymbolType::Graphic, "single frame") => inst.first_frame.min(len - 1),
-        (SymbolType::Graphic, "play once") => (inst.first_frame + offset).min(len - 1),
-        (SymbolType::Graphic, _) => (inst.first_frame + offset) % len,
+        (SymbolType::Graphic, "play once") => inst.first_frame.saturating_add(offset).min(len - 1),
+        (SymbolType::Graphic, _) => {
+            ((u64::from(inst.first_frame) + u64::from(offset)) % u64::from(len)) as u32
+        }
         _ => 0,
     }
 }
@@ -176,11 +155,20 @@ fn draw_elements(
                     cx.report.skip("symbol nesting deeper than 32", loc);
                     continue;
                 }
+                if cx.expanding.contains(&sym.name.as_str()) {
+                    cx.report.skip("symbol placed inside itself", loc);
+                    continue;
+                }
                 if inst.symbol_type != SymbolType::Graphic {
                     cx.report
                         .skip("movie clip or button drawn at its first frame", loc);
                 }
-                let f = symbol_frame(inst, offset, sym.timeline.frame_count());
+                let len = *cx
+                    .frame_counts
+                    .entry(sym.name.as_str())
+                    .or_insert_with(|| sym.timeline.frame_count());
+                let f = symbol_frame(inst, offset, len);
+                cx.expanding.push(sym.name.as_str());
                 let m = m.then_after(&inst.matrix);
                 let at = format!("{loc} > {}", sym.name);
                 draw_timeline(
@@ -193,6 +181,7 @@ fn draw_elements(
                     cx,
                     &at,
                 );
+                cx.expanding.pop();
             }
             Element::BitmapInstance { .. } => cx.report.skip("bitmap instance", loc),
             Element::Text { .. } => cx.report.skip("text", loc),
@@ -203,10 +192,10 @@ fn draw_elements(
 
 /// The keyframe span of `layer` holding frame `f`.
 fn span_at(layer: &Layer, f: u32) -> Option<&Frame> {
-    layer
-        .frames
-        .iter()
-        .find(|s| s.index <= f && f < s.index.saturating_add(s.duration.max(1)))
+    // Spans are sorted by index: take the last one starting at or before f.
+    let n = layer.frames.partition_point(|s| s.index <= f);
+    let s = layer.frames.get(n.checked_sub(1)?)?;
+    (f < s.index.saturating_add(s.duration.max(1))).then_some(s)
 }
 
 /// Draw one layer of `timeline` at frame `f`.
@@ -270,11 +259,48 @@ fn draw_timeline(
     }
 }
 
+/// Whether every frame of `span` draws the same: no classic tween, and every
+/// symbol instance shows one fixed frame.
+fn is_static(timeline: &Timeline, index: usize, span: &Frame, cx: &mut Ctx) -> bool {
+    fn fixed(elements: &[Element], cx: &Ctx) -> bool {
+        elements.iter().all(|e| match e {
+            Element::Group { members } => fixed(members, cx),
+            Element::SymbolInstance(i) => {
+                i.symbol_type != SymbolType::Graphic
+                    || i.loop_mode == "single frame"
+                    || cx
+                        .symbols
+                        .get(i.library_item.as_str())
+                        .is_none_or(|s| s.timeline.frame_count() <= 1)
+            }
+            _ => true,
+        })
+    }
+    !cx.tweens_of(timeline, index).contains_key(&span.index) && fixed(&span.elements, cx)
+}
+
+/// A layer shows only when it and every folder above it are visible.
+fn visible(timeline: &Timeline, index: usize) -> bool {
+    let mut at = Some(index);
+    for _ in 0..=timeline.layers.len() {
+        let Some(layer) = at.and_then(|i| timeline.layers.get(i)) else {
+            return true;
+        };
+        if !layer.visible {
+            return false;
+        }
+        at = layer.parent_layer_index;
+    }
+    true
+}
+
 /// Convert the first scene of `doc` into a legacy Nemo project.
 pub fn to_legacy_project(doc: &XflDocument) -> LegacyProject {
     let mut cx = Ctx {
         symbols: doc.symbols.iter().map(|s| (s.name.as_str(), s)).collect(),
         tweens: HashMap::new(),
+        frame_counts: HashMap::new(),
+        expanding: Vec::new(),
         report: ImportReport::default(),
     };
     if doc.timelines.len() > 1 {
@@ -285,7 +311,12 @@ pub fn to_legacy_project(doc: &XflDocument) -> LegacyProject {
         layers: Vec::new(),
     };
     let scene = doc.timelines.first().unwrap_or(&empty);
-    let total = scene.frame_count().max(1);
+    let mut total = scene.frame_count().max(1);
+    if total > MAX_FRAMES {
+        cx.report
+            .skip(format!("frames after {MAX_FRAMES}"), "DOMDocument.xml");
+        total = MAX_FRAMES;
+    }
     let mut layers = Vec::new();
     // XFL lists the top layer first; a Nemo project lists the bottom first.
     for index in (0..scene.layers.len()).rev() {
@@ -313,7 +344,18 @@ pub fn to_legacy_project(doc: &XflDocument) -> LegacyProject {
         }
         let mut frames = Vec::with_capacity(total as usize);
         let mut previous: Option<Vec<Value>> = None;
+        let mut drawn_span: Option<*const Frame> = None;
         for f in 0..total {
+            // Inside a span whose drawing cannot change, the frame is held.
+            let span = span_at(layer, f).map(|s| s as *const Frame);
+            if previous.is_some() && span == drawn_span {
+                let still = span_at(layer, f).is_none_or(|s| is_static(scene, index, s, &mut cx));
+                if still {
+                    frames.push(json!({"strokes": []}));
+                    continue;
+                }
+            }
+            drawn_span = span;
             let loc = format!("{} frame {}", layer.name, f + 1);
             let mut strokes = Vec::new();
             draw_layer(
@@ -348,7 +390,7 @@ pub fn to_legacy_project(doc: &XflDocument) -> LegacyProject {
         let mut record = json!({
             "name": layer.name,
             "layerUid": format!("xfl-layer-{index}"),
-            "visible": layer.visible,
+            "visible": visible(scene, index),
             "locked": layer.locked,
             "frames": frames,
         });
@@ -357,6 +399,11 @@ pub fn to_legacy_project(doc: &XflDocument) -> LegacyProject {
         }
         layers.push(record);
         cx.report.count("layers", 1);
+    }
+    if layers.is_empty() {
+        // The native reader needs at least one layer.
+        layers.push(json!({"name": "Layer 1", "layerUid": "xfl-layer-empty",
+            "frames": [{"isKeyframe": true, "strokes": []}]}));
     }
     let fps = if doc.frame_rate > 0.0 {
         doc.frame_rate
