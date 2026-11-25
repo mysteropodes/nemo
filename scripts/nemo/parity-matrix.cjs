@@ -17,7 +17,10 @@
 //   node scripts/nemo/parity-matrix.cjs --import-tasks <228-task traceability.csv>
 //   node scripts/nemo/parity-matrix.cjs --freeze-baseline  rebuild baseline-surfaces.json
 //   node scripts/nemo/parity-matrix.cjs --refresh-owners   snapshot owners via `gh`
-//   node scripts/nemo/parity-matrix.cjs --strict           fail on unmapped/unowned rows
+//   node scripts/nemo/parity-matrix.cjs --strict           fail on unmapped/unowned rows and on
+//                                                          rows with several contributing issues
+//                                                          and no primaryOwner decision
+//   node scripts/nemo/parity-matrix.cjs --undecided        list those rows (JSON lines), exit 0
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -105,8 +108,12 @@ function main() {
   if (args.includes('--strict')) {
     const open = (matrix.counts.surfaceStatus.unmapped || 0) + (matrix.counts.surfaceStatus.unowned || 0);
     if (open) problems.push(`${open} surface(s) are unmapped or unowned (strict)`);
+    const undecided = lib.undecidedSurfaces(matrix);
+    if (undecided.length) problems.push(`${undecided.length} surface(s) have several contributing issues and no primaryOwner (strict; list them with --undecided)`);
   }
+  if (args.includes('--undecided')) for (const u of lib.undecidedSurfaces(matrix)) console.log(JSON.stringify(u));
   if (problems.length) { console.error('parity matrix: ' + problems.slice(0, 10).join('; ')); process.exit(1); }
+  if (args.includes('--undecided')) return;
   console.log(`parity matrix: ${matrix.counts.surfaces} surfaces ${JSON.stringify(matrix.counts.surfaceStatus)}, ${matrix.counts.tasks} tasks ${JSON.stringify(matrix.counts.taskStatus)}`);
 }
 

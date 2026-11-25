@@ -7,6 +7,7 @@ Owners snapshot: 2026-10-30. A *declared* owner is a non-parent issue declaring 
 
 - Surfaces: 903 (curated-closed 75 · curated-open 195 · disposition 37 · issues-closed 77 · issues-open 519)
 - Tasks: 228 (curated-closed 43 · curated-open 18 · issues-closed 67 · issues-open 100)
+- Primary acceptance owner (the one issue accountable for a row; `sole` = exactly one contributing issue, `explicit` = `primaryOwner` in `mapping.json`, `undecided` = several contributors and no decision yet, `n/a` = disposition, no-task or unowned): n/a 37 · sole 298 · undecided 568
 - Mapping confidence: high 450 · low 90 · medium 363 (medium/low rows need human review)
 
 - Family evidence (source-level records, additive; surfaces per verdict): components (source-pass 6) · frames (incomplete 19)

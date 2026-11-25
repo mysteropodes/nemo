@@ -88,3 +88,49 @@ test('D34/D36-D40 are owned one-to-one by #2520-#2525, not by the Motion present
   assert.equal(pending.length, 30);
   assert.ok(pending.every((s) => /-open$/.test(s.status)), 'the 30 rows stay open');
 });
+
+test('primary acceptance owner: sole contributor derives, several need an explicit decision, never guessed (CS8 #2349)', () => {
+  const owners = { owners: { F09: [{ issue: 1, state: 'open' }, { issue: 3, state: 'open' }], G43: [{ issue: 2, state: 'open' }] } };
+  const mapping = { surfaces: {
+    'dom:#a': { tasks: ['G43'] },
+    'dom:#b': { tasks: ['F09', 'G43'] },
+    'dom:#c': { tasks: ['F09', 'G43'], primaryOwner: 2 },
+  } };
+  assert.deepEqual(lib.validate({ tasks, baseline, mapping, owners }), []);
+  const m = lib.buildMatrix({ config, tasks, baseline, mapping, owners });
+  assert.deepEqual(m.surfaces.map((s) => [s.contributors, s.primaryOwner, s.primaryOwnerBasis]),
+    [[[2], 2, 'sole'], [[1, 2, 3], null, 'undecided'], [[1, 2, 3], 2, 'explicit']]);
+  assert.deepEqual(m.counts.primaryOwner, { sole: 1, undecided: 1, explicit: 1 });
+  assert.deepEqual(lib.undecidedSurfaces(m), [{ id: 'dom:#b', tasks: ['F09', 'G43'], contributors: [1, 2, 3] }]);
+  // Dispositions, no-task gaps, unmapped and unowned rows need no accepting issue.
+  const rest = lib.buildMatrix({ config, tasks, baseline,
+    mapping: { surfaces: { 'dom:#a': { disposition: 'baseline defect: x' }, 'dom:#b': { tasks: [], noTask: true } } }, owners: { owners: {} } });
+  assert.deepEqual(rest.surfaces.map((s) => [s.contributors, s.primaryOwner, s.primaryOwnerBasis]), [[[], null, 'n/a'], [[], null, 'n/a'], [[], null, 'n/a']]);
+});
+
+test('validate rejects a primaryOwner that is not a contributing issue, is malformed, or has nothing to accept', () => {
+  const owners = { owners: { F09: [{ issue: 1, state: 'open' }] } };
+  const bad = lib.validate({ tasks, baseline, owners, mapping: { surfaces: {
+    'dom:#a': { tasks: ['F09'], primaryOwner: 9 },
+    'dom:#b': { tasks: ['F09'], primaryOwner: '1' },
+    'dom:#c': { disposition: 'baseline defect: x', primaryOwner: 1 },
+  } } });
+  for (const pattern of [/dom:#a primaryOwner #9 is not a contributing issue/, /dom:#b has an invalid primaryOwner/, /dom:#c names primaryOwner but has no tasks/]) {
+    assert.ok(bad.some((p) => pattern.test(p)), pattern + ' in ' + bad.join(' | '));
+  }
+  // A decision that is no longer a contributor is not honoured silently: the row falls back to undecided.
+  const stale = lib.buildMatrix({ config, tasks, baseline, owners: { owners: { F09: [{ issue: 1, state: 'open' }, { issue: 2, state: 'open' }] } },
+    mapping: { surfaces: { 'dom:#a': { tasks: ['F09'], primaryOwner: 5 } } } });
+  assert.equal(stale.surfaces[0].primaryOwnerBasis, 'undecided');
+});
+
+test('the committed matrix reports every row with several contributors as undecided until a primaryOwner is recorded', () => {
+  const matrix = JSON.parse(fs.readFileSync(path.join(cli.DIR, 'matrix.json'), 'utf8'));
+  for (const s of matrix.surfaces) {
+    if (s.primaryOwnerBasis === 'undecided') assert.ok(s.contributors.length > 1 && s.primaryOwner === null, s.id);
+    else if (s.primaryOwnerBasis === 'sole') assert.equal(s.contributors.length, 1, s.id);
+    else if (s.primaryOwnerBasis === 'explicit') assert.ok(s.contributors.includes(s.primaryOwner), s.id);
+    else assert.equal(s.primaryOwner, null, s.id);
+  }
+  assert.equal(cli.outputs().matrix.counts.primaryOwner.undecided, lib.undecidedSurfaces(matrix).length);
+});
