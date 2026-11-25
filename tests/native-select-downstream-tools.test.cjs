@@ -4,7 +4,6 @@
 // select-bridge (script order), so a consumed event never reached them: on the installed trial they did nothing at all,
 // with no message. Same family as #2356 SEL-F1 (Direct Select), for the tools SEL-F1 did not cover.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const Intent=require('../src/js/adapters/select-canvas-intent.js');
 const SELECT=fs.readFileSync(require.resolve('../src/js/select-bridge.js'),'utf8');
 const INDEX=fs.readFileSync(require.resolve('../src/index.html'),'utf8');
 const DOWNSTREAM=['eraser','line','rect','ellipse','star','speechbubble','pen','fill'];
@@ -19,7 +18,7 @@ function dispatch(path,type,event){
 function harness(tool,owns){
   const counts={select:0,legacy:0,downstream:0};
   const doc=node('document'),area=node('canvas-area'),canvas=node('drawing-canvas');
-  const root={state:{tool},NemoSelectCanvasIntent:Intent,NemoNativeOpacityCutover:{blocksLegacy:()=>owns!==false},addEventListener(){}};
+  const root={state:{tool},NemoNativeOpacityCutover:{blocksLegacy:()=>owns!==false},addEventListener(){}};
   const sandbox={window:root,state:root.state,nativePointerIntent:null,nativePaperToolPointer:null,
     nativePointer:()=>{const hit=e=>{counts.select++;e.stopImmediatePropagation();e.preventDefault();};return {down:hit,move:hit,up:hit,cancelEvent:hit};},
     onDown:()=>counts.legacy++,onMove:()=>counts.legacy++,onUp:()=>counts.legacy++,nativePaperRotateRingPress:()=>false,target:area};
@@ -63,9 +62,4 @@ test('a legacy (non-native) project keeps its legacy routing for these tools',()
   assert.equal(h.counts.select,0);
   assert.equal(h.counts.legacy,1);
   assert.equal(h.counts.downstream,1);
-});
-
-test('ownedDownstream names exactly the tools with a later native controller',()=>{
-  for(const tool of DOWNSTREAM)assert.equal(Intent.ownedDownstream(tool),true,tool);
-  for(const tool of ['select','subselect','draw','fillbrush','text','rig','hand',undefined,null,''])assert.equal(Intent.ownedDownstream(tool),false,String(tool));
 });

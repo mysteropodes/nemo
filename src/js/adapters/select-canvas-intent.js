@@ -500,12 +500,6 @@
     if (root.SMEngineBridge && typeof root.SMEngineBridge.renderNow === 'function') root.SMEngineBridge.renderNow();
   }
 
-  // Tools whose native controller listens on #canvas-area in capture phase AFTER select-bridge (script order of index.html:
-  // shape-bridge, eraser-bridge, fill-bridge, pen-bridge). The select intent consumes every event it is handed, so handing it
-  // one of their gestures left them deaf on a native project: the eraser, the shape tools, the pen and the bucket did nothing,
-  // with no message. Each of these bridges keeps its own "never reopen a Paper writer under a native owner" refusal.
-  var DOWNSTREAM = Object.freeze(['eraser', 'line', 'rect', 'ellipse', 'star', 'speechbubble', 'pen', 'fill']);
-  function ownedDownstream(tool) { return DOWNSTREAM.indexOf(tool) >= 0; }
-  return Object.freeze({ create: create, ownedDownstream: ownedDownstream, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
+  return Object.freeze({ create: create, hitHandles: hitHandles, objectProject: objectProject, presented: presented,
     presentedState: presentedSession, presentedSettled: presentedSettled, heldId: heldId, layerList: layerList, worldPoint: worldPoint, recordGeometry: recordGeometry, recordCenter: recordCenter, presentedDrag: presentedDrag, reshapeSteps: reshapeSteps, transformSteps: transformSteps, inRecordSpace: inRecordSpace, layerPaths: layerPaths, reread: reread, marquee: marquee, pick: pick, pickContext: pickContext, applyPick: applyPick, resolvePick: resolvePick });
 }));
