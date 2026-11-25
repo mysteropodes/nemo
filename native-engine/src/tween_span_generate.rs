@@ -78,8 +78,19 @@ pub(super) fn generate_span(
         .iter()
         .map(|&i| vanish_plan(&b[i], &persist_b))
         .collect::<R<_>>()?;
-    let mut pairs = vec![];
-    for spec in specs {
+    let centroid = |s: &[SegOut]| {
+        let p = s.iter().fold([0., 0.], |mut p, s| {
+            p[0] += s.point[0];
+            p[1] += s.point[1];
+            p
+        });
+        [p[0] / s.len() as f64, p[1] / s.len() as f64]
+    };
+    // Resample every pair first: an open stroke that moves rigidly tells the
+    // symmetric closed shapes it carries (a hand on its arm) which way they turned.
+    let mut sampled = vec![];
+    let mut turns: Vec<(Vec<[f64; 2]>, f64)> = vec![];
+    for spec in &specs {
         let sa = stroke(&spec.a_data);
         let sb = stroke(&spec.b_data);
         let n = (poly_length(&sa).max(poly_length(&sb)) / 8.)
@@ -87,21 +98,39 @@ pub(super) fn generate_span(
             .min(150.)
             .max(options.resample_points as f64) as usize;
         let vb = sa.is_vector_brush && sb.is_vector_brush;
-        let (ra, rb) = resample_pair(&sa, &sb, n, vb);
+        let (ra, mut rb) = resample_pair(&sa, &sb, n, vb);
         let drawn_start = sb
             .center_segments
             .as_ref()
             .filter(|c| vb && c.len() > 1)
             .map(|c| c[0].point)
             .or_else(|| sb.segments.first().map(|s| s.point));
-        let rb = align_pair_with(&ra, &rb, drawn_start);
-        let centroid = |s: &[SegOut]| {
-            let p = s.iter().fold([0., 0.], |mut p, s| {
-                p[0] += s.point[0];
-                p[1] += s.point[1];
-                p
-            });
-            [p[0] / s.len() as f64, p[1] / s.len() as f64]
+        let closed = !vb && sa.closed && sb.closed;
+        if !closed {
+            rb = align_pair_with(&ra, &rb, drawn_start);
+            if let Some(turn) = rigid_turn(&ra, &rb) {
+                turns.push((ra.segments.iter().map(|s| s.point).collect(), turn));
+            }
+        }
+        sampled.push((sa, sb, vb, ra, rb, closed.then_some(drawn_start)));
+    }
+    let mut pairs = vec![];
+    for (spec, (sa, sb, vb, ra, rb, pending)) in specs.into_iter().zip(sampled) {
+        let rb = match pending {
+            None => rb,
+            Some(drawn_start) => {
+                // The limb that passes nearest, if it comes within the shape's own width.
+                let c = centroid(&ra.segments);
+                let far = |p: &[f64; 2]| (p[0] - c[0]).hypot(p[1] - c[1]);
+                let reach = 2. * ra.segments.iter().map(|s| far(&s.point)).fold(0., f64::max);
+                let gap = |t: &(Vec<[f64; 2]>, f64)| t.0.iter().map(far).fold(f64::MAX, f64::min);
+                let hint = turns
+                    .iter()
+                    .filter(|t| gap(t) <= reach)
+                    .min_by(|x, y| gap(x).total_cmp(&gap(y)))
+                    .map_or(0., |t| t.1);
+                align_pair_toward(&ra, &rb, drawn_start, hint)
+            }
         };
         let handles = doc
             .tween_motion_arc_handles(

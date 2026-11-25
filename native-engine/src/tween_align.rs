@@ -211,7 +211,7 @@ pub(super) fn align_pair(a: &ResampledOut, b: &ResampledOut) -> ResampledOut {
 /// ball, a rectangle) has several start points that fit equally well, each
 /// with a different rotation; without a prior, rounding picks one, and a
 /// 30 degree move can be interpolated as a 210 degree spin.
-fn turn_penalty(a: &ResampledOut, b: &ResampledOut) -> (f64, f64) {
+fn turn_penalty(a: &ResampledOut, b: &ResampledOut, hint: f64) -> (f64, f64) {
     let n = a.segments.len().min(b.segments.len());
     let points = |r: &ResampledOut| -> Vec<(f64, f64)> {
         r.segments[..n]
@@ -227,7 +227,8 @@ fn turn_penalty(a: &ResampledOut, b: &ResampledOut) -> (f64, f64) {
         .iter()
         .map(|p| (p.0 - fit.cb.0).powi(2) + (p.1 - fit.cb.1).powi(2))
         .sum();
-    let turn = fit.w_im.atan2(fit.w_re) / std::f64::consts::PI;
+    let turn = (fit.w_im.atan2(fit.w_re) - hint).rem_euclid(std::f64::consts::TAU);
+    let turn = turn.min(std::f64::consts::TAU - turn) / std::f64::consts::PI;
     (0.05 * size * turn * turn, size)
 }
 /// What reading an open stroke against the direction it was drawn in costs, as
@@ -241,6 +242,35 @@ pub(super) fn align_pair_with(
     a: &ResampledOut,
     b: &ResampledOut,
     drawn_start: Option<[f64; 2]>,
+) -> ResampledOut {
+    align_pair_toward(a, b, drawn_start, 0.)
+}
+/// The turn (radians) that carries `a` onto the aligned `b`, when the pair is a
+/// rigid move: what a stroke can tell a symmetric neighbour about its own turn.
+pub(super) fn rigid_turn(a: &ResampledOut, b: &ResampledOut) -> Option<f64> {
+    let (_, size) = turn_penalty(a, b, 0.);
+    let fit = fit_similarity_transform(
+        &a.segments
+            .iter()
+            .map(|s| (s.point[0], s.point[1]))
+            .collect::<Vec<_>>(),
+        &b.segments
+            .iter()
+            .map(|s| (s.point[0], s.point[1]))
+            .collect::<Vec<_>>(),
+    )?;
+    let scale = fit.w_re.hypot(fit.w_im);
+    (size > 1e-6 && (0.8..1.25).contains(&scale) && rotation_fit_residual(a, b) < 0.04 * size)
+        .then(|| fit.w_im.atan2(fit.w_re))
+}
+/// `align_pair_with`, with the least-turn prior centred on `hint` instead of on
+/// no turn at all. A shape with a symmetry cannot tell a 100 degree turn from
+/// an 80 degree one the other way; the limb it rides on can.
+pub(super) fn align_pair_toward(
+    a: &ResampledOut,
+    b: &ResampledOut,
+    drawn_start: Option<[f64; 2]>,
+    hint: f64,
 ) -> ResampledOut {
     let least_turn = drawn_start.is_some();
     let against = |r: &ResampledOut| -> bool {
@@ -264,7 +294,7 @@ pub(super) fn align_pair_with(
     let cost_fn = |x: &ResampledOut, y: &ResampledOut| {
         let cost = base_fn(x, y) * (1.0 + ALIGN_TURN_W * align_turn_disagreement(x, y));
         if least_turn {
-            cost + turn_penalty(x, y).0
+            cost + turn_penalty(x, y, hint).0
         } else {
             cost
         }
@@ -273,7 +303,7 @@ pub(super) fn align_pair_with(
     let rev = reverse_resampled(&b);
     let bias = |r: &ResampledOut| {
         if !closed && against(r) {
-            REVERSAL_BIAS * turn_penalty(a, r).1
+            REVERSAL_BIAS * turn_penalty(a, r, 0.).1
         } else {
             0.0
         }

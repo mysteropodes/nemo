@@ -475,3 +475,28 @@ mod public_shapes;
 
 #[path = "object_tween_component.rs"]
 mod component;
+/// A symmetric hand cannot tell a 110 degree turn from 70 the other way; the arm that carries it can.
+#[test]
+fn a_symmetric_shape_takes_its_turn_from_the_limb_that_carries_it() {
+    let stroke = |id: &str, closed: bool, p: Vec<[f64; 2]>| json!({"segments":p.iter().map(|p| json!({"point":p,"handleIn":[0,0],"handleOut":[0,0]})).collect::<Vec<_>>(),"closed":closed,"strokeColor":"#112233","strokeWidth":4,"strokeCap":"round","strokeJoin":"round","fillColor":null,"opacity":1,"strokeId":id,"hasRealStroke":true});
+    let key = |tag: &str, degrees: f64| {
+        let (sin, cos) = degrees.to_radians().sin_cos();
+        let turn = |p: [f64; 2]| [p[0] * cos - p[1] * sin, p[0] * sin + p[1] * cos];
+        let arm = [[0., 0.], [40., 6.], [80., 6.], [120., 0.]].map(turn).to_vec();
+        let hand = (0..12).map(|i| f64::from(i) * std::f64::consts::TAU / 12.).map(|a| turn([150. + 30. * a.cos(), 15. * a.sin()])).collect();
+        json!({"strokes":[stroke(&format!("arm{tag}"), false, arm), stroke(&format!("hand{tag}"), true, hand)],"isKeyframe":true,"isInterpolated":false})
+    };
+    let blank = json!({"strokes":[],"isKeyframe":false,"isInterpolated":false});
+    let mut o = NativeObjectHistory::new("hand", document(&json!([key("0", 0.), blank, key("1", 110.)]), true)).unwrap();
+    let q = request(&o, "generate", "tween.generate", json!({"command":"object.tween.generate","layerUid":"L0","options":{"resamplePoints":12,"step":1,"skipManual":true,"easing":[]}}));
+    assert_eq!(dispatch(&mut o, &q)["ok"], true);
+    let doc = head(&o);
+    let hand = doc.objects.iter().find(|r| r.target.frame_scope.frame == 1 && serde_json::to_value(r).unwrap()["geometry"]["closed"] == true).unwrap();
+    let points: Vec<[f64; 2]> = serde_json::to_value(hand).unwrap()["geometry"]["segments"].as_array().unwrap().iter().map(|s| [s["point"]["x"].as_f64().unwrap(), s["point"]["y"].as_f64().unwrap()]).collect();
+    let n = points.len() as f64;
+    let c = points.iter().fold([0., 0.], |c, p| [c[0] + p[0] / n, c[1] + p[1] / n]);
+    let (sin, cos) = 55_f64.to_radians().sin_cos();
+    assert!((c[0] - 150. * cos).hypot(c[1] - 150. * sin) < 6., "hand centre {c:?}");
+    let far = points.iter().map(|p| [p[0] - c[0], p[1] - c[1]]).max_by(|x, y| x[0].hypot(x[1]).total_cmp(&y[0].hypot(y[1]))).unwrap();
+    assert!((far[0].hypot(far[1]) - 30.).abs() < 3. && (far[0] * sin - far[1] * cos).abs() < 6., "long axis {far:?}");
+}
