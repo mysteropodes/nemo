@@ -2980,6 +2980,45 @@
         "lib.rs"
       ],
       "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.xfl.import",
+      "layer": "engine",
+      "dir": "xfl-import/src",
+      "files": [
+        "archive.rs",
+        "bitmap.rs",
+        "convert.rs",
+        "document.rs",
+        "ease.rs",
+        "edges.rs",
+        "guide.rs",
+        "lib.rs",
+        "model.rs",
+        "paths.rs",
+        "report.rs",
+        "shape.rs",
+        "tween.rs",
+        "xml.rs"
+      ],
+      "publicApi": [
+        "lib.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.xfl.import.tests",
+      "layer": "tests",
+      "dir": "xfl-import",
+      "files": [
+        "examples/fla_dump.rs",
+        "tests/cases.rs",
+        "tests/common/mod.rs",
+        "tests/convert.rs",
+        "tests/read.rs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
     }
   ],
   "sizeProfiles": {

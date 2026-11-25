@@ -44,7 +44,14 @@ cargo run --example fla_dump -- path/to/file.fla
    markers, masks). Needs a decision with the native-engine owners on the
    entry point, like the SVG/PSD/Figma import plans.
 4. Symbols as Components (one instance per layer for now) and classic tweens
-   as Motion keys with ease.
+   as Motion keys with ease. Model side started: `classic_tweens(timeline, layer_index)`
+   finds each tween and `ClassicTween::sample(frame)` gives Flash's
+   decomposed transform (pivot position, scales, skews) with rotation options,
+   a per-property ease (simple, or the custom ease Bézier solved for time) and
+   travel along a motion guide stroke by arc length (`ease.rs`, `guide.rs`).
+   Not confirmed against Animate: the orient-to-path rule, the 5 px distance
+   under which a keyframe counts as attached to the guide, and named ease
+   presets (`<Ease method>`), which fall back to the simple ease.
 5. Validation on a real Animate corpus (PNG export from Animate against
    Nemo's render), then the `.swf` fallback via Ruffle's `swf` crate.
 
