@@ -294,3 +294,204 @@ fn tween_pressure_outline_matches_original_caps_and_rings() {
         }
     }
 }
+
+// ---- opt-in rigid swing (pivot arc) and least-turn alignment ----------------
+fn swing_stroke(points: &[[f64; 2]], closed: bool) -> StrokeIn {
+    serde_json::from_value(serde_json::json!({
+        "segments": points.iter().map(|p| serde_json::json!({ "point": p })).collect::<Vec<_>>(),
+        "closed": closed,
+        "strokeColor": "#000000"
+    }))
+    .unwrap()
+}
+fn turned(points: &[[f64; 2]], degrees: f64) -> Vec<[f64; 2]> {
+    let (s, c) = degrees.to_radians().sin_cos();
+    points
+        .iter()
+        .map(|p| [p[0] * c - p[1] * s, p[0] * s + p[1] * c])
+        .collect()
+}
+fn swing(a: &[[f64; 2]], b: &[[f64; 2]], closed: bool, improved: bool, t: f64) -> Vec<SegOut> {
+    let (ra, rb) = resample_pair(
+        &swing_stroke(a, closed),
+        &swing_stroke(b, closed),
+        25,
+        false,
+    );
+    let rb = align_pair_with(&ra, &rb, improved);
+    let pair = PreparedInterpolation::new(
+        ra.segments,
+        rb.segments,
+        closed,
+        closed,
+        Some((a.len(), b.len())),
+    )
+    .unwrap();
+    let pair = if improved {
+        pair.with_pivot_arc()
+    } else {
+        pair
+    };
+    pair.evaluate(t, None).unwrap()
+}
+fn polyline(s: &[SegOut]) -> f64 {
+    s.windows(2)
+        .map(|w| (w[1].point[0] - w[0].point[0]).hypot(w[1].point[1] - w[0].point[1]))
+        .sum()
+}
+fn arm() -> Vec<[f64; 2]> {
+    (0..=12)
+        .map(|i| {
+            let u = f64::from(i) / 12.;
+            [200. * u, 18. * (std::f64::consts::PI * u).sin()]
+        })
+        .collect()
+}
+
+#[test]
+fn a_limb_swinging_about_its_end_keeps_its_length_and_its_pivot() {
+    let a = arm();
+    let rest = polyline(&swing(&a, &a, false, false, 0.5));
+    for degrees in [30., 60., 90.] {
+        let b = turned(&a, degrees);
+        for t in [0.25, 0.5, 0.75] {
+            let mid = swing(&a, &b, false, true, t);
+            let radii = [mid[0].point, mid[mid.len() - 1].point].map(|p| p[0].hypot(p[1]));
+            assert!(
+                (polyline(&mid) / rest - 1.).abs() < 0.01,
+                "{degrees} t={t}: length"
+            );
+            assert!(
+                radii[0] < 0.5,
+                "{degrees} t={t}: shoulder moved {}",
+                radii[0]
+            );
+            assert!(
+                (radii[1] - 200.).abs() < 1.,
+                "{degrees} t={t}: tip at {}",
+                radii[1]
+            );
+            let tip = mid[mid.len() - 1].point;
+            let angle = tip[1].atan2(tip[0]).to_degrees();
+            assert!(
+                (angle - degrees * t).abs() < 0.5,
+                "{degrees} t={t}: tip angle {angle}"
+            );
+        }
+    }
+    // The baseline this replaces: a 90 degree swing is a straight blend.
+    let baseline = swing(&a, &turned(&a, 90.), false, false, 0.5);
+    assert!(polyline(&baseline) / rest < 0.75);
+}
+
+#[test]
+fn a_symmetric_closed_shape_follows_its_arc_without_an_extra_half_turn() {
+    let hand: Vec<[f64; 2]> = (0..16)
+        .map(|i| {
+            let a = f64::from(i) / 16. * std::f64::consts::TAU;
+            [150. + 30. * a.cos(), 15. * a.sin()]
+        })
+        .collect();
+    for degrees in [30., 60.] {
+        let mid = swing(&hand, &turned(&hand, degrees), true, true, 0.5);
+        let n = mid.len() as f64;
+        let c = mid.iter().fold([0., 0.], |c, s| {
+            [c[0] + s.point[0] / n, c[1] + s.point[1] / n]
+        });
+        assert!(
+            (c[0].hypot(c[1]) - 150.).abs() < 6.,
+            "{degrees}: radius {}",
+            c[0].hypot(c[1])
+        );
+        let far = mid
+            .iter()
+            .map(|s| [s.point[0] - c[0], s.point[1] - c[1]])
+            .max_by(|x, y| x[0].hypot(x[1]).total_cmp(&y[0].hypot(y[1])))
+            .unwrap();
+        // Long axis modulo a half turn, against the half-way orientation.
+        let axis = (far[1].atan2(far[0]).to_degrees() - degrees / 2.).rem_euclid(180.);
+        assert!(
+            axis.min(180. - axis) < 12.,
+            "{degrees}: long axis off by {axis}"
+        );
+        assert!(
+            (far[0].hypot(far[1]) - 30.).abs() < 3.5,
+            "{degrees}: long axis length"
+        );
+    }
+}
+
+#[test]
+fn pairs_that_are_not_a_rigid_swing_keep_the_baseline_result() {
+    let straight: Vec<[f64; 2]> = (0..=12).map(|i| [200. * f64::from(i) / 12., 0.]).collect();
+    let bent: Vec<[f64; 2]> = (0..=12)
+        .map(|i| {
+            if i <= 6 {
+                [100. * f64::from(i) / 6., 0.]
+            } else {
+                [100., 100. * f64::from(i - 6) / 6.]
+            }
+        })
+        .collect();
+    let moved: Vec<[f64; 2]> = arm().iter().map(|p| [p[0] + 300., p[1] - 40.]).collect();
+    for (a, b) in [(straight, bent), (arm(), moved)] {
+        for t in [0.2, 0.5, 0.8] {
+            let (ra, rb) = resample_pair(
+                &swing_stroke(&a, false),
+                &swing_stroke(&b, false),
+                25,
+                false,
+            );
+            let rb = align_pair(&ra, &rb);
+            let make = || {
+                PreparedInterpolation::new(
+                    ra.segments.clone(),
+                    rb.segments.clone(),
+                    false,
+                    false,
+                    None,
+                )
+                .unwrap()
+            };
+            let (base, arc) = (
+                make().evaluate(t, None).unwrap(),
+                make().with_pivot_arc().evaluate(t, None).unwrap(),
+            );
+            for (x, y) in base.iter().zip(&arc) {
+                assert_eq!(x.point, y.point);
+                assert_eq!(x.handle_in, y.handle_in);
+                assert_eq!(x.handle_out, y.handle_out);
+            }
+        }
+    }
+}
+
+#[test]
+fn manual_arc_handles_still_steer_the_centre_of_a_rigid_swing() {
+    let a = arm();
+    let b = turned(&a, 60.);
+    let (ra, rb) = resample_pair(
+        &swing_stroke(&a, false),
+        &swing_stroke(&b, false),
+        25,
+        false,
+    );
+    let rb = align_pair(&ra, &rb);
+    let mean = |s: &[SegOut]| {
+        let n = s.len() as f64;
+        s.iter().fold([0., 0.], |c, s| {
+            [c[0] + s.point[0] / n, c[1] + s.point[1] / n]
+        })
+    };
+    let (ca, cb) = (mean(&ra.segments), mean(&rb.segments));
+    let pair = PreparedInterpolation::new(ra.segments, rb.segments, false, false, None)
+        .unwrap()
+        .with_pivot_arc();
+    let controls = ([ca[0] + 40., ca[1] - 90.], [cb[0] + 40., cb[1] - 90.]);
+    let centre = mean(&pair.evaluate(0.5, Some(controls)).unwrap());
+    let expected = [
+        (ca[0] + 3. * controls.0[0] + 3. * controls.1[0] + cb[0]) / 8.,
+        (ca[1] + 3. * controls.0[1] + 3. * controls.1[1] + cb[1]) / 8.,
+    ];
+    assert!((centre[0] - expected[0]).hypot(centre[1] - expected[1]) < 1e-6);
+}

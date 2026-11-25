@@ -13,7 +13,7 @@ fn local_trust(pair: &PreparedInterpolation) -> Vec<f64> {
         &pair.a,
         &pair.b,
         0.5,
-        mix(pair.ca, pair.cb, 0.5),
+        pair.center_at(0.5),
         pair.closed_a,
         None,
     );
@@ -195,7 +195,7 @@ pub(super) fn choose(pair: &PreparedInterpolation) -> Decision {
     let fits = fit_local(&pair.a, &pair.b);
     let mut trajectories = vec![vec![pair.a.clone()]; 4];
     for t in [0.15, 0.35, 0.5, 0.65, 0.85] {
-        let center = mix(pair.ca, pair.cb, t);
+        let center = pair.center_at(t);
         let linear = pair.linear_at(t, center);
         let intrinsic = intrinsic(
             &pair.a,

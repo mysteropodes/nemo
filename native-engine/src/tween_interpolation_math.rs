@@ -155,6 +155,44 @@ pub(super) fn rigid_fit(a: &[SegOut], b: &[SegOut], ca: [f64; 2], cb: [f64; 2]) 
     }
     (theta, scale)
 }
+/// Undamped similarity fit of the centred pair: angle, scale and how well it
+/// explains the pair (1 = rigid, 0 = a quarter of the shape's size unexplained).
+pub(super) fn similarity(
+    a: &[SegOut],
+    b: &[SegOut],
+    ca: [f64; 2],
+    cb: [f64; 2],
+) -> Option<(f64, f64, f64)> {
+    let centred = |s: &[SegOut], c: [f64; 2]| -> Vec<(f64, f64)> {
+        s.iter()
+            .map(|s| (s.point[0] - c[0], s.point[1] - c[1]))
+            .collect()
+    };
+    let (aa, bb) = (centred(a, ca), centred(b, cb));
+    let fit = fit_similarity_transform(&aa, &bb)?;
+    let scale = fit.w_re.hypot(fit.w_im);
+    if !(scale > 0.33 && scale < 3.) {
+        return None;
+    }
+    let (mut residual, mut size) = (0., 0.);
+    for (a, b) in aa.iter().zip(&bb) {
+        let r = [
+            fit.w_re * a.0 - fit.w_im * a.1 - b.0,
+            fit.w_im * a.0 + fit.w_re * a.1 - b.1,
+        ];
+        residual += r[0] * r[0] + r[1] * r[1];
+        size += b.0 * b.0 + b.1 * b.1;
+    }
+    if !(size > 1e-9) {
+        return None;
+    }
+    let relative = (residual / size).sqrt();
+    Some((
+        fit.w_im.atan2(fit.w_re),
+        scale,
+        ((0.25 - relative) / 0.15).clamp(0., 1.),
+    ))
+}
 pub(super) fn intrinsic(
     a: &[SegOut],
     b: &[SegOut],

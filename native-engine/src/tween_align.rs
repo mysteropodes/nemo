@@ -204,6 +204,37 @@ pub(super) fn rotation_fit_residual(a: &ResampledOut, b: &ResampledOut) -> f64 {
 // the plain raw-distance test; closed loops keep the rotation-fit
 // criterion (the 90°-rectangle / rotated-start-star fix).
 pub(super) fn align_pair(a: &ResampledOut, b: &ResampledOut) -> ResampledOut {
+    align_pair_with(a, b, false)
+}
+/// Least-turn prior for closed shapes: `5%` of the shape's squared size per
+/// half turn, added to the residual. A shape with a symmetry (an oval eye, a
+/// ball, a rectangle) has several start points that fit equally well, each
+/// with a different rotation; without a prior, rounding picks one, and a
+/// 30 degree move can be interpolated as a 210 degree spin.
+fn turn_penalty(a: &ResampledOut, b: &ResampledOut) -> f64 {
+    let n = a.segments.len().min(b.segments.len());
+    let points = |r: &ResampledOut| -> Vec<(f64, f64)> {
+        r.segments[..n]
+            .iter()
+            .map(|s| (s.point[0], s.point[1]))
+            .collect()
+    };
+    let (pa, pb) = (points(a), points(b));
+    let Some(fit) = fit_similarity_transform(&pa, &pb) else {
+        return 0.0;
+    };
+    let size: f64 = pb
+        .iter()
+        .map(|p| (p.0 - fit.cb.0).powi(2) + (p.1 - fit.cb.1).powi(2))
+        .sum();
+    let turn = fit.w_im.atan2(fit.w_re) / std::f64::consts::PI;
+    0.05 * size * turn * turn
+}
+pub(super) fn align_pair_with(
+    a: &ResampledOut,
+    b: &ResampledOut,
+    least_turn: bool,
+) -> ResampledOut {
     let closed =
         resampled_is_closed(a) && resampled_is_closed(b) && rotation_ok(a) && rotation_ok(b);
     let base_fn = if closed {
@@ -212,7 +243,12 @@ pub(super) fn align_pair(a: &ResampledOut, b: &ResampledOut) -> ResampledOut {
         align_cost
     };
     let cost_fn = |x: &ResampledOut, y: &ResampledOut| {
-        base_fn(x, y) * (1.0 + ALIGN_TURN_W * align_turn_disagreement(x, y))
+        let cost = base_fn(x, y) * (1.0 + ALIGN_TURN_W * align_turn_disagreement(x, y));
+        if closed && least_turn {
+            cost + turn_penalty(x, y)
+        } else {
+            cost
+        }
     };
     let mut best = b.clone();
     let mut best_cost = cost_fn(&a, &b);
