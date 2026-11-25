@@ -348,16 +348,8 @@ fn native_tween_generation_matches_baseline_with_one_undo_redo_and_reopen() {
                 // Baseline #126: the corrected frame is re-tweened as a key, then stays a SOFT manually edited in-between.
                 let doc = head(&o);
                 let timing = doc.layers[0].timing.value().unwrap();
-                assert_eq!(
-                    timing.exposure(2),
-                    ("interpolated", Some(2), true),
-                    "{name}"
-                );
-                assert_eq!(
-                    timing.exposure(1),
-                    ("interpolated", Some(1), false),
-                    "{name}"
-                );
+                assert_eq!(timing.exposure(2), ("interpolated", Some(2), true), "{name}");
+                assert_eq!(timing.exposure(1), ("interpolated", Some(1), false), "{name}");
                 assert_eq!(timing.exposure(0).0, "key", "{name}");
             }
             let after = bytes(&o);
@@ -414,9 +406,7 @@ fn endpoint_key_edit_keeps_in_betweens_until_regenerate_recomputes_them() {
         edit["strokes"][0]["strokeId"].as_str().unwrap(),
     );
     let axis = |i: usize| {
-        edit["strokes"][0]["segments"][0]["point"][i]
-            .as_f64()
-            .unwrap()
+        edit["strokes"][0]["segments"][0]["point"][i].as_f64().unwrap()
             - input["frames"][frame as usize]["strokes"][0]["segments"][0]["point"][i]
                 .as_f64()
                 .unwrap()
@@ -432,12 +422,7 @@ fn endpoint_key_edit_keeps_in_betweens_until_regenerate_recomputes_them() {
         assert_frames(&head(&o), &input["frames"], "endpoint-generated");
         let (original, retained) = (bytes(&o), o.acquire_snapshot(0).unwrap());
         let target = json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":frame},"layerUid":"L0","strokeId":stroke});
-        let q = request(
-            &o,
-            "edit",
-            "subselect.edit",
-            json!({"command":"object.subselect.edit","stableTarget":target,"intent":{"kind":"move","indices":[0],"delta":delta}}),
-        );
+        let q = request(&o, "edit", "subselect.edit", json!({"command":"object.subselect.edit","stableTarget":target,"intent":{"kind":"move","indices":[0],"delta":delta}}));
         let reply = dispatch(&mut o, &q);
         assert_eq!(reply["ok"], true, "{reply}");
         assert_eq!((o.history_depths(), o.content_revision()), ((1, 0), 1));
@@ -445,24 +430,13 @@ fn endpoint_key_edit_keeps_in_betweens_until_regenerate_recomputes_them() {
         assert_frames(&head(&o), &wanted["stay"], "endpoint-stay");
         let edited = bytes(&o);
         assert_ne!(edited, original);
-        let q = request(
-            &o,
-            "regenerate",
-            "tween.regenerate",
-            json!({"command":"object.tween.regenerate","layerUid":"L0","options":input["options"]}),
-        );
+        let q = request(&o, "regenerate", "tween.regenerate", json!({"command":"object.tween.regenerate","layerUid":"L0","options":input["options"]}));
         let reply = dispatch(&mut o, &q);
         assert_eq!(reply["ok"], true, "{reply}");
         assert_eq!((o.history_depths(), o.content_revision()), ((2, 0), 2));
-        // The edited key turns the stroke 18 degrees and moves it four radii away.
-        // The JavaScript baseline drops that turn (a straight blend); the rigid
-        // swing keeps it, so the regenerated frames sit near the oracle, not on it.
-        assert_frames_within(
-            &head(&o),
-            &wanted["regenerated"],
-            "endpoint-regenerated",
-            2.5,
-        );
+        // The edited key turns the stroke 18 degrees and moves it four radii away. The JavaScript
+        // baseline drops that turn; the rigid swing keeps it, so the result sits near the oracle.
+        assert_frames_within(&head(&o), &wanted["regenerated"], "endpoint-regenerated", 2.5);
         assert_ne!(bytes(&o), edited);
         let regenerated = bytes(&o);
         for (id, want) in [("undo-regenerate", &edited), ("undo-edit", &original)] {
@@ -475,19 +449,9 @@ fn endpoint_key_edit_keeps_in_betweens_until_regenerate_recomputes_them() {
             assert_eq!(dispatch(&mut o, &q)["ok"], true);
         }
         assert_eq!(bytes(&o), regenerated);
-        assert_eq!(
-            encode_storage_project(retained.document()).unwrap(),
-            original
-        );
-        let reopened =
-            NativeObjectHistory::new("reopened", decode_storage_project(&regenerated).unwrap())
-                .unwrap();
-        assert_frames_within(
-            &head(&reopened),
-            &wanted["regenerated"],
-            "endpoint-reopened",
-            2.5,
-        );
+        assert_eq!(encode_storage_project(retained.document()).unwrap(), original);
+        let reopened = NativeObjectHistory::new("reopened", decode_storage_project(&regenerated).unwrap()).unwrap();
+        assert_frames_within(&head(&reopened), &wanted["regenerated"], "endpoint-reopened", 2.5);
     }
 }
 
