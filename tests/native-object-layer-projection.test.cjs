@@ -195,9 +195,15 @@ test('a native paint still refreshes the selection and tool sections of the righ
     'updateTextActionsPanel','updateTextPropsPanel','updatePropsContext'];
   const legacy=['syncDocFields','getEffectiveStrokes','renderLayerList','updateCompInstancePanel','updateDuplicatorPanel','updateFootagePanel','updateRevisionPanel'];
   for(const name of panels.concat(legacy))ui[name]=()=>{log.push(name);return [];};
+  const refresh=fs.readFileSync('src/js/timeline.js','utf8'),from=refresh.indexOf('function refreshNativePanels(');
+  vm.runInContext(refresh.slice(from,refresh.indexOf('\n}\n',from)+2),ui);
   ui.NemoNativeObjectProject={paintUI:(win,frameOnly)=>{log.push('paint:'+frameOnly);return true;}};
   ui.updateUI(true);
   assert.deepEqual(log,['paint:true'].concat(panels),'the native paint comes first, the panel context last, and no legacy document reader runs');
+  // A panel refresh that throws is reported and never fails the native paint.
+  const warned=[];ui.console={warn:(...args)=>warned.push(args[0])};ui.updateMaskPanel=()=>{throw new Error('panel');};
+  assert.doesNotThrow(()=>ui.updateUI(true));assert.deepEqual(warned,['Nemo native panel refresh failed']);
+  ui.updateMaskPanel=()=>0;
   log.length=0;ui.NemoNativeObjectProject={paintUI:()=>false};
   ui.updateUI(true);
   assert.equal(log[0],'syncDocFields','a legacy project keeps the baseline path');

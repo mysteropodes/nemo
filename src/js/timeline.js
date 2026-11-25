@@ -2669,11 +2669,16 @@ function syncDocFields(){
 // a new invariant, just the scrub path adopting the proven one. Any caller
 // that CHANGED CONTENT must not pass frameOnly — the panel refreshes below
 // still run either way, only the wholesale timeline rebuild is skipped.
+// The native paint hides every baseline section of the right panel; the selection and tool sections that have a native owner (#2372: Transform
+// fields, fill / stroke restyle, mask, parametric shapes, text) are filled and shown again here, as the baseline updateUI does at its end. These
+// are read-side refreshes: one that fails is reported and never fails the native paint.
+function refreshNativePanels(){
+  try{updateSelPropsPanel();updateFsSelPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateStarPanel();updateTextActionsPanel();updateTextPropsPanel();updatePropsContext();}
+  catch(error){console.warn('Nemo native panel refresh failed',error);}
+}
 function updateUI(frameOnly){
   if(window.NemoNativeInspectorUnavailable)window.NemoNativeInspectorUnavailable.sync(window); // #2372 UNAVAIL-NOTICES: mark/unmark the controls with no native owner
-  // The native paint hides every baseline section of the right panel; the selection and tool sections that have a native owner (#2372: Transform
-  // fields, fill / stroke restyle, mask, parametric shapes, text) are refreshed and shown again here, as the baseline updateUI does below.
-  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly)){updateSelPropsPanel();updateFsSelPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateStarPanel();updateTextActionsPanel();updateTextPropsPanel();updatePropsContext();return;}
+  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly)){refreshNativePanels();return;}
   syncDocFields();
   // countOnly: this is only ever read for .length just below.
   var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame,true);

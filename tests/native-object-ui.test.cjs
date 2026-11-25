@@ -40,7 +40,7 @@ function shippedEntrypoints(root){
   const legacy=()=>{throw Error('LEGACY FRAME READER');};
   const context=vm.createContext({window:root,state:root.state,document:root.document,console,
     syncDocFields:legacy,_tlScrollSnapshot:legacy,reconcileLayerIndexState:legacy,saveAllLayerFrames:legacy,
-    activateUL:legacy,clearSel:legacy});
+    activateUL:legacy,clearSel:legacy,refreshNativePanels:()=>{}});
   vm.runInContext(['updateUI','renderTimeline','renderLayerList'].map(shipped).join('\n'),context);
   root.updateUI=context.updateUI;root.renderTimeline=context.renderTimeline;root.renderLayerList=context.renderLayerList;
   root.SM={setActiveLayer:vm.runInContext('('+timeline.slice(start,end).replace('  setActiveLayer:','').replace(/,\s*$/,'')+')',context)};
