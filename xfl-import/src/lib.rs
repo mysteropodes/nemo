@@ -10,11 +10,13 @@
 
 mod archive;
 mod bitmap;
+mod convert;
 mod document;
 mod ease;
 mod edges;
 mod guide;
 mod model;
+mod paths;
 mod report;
 mod shape;
 mod tween;
@@ -22,6 +24,7 @@ mod xml;
 
 pub use archive::Archive;
 pub use bitmap::{decode_bitmap, BitmapData};
+pub use convert::{to_legacy_project, LegacyProject};
 pub use ease::{
     check_custom_ease, custom_ease, resolve_eases, simple_ease, CurveError, Ease, PropertyEases,
 };
