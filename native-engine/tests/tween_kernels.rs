@@ -489,16 +489,17 @@ fn far_travel_reversed_lines_dots_and_steered_bends_are_handled() {
     assert!(apart(mean(&old), mean(&new)) < 1e-6);
     let across = |dx: f64| mean(&swing(&arm(), &turned(&arm(), 90.).iter().map(|p| [p[0] + dx, p[1]]).collect::<Vec<_>>(), false, true, 0.5));
     assert!(apart(across(500.), [across(520.)[0] - 10., across(520.)[1]]) < 12.);
-    // A curve flipped across its chord is a change of shape, not a half turn: baseline result, ends in place.
     for bulge in [18., 30., 80.] {
         let curve = |h: f64| line.iter().map(|p| [p[0], h * (std::f64::consts::PI * p[0] / 200.).sin()]).collect::<Vec<_>>();
-        let (mid, base) = (swing(&curve(bulge), &curve(-bulge), false, true, 0.25), swing(&curve(bulge), &curve(-bulge), false, false, 0.25));
-        assert!(apart(mid[0].point, base[0].point) < 1e-9 && apart(mid[0].point, [0., 0.]) < 6. && apart(mid[mid.len() - 1].point, [200., 0.]) < 6., "{bulge}");
+        for shift in [0., 40., 150.] {
+            let moved: Vec<[f64; 2]> = curve(-bulge).iter().map(|p| [p[0] + shift, p[1] + shift / 2.]).collect();
+            let (mid, base) = (swing(&curve(bulge), &moved, false, true, 0.25), swing(&curve(bulge), &moved, false, false, 0.25));
+            assert!(apart(mid[0].point, base[0].point) < 1e-9 && apart(mid[0].point, [shift / 4., shift / 8.]) < 6., "{bulge} {shift}");
+        }
     }
     for degrees in [30., 50., 60., 80.] {
         let back: Vec<[f64; 2]> = turned(&line, degrees).into_iter().rev().collect();
-        let mid = swing(&line, &back, false, true, 0.5);
-        let (tip, root) = (mid[mid.len() - 1].point, mid[0].point);
+        let (tip, root) = { let m = swing(&line, &back, false, true, 0.5); (m[m.len() - 1].point, m[0].point) };
         let angle = (tip[1] - root[1]).atan2(tip[0] - root[0]).to_degrees();
         assert!((angle.rem_euclid(180.) - degrees / 2.).abs() < 1., "{degrees}: {angle}");
     }

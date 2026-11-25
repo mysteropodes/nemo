@@ -278,11 +278,12 @@ pub(super) fn align_pair_toward(
     // closer). Two conditions keep that from misreading other pairs. One of
     // the two readings must be a near-rigid move, to a tenth of the stroke's
     // size: between two different drawings the residual is no evidence of
-    // direction. And the baseline reading must move an end by more than 15% of
-    // the stroke's length: a curve flipped across its chord (a smile turned
-    // into a frown) is also "itself, reversed and turned half round", but its
-    // ends have not moved, and it is a change of shape.
-    let rigid = !closed && least_turn && {
+    // direction. And the baseline reading must turn the stroke's end-to-end
+    // vector by more than 15% of its length: a curve flipped across its chord
+    // (a smile turned into a frown) is also "itself, reversed and turned half round", but its
+    // ends have not moved, and it is a change of shape. (Flipped and tilted by
+    // more than that, it is the same point set as a wide swing: undecidable.)
+    let rigid = !closed && least_turn && a.segments.len().min(b.segments.len()) >= 2 && {
         let size = turn_penalty(a, b, 0.).1;
         let kept = if align_cost(a, &rev) < align_cost(a, b) {
             &rev
@@ -290,16 +291,19 @@ pub(super) fn align_pair_toward(
             b
         };
         let n = a.segments.len().min(kept.segments.len());
-        let apart = |i: usize| {
-            let (p, q) = (a.segments[i].point, kept.segments[i].point);
-            (p[0] - q[0]).hypot(p[1] - q[1])
+        // The change of the end-to-end vector: travel alone leaves it at zero.
+        let chord = |r: &ResampledOut| {
+            let (p, q) = (r.segments[0].point, r.segments[n - 1].point);
+            [q[0] - p[0], q[1] - p[1]]
         };
+        let (va, vb) = (chord(a), chord(kept));
+        let turned = (va[0] - vb[0]).hypot(va[1] - vb[1]) / 2.;
         let length: f64 = a.segments[..n]
             .windows(2)
             .map(|w| (w[1].point[0] - w[0].point[0]).hypot(w[1].point[1] - w[0].point[1]))
             .sum();
         n >= 2
-            && apart(0).max(apart(n - 1)) > 0.15 * length
+            && turned > 0.15 * length
             && rotation_fit_residual(a, b).min(rotation_fit_residual(a, &rev)) <= 0.01 * size
     };
     let least_turn = least_turn && (closed || rigid);
