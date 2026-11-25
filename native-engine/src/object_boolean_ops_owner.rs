@@ -36,6 +36,8 @@ mod fill_brush;
 #[cfg(feature = "evaluation")]
 #[path = "object_boolean_frame_motion.rs"]
 mod frame_motion;
+#[path = "object_boolean_ops_unlink.rs"]
+mod unlink;
 #[path = "object_boolean_ops_payload.rs"]
 mod wire;
 use wire::{
@@ -183,6 +185,8 @@ impl PreparedBooleanEdit {
             plan.document =
                 regenerate_many(plan.document, scope, &touched, origin.content_revision())
                     .map_err(|error| refusal_code(&error))?;
+            // The untouched half of a linked pressure/backdrop pair must not keep naming a partner the edit replaced.
+            unlink::release_broken_links(&mut plan.document, scope);
             // The edited document must pass the admission a reopened file would. The plan already
             // refused every caller-caused overflow (`TooManySegments`), so a failure here is an
             // engine invariant breach, as in the group owner.
