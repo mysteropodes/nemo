@@ -189,6 +189,23 @@ test('known ordinary timeline frame-reader gap remains explicit for metadata pro
   assert.throws(()=>ui.updateUI(true),/reading '7'/,'selecting the new row needs a separately admitted native UI reader');
   assert.equal(Object.hasOwn(root.state.layers[2],'frames'),false);
 });
+test('a native paint still refreshes the selection and tool sections of the right panel',()=>{
+  const root=view(),ui=shippedTimeline(root),log=[];
+  const panels=['updateSelPropsPanel','updateFsSelPanel','updateMaskPanel','updateCornersPanel','updateEllipseArcPanel','updateStarPanel',
+    'updateTextActionsPanel','updateTextPropsPanel','updatePropsContext'];
+  const legacy=['syncDocFields','getEffectiveStrokes','renderLayerList','updateCompInstancePanel','updateDuplicatorPanel','updateFootagePanel','updateRevisionPanel'];
+  for(const name of panels.concat(legacy))ui[name]=()=>{log.push(name);return [];};
+  ui.NemoNativeObjectProject={paintUI:(win,frameOnly)=>{log.push('paint:'+frameOnly);return true;}};
+  ui.updateUI(true);
+  assert.deepEqual(log,['paint:true'].concat(panels),'the native paint comes first, the panel context last, and no legacy document reader runs');
+  log.length=0;ui.NemoNativeObjectProject={paintUI:()=>false};
+  ui.updateUI(true);
+  assert.equal(log[0],'syncDocFields','a legacy project keeps the baseline path');
+  // The Document fields and the Elements tree have native owners: their baseline sections stay hidden on a native project.
+  const source=fs.readFileSync('src/js/timeline.js','utf8'),context=source.slice(source.indexOf('function updatePropsContext('));
+  const guard=context.indexOf("if(nativeXformOwned())show['canvas-sec']=show['shapes-sec']=false;"),paint=context.indexOf('Object.keys(show).forEach(');
+  assert.ok(guard>0&&guard<paint&&paint-guard<200,'the native filter is applied just before the sections are shown');
+});
 function desktop(){
   let active=false,revision=0,layers=clone([A,B]),pending=null,previewGate=null,fault=null;
   const listeners=new Map(),log=[],calls=[],binding={apiVersion:2,instanceId:'instance',documentId:'document',lifecycleGeneration:1,

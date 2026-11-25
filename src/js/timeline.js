@@ -2671,7 +2671,9 @@ function syncDocFields(){
 // still run either way, only the wholesale timeline rebuild is skipped.
 function updateUI(frameOnly){
   if(window.NemoNativeInspectorUnavailable)window.NemoNativeInspectorUnavailable.sync(window); // #2372 UNAVAIL-NOTICES: mark/unmark the controls with no native owner
-  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly))return;
+  // The native paint hides every baseline section of the right panel; the selection and tool sections that have a native owner (#2372: Transform
+  // fields, fill / stroke restyle, mask, parametric shapes, text) are refreshed and shown again here, as the baseline updateUI does below.
+  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly)){updateSelPropsPanel();updateFsSelPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateStarPanel();updateTextActionsPanel();updateTextPropsPanel();updatePropsContext();return;}
   syncDocFields();
   // countOnly: this is only ever read for .length just below.
   var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame,true);
@@ -3372,6 +3374,9 @@ function updatePropsContext(){
     show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['rig-opts-sec']=show['combine-opts-sec']=false;
     if(ctx!=='document')show['canvas-sec']=false;
   }
+  // On a native object project the Document fields and the Elements tree live in #native-object-inspector (their baseline sections are emptied or
+  // replaced there), so only the sections a selection or a tool owns are shown.
+  if(nativeXformOwned())show['canvas-sec']=show['shapes-sec']=false;
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
   // Only pays the tree-rebuild cost while the section is actually visible
   // (same "don't do free work" principle as the rail render just below).
