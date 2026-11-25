@@ -4,6 +4,7 @@
 use std::io::Write;
 
 use nemo_xfl_import::*;
+use serde_json::Value;
 
 pub const SQUARE_WITH_HOLE: &str = r##"
 <DOMShape>
@@ -68,6 +69,29 @@ pub fn zip_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
     buf.into_inner()
 }
 
+/// A `.fla` holding one scene with `scene_layers` and the named library symbols.
+pub fn fla_bytes(scene_layers: &str, library: &[(&str, &str)]) -> Vec<u8> {
+    let includes: String = library
+        .iter()
+        .map(|(name, _)| format!(r##"<Include href="{name}.xml"/>"##))
+        .collect();
+    let doc = format!(
+        r##"<DOMDocument width="640" height="360" frameRate="12" backgroundColor="#336699">
+  <symbols>{includes}</symbols>
+  <timelines><DOMTimeline name="Scene 1"><layers>{scene_layers}</layers></DOMTimeline></timelines>
+</DOMDocument>"##
+    );
+    let mut entries: Vec<(String, Vec<u8>)> = vec![("DOMDocument.xml".into(), doc.into_bytes())];
+    for (name, xml) in library {
+        entries.push((format!("LIBRARY/{name}.xml"), xml.as_bytes().to_vec()));
+    }
+    let refs: Vec<(&str, &[u8])> = entries
+        .iter()
+        .map(|(n, b)| (n.as_str(), b.as_slice()))
+        .collect();
+    zip_bytes(&refs)
+}
+
 pub fn sample() -> Vec<u8> {
     let doc = doc_xml(SQUARE_WITH_HOLE);
     zip_bytes(&[
@@ -113,4 +137,157 @@ pub fn lossless_2x1() -> Vec<u8> {
     out.extend_from_slice(&stream);
     out.extend_from_slice(&[0, 0]);
     out
+}
+
+// Motion evaluation as the baseline does it (motion.js, app.js), for the
+// component tests.
+
+/// `evalCurvePoints` for waypoints carrying explicit tangents.
+pub fn curve_y(pts: &[Value], x: f64) -> f64 {
+    let x = x.clamp(0.0, 1.0);
+    let mut i = 0;
+    while i < pts.len() - 2 && pts[i + 1]["x"].as_f64().unwrap() < x {
+        i += 1;
+    }
+    let g = |p: &Value, k: &str| p[k].as_f64().expect("explicit tangent");
+    let (p0, p3) = (&pts[i], &pts[i + 1]);
+    let xs = [
+        g(p0, "x"),
+        g(p0, "x") + g(p0, "tx") / 3.0,
+        g(p3, "x") - g(p3, "tx") / 3.0,
+        g(p3, "x"),
+    ];
+    let ys = [
+        g(p0, "y"),
+        g(p0, "y") + g(p0, "ty") / 3.0,
+        g(p3, "y") - g(p3, "ty") / 3.0,
+        g(p3, "y"),
+    ];
+    let at = |p: [f64; 4], t: f64| {
+        let u = 1.0 - t;
+        u * u * u * p[0] + 3.0 * u * u * t * p[1] + 3.0 * u * t * t * p[2] + t * t * t * p[3]
+    };
+    let slope = |p: [f64; 4], t: f64| {
+        let u = 1.0 - t;
+        3.0 * u * u * (p[1] - p[0]) + 6.0 * u * t * (p[2] - p[1]) + 3.0 * t * t * (p[3] - p[2])
+    };
+    let span = xs[3] - xs[0];
+    let mut t = if span > 1e-6 { (x - xs[0]) / span } else { 0.0 };
+    for _ in 0..8 {
+        let (ex, dx) = (at(xs, t) - x, slope(xs, t));
+        if dx.abs() < 1e-6 {
+            break;
+        }
+        t = (t - ex / dx).clamp(0.0, 1.0);
+    }
+    at(ys, t)
+}
+
+/// `rawValueAtFrame` of a layer holder.
+pub fn value(layer: &Value, prop: &str, f: f64, neutral: &[f64]) -> Vec<f64> {
+    let nums = |v: &Value| -> Vec<f64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|n| n.as_f64().unwrap())
+            .collect()
+    };
+    let Some(keys) = layer["motion"][prop]["keys"].as_array() else {
+        return layer["motionStatic"]
+            .get(prop)
+            .map_or(neutral.to_vec(), nums);
+    };
+    let fr = |k: &Value| k["frame"].as_f64().unwrap();
+    if f <= fr(&keys[0]) {
+        return nums(&keys[0]["v"]);
+    }
+    if f >= fr(keys.last().unwrap()) {
+        return nums(&keys.last().unwrap()["v"]);
+    }
+    let i = (0..keys.len() - 1).find(|&i| f < fr(&keys[i + 1])).unwrap();
+    let (a, b) = (&keys[i], &keys[i + 1]);
+    if a["hold"] == true {
+        return nums(&a["v"]);
+    }
+    let y = curve_y(
+        a["curvePoints"]
+            .as_array()
+            .expect("an eased key names its curve"),
+        (f - fr(a)) / (fr(b) - fr(a)),
+    );
+    nums(&a["v"])
+        .iter()
+        .zip(nums(&b["v"]))
+        .map(|(u, v)| u + (v - u) * y)
+        .collect()
+}
+
+/// `resolveSymbolFrameIdx`, or `None` where a blank key hides the component.
+pub fn shown(layer: &Value, len: i64, f: usize) -> Option<i64> {
+    let frames = layer["frames"].as_array().unwrap();
+    let key = (0..=f)
+        .rev()
+        .map(|k| &frames[k])
+        .find(|k| k["isKeyframe"] == true)?;
+    if key["blankOverride"] == true {
+        return None;
+    }
+    if let Some(p) = key["componentFrame"].as_i64() {
+        return Some(p.clamp(0, len - 1));
+    }
+    let e = (f as i64 - layer["symPlacedAt"].as_i64().unwrap_or(0)).max(0);
+    Some(if layer["symPlayMode"] == "once" {
+        e.min(len - 1)
+    } else {
+        e % len
+    })
+}
+
+/// Centre of the anchor bounds of a component frame (rectangles: the curve bounds).
+pub fn center(symbol: &Value, ii: usize) -> (f64, f64) {
+    let mut b = [f64::INFINITY, f64::INFINITY, -f64::INFINITY, -f64::INFINITY];
+    for l in symbol["layers"].as_array().unwrap() {
+        let frames = l["frames"].as_array().unwrap();
+        let key = (0..=ii)
+            .rev()
+            .map(|k| &frames[k])
+            .find(|k| k["isKeyframe"] == true)
+            .unwrap();
+        for s in key["strokes"].as_array().unwrap() {
+            for seg in s["segments"].as_array().unwrap() {
+                let (x, y) = (
+                    seg["point"][0].as_f64().unwrap(),
+                    seg["point"][1].as_f64().unwrap(),
+                );
+                b = [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)];
+            }
+        }
+    }
+    ((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0)
+}
+
+/// The instance matrix and alpha a Nemo instance layer shows at frame `f`.
+pub fn pose(layer: &Value, symbol: &Value, f: usize) -> Option<(Matrix, f64, i64)> {
+    let ii = shown(layer, symbol["totalFrames"].as_i64().unwrap(), f)?;
+    let (cx, cy) = center(symbol, ii as usize);
+    let ff = f as f64;
+    let (d, a) = (
+        value(layer, "position", ff, &[0.0, 0.0]),
+        value(layer, "anchor", ff, &[0.0, 0.0]),
+    );
+    let rot = value(layer, "rotation", ff, &[0.0])[0].to_radians();
+    let s = value(layer, "scale", ff, &[100.0, 100.0]);
+    let (sx, sy) = (s[0] / 100.0, s[1] / 100.0);
+    let (qx, qy) = (cx + a[0], cy + a[1]);
+    let (cs, sn) = (rot.cos(), rot.sin());
+    let (ma, mb, mc, md) = (sx * cs, sx * sn, -sy * sn, sy * cs);
+    let m = Matrix {
+        a: ma,
+        b: mb,
+        c: mc,
+        d: md,
+        tx: qx + d[0] - (ma * qx + mc * qy),
+        ty: qy + d[1] - (mb * qx + md * qy),
+    };
+    Some((m, value(layer, "opacity", ff, &[100.0])[0] / 100.0, ii))
 }

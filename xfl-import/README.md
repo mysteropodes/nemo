@@ -52,6 +52,15 @@ cargo run --example fla_dump -- path/to/file.fla
    Not confirmed against Animate: the orient-to-path rule, the 5 px distance
    under which a keyframe counts as attached to the guide, and named ease
    presets (`<Ease method>`), which fall back to the simple ease.
+   Mapping side (`instance.rs`): a scene layer that only places one symbol
+   becomes an instance layer of a component (`symbols`, its own layers
+   flattened, nested symbols expanded); fixed frames are `componentFrame`
+   picks, a playing graphic one `symPlayMode`/`symPlacedAt`, empty spans
+   `blankOverride`. The transform is layer Motion with the pivot held on the
+   transformation point; simple eases and custom eases with symmetric handles
+   are exact `curvePoints`, other custom eases and motion guides are baked one
+   key per frame. Skewed instances keep a fixed `symMatrix` or are flattened.
+   `ConvertOptions { components: false }` flattens every layer.
 5. Validation on a real Animate corpus (PNG export from Animate against
    Nemo's render), then the `.swf` fallback via Ruffle's `swf` crate.
 
