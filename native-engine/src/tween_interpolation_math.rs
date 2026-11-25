@@ -174,19 +174,30 @@ pub(super) fn similarity(
     if !(scale > 0.33 && scale < 3.) {
         return None;
     }
-    let (mut residual, mut size) = (0., 0.);
+    // Residual with the fitted rotation, and with the best scale alone.
+    let (dot, square) = aa.iter().zip(&bb).fold((0., 0.), |(d, q), (a, b)| {
+        (d + a.0 * b.0 + a.1 * b.1, q + a.0 * a.0 + a.1 * a.1)
+    });
+    let plain_scale = if square > 1e-9 { dot / square } else { 1. };
+    let (mut residual, mut plain, mut size) = (0., 0., 0.);
     for (a, b) in aa.iter().zip(&bb) {
         let r = [
             fit.w_re * a.0 - fit.w_im * a.1 - b.0,
             fit.w_im * a.0 + fit.w_re * a.1 - b.1,
         ];
         residual += r[0] * r[0] + r[1] * r[1];
+        plain += (plain_scale * a.0 - b.0).powi(2) + (plain_scale * a.1 - b.1).powi(2);
         size += b.0 * b.0 + b.1 * b.1;
     }
     if !(size > 1e-9) {
         return None;
     }
-    let relative = (residual / size).sqrt();
+    let (relative, unturned) = ((residual / size).sqrt(), (plain / size).sqrt());
+    // The turn has to be what explains the pair. A round shape fits any angle,
+    // so its fitted rotation says nothing and must not bend a straight move.
+    if unturned < 0.2_f64.max(2. * relative) {
+        return None;
+    }
     Some((
         fit.w_im.atan2(fit.w_re),
         scale,

@@ -88,7 +88,7 @@ pub(super) fn generate_span(
             .max(options.resample_points as f64) as usize;
         let vb = sa.is_vector_brush && sb.is_vector_brush;
         let (ra, rb) = resample_pair(&sa, &sb, n, vb);
-        let rb = align_pair(&ra, &rb);
+        let rb = align_pair_with(&ra, &rb, true);
         let centroid = |s: &[SegOut]| {
             let p = s.iter().fold([0., 0.], |mut p, s| {
                 p[0] += s.point[0];
@@ -114,7 +114,8 @@ pub(super) fn generate_span(
             !vb && sb.closed,
             (!vb).then_some((sa.segments.len(), sb.segments.len())),
         )
-        .ok_or(DispatchErrorCode::InvalidRequest)?;
+        .ok_or(DispatchErrorCode::InvalidRequest)?
+        .with_pivot_arc();
         let id = if spec.a_piece {
             spec.b_data.target.stroke_id.clone()
         } else {
