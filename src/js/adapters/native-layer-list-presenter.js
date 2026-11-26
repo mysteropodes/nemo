@@ -107,7 +107,7 @@
     pick.setAttribute('aria-pressed',String(context.selection.indexOf(i)>=0));
     pick.setAttribute('aria-label',label+' ('+layer.layerUid+')');
     pick.addEventListener('click',function(event){return context.onPick(i,layer,event,node);});
-    var eye=text(doc,'button',layer.visible===false?'Show':'Hide');eye.type='button';eye.dataset.nativeLayerEye=layer.visible===false?'off':'on'; // drawn as the baseline eye icon (style.css); the caption stays for assistive technology
+    var eye=text(doc,'button',layer.visible===false?'Show':'Hide');eye.type='button';
     eye.setAttribute('aria-label',(layer.visible===false?'Show ':'Hide ')+label+' ('+layer.layerUid+')');
     // Availability is checked at CLICK time: this render can precede preview/ACK.
     eye.addEventListener('click',function(){return context.onVisibility(layer);});
