@@ -87,6 +87,7 @@ test('unadmitted inspector values are hidden explicitly, with original nodes/vis
   root.document.nodes.set('props-panel',panel);UI.render(root,metadata(),false,fixturePorts(root));
   assert.equal(width.hidden,true);assert.equal(width.value,1920,'do not fabricate native property values in legacy controls');
   assert.equal(panel.children[2].children[1].textContent,'Native drawing property inspectors are unavailable.');
+  assert.equal(panel.children[2].children[1].hidden,true,'not shown in a drawing mode: the selection and tool sections are (refreshNativePanels)');
   UI.render(root,metadata(),false,fixturePorts(root));assert.equal(panel.children.length,3,'one owned availability notice');
   const foreign=element();panel.appendChild(foreign);root.NemoNativeObjectProject=Project;
   assert.equal(Project.paintUI(root),false);assert.equal(panel.children.length,3);assert.equal(panel.children[0],width);

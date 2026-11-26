@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "1c5d02153d95560ce284c77c6df60e7bbe7eeda3",
-  "describe": "1c5d0215"
+  "head": "eace2ea47a44bbece0d223b39f4a99800ff7dd8f",
+  "describe": "eace2ea4-dirty"
  },
- "inputsDigest": "78e4849f5956ee3b0b366b54a3fbad66c68d7ad3cd454bb773df7b43c3374813",
+ "inputsDigest": "fde7cc2bc764bbc8084b774f1cde5ea336ed233ac5e293eb3c4886a03c546754",
  "states": [
   "inventoried",
   "characterized",
@@ -3723,7 +3723,7 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 67,
+    "functionsVisited": 65,
     "via": "variable replaceBtn",
     "references": [
      "src/js/adapters/native-palette-ui.js:248 render()",
@@ -3773,7 +3773,7 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 102,
+    "functionsVisited": 100,
     "via": "variable swapBtn",
     "references": [
      "src/js/adapters/native-palette-ui.js:259 render()",
@@ -22920,7 +22920,7 @@
    "source": "src/js/adapters/native-palette-ui.js:214",
    "meta": {
     "i18n": null,
-    "functionsVisited": 33
+    "functionsVisited": 31
    },
    "fixtures": [
     "static-props",
@@ -22958,7 +22958,7 @@
    "source": "src/js/adapters/native-palette-ui.js:215",
    "meta": {
     "i18n": null,
-    "functionsVisited": 33
+    "functionsVisited": 31
    },
    "fixtures": [
     "static-props",

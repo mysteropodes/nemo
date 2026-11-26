@@ -145,13 +145,38 @@ test('stale frame, selection, style, owner or viewport cancels without transport
  }
 });
 test('native unavailable modes and unconfirmed presentation are consumed before any legacy writer',async()=>{
- for(const change of [f=>f.root.state.tool='star',f=>f.root.state.symmetryEnabled=true,f=>f.root.state.shadowMode=true,
+ for(const change of [f=>f.root.state.symmetryEnabled=true,f=>f.root.state.shadowMode=true,
   f=>f.root.state.strokeStyle='dashed',f=>f.root.state.layers[0].locked=true,
   f=>f.root.state.strokeEnabled=f.root.state.fillEnabled=false,f=>f.root.document.documentElement.classList.remove('nemo-native-underlay')]){
   const f=await fixture();change(f);assert.equal(f.area.fire('pointerdown').stopped,true);f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0);
  }
 });
 // #2361 G15 Mask mode (tools.js tagOwner @1065e9d8): a shape drawn while Mask is on commits once as a mask of the layer.
+// Star and Speech Bubble (shape-bridge.js shapeGeom + commitShape @baseline): the baseline builders are window-exposed Paper
+// helpers; here they are recorded stand-ins of the same output shape, so the test proves the arguments and what is committed.
+function paramBuilders(f){const seen=[],pt=(x,y)=>({point:{x,y},handleIn:{x:0,y:0},handleOut:{x:0,y:0}});let removed=0;
+ f.root.buildStarPolygonPath=(cx,cy,r,n,ratio,corner)=>{seen.push(['star',cx,cy,r,n,ratio,corner]);const segments=[];
+  for(let i=0;i<n*2;i++){const a=-Math.PI/2+i*Math.PI/n,d=i%2?r*ratio:r;segments.push(pt(cx+d*Math.cos(a),cy+d*Math.sin(a)));}return {segments,remove(){removed++;}};};
+ f.root.buildRoundRectPath=(l,t,r,b,tl,tr,br,bl)=>{seen.push(['round',l,t,r,b,tl,tr,br,bl]);return {segments:[pt(l,t),pt(r,t),pt(r,b),pt(l,b)],remove(){removed++;}};};
+ return {seen,removed:()=>removed};}
+test('a Star commits one native record that is parametric from creation, with the tool options and its own box',async()=>{
+ const f=await fixture('star'),b=paramBuilders(f);f.root.state.starPointCount=6;f.root.state.starInnerRatio=.4;
+ const result=await f.gesture();assert.equal(result.status,'applied');assert.equal(f.calls.length,1);assert.equal(f.records.size,1);
+ assert.deepEqual(b.seen.at(-1),['star',60,50,30,6,.4,0],'centre and radius of the dragged box, as shapeGeom @baseline');
+ const r=f.calls[0].payload.record;assert.equal(r.geometry.closed,true);assert.equal(r.geometry.segments.length,12);
+ const half=30*Math.cos(Math.PI/6),ps=r.vectorExt.paramShape,box=ps.box;assert.deepEqual({...ps,box:null},{kind:'star',pointCount:6,innerRatio:.4,cornerRadius:0,box:null});
+ for(const [k,v] of [['x1',60-half],['y1',20],['x2',60+half],['y2',80]])assert.ok(Math.abs(box[k]-v)<1e-9,k+': the box is the star outline (stampParamShapeBox @baseline), not the dragged rectangle');
+});
+test('a Star without tool options uses the baseline defaults (5 points, inner ratio 0.5)',async()=>{
+ const f=await fixture('star'),b=paramBuilders(f);await f.gesture();assert.equal(f.calls.length,1);assert.deepEqual(b.seen.at(-1).slice(4),[5,.5,0]);
+ const ps=f.calls[0].payload.record.vectorExt.paramShape;assert.equal(ps.pointCount,5);assert.equal(ps.innerRatio,.5);
+});
+test('a Speech Bubble commits its rounded box as one plain native record',async()=>{
+ const f=await fixture('speechbubble'),b=paramBuilders(f);const result=await f.gesture();assert.equal(result.status,'applied');assert.equal(f.calls.length,1);
+ const rad=Math.max(4,60*.18);assert.deepEqual(b.seen.at(-1),['round',20,20,100,80,rad,rad,rad,rad]);
+ const r=f.calls[0].payload.record;assert.equal(r.geometry.closed,true);assert.equal(r.geometry.segments.length,4);
+ assert.equal(r.vectorExt&&r.vectorExt.paramShape,undefined,'not parametric, as commitShape @baseline');assert.ok(b.removed()>0,'the builder path is dropped');
+});
 test('Mask mode commits the shape as a mask with the chosen combine mode, add by default',async()=>{
  for(const [type,mode] of [[undefined,'add'],['intersect','intersect']]){
   const f=await fixture();f.root.state.maskMode=true;if(type)f.root.state.maskModeType=type;
