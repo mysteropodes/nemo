@@ -120,6 +120,7 @@
       if (tries) await new Promise(function (done) { (root.setTimeout || setTimeout)(done, 120); });
       try { fresh = await I.reread(root, sel, false); } catch (_) { fresh = null; }
     }
+    var now = root.selectedPaths || []; if (now.length !== sel.length || !now.every(function (p, at) { return p && p.data && p.data.strokeId === sel[at].data.strokeId; })) return; // the user picked something else while the read waited: their selection stands
     root.selectedPaths = fresh ? fresh.paths.map(function (p) { if (angles[p.data.strokeId] && (p.data.nativeRole === 'raster' || p.data.nativeRole === 'text')) p.data.boxAngle = angles[p.data.strokeId] % 360; return p; }) : [];
     root.state.selectedStrokeIndices = [];
   }

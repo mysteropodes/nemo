@@ -317,3 +317,27 @@ fn stamps_naming_the_drawn_frame_a_repeat_or_a_frame_past_the_end_are_refused() 
         assert!(owner.prepare_fill_brush_json(p.to_string().as_bytes()).is_err(), "{stamps}");
     }
 }
+
+/// A hand-drawn outline is hundreds of points. The dispatcher's envelope admits what the transport and the owner do
+/// (256 segments, 65,536 bytes): a stroke over the default 4,096-byte message was refused before it reached the owner.
+#[test]
+fn a_hand_drawn_outline_passes_the_dispatcher_envelope() {
+    let mut owner = owner(vec![]);
+    let ring: Vec<Value> = (0..256)
+        .map(|i| {
+            let a = f64::from(i) * std::f64::consts::TAU / 256.0;
+            json!({"point":[500.0 + 100.0 * a.cos(), 500.0 + 100.0 * a.sin()],
+                "handleIn":[-0.123_456_789, 0.987_654_321],"handleOut":[0.123_456_789, -0.987_654_321]})
+        })
+        .collect();
+    let request = json!({"apiVersion":2,"requestId":"fill-brush-1","instanceId":owner.instance_id(),
+        "documentId":owner.document_id(),"operation":"command.document.object.fill.brush",
+        "expectedRevision":owner.content_revision(),"payload":payload(Value::Array(ring), "below")});
+    let size = request.to_string().len();
+    assert!(size > 4096 && size <= 65_536, "{size}");
+    let typed: crate::commands::OpacityRequest = serde_json::from_value(request).unwrap();
+    let reply = serde_json::to_value(owner.try_dispatch_object_command(&typed).unwrap().unwrap()).unwrap();
+    assert_eq!(reply["ok"], true, "{reply}");
+    assert_eq!(owner.history_depths(), (1, 0), "one undo entry");
+    assert_eq!(f::frame_records(&f::state(&owner), "L0", 0).len(), 1);
+}

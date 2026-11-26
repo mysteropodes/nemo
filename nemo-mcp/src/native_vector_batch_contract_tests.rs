@@ -1,6 +1,16 @@
 //! `object.vector.batch` request and receipt shells (#2361, #2362).
-use super::super::{request as vector_request, result as vector_result, VECTOR};
+use super::super::{request as contract_request, result as vector_result, VECTOR};
 use serde_json::{json, Value};
+
+/// The contract's verdict, and for every payload it admits the declared transport schema's too: the host checks both
+/// (`native_contract::validate_request`), so a step the schema does not declare is refused before it reaches the engine.
+fn vector_request(operation: &str, payload: &Value) -> bool {
+    let admitted = contract_request(operation, payload);
+    if admitted {
+        assert!(crate::native_contract::validate_request(operation, payload), "the transport schema refuses a payload the contract admits: {payload}");
+    }
+    admitted
+}
 
 fn target(layer: &str, stroke: &str) -> Value {
     json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":3},"layerUid":layer,"strokeId":stroke})
@@ -298,4 +308,12 @@ fn an_order_step_names_a_target_and_an_end_of_the_stack() {
     ] {
         assert!(!vector_request(VECTOR, &json!({"command":"object.vector.batch","ops":[bad.clone()]})), "{bad}");
     }
+}
+
+#[test]
+fn the_select_move_as_the_desktop_sends_it_passes_the_host_gate() {
+    // The payload of a Select drag on a held Animation 2D cell, captured from the desktop client (2026-11-25).
+    let moved = json!({"command":"object.vector.batch","keyframe":"copy","ops":[{"op":"reshape","frame":0,"matrix":[1,0,0,1,247.33054898606144,131.90839694656484],
+        "stableTarget":{"contextId":"scene-root","frameScope":{"frame":0,"kind":"authored"},"layerUid":"layer-1","strokeId":"native-stroke:2:0"}}]});
+    assert!(vector_request(VECTOR, &moved));
 }

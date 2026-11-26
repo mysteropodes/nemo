@@ -1327,6 +1327,307 @@
                     "description": "The cell the step edits (the held cell a copy key has just made); absent: the target's own frame."
                   }
                 }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "stableTarget"
+                ],
+                "oneOf": [
+                  {
+                    "required": [
+                      "geometry"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "center"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "matrix"
+                    ]
+                  }
+                ],
+                "properties": {
+                  "op": {
+                    "const": "reshape"
+                  },
+                  "stableTarget": {
+                    "$ref": "#/$defs/ObjectContextTarget"
+                  },
+                  "geometry": {
+                    "$ref": "#/$defs/ObjectVectorGeometry"
+                  },
+                  "center": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 256,
+                    "items": {
+                      "$ref": "#/$defs/ObjectPressureAnchor"
+                    },
+                    "description": "Sculpt: a pressure ribbon rebuilt on this centreline."
+                  },
+                  "matrix": {
+                    "type": "array",
+                    "minItems": 6,
+                    "maxItems": 6,
+                    "items": {
+                      "$ref": "#/$defs/ObjectFiniteNumber"
+                    },
+                    "description": "#2372 Select move, scale, turn, skew or flip: the affine [a, b, c, d, tx, ty] in the record's own space. The record brings what belongs to it (a ribbon's outline and linked fill, a texture anchor's copies, a gradient's end points, a dynamic shape's box); the target may also be a stored image or text block."
+                  },
+                  "frame": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295,
+                    "description": "The cell the step edits (the held cell a copy key has just made); absent: the target's own frame."
+                  }
+                },
+                "description": "New geometry, a new centreline or an affine for a named record, exactly one of the three; the native style is kept."
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "stableTarget",
+                  "style"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "restyle"
+                  },
+                  "stableTarget": {
+                    "$ref": "#/$defs/ObjectContextTarget"
+                  },
+                  "style": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "minProperties": 1,
+                    "properties": {
+                      "fill": {
+                        "type": "string",
+                        "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                      },
+                      "stroke": {
+                        "type": "string",
+                        "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+                      },
+                      "width": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 10000
+                      },
+                      "opacity": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "fillEnabled": {
+                        "type": "boolean"
+                      },
+                      "strokeEnabled": {
+                        "type": "boolean"
+                      },
+                      "cap": {
+                        "enum": [
+                          "butt",
+                          "round",
+                          "square"
+                        ]
+                      },
+                      "join": {
+                        "enum": [
+                          "miter",
+                          "round",
+                          "bevel"
+                        ]
+                      },
+                      "miter": {
+                        "type": "number",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      "dashOffset": {
+                        "type": "number",
+                        "minimum": -1000000,
+                        "maximum": 1000000
+                      },
+                      "paintOrder": {
+                        "enum": [
+                          "fillFirst",
+                          "strokeFirst"
+                        ]
+                      },
+                      "strokeStyle": {
+                        "enum": [
+                          "solid",
+                          "dashed",
+                          "dotted"
+                        ]
+                      },
+                      "brushPreset": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96
+                      },
+                      "maskFeather": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 500
+                      },
+                      "maskMode": {
+                        "enum": [
+                          "add",
+                          "subtract",
+                          "intersect"
+                        ]
+                      },
+                      "unmask": {
+                        "const": true
+                      },
+                      "fillGradient": {
+                        "oneOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "$ref": "#/$defs/ObjectVectorFillGradient"
+                          }
+                        ]
+                      },
+                      "xformAnchorKey": {
+                        "enum": [
+                          null,
+                          "tl",
+                          "tc",
+                          "tr",
+                          "ml",
+                          "mc",
+                          "mr",
+                          "bl",
+                          "bc",
+                          "br"
+                        ]
+                      },
+                      "xformAnchorCustom": {
+                        "oneOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "items": {
+                              "type": "number",
+                              "minimum": -10000000,
+                              "maximum": 10000000
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "description": "At least one member. brushPreset, maskFeather, maskMode, unmask and fillGradient each stand alone; the Select pivot (xformAnchorKey, xformAnchorCustom) combines with no other member; a switch turned on names its colour. The native owner enforces these combinations."
+                  },
+                  "frame": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295,
+                    "description": "The cell the step edits (the held cell a copy key has just made); absent: the target's own frame."
+                  }
+                },
+                "description": "#2372: restyles a named record or stored item; its receipt id is the named target."
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "stableTarget",
+                  "frame"
+                ],
+                "not": {
+                  "required": [
+                    "geometry",
+                    "offset"
+                  ]
+                },
+                "properties": {
+                  "op": {
+                    "const": "clone"
+                  },
+                  "stableTarget": {
+                    "$ref": "#/$defs/ObjectContextTarget"
+                  },
+                  "frame": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295,
+                    "description": "The cell the new stroke is written to."
+                  },
+                  "geometry": {
+                    "$ref": "#/$defs/ObjectVectorGeometry"
+                  },
+                  "offset": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "$ref": "#/$defs/ObjectFiniteNumber"
+                    }
+                  },
+                  "placement": {
+                    "enum": [
+                      "front",
+                      "behind"
+                    ]
+                  },
+                  "keyframe": {
+                    "const": "copy"
+                  }
+                },
+                "description": "A new stroke from a named one, keeping its native style: with new geometry (a knife piece) or shifted by offset (a duplicate or a pose stamp), never both."
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "op",
+                  "fromStep",
+                  "frame"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "copy"
+                  },
+                  "fromStep": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 62,
+                    "description": "The index of an earlier create or copy step of this batch."
+                  },
+                  "frame": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295,
+                    "description": "The cell the copy is written to."
+                  },
+                  "placement": {
+                    "enum": [
+                      "front",
+                      "behind"
+                    ]
+                  },
+                  "keyframe": {
+                    "const": "copy"
+                  }
+                },
+                "description": "An earlier create's record again on another frame (multi-frame stamps)."
               }
             ]
           }
@@ -1347,7 +1648,7 @@
           "description": "Optional (absent or false = atomic: any step the engine refuses refuses the whole batch with nothing written). true lets restyle steps the engine cannot do (a texture anchor the edit would unhide) be skipped while the rest apply; the receipt then reports skippedSteps. A batch whose every step is skipped is still refused."
         }
       },
-      "description": "#2361/#2362: 1..64 ordered create/replace/delete/order steps on the layers of ONE context, the scene root or a declared component (one or, for a Select spanning layers, several; a trimEnds batch is one layer) as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
+      "description": "#2361/#2362: 1..64 ordered create/replace/delete/order/reshape/restyle/clone/copy steps on the layers of ONE context, the scene root or a declared component (one or, for a Select spanning layers, several; a trimEnds batch is one layer) as one revision and one undo entry; the native owner refuses the whole batch when any step is refused."
     },
     "ObjectVectorEditPayload": {
       "oneOf": [

@@ -2669,9 +2669,20 @@ function syncDocFields(){
 // a new invariant, just the scrub path adopting the proven one. Any caller
 // that CHANGED CONTENT must not pass frameOnly — the panel refreshes below
 // still run either way, only the wholesale timeline rebuild is skipped.
+// The native paint hides every baseline section of the right panel (hidden + display:none); the selection and tool sections that have a native
+// owner (#2372: Transform fields, fill / stroke restyle, mask, parametric shapes, text) are filled and shown again here, as the baseline updateUI
+// does at its end. These are read-side refreshes: one that fails is reported and never fails the native paint or the refreshes after it.
+function refreshNativePanels(){
+  [updateSelPropsPanel,updateFsSelPanel,updateMaskPanel,updateCornersPanel,updateEllipseArcPanel,updateStarPanel,updateTextActionsPanel,updateTextPropsPanel,updatePropsContext].forEach(function(refresh){
+    try{refresh();}catch(error){console.warn('Nemo native panel refresh failed',error);}
+  });
+  // A section its refresh just showed (display '' or 'block') must also lose the `hidden` the native paint set, or display '' leaves it invisible.
+  var panel=document.getElementById('props-panel');
+  if(panel&&panel.children)Array.prototype.forEach.call(panel.children,function(sec){if(sec.hidden&&sec.id!=='native-object-inspector'&&sec.style.display!=='none')sec.hidden=false;});
+}
 function updateUI(frameOnly){
   if(window.NemoNativeInspectorUnavailable)window.NemoNativeInspectorUnavailable.sync(window); // #2372 UNAVAIL-NOTICES: mark/unmark the controls with no native owner
-  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly))return;
+  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly)){refreshNativePanels();return;}
   syncDocFields();
   // countOnly: this is only ever read for .length just below.
   var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame,true);
@@ -3372,6 +3383,9 @@ function updatePropsContext(){
     show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=show['tool-opts-sec']=show['rig-opts-sec']=show['combine-opts-sec']=false;
     if(ctx!=='document')show['canvas-sec']=false;
   }
+  // On a native object project the Document fields and the Elements tree live in #native-object-inspector (their baseline sections are emptied or
+  // replaced there), so only the sections a selection or a tool owns are shown.
+  if(nativeXformOwned())show['canvas-sec']=show['shapes-sec']=false;
   Object.keys(show).forEach(function(id){var sec=document.getElementById(id);if(sec)sec.style.display=show[id]?'block':'none';});
   // Only pays the tree-rebuild cost while the section is actually visible
   // (same "don't do free work" principle as the rail render just below).
@@ -3379,9 +3393,12 @@ function updatePropsContext(){
   // Collapse-to-rail (2026-08) — keep the rail in sync with whatever this
   // call decided is relevant, but only pay the DOM-rebuild cost while the
   // panel is actually collapsed (rail is invisible otherwise).
-  window._lastPropsShow=show;
+  // The collapsed rail of a native project also lists the native inspector and its palette: a map of its own, since `show` also drives the
+  // display loop above and the force-open loop below, which are not theirs.
+  var railShow=nativeXformOwned()?Object.assign({},show,{'native-object-inspector':true,'swatches-sec':!!window.NemoNativePaletteController}):show;
+  window._lastPropsShow=railShow;
   var ppEl=document.getElementById('props-panel');
-  if(ppEl&&ppEl.classList.contains('collapsed')&&window.renderPropsPanelRail)renderPropsPanelRail(show);
+  if(ppEl&&ppEl.classList.contains('collapsed')&&window.renderPropsPanelRail)renderPropsPanelRail(railShow);
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
   // inserted at the back regardless (see draw-bridge.js/tools.js commit) —
   // so showing that dropdown while Fill Brush is active was a dead control.

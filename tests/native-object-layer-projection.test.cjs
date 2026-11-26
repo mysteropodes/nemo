@@ -189,6 +189,35 @@ test('known ordinary timeline frame-reader gap remains explicit for metadata pro
   assert.throws(()=>ui.updateUI(true),/reading '7'/,'selecting the new row needs a separately admitted native UI reader');
   assert.equal(Object.hasOwn(root.state.layers[2],'frames'),false);
 });
+test('a native paint still refreshes the selection and tool sections of the right panel',()=>{
+  const root=view(),ui=shippedTimeline(root),log=[];
+  const panels=['updateSelPropsPanel','updateFsSelPanel','updateMaskPanel','updateCornersPanel','updateEllipseArcPanel','updateStarPanel',
+    'updateTextActionsPanel','updateTextPropsPanel','updatePropsContext'];
+  const legacy=['syncDocFields','getEffectiveStrokes','renderLayerList','updateCompInstancePanel','updateDuplicatorPanel','updateFootagePanel','updateRevisionPanel'];
+  for(const name of panels.concat(legacy))ui[name]=()=>{log.push(name);return [];};
+  const refresh=fs.readFileSync('src/js/timeline.js','utf8'),from=refresh.indexOf('function refreshNativePanels(');
+  vm.runInContext(refresh.slice(from,refresh.indexOf('\n}\n',from)+2),ui);
+  ui.NemoNativeObjectProject={paintUI:(win,frameOnly)=>{log.push('paint:'+frameOnly);return true;}};
+  ui.updateUI(true);
+  assert.deepEqual(log,['paint:true'].concat(panels),'the native paint comes first, the panel context last, and no legacy document reader runs');
+  // A panel refresh that throws is reported and never fails the native paint.
+  const warned=[];ui.console={warn:(...args)=>warned.push(args[0])};ui.updateMaskPanel=()=>{throw new Error('panel');};
+  log.length=0;assert.doesNotThrow(()=>ui.updateUI(true));assert.deepEqual(warned,['Nemo native panel refresh failed']);
+  assert.equal(log.at(-1),'updatePropsContext','the refreshes after the failing one still run');
+  // A section a refresh showed loses the `hidden` the native paint set; one left at display:none stays hidden, as does the native inspector.
+  const shown={id:'mask-sec',hidden:true,style:{display:''}},left={id:'fill-sec',hidden:true,style:{display:'none'}},own={id:'native-object-inspector',hidden:true,style:{display:''}};
+  const byId=ui.document.getElementById;ui.document.getElementById=id=>id==='props-panel'?{children:[shown,left,own]}:byId(id);
+  ui.updateUI(true);ui.document.getElementById=byId;
+  assert.deepEqual([shown.hidden,left.hidden,own.hidden],[false,true,true]);
+  ui.updateMaskPanel=()=>0;
+  log.length=0;ui.NemoNativeObjectProject={paintUI:()=>false};
+  ui.updateUI(true);
+  assert.equal(log[0],'syncDocFields','a legacy project keeps the baseline path');
+  // The Document fields and the Elements tree have native owners: their baseline sections stay hidden on a native project.
+  const source=fs.readFileSync('src/js/timeline.js','utf8'),context=source.slice(source.indexOf('function updatePropsContext('));
+  const guard=context.indexOf("if(nativeXformOwned())show['canvas-sec']=show['shapes-sec']=false;"),paint=context.indexOf('Object.keys(show).forEach(');
+  assert.ok(guard>0&&guard<paint&&paint-guard<200,'the native filter is applied just before the sections are shown');
+});
 function desktop(){
   let active=false,revision=0,layers=clone([A,B]),pending=null,previewGate=null,fault=null;
   const listeners=new Map(),log=[],calls=[],binding={apiVersion:2,instanceId:'instance',documentId:'document',lifecycleGeneration:1,

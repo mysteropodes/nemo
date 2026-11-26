@@ -110,8 +110,10 @@
   function listedIds(items) { var seen = {}; (items || []).forEach(function (item) { seen[item.stableTarget.strokeId] = true; }); return seen; }
   async function addedPaths(host, I, idx, before) {
     var fresh = null;
-    for (var tries = 0; tries < 2 && !fresh; tries++) {
+    for (var tries = 0; tries < 3 && !fresh; tries++) {
       try {
+        // The request's own repaint keeps the queue busy for a few frames: wait for the presentation, or the new shapes are not selected.
+        if (typeof I.presentedSettled === 'function' && !I.presentedState(host)) await I.presentedSettled(host);
         fresh = await I.layerPaths(host, function (item) {
           return !before[item.stableTarget.strokeId] && !(item.role === 'fill' && item.owner) && item.brush !== 'copy'; }, false, idx);
       } catch (_) { fresh = null; }
