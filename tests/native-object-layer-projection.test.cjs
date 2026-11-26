@@ -202,7 +202,13 @@ test('a native paint still refreshes the selection and tool sections of the righ
   assert.deepEqual(log,['paint:true'].concat(panels),'the native paint comes first, the panel context last, and no legacy document reader runs');
   // A panel refresh that throws is reported and never fails the native paint.
   const warned=[];ui.console={warn:(...args)=>warned.push(args[0])};ui.updateMaskPanel=()=>{throw new Error('panel');};
-  assert.doesNotThrow(()=>ui.updateUI(true));assert.deepEqual(warned,['Nemo native panel refresh failed']);
+  log.length=0;assert.doesNotThrow(()=>ui.updateUI(true));assert.deepEqual(warned,['Nemo native panel refresh failed']);
+  assert.equal(log.at(-1),'updatePropsContext','the refreshes after the failing one still run');
+  // A section a refresh showed loses the `hidden` the native paint set; one left at display:none stays hidden, as does the native inspector.
+  const shown={id:'mask-sec',hidden:true,style:{display:''}},left={id:'fill-sec',hidden:true,style:{display:'none'}},own={id:'native-object-inspector',hidden:true,style:{display:''}};
+  const byId=ui.document.getElementById;ui.document.getElementById=id=>id==='props-panel'?{children:[shown,left,own]}:byId(id);
+  ui.updateUI(true);ui.document.getElementById=byId;
+  assert.deepEqual([shown.hidden,left.hidden,own.hidden],[false,true,true]);
   ui.updateMaskPanel=()=>0;
   log.length=0;ui.NemoNativeObjectProject={paintUI:()=>false};
   ui.updateUI(true);

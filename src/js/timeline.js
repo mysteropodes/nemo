@@ -2669,12 +2669,16 @@ function syncDocFields(){
 // a new invariant, just the scrub path adopting the proven one. Any caller
 // that CHANGED CONTENT must not pass frameOnly — the panel refreshes below
 // still run either way, only the wholesale timeline rebuild is skipped.
-// The native paint hides every baseline section of the right panel; the selection and tool sections that have a native owner (#2372: Transform
-// fields, fill / stroke restyle, mask, parametric shapes, text) are filled and shown again here, as the baseline updateUI does at its end. These
-// are read-side refreshes: one that fails is reported and never fails the native paint.
+// The native paint hides every baseline section of the right panel (hidden + display:none); the selection and tool sections that have a native
+// owner (#2372: Transform fields, fill / stroke restyle, mask, parametric shapes, text) are filled and shown again here, as the baseline updateUI
+// does at its end. These are read-side refreshes: one that fails is reported and never fails the native paint or the refreshes after it.
 function refreshNativePanels(){
-  try{updateSelPropsPanel();updateFsSelPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateStarPanel();updateTextActionsPanel();updateTextPropsPanel();updatePropsContext();}
-  catch(error){console.warn('Nemo native panel refresh failed',error);}
+  [updateSelPropsPanel,updateFsSelPanel,updateMaskPanel,updateCornersPanel,updateEllipseArcPanel,updateStarPanel,updateTextActionsPanel,updateTextPropsPanel,updatePropsContext].forEach(function(refresh){
+    try{refresh();}catch(error){console.warn('Nemo native panel refresh failed',error);}
+  });
+  // A section its refresh just showed (display '' or 'block') must also lose the `hidden` the native paint set, or display '' leaves it invisible.
+  var panel=document.getElementById('props-panel');
+  if(panel&&panel.children)Array.prototype.forEach.call(panel.children,function(sec){if(sec.hidden&&sec.id!=='native-object-inspector'&&sec.style.display!=='none')sec.hidden=false;});
 }
 function updateUI(frameOnly){
   if(window.NemoNativeInspectorUnavailable)window.NemoNativeInspectorUnavailable.sync(window); // #2372 UNAVAIL-NOTICES: mark/unmark the controls with no native owner
@@ -3389,6 +3393,8 @@ function updatePropsContext(){
   // Collapse-to-rail (2026-08) — keep the rail in sync with whatever this
   // call decided is relevant, but only pay the DOM-rebuild cost while the
   // panel is actually collapsed (rail is invisible otherwise).
+  // The collapsed rail of a native project also lists the native inspector and its palette (their display is not this function's to set).
+  if(nativeXformOwned()){show['native-object-inspector']=true;if(window.NemoNativePaletteController)show['swatches-sec']=true;}
   window._lastPropsShow=show;
   var ppEl=document.getElementById('props-panel');
   if(ppEl&&ppEl.classList.contains('collapsed')&&window.renderPropsPanelRail)renderPropsPanelRail(show);

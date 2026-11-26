@@ -356,6 +356,9 @@
   // false when a layer lost one of them (the document moved on); null when a layer could not be read at all. `layerUid` and `frame` are
   // those of the first path's layer: the batch route needs one, every step names its own layer. `centres` adds a ribbon's centreline.
   async function reread(root, paths, centres) {
+    // A commit's own repaint keeps the queue busy for a few frames. The callers drop the selection when this answers null, so the read
+    // waits for the presentation (the shared bounded wait) instead of answering "nothing" for a canvas that is only not shown yet.
+    if (!presentedSession(root)) await presentedSettled(root);
     var groups = [], fresh = [], first = null, complete = true;
     paths.forEach(function (p) {
       var idx = p.data.nativeLayerIndex, g = groups.find(function (x) { return x.idx === idx; });
