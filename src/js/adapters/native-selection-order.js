@@ -27,6 +27,7 @@
     var list = mode === 'back' ? paths.slice().reverse() : paths;
     return list.map(function (p) { return { order: { stableTarget: p.data.nativeStableTarget, mode: mode } }; });
   }
+  function sameIds(now, was) { now = now || []; return now.length === was.length && now.every(function (p, at) { return p && p.data && p.data.strokeId === was[at].data.strokeId; }); }
   // The committed items as fresh presented paths (the old ones describe the stack from before); the selection stays the same items.
   async function reselect(host, sel) {
     var I = host.NemoSelectCanvasIntent, fresh = null;
@@ -34,6 +35,7 @@
       if (tries) await new Promise(function (done) { (host.setTimeout || setTimeout)(done, 120); });
       try { fresh = await I.reread(host, sel, false); } catch (_) { fresh = null; }
     }
+    if (!sameIds(host.selectedPaths, sel)) return; // the user picked something else while the read waited: their selection stands
     host.selectedPaths = fresh ? fresh.paths : [];
     if (host.state) host.state.selectedStrokeIndices = [];
   }

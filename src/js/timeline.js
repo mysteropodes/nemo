@@ -3393,11 +3393,12 @@ function updatePropsContext(){
   // Collapse-to-rail (2026-08) — keep the rail in sync with whatever this
   // call decided is relevant, but only pay the DOM-rebuild cost while the
   // panel is actually collapsed (rail is invisible otherwise).
-  // The collapsed rail of a native project also lists the native inspector and its palette (their display is not this function's to set).
-  if(nativeXformOwned()){show['native-object-inspector']=true;if(window.NemoNativePaletteController)show['swatches-sec']=true;}
-  window._lastPropsShow=show;
+  // The collapsed rail of a native project also lists the native inspector and its palette: a map of its own, since `show` also drives the
+  // display loop above and the force-open loop below, which are not theirs.
+  var railShow=nativeXformOwned()?Object.assign({},show,{'native-object-inspector':true,'swatches-sec':!!window.NemoNativePaletteController}):show;
+  window._lastPropsShow=railShow;
   var ppEl=document.getElementById('props-panel');
-  if(ppEl&&ppEl.classList.contains('collapsed')&&window.renderPropsPanelRail)renderPropsPanelRail(show);
+  if(ppEl&&ppEl.classList.contains('collapsed')&&window.renderPropsPanelRail)renderPropsPanelRail(railShow);
   // state.drawMode (Front/Behind) has no effect on Fill Brush — it's always
   // inserted at the back regardless (see draw-bridge.js/tools.js commit) —
   // so showing that dropdown while Fill Brush is active was a dead control.
