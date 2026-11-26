@@ -35,10 +35,10 @@
       if(typeof hooks.dispose==='function')hooks.dispose();motionBindings.delete(root);}});
   }
   function paintMotion(root,ports,prior){
-    if(!root.state||root.state.appMode!=='motion'){retireMotion(root);prior.notice.textContent='Native drawing property inspectors are unavailable.';return;}
+    if(!root.state||root.state.appMode!=='motion'){retireMotion(root);prior.notice.textContent='Native drawing property inspectors are unavailable.';prior.notice.hidden=true;/* the selection and tool sections are shown again by timeline.js refreshNativePanels, so the notice is not shown in drawing modes (no such notice @baseline) */return;}
     var section=root.document.getElementById('motion-props-sec'),body=root.document.getElementById('motion-props-body');
     var header=section&&section.querySelector('.phdr');
-    prior.notice.textContent='Native Motion property values and edits are unavailable.';
+    prior.notice.hidden=false;prior.notice.textContent='Native Motion property values and edits are unavailable.';
     if(!section||!body||!header){retireMotion(root);return;}
     if(!motionBindings.has(root)&&!seam(root).isMounted(root,'motion-properties'))return;
     var surface=motionSurface(root);if(!surface){retireMotion(root);return;}
