@@ -11,6 +11,7 @@ class El {
       remove(c) { self.className = self.className.split(' ').filter((x) => x && x !== c).join(' '); }, contains(c) { return self.className.split(' ').includes(c); } }; }
   get firstChild() { return this.children[0] || null; }
   appendChild(x) { this.children.push(x); x.parentNode = this; return x; }
+  removeChild(x) { this.children.splice(this.children.indexOf(x), 1); x.parentNode = null; return x; }
   insertBefore(x, ref) { const at = ref ? this.children.indexOf(ref) : this.children.length; this.children.splice(at < 0 ? this.children.length : at, 0, x); x.parentNode = this; return x; }
   querySelector(sel) { const cls = sel.slice(1); return this.children.find((c) => c.className.split(' ').includes(cls)) || null; }
 }
@@ -19,10 +20,10 @@ function bench(answers) {
   const info = { contentRevision: 3, totalFrames: 6, layers: [{ layerUid: 'A', color: '#5FA875' }, { layerUid: 'B' }] };
   const grid = new El('div'), status = new El('div'); status.className = 'native-object-timing-unavailable'; status.textContent = 'Key — Source frame 1 — Content'; grid.appendChild(status);
   const rows = info.layers.map(() => { const row = new El('div'), bar = new El('div'); bar.className = 'layer-inout-bar'; row.appendChild(bar); return row; });
-  const asked = [], observers = [];
+  const asked = [];
   const session = { readPresentedObjectSession: () => ({}), readLayerCells: async (uid, pin) => { asked.push(uid); assert.equal(pin, info); const a = answers[uid]; return typeof a === 'function' ? a() : a; } };
-  const host = { document: doc, FC: 10, state: { currentFrame: 1, waIn: 0, waOut: 4 }, MutationObserver: class { constructor(fn) { observers.push(fn); } observe() {} } };
-  return { host, view: { info, rows, grid }, session, asked, status, observers };
+  const host = { document: doc, FC: 10, state: { appMode: 'anim2d', currentFrame: 1, waIn: 0, waOut: 4 } };
+  return { host, view: { info, rows, grid }, session, asked, status };
 }
 const KEY_HELD = [[0, 1, 'key', 0, true, false], [1, 3, 'held', 0, true, false], [4, 1, 'interpolated', 0, true, false], [5, 1, 'key', 5, false, false]];
 test('each scene row gets one display-only baseline cell per frame, under the bar, with the runs of its own layer', async () => {
@@ -46,7 +47,7 @@ test('a frame-only repaint moves the current cell and starts no read', async () 
 test('a refused read leaves the row blank and is asked again by the next paint; a thrown read is contained', async () => {
   let n = 0; const b = bench({ A: () => (n++ ? KEY_HELD : null), B: () => { throw new Error('refused'); } });
   Grid.paintScene(b.host, b.view, b.session); await turn();
-  assert.equal(b.view.rows[0].nativeCells[0].className, 'fc'); assert.equal(b.status.style.display, '', 'the text stays while a row has no cells');
+  assert.equal(b.view.rows[0].nativeCells[0].className, 'fc'); assert.equal(b.status.style.position, '', 'the text stays while a row has no cells');
   Grid.paintScene(b.host, b.view, b.session); await turn();
   assert.equal(b.view.rows[0].nativeCells[0].className, 'fc kf-full'); assert.deepEqual(b.asked, ['A', 'B', 'A', 'B']);
 });
@@ -55,12 +56,19 @@ test('an answer for rows that were replaced meanwhile is dropped', async () => {
   Grid.paintScene(b.host, b.view, b.session); const cells = b.view.rows[0].nativeCells; b.view.rows = b.view.rows.slice(); release(); await turn(); await turn();
   assert.equal(cells[0].className, 'fc');
 });
-test('the one-line timing text is hidden once every shown row has its cells, and any other message stays visible', async () => {
+test('the timing text leaves the layout once every shown row has its cells and never comes back on a text change (no row shift per frame)', async () => {
   const b = bench({ A: KEY_HELD, B: [] }); Grid.paintScene(b.host, b.view, b.session); await turn();
-  assert.equal(b.status.style.display, 'none'); assert.equal(b.observers.length, 1, 'watched once');
-  b.status.textContent = 'Native timing is unavailable.'; b.observers[0](); assert.equal(b.status.style.display, '');
-  b.status.textContent = 'Held — Source frame 1 — Content'; b.observers[0](); assert.equal(b.status.style.display, 'none');
-  Grid.paintScene(b.host, b.view, b.session); await turn(); assert.equal(b.observers.length, 1);
+  assert.equal(b.status.style.position, 'absolute'); assert.equal(b.status.style.width, '1px'); assert.equal(b.status.style.display, undefined, 'kept for assistive technology, not display:none');
+  b.status.textContent = 'Native timing is unavailable.'; b.host.state.currentFrame = 2; Grid.paintScene(b.host, b.view, b.session); await turn();
+  assert.equal(b.status.style.position, 'absolute', 'the per-frame blanking of the text does not bring the line back');
+});
+test('Motion rows carry no frame cells: none are painted there, and those painted before the switch are removed and come back in a drawing mode', async () => {
+  const b = bench({ A: KEY_HELD, B: [] }); b.host.state.appMode = 'motion'; assert.equal(Grid.paintScene(b.host, b.view, b.session), true); await turn();
+  assert.equal(b.view.rows[0].children.length, 1); assert.deepEqual(b.asked, []);
+  b.host.state.appMode = 'anim2d'; Grid.paintScene(b.host, b.view, b.session); await turn(); assert.equal(b.view.rows[0].children.length, 7); assert.equal(b.status.style.position, 'absolute');
+  b.host.state.appMode = 'motion'; Grid.paintScene(b.host, b.view, b.session); await turn();
+  assert.equal(b.view.rows[0].children.length, 1); assert.equal(b.view.rows[0].children[0].className, 'layer-inout-bar'); assert.equal(b.status.style.position, '', 'the text is the display again');
+  b.host.state.appMode = 'anim2d'; Grid.paintScene(b.host, b.view, b.session); await turn(); assert.equal(b.view.rows[0].nativeCells[0].className, 'fc kf-full');
 });
 test('a busy native queue is waited for through the shared presentation wait before the read', async () => {
   const b = bench({ A: KEY_HELD, B: [] }); let shown = null, waits = 0; b.session.readPresentedObjectSession = () => shown;

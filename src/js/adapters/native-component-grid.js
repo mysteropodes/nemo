@@ -131,21 +131,24 @@
   // `view` is the range grid's own state (native-layer-range-desktop.js: rows, info, frame), `session` the project session. Display only: the cells
   // take no pointer events, so the frame header, the in/out bars and the property keys keep every gesture they own. The runs are a function of the
   // revision alone, so they are read once per painted row set and a frame-only repaint just moves the .cur cell. A refused read leaves the row blank.
-  var TIMING_TEXT = /^(Key|Sample|Held|Unexposed) — /, watched = typeof WeakSet === 'function' ? new WeakSet() : null;
-  function sceneStatus(host, grid, shown) {
-    // The one-line "Key — Source frame 1 — Content" text describes what the cells now show; a refusal or any other message stays visible.
+  // The one-line timing text ("Key — Source frame 1 — Content", blanked to "unavailable" at the start of every frame's read) describes what the
+  // cells show. While every shown row has its cells it is kept for assistive technology but taken out of the layout (never toggled per text
+  // change: it sits above the rows, so showing it for the time of a read would shift the grid against the layer list, CLAUDE.md section 11).
+  var OFFSCREEN = { position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap' };
+  function sceneStatus(grid, covered) {
     var status = grid && grid.querySelector ? grid.querySelector('.native-object-timing-unavailable') : null;
-    if (!status) return;
-    var apply = function () { status.style.display = shown() && TIMING_TEXT.test(status.textContent || '') ? 'none' : ''; };
-    apply();
-    if (watched && !watched.has(status) && typeof host.MutationObserver === 'function') {
-      watched.add(status); new host.MutationObserver(apply).observe(status, { childList: true, characterData: true, subtree: true });
-    }
+    if (status) Object.keys(OFFSCREEN).forEach(function (key) { status.style[key] = covered ? OFFSCREEN[key] : ''; });
   }
+  function sceneCovered(rows) { return rows.length > 0 && rows.every(function (r) { return r.hidden || r.nativeRuns === true; }); }
   function paintScene(host, view, session) {
     var info = view && view.info, rows = view && view.rows, s = host.state;
     if (!info || !Array.isArray(rows) || !s || !session || typeof session.readLayerCells !== 'function') return false;
     var frame = s.currentFrame, fc = Number.isFinite(host.FC) && host.FC > 0 ? host.FC : 14;
+    // Motion rows are property lanes (the baseline Motion layer row has no frame cells, layer-inout.js): none there, and any painted before the switch go.
+    if (s.appMode === 'motion') {
+      rows.forEach(function (row) { (row.nativeCells || []).forEach(function (c) { if (c.parentNode === row) row.removeChild(c); }); row.nativeCells = null; row.nativeRuns = false; });
+      sceneStatus(view.grid, false); return true;
+    }
     rows.forEach(function (row, li) {
       var layer = info.layers[li];
       if (!layer) return;
@@ -170,7 +173,7 @@
           row.nativeAsking = false;
           if (!runs || view.info !== info || view.rows !== rows || row.nativeCells !== held) return;
           applyRuns(held, runs); row.nativeRuns = true; if (held[row.nativeCellFrame]) held[row.nativeCellFrame].classList.add('cur');
-          sceneStatus(host, view.grid, function () { return view.rows === rows && rows.every(function (r) { return r.hidden || r.nativeRuns === true; }); });
+          sceneStatus(view.grid, sceneCovered(rows));
         }).catch(function () { row.nativeAsking = false; /* a refused read leaves the row blank */ });
       }
       if (row.nativeCellFrame !== frame) {
@@ -179,7 +182,7 @@
         row.nativeCellFrame = frame;
       }
     });
-    sceneStatus(host, view.grid, function () { return view.rows === rows && rows.every(function (r) { return r.hidden || r.nativeRuns === true; }); });
+    sceneStatus(view.grid, sceneCovered(rows));
     return true;
   }
   return Object.freeze({ paint: paint, applyRuns: applyRuns, framesOf: framesOf, paintScene: paintScene });
