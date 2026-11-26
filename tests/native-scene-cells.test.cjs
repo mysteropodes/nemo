@@ -51,6 +51,13 @@ test('a refused read leaves the row blank and is asked again by the next paint; 
   Grid.paintScene(b.host, b.view, b.session); await turn();
   assert.equal(b.view.rows[0].nativeCells[0].className, 'fc kf-full'); assert.deepEqual(b.asked, ['A', 'B', 'A', 'B']);
 });
+test('a still timeline asks a refused row again on its own, a bounded number of times', async () => {
+  let n = 0; const b = bench({ A: () => (++n < 3 ? null : KEY_HELD), B: [] }), timers = []; b.host.setTimeout = (fn, ms) => { assert.equal(ms, 250); timers.push(fn); };
+  Grid.paintScene(b.host, b.view, b.session); await turn(); assert.equal(timers.length, 1); timers.shift()(); await turn(); timers.shift()(); await turn();
+  assert.equal(b.view.rows[0].nativeCells[0].className, 'fc kf-full'); assert.equal(timers.length, 0); assert.equal(b.status.style.position, 'absolute');
+  const never = bench({ A: null, B: [] }), again = []; never.host.setTimeout = (fn) => again.push(fn); Grid.paintScene(never.host, never.view, never.session); await turn();
+  for (let i = 0; i < 20 && again.length; i++) { again.shift()(); await turn(); } assert.equal(never.asked.filter((u) => u === 'A').length, 9, 'the first ask and eight more');
+});
 test('an answer for rows that were replaced meanwhile is dropped', async () => {
   let release; const gate = new Promise((r) => { release = r; }); const b = bench({ A: () => gate.then(() => KEY_HELD), B: [] });
   Grid.paintScene(b.host, b.view, b.session); const cells = b.view.rows[0].nativeCells; b.view.rows = b.view.rows.slice(); release(); await turn(); await turn();

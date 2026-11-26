@@ -146,7 +146,7 @@
     var frame = s.currentFrame, fc = Number.isFinite(host.FC) && host.FC > 0 ? host.FC : 14;
     // Motion rows are property lanes (the baseline Motion layer row has no frame cells, layer-inout.js): none there, and any painted before the switch go.
     if (s.appMode === 'motion') {
-      rows.forEach(function (row) { (row.nativeCells || []).forEach(function (c) { if (c.parentNode === row) row.removeChild(c); }); row.nativeCells = null; row.nativeRuns = false; });
+      rows.forEach(function (row) { (row.nativeCells || []).forEach(function (c) { if (c.parentNode === row) row.removeChild(c); }); row.nativeCells = null; row.nativeRuns = false; row.nativeAsking = false; /* a read still pending is dropped by its own cells check */ });
       sceneStatus(view.grid, false); return true;
     }
     rows.forEach(function (row, li) {
@@ -171,7 +171,9 @@
         var held = row.nativeCells, W = host.NemoNativePresentationWait, shown = function () { return typeof session.readPresentedObjectSession === 'function' ? session.readPresentedObjectSession() : true; };
         Promise.resolve(W && !shown() ? W.await(host, { read: shown }) : null).then(function () { return session.readLayerCells(layer.layerUid, info); }).then(function (runs) {
           row.nativeAsking = false;
-          if (!runs || view.info !== info || view.rows !== rows || row.nativeCells !== held) return;
+          if (view.info !== info || view.rows !== rows || row.nativeCells !== held) return;
+          // Still refused after the wait (a project just opened, a long repaint): asked again a few times on its own, since a still timeline has no next paint.
+          if (!runs) { row.nativeTries = (row.nativeTries || 0) + 1; if (row.nativeTries <= 8 && typeof host.setTimeout === 'function') host.setTimeout(function () { if (view.rows === rows) paintScene(host, view, session); }, 250); return; }
           applyRuns(held, runs); row.nativeRuns = true; if (held[row.nativeCellFrame]) held[row.nativeCellFrame].classList.add('cur');
           sceneStatus(view.grid, sceneCovered(rows));
         }).catch(function () { row.nativeAsking = false; /* a refused read leaves the row blank */ });
