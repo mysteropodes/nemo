@@ -355,8 +355,8 @@
   // The selected `paths` (they may sit on several layers) as fresh presented paths, one read per layer, in the order given. `complete` is
   // false when a layer lost one of them (the document moved on); null when a layer could not be read at all. `layerUid` and `frame` are
   // those of the first path's layer: the batch route needs one, every step names its own layer. `centres` adds a ribbon's centreline.
-  async function reread(root, paths, centres) {
-    if (!presentedSession(root)) await presentedSettled(root); // a commit's own repaint keeps the queue busy for a few frames: wait (bounded) instead of answering null, on which the callers drop the selection
+  async function reread(root, paths, centres) { for (var n = 0, out = null, W = root.NemoNativePresentationWait; n < 2 && !out; n++) { if (W && !presentedSession(root)) await W.await(root, { read: function () { return presentedSession(root); } }); out = await rereadOnce(root, paths, centres); } return out; } // a commit's own repaint keeps the native queue busy, and can re-present mid-read, for a few frames: the read waits (bounded, whatever revision the commit lands on) and is tried twice instead of answering null, on which the callers drop the selection.
+  async function rereadOnce(root, paths, centres) {
     var groups = [], fresh = [], first = null, complete = true;
     paths.forEach(function (p) {
       var idx = p.data.nativeLayerIndex, g = groups.find(function (x) { return x.idx === idx; });
