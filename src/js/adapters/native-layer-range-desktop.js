@@ -405,7 +405,7 @@
     if(w.node&&w.node.parentNode===grid&&same(w.info,info)&&w.rows.length===info.layers.length){
       w.ports=ports;w.barUiReady=barUiReady;
       if(w.frame!==frame){w.frame=frame;if(s&&typeof s.readLayerRange==='function')w.rows.forEach(function(row,li){if(!row.nativeRange&&row.rangeAsked!==frame)askRange(root,s,w,row,li,info,frame,w.node);});}
-      refreshKeys(root);return;}
+      refreshKeys(root);sceneCells(root,w,s);return;}
     var ownPending=w.capture&&owner(w.capture.info,info)&&info.contentRevision===w.capture.info.contentRevision+1&&!w.down;
     if(!ownPending)cancel(root);
     w.serial++;var ticket=w.serial;w.info=info;w.frame=frame;w.grid=grid;w.ports=ports;w.barUiReady=barUiReady;
@@ -414,10 +414,12 @@
     w.rows=info.layers.map(function(layer,li){var row=root.document.createElement('div');row.className='frow native-layer-range-row';row.dataset.layer=String(li);row.dataset.layerUid=layer.layerUid;
       row.style.position='relative';row.style.height='22px';row.style.width=(info.totalFrames*root.FC)+'px';row.hidden=!!(root.state.hideShy&&layer.shy)||!!(root.NemoNativeLayerListPresenter&&root.NemoNativeLayerListPresenter.hiddenByFolder(info,layer));
       return row;});
-    w.rows.forEach(function(row,li){node.appendChild(row);if(w.barUiReady)w.ports.barUi.buildBar(row,li);});grid.appendChild(node);refreshKeys(root);
+    w.rows.forEach(function(row,li){node.appendChild(row);if(w.barUiReady)w.ports.barUi.buildBar(row,li);});grid.appendChild(node);refreshKeys(root);sceneCells(root,w,s);
     if(!s||typeof s.readLayerRange!=='function')return;
     w.rows.forEach(function(row,li){askRange(root,s,w,row,li,info,frame,node);});
   }
+  // The rows' frame cells (key dot, held span, tween mark), as the baseline grid shows them: native-component-grid.js paintScene, display only.
+  function sceneCells(root,w,s){try{if(root.NemoNativeComponentGrid&&typeof root.NemoNativeComponentGrid.paintScene==='function')root.NemoNativeComponentGrid.paintScene(root,w,s);}catch(error){if(root.console)root.console.warn('Nemo native scene cells failed',error);}}
   function askRange(root,s,w,row,li,info,frame,node){
     var ticket=w.serial;row.rangeAsked=frame;
     Promise.resolve(s.readLayerRange(info.layers[li].layerUid,frame,info)).then(function(result){

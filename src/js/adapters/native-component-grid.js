@@ -127,5 +127,60 @@
     });
     return true;
   }
-  return Object.freeze({ paint: paint, applyRuns: applyRuns, framesOf: framesOf });
+  // The SCENE rows of a native project (baseline timeline.js renderTimeline: one .fc cell per frame with its key dot, held span and tween mark).
+  // `view` is the range grid's own state (native-layer-range-desktop.js: rows, info, frame), `session` the project session. Display only: the cells
+  // take no pointer events, so the frame header, the in/out bars and the property keys keep every gesture they own. The runs are a function of the
+  // revision alone, so they are read once per painted row set and a frame-only repaint just moves the .cur cell. A refused read leaves the row blank.
+  var TIMING_TEXT = /^(Key|Sample|Held|Unexposed) — /, watched = typeof WeakSet === 'function' ? new WeakSet() : null;
+  function sceneStatus(host, grid, shown) {
+    // The one-line "Key — Source frame 1 — Content" text describes what the cells now show; a refusal or any other message stays visible.
+    var status = grid && grid.querySelector ? grid.querySelector('.native-object-timing-unavailable') : null;
+    if (!status) return;
+    var apply = function () { status.style.display = shown() && TIMING_TEXT.test(status.textContent || '') ? 'none' : ''; };
+    apply();
+    if (watched && !watched.has(status) && typeof host.MutationObserver === 'function') {
+      watched.add(status); new host.MutationObserver(apply).observe(status, { childList: true, characterData: true, subtree: true });
+    }
+  }
+  function paintScene(host, view, session) {
+    var info = view && view.info, rows = view && view.rows, s = host.state;
+    if (!info || !Array.isArray(rows) || !s || !session || typeof session.readLayerCells !== 'function') return false;
+    var frame = s.currentFrame, fc = Number.isFinite(host.FC) && host.FC > 0 ? host.FC : 14;
+    rows.forEach(function (row, li) {
+      var layer = info.layers[li];
+      if (!layer) return;
+      if (!row.nativeCells) {
+        var cells = [];
+        for (var fi = 0; fi < info.totalFrames; fi += 1) {
+          var cell = node(host, 'div', 'fc' + (fi < s.waIn || fi > s.waOut ? ' outside-wa' : '')); cell.dataset.frame = String(fi); cell.dataset.layer = String(li);
+          cell.style.position = 'absolute'; cell.style.left = (fi * fc) + 'px'; cell.style.top = '0'; cell.style.width = fc + 'px'; cell.style.height = '100%'; cell.style.pointerEvents = 'none';
+          if (layer.color) cell.style.setProperty('--dot-color', layer.color);
+          cells.push(cell);
+        }
+        row.nativeCells = cells; row.nativeCellFrame = -1;
+        // Under the bar and the key nodes the range grid puts in the row.
+        var first = row.firstChild; cells.forEach(function (c) { row.insertBefore(c, first); });
+      }
+      // Asked until answered: a read refused while the commit's own repaint keeps the native queue busy (null) waits for the presentation
+      // (the shared bounded wait) and, if still refused, is asked again by the next paint.
+      if (row.nativeRuns !== true && row.nativeAsking !== true) {
+        row.nativeAsking = true;
+        var held = row.nativeCells, W = host.NemoNativePresentationWait, shown = function () { return typeof session.readPresentedObjectSession === 'function' ? session.readPresentedObjectSession() : true; };
+        Promise.resolve(W && !shown() ? W.await(host, { read: shown }) : null).then(function () { return session.readLayerCells(layer.layerUid, info); }).then(function (runs) {
+          row.nativeAsking = false;
+          if (!runs || view.info !== info || view.rows !== rows || row.nativeCells !== held) return;
+          applyRuns(held, runs); row.nativeRuns = true; if (held[row.nativeCellFrame]) held[row.nativeCellFrame].classList.add('cur');
+          sceneStatus(host, view.grid, function () { return view.rows === rows && rows.every(function (r) { return r.hidden || r.nativeRuns === true; }); });
+        }).catch(function () { row.nativeAsking = false; /* a refused read leaves the row blank */ });
+      }
+      if (row.nativeCellFrame !== frame) {
+        if (row.nativeCells[row.nativeCellFrame]) row.nativeCells[row.nativeCellFrame].classList.remove('cur');
+        if (row.nativeCells[frame]) row.nativeCells[frame].classList.add('cur');
+        row.nativeCellFrame = frame;
+      }
+    });
+    sceneStatus(host, view.grid, function () { return view.rows === rows && rows.every(function (r) { return r.hidden || r.nativeRuns === true; }); });
+    return true;
+  }
+  return Object.freeze({ paint: paint, applyRuns: applyRuns, framesOf: framesOf, paintScene: paintScene });
 }));
