@@ -117,9 +117,7 @@
       if(ports.freehand)return ports.dictionary(t.samples,t.style);
       var g=ports.geometry(t.tool,t.start[0],t.start[1],end[0],end[1]);
       var out=Object.assign({},t.style,{closed:g.closed,segments:g.segments.map(function(s){return {point:s.point.slice(),handleIn:(s.handleIn||[0,0]).slice(),handleOut:(s.handleOut||[0,0]).slice()};})});
-      if(t.tool==='rect')out.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0,box:{x1:Math.min(t.start[0],end[0]),y1:Math.min(t.start[1],end[1]),x2:Math.max(t.start[0],end[0]),y2:Math.max(t.start[1],end[1])}};
-      if(t.tool==='star'){var xs=out.segments.map(function(s){return s.point[0];}),ys=out.segments.map(function(s){return s.point[1];});
-        out.paramShape={kind:'star',pointCount:root.state.starPointCount||5,innerRatio:root.state.starInnerRatio!==undefined?root.state.starInnerRatio:0.5,cornerRadius:0,box:{x1:Math.min.apply(null,xs),y1:Math.min.apply(null,ys),x2:Math.max.apply(null,xs),y2:Math.max.apply(null,ys)}};}
+      if(t.tool==='rect')out.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0,box:{x1:Math.min(t.start[0],end[0]),y1:Math.min(t.start[1],end[1]),x2:Math.max(t.start[0],end[0]),y2:Math.max(t.start[1],end[1])}}; if(t.tool==='star'){var xs=out.segments.map(function(s){return s.point[0];}),ys=out.segments.map(function(s){return s.point[1];});out.paramShape={kind:'star',pointCount:root.state.starPointCount||5,innerRatio:root.state.starInnerRatio!==undefined?root.state.starInnerRatio:0.5,cornerRadius:0,box:{x1:Math.min.apply(null,xs),y1:Math.min.apply(null,ys),x2:Math.max.apply(null,xs),y2:Math.max.apply(null,ys)}};}
       return Paint.shade(out,final);
     }
     // The live preview shows the stroke and, with symmetry on, every copy the commit will create (symmetry-bridge.js onPreview @1065e9d8); a refused symmetry previews only the stroke itself.
